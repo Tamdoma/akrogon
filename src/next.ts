@@ -62,7 +62,7 @@ import { transcriptFor } from './transcript';
 import { checkBase, localBase, trackingRef } from './preflight';
 import { checkLocation } from './guard';
 import { attemptId, applyTop, branchSha, buildStack, isAncestor, memberBase, removeEmptyUntrackedDirs } from './batch';
-import { clearBusyNotices, commandMerged, commitMove, completeOwner, repoNotices } from './phase';
+import { clearBlockedNotices, clearBusyNotices, commandMerged, commitMove, completeOwner, repoNotices } from './phase';
 import { noticeId, noticeState, removeNotice, writeNotice } from './notice';
 import { landAlive, launchLand } from './land';
 import { appendAttempt, readPressure, resolveTools, type PressureSnapshot } from './attempts';
@@ -153,6 +153,8 @@ async function observeBusy(
   now: number,
 ): Promise<{ state: State; notified: boolean }> {
   const id: string = noticeId(repo.name, 'busy', state.slug, seat);
+  if (t.status?.state !== 'blocked' && state.blocked_notified[seat] !== undefined)
+    state = await clearBlockedNotices(repo, path, state, seat);
   if (t.status?.state !== 'working' && t.status?.state !== 'blocked') {
     if (state.busy_since[seat] === undefined && state.busy_notified[seat] === undefined)
       return { state, notified: false };
@@ -164,6 +166,29 @@ async function observeBusy(
     };
     saveState(path, cleared);
     return { state: cleared, notified: false };
+  }
+  if (t.status?.state === 'blocked') {
+    const blocked: string = noticeId(repo.name, 'blocked', state.slug, seat);
+    if (state.blocked_notified[seat] === 'pending') {
+      if (noticeState(await repoNotices(repo), blocked) === 'pending')
+        return { state, notified: false };
+      const shown: State = {
+        ...state,
+        blocked_notified: { ...state.blocked_notified, [seat]: 'shown' },
+      };
+      saveState(path, shown);
+      return { state: shown, notified: false };
+    }
+    if (state.blocked_notified[seat] !== undefined) return { state, notified: false };
+    const kind: string = t.status.kind ?? 'unknown';
+    writeNotice(await repoNotices(repo), blocked, {
+      title: `Blocked leaf: ${state.repo}/${state.slug} seat ${seat} (${kind})`,
+      body: (await screen(t.session, t.address)).split('\n').slice(-40).join('\n'),
+      attention: true,
+    });
+    const recorded: State = { ...state, blocked_notified: { ...state.blocked_notified, [seat]: 'pending' } };
+    saveState(path, recorded);
+    return { state: recorded, notified: true };
   }
   const since: string = state.busy_since[seat] ?? new Date(now).toISOString();
   const observed: State = { ...state, busy_since: { ...state.busy_since, [seat]: since } };
@@ -438,6 +463,7 @@ async function dispatchSlot(
   const seat: Seen | undefined = known === undefined ? undefined : await terminal(place.session, known.address);
   if (seat === undefined || seat.state === 'finished') {
     if (seat !== undefined) await end(place.session, seat.address);
+    await clearBlockedNotices(repo, leaf.path, readState(leaf.path), slot);
     await prepare();
     const started: Started = await startSeat(global, repo, { path: leaf.path, state: recorded }, slot, prompt, place);
     if (started.outcome === 'failed')
