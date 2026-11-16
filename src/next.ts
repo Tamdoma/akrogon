@@ -461,8 +461,7 @@ async function dispatchSlot(
   };
   const known: Seen | undefined = allocation.seats[slot];
   const ref = recorded.seat[slot];
-  // An unlisted or removed recorded terminal is probed once; not_found means gone (a finished
-  // terminal still answers get), any other error still propagates.
+  // A terminal can disappear between discovery and this read.
   const lookup = async (address: string): Promise<Seen | undefined> => {
     try {
       return await terminal(place.session, address);
@@ -471,8 +470,7 @@ async function dispatchSlot(
       throw error;
     }
   };
-  const seat: Seen | undefined =
-    known !== undefined ? await lookup(known.address) : ref === undefined ? undefined : await lookup(ref.address);
+  const seat: Seen | undefined = known === undefined ? undefined : await lookup(known.address);
   if (seat === undefined || seat.state === 'finished') {
     const recordedPrompt = ref === undefined ? undefined : recorded.prompted[slot];
     const silentEnd: boolean =
