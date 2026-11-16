@@ -26,7 +26,7 @@ Akrogon looks for `config.yaml` in its home folder. The home folder is `$AKROGON
 | --- | --- |
 | `max_active` | How many leaves may run at once across all registered repos. When that many are running, akrogon starts no new leaf. Work already running is not stopped. A positive whole number. Default 3. |
 | `slots` | The default seats `a` and `b`. Both are required. Each seat is a `harness`, a `model` and an `effort`. |
-| `harnesses` | Maps a harness name to the command that starts it. `{model}` and `{effort}` in the command are filled from the seat. The command must start with the harness name. Every seat's harness must have an entry here. |
+| `harnesses` | Maps a harness name to the command that starts it. `{model}` and `{effort}` in the command are filled from the seat. The command must start with the harness name. Every seat's harness must have an entry here. For a `claude` line, akrogon merges `permissions.denyInsteadOfPrompting: true` into the line's one `--settings` JSON object or adds it when the line has none. A `claude` line it cannot merge without dropping a setting (a non-object or missing value, a non-object `permissions`, more than one `--settings`, or a `--` token) is refused at launch naming the operand. |
 | `toolkits` | Test toolkit choices per language, for example `<language>: <runner>`. Setup reads them when a repo has no tests. Default empty. |
 | `repos` | Maps a repo name to its checkout folder. A relative path is read from the akrogon home folder, and `~` means your home folder. Default empty. |
 | `prefixes` | Maps a registered repo name to its prefix of two lowercase letters. Optional. No command reads it yet. |
