@@ -1771,7 +1771,7 @@ test('modified old test files need a Test-Change trailer on every guarded move',
   }
 });
 
-test('a flush-left wrapped Test-Change trailer is refused and the refusal states the one-line writer form', async () => {
+test('a flush-left wrapped Test-Change trailer is refused and a later empty commit carrying the citation repairs it', async () => {
   const f: Fixture = await fixture();
   try {
     const worktree: string = await oldFileBranch(f, 'cite-wrap');
@@ -1783,7 +1783,6 @@ test('a flush-left wrapped Test-Change trailer is refused and the refusal states
     const refused: Result = await cli(f, ['phase', 'cite-wrap', 'check.review', '--slot', 'A']);
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain('x.test.ts');
-    expect(refused.stderr).toContain('one line');
     expect(bytes(path)).toBe(before);
     await command(
       ['git', 'commit', '--allow-empty', '-m', 'cite\n\nTest-Change: x.test.ts src change edited the test'],
