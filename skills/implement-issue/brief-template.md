@@ -18,11 +18,13 @@ Concrete paths from the plan, one existing pattern to copy, and this skill folde
 
 ## 4. Change list and needed interfaces
 
-Files and changes, the signatures and data shapes this worker needs, and relevant output from a preceding worker, rather than every interface in the project. For a delegated leaf each brief also records the chunks that must land first, the paths this unit owns, and any shared test resource or consumed output; the records carry the plan's wave values into the sub-brief, and A groups from them only when the plan has no wave grouping.
+Files and changes, the signatures and data shapes this worker needs, and relevant output from a preceding worker, rather than every interface in the project. For a delegated leaf each brief also records the chunks that must land first, the paths this unit owns, any shared test resource or consumed output, and the commit A created the worker worktree at, which A fills in when it creates that worktree at its wave, never when it writes the sub-briefs, because later waves start after earlier cherry-picks; a relaunched worker reads the same brief. The records carry the plan's wave values into the sub-brief, and A groups from them only when the plan has no wave grouping.
 
 ## 5. Do-not, reasons and exceptions
 
 Task-specific exclusions with why each matters and its actual exception, including: return a mismatch with evidence to the plan author instead of changing scope or an interface; the exception is a revised brief from A authorizing that change.
+
+Every brief also carries the standing exclusion: the worker never runs any `git stash` subcommand, because every worktree of a repo shares one stash and a pop can lift a sibling worker's edit; to check behaviour on the base it uses a second worktree of the base instead. A delegated leaf brief adds one replacement for setting work aside: commit it as a WIP commit and, before returning, `git reset --soft <creation commit>` and make the unit's returned commit once, so A's cherry-pick of that one commit carries all the work. A standalone brief carries no reset step.
 
 End this section by restating the reasons and exceptions so they remain attached to the exclusions.
 
