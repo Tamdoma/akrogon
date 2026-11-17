@@ -41,7 +41,7 @@ Only you start it. No phase, chart or command runs it for you. It works on `lear
 - **Stopped.** The mechanism is stopped everywhere it can recur. The line is deleted and `Applied` is appended to its history file.
 - **Checkable.** A command could detect the mechanism as a fixed pattern, and it is still reachable. You get one printed `/seed-issue` line. Nothing is filed.
 - **Removal.** The mechanism is a check, gate or stop that refused valid work, and it is still reachable. You get one printed `/seed-issue` line naming the check to remove. Nothing is filed.
-- **Transfer.** A judgment lesson that one live review step in this repo reaches. The lesson is added to that step, the line is deleted and `Transferred` is appended to its history file.
+- **Transfer.** A judgment lesson a live review step in this repo reaches, or a judgment lesson an installed akrogon step covers (a plan-issue or check-issue step, or a standing-design line those apply). In this repo the lesson is added to that step, the line is deleted and `Transferred` is appended to its history file; an installed step gets no added text, the line is deleted with the installed file cited in history, and a lesson it contradicts or only partly covers is rewritten instead, which counts as a stay.
 - **Stays.** Everything else, such as judgment calls with no fitting step or missing evidence.
 
 It prints the lines grouped by outcome with file:line evidence, then a footer with the counts. All edits stay uncommitted. Then you:
