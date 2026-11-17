@@ -572,9 +572,11 @@ export async function requireTestChangeCitations(
   const cited: Set<string> = await citedPaths(worktree, `${from}..${to}`);
   const missing: string[] = changed.filter((path) => !cited.has(path));
   if (missing.length === 0) return;
-  throw new Error(
-    `Changed test files need a citation:\n${missing.map((path) => `Test-Change: ${path} <source and reason>`).join('\n')}\nAdd each line to the final trailer block of a commit on this branch; a later empty commit may carry it.`,
-  );
+  throw new Error(citationRefusal(missing));
+}
+
+function citationRefusal(missing: string[]): string {
+  return `Changed test files need a citation:\n${missing.map((path) => `Test-Change: ${path} <source and reason>`).join('\n')}\nAdd each citation as one line to the final trailer block, the commit message's last paragraph holding only trailer lines; a later empty commit may carry it.`;
 }
 
 async function treeBlobs(worktree: string, rev: string): Promise<Map<string, string>> {
@@ -635,9 +637,7 @@ export async function requireFrozenCitations(
     if (!cited.has(path)) missing.push(path);
   }
   if (missing.length === 0) return;
-  throw new Error(
-    `Changed test files need a citation:\n${missing.map((path) => `Test-Change: ${path} <source and reason>`).join('\n')}\nAdd each line to the final trailer block of a commit on this branch; a later empty commit may carry it.`,
-  );
+  throw new Error(citationRefusal(missing));
 }
 
 export async function requireNonEmpty(
