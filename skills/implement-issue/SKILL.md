@@ -94,7 +94,7 @@ The prompt `implement-issue direct chart=<chart-folder> worktree=<path>` is the 
 
 Direct implementation follows the Shared context command-output keeping rule with the absolute `<chart>/direct` path as holder: `akrogon run-check --holder <chart>/direct --name <label> -- <cmd>` keeps logs there. A wrong proof command is corrected under the `plan-issue` `plan.synthesis` proof-command rule and the correction is recorded in `<chart>/direct/plan.md`.
 
-Delegation, checking and self-repair work as in Standalone, with A owning the result. A makes no phase call and does not finish: it returns to the door, which sends the result to B for review and back to A for repair rounds under the chart-issues direct route. Direct follows the same order rule: tests from the chart's draft brief first, committed, then code, covering mechanical behavior and a choice's record; the choice is recorded in `<chart>/direct/report.md` and read by B under check-issue's recorded-choice bar.
+Delegation, checking and self-repair work as in Standalone, with A owning the result. A makes no phase call and does not finish: it returns to the door, which sends the result to B for review and back to A for repair rounds under the chart-issues direct route. Direct follows the same order rule: tests from the chart's draft brief first, committed, then code, covering mechanical behavior and a choice's record; the choice is recorded in `<chart>/direct/report.md` and read by B under check-issue's rule that a recorded model choice is a Fix only for a named harm.
 
 ## Printed footer
 
