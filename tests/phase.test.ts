@@ -1771,6 +1771,34 @@ test('modified old test files need a Test-Change trailer on every guarded move',
   }
 });
 
+test('a flush-left wrapped Test-Change trailer is refused and the refusal states the one-line writer form', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const worktree: string = await oldFileBranch(f, 'cite-wrap');
+    const path: string = leaf(f, 'cite-wrap', 'implement', { worktree });
+    const before: string = bytes(path);
+    writeFileSync(resolve(worktree, 'x.test.ts'), 'edited\n');
+    await commitAll(worktree, ['edit test\n\nTest-Change: x.test.ts src change edited\nthe test']);
+    await verified(f, 'cite-wrap', 'leaf');
+    const refused: Result = await cli(f, ['phase', 'cite-wrap', 'check.review', '--slot', 'A']);
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain('x.test.ts');
+    expect(refused.stderr).toContain('one line');
+    expect(bytes(path)).toBe(before);
+    await command(
+      ['git', 'commit', '--allow-empty', '-m', 'cite\n\nTest-Change: x.test.ts src change edited the test'],
+      worktree,
+    );
+    await verified(f, 'cite-wrap', 'leaf');
+    const moved: Result = await cli(f, ['phase', 'cite-wrap', 'check.review', '--slot', 'A']);
+    expect(moved.code).toBe(0);
+    expect(moved.stdout).toBe('moved check.review');
+    expect(readState(path).phase).toBe('check.review');
+  } finally {
+    f.clean();
+  }
+});
+
 test('deleted and typechanged old test files need one trailer each naming the file', async () => {
   const f: Fixture = await fixture();
   try {
