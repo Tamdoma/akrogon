@@ -2,7 +2,7 @@
 
 Some findings matter beyond the leaf that found them. A seat writes such a finding as a lesson, so later charting and planning can check it. You clear lessons that no longer apply with `/learn-issues`.
 
-![Lessons flow: a reusable finding becomes one line in LESSONS.md plus a history file, and learn-issues sorts each active line as stopped, checkable, transfer or stays](../pictures/lessons-flow.svg)
+![Lessons flow: a reusable finding becomes one line in LESSONS.md plus a history file, and learn-issues sorts each active line as stopped, checkable, removal, transfer or stays](../pictures/lessons-flow.svg)
 
 ## What a lesson is
 
@@ -39,6 +39,7 @@ Only you start it. No phase, chart or command runs it for you. It works on `lear
 
 - **Stopped.** The mechanism is stopped everywhere it can recur. The line is deleted and `Applied` is appended to its history file.
 - **Checkable.** A command could detect the mechanism as a fixed pattern, and it is still reachable. You get one printed `/seed-issue` line. Nothing is filed.
+- **Removal.** The mechanism is a check, gate or stop that refused valid work, and it is still reachable. You get one printed `/seed-issue` line naming the check to remove. Nothing is filed.
 - **Transfer.** A judgment lesson that one live review step in this repo reaches. The lesson is added to that step, the line is deleted and `Transferred` is appended to its history file.
 - **Stays.** Everything else, such as judgment calls with no fitting step or missing evidence.
 

@@ -50,7 +50,7 @@ Chart consultants are different from seats A and B. A consultant is an hc termin
 
 - **Result:** one GitHub issue that records an observation as unverified intake. It goes to the repository named by `issues_repo` in the root `akrogon.yaml`, else to the GitHub `origin`. When the failure names a path that belongs to akrogon, it goes to akrogon's own issue destination.
 - **When to use:** you saw something wrong and want it filed for later charting. It needs only an authenticated `gh`, with no install, registration or leaf.
-- **Who starts it:** you. A seat that writes a checkable lesson also runs it, following the lesson rule.
+- **Who starts it:** you. A seat that writes a checkable lesson, or a lesson about a check that refused valid work, also runs it, following the lesson rule.
 - **Source:** [`skills/seed-issue/SKILL.md`](../../skills/seed-issue/SKILL.md)
 
 ## broadcast-issue
@@ -76,7 +76,7 @@ Chart consultants are different from seats A and B. A consultant is an hc termin
 
 ## learn-issues
 
-- **Result:** each active lesson in `learnings/LESSONS.md` sorted as stopped, checkable, transfer or stays. Stopped lines are removed, transfers are prepared for your approval, and checkable ones get a printed `/seed-issue` line you can choose to run. All edits stay uncommitted for you to review.
+- **Result:** each active lesson in `learnings/LESSONS.md` sorted as stopped, checkable, removal, transfer or stays. Stopped lines are removed, transfers are prepared for your approval, and checkable ones get a printed `/seed-issue` line you can choose to run. A removal is a check that refused valid work, and it gets a printed `/seed-issue` line naming that check for removal. All edits stay uncommitted for you to review.
 - **When to use:** the lesson list has grown and you want to clear what no longer applies.
 - **Who starts it:** you. It is operator-invoked only.
 - **Source:** [`skills/learn-issues/SKILL.md`](../../skills/learn-issues/SKILL.md)

@@ -13,7 +13,7 @@
 - `skills/implement-issue/SKILL.md` runs implementation and repair passes.
 - `skills/implement-issue/worker-protocol.md` defines worker scope and returns.
 - `skills/check-issue/SKILL.md` defines review evidence and Fix/Nit verdicts.
-- `skills/learn-issues/SKILL.md` triages active lessons not yet retired by a leaf: removes stopped lines, prepares operator-approved transfers, prints seed lines for checkable ones.
+- `skills/learn-issues/SKILL.md` triages active lessons not yet retired by a leaf: removes stopped lines, prepares operator-approved transfers, prints seed lines for checkable ones and for removal of a check that refused valid work.
 - `skills/lesson-rule.md` holds the shared rule every lesson write site follows; a file shared by several skills is reached through a link file inside each skill folder, never through `../`.
 - `skills/lifecycle-rules.md` holds once the rules plan-issue, implement-issue, check-issue and merge-issue share: grant reuse and count lines, `.env` handling and the producer key save, kept command output, and the red-check judgment; each skill reaches it through a `lifecycle-rules.md` link inside its own folder and names its own record file, command forms and seat-only clauses beside the link.
 - `skills/mine-issues/SKILL.md` mines the work since the last extraction, or an operator-named window, into post materials and a source list under the state home's `materials/<repository>/`, removing only the client's identity; operator-invoked, it writes no post and edits no repository.
