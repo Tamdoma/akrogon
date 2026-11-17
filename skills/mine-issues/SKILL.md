@@ -46,8 +46,12 @@ A story needs a turn: something that went differently from what a competent pers
 - A correction from the operator: the person said no, and the work changed.
 - A method: how a hard thing was done cheaply or reliably, with what it cost.
 - A default refused: the tool, model or usual practice had an out-of-the-box answer, and the work chose differently for a stated reason.
+- A fact about the outside world: how a platform, vendor, data source or market actually behaves, found by measuring, most of all when it contradicts its documentation or what the industry assumes.
+- The idea behind the approach: the model of the problem the work is built on, stated plainly, such as deriving the ideal from what the successful examples share.
 
 Three tests then apply. Insight: the item changes how a reader should think about this kind of work, beyond the one fix. Only here: at least one detail could come from no other team's work. Checkable: its facts have sources. An item failing any of them is dropped, along with routine progress, anything true of AI work in general, and any story an earlier materials file already delivered unless the window adds a new number or a new turn. Read the earlier files' story labels for that check.
+
+Background counts. When the window's work runs on a decision, measurement or finding made before the window, follow the citation from the window's records to where it was made and mine it as a story marked `background`, unless an earlier materials file already delivered it. A method used all day is often the most valuable story and was decided on another day.
 
 There is no cap on stories. Order them by business stake, and when unsure whether an item is material, keep it. A window with no turn returns no stories and says so; never pad. Dropped items are listed in one line each with the reason, so the operator can overrule.
 
@@ -81,7 +85,7 @@ Each story is a block of plain fragments, not prose. Give every number, phrase a
 
 A field with nothing true to put in it is written `none`, never filled. `Stake`, `Default`, `How`, `Why`, `Insight` and `Rule` are required: a story without them is not a story. `Insight` is the part a reader keeps after forgetting the numbers. Each part of it rests on a fact id, and a principle the facts do not show is not written. Vendors, tools and model makers are named, with their real prices.
 
-The file opens with a header: the window and scope, one plain line on what was at stake across it, the story ids in snag-after-snag order, the insights that run across several stories with their story ids, the dropped items, and an `Operator checks` list of every fact whose status is not `true now`.
+The file opens with a header: the window and scope, one plain line on what was at stake across it, the story ids in snag-after-snag order, the insights that run across several stories with their story ids, the nuggets (one line each: the fact or idea a reader would repeat to a colleague, with its story id), the dropped items, and an `Operator checks` list of every fact whose status is not `true now`.
 
 ## Truth
 
