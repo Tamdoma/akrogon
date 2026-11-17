@@ -145,6 +145,17 @@ test('README, docs and skill links resolve to files and anchors', () => {
   expect(broken).toEqual([]);
 });
 
+test('lesson-rule files stay symlinks to the shared rule', () => {
+  const rows: string[] = Bun.spawnSync(['git', 'ls-files', '-s', '--', 'skills/*/lesson-rule.md'], {
+    cwd: repoRoot,
+  })
+    .stdout.toString()
+    .split('\n')
+    .filter((line) => line !== '');
+  expect(rows.length).toBe(5);
+  for (const row of rows) expect(row).toMatch(/^120000 /);
+});
+
 test('lesson write sites link the shared lesson rule', () => {
   const root: string = resolve(import.meta.dir, '..');
   const writeSites: string[] = [
