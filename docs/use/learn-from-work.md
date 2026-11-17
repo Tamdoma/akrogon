@@ -17,6 +17,7 @@ Every write follows the [lesson rule](../../skills/lesson-rule.md):
 
 - A lesson with the same failure cause and scope as an active line adds its case to that line's history file instead of a new line.
 - A lesson a command could detect as a fixed pattern gets a `/seed-issue` report, and the report URL goes in its history file.
+- A lesson about a check, gate or stop that refused valid work gets a `/seed-issue` report asking to remove that check.
 - A lesson about akrogon's own skills or command is written into akrogon's `learnings/`.
 
 ## How a line leaves
