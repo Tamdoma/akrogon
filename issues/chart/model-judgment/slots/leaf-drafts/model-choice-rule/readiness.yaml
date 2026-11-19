@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: existing link and readiness-example checks
+    command: bun test tests/docs-links.test.ts tests/chart-shapes.test.ts
+    identity: local operator checkout, no credentials
+    target: /home/ivan/Work/infra/akrogon at main 7cecb045
+    version: bun 1.4.4
+    date: '2026-11-17'
+    result: 14 pass, 0 fail
+    cleanup: none needed (read-only)
+    limits: proves both checkers run and pass on today's text; does not prove they accept the leaf's edited files, which is criterion 4's own proof
+    record: issues/chart/model-judgment/forks/split-proof.md

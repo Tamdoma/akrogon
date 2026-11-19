@@ -1,0 +1,19 @@
+opened: '2026-11-16T19:59:30Z'
+seats:
+  - seat: A
+    address: t126
+    name: null
+    recipe:
+      harness: claude
+    session: /home/ivan/.claude/projects/-home-ivan-Work-infra-akrogon/271637a5-a28b-4344-8742-b9d8c30081d3.jsonl
+  - seat: B
+    address: t1z9
+    name: ak-slot-b
+    recipe:
+      harness: codex
+      model: gpt-6.1-sol
+      effort: high
+    session: /home/ivan/.codex/sessions/2026/11/16/rollout-2026-11-16T21-01-20-01a1e5f3-29cb-7ac3-bd79-74132ac78e95.jsonl
+spans:
+  - from: '2026-11-16T19:59:30Z'
+    to: '2026-11-16T20:23:28Z'

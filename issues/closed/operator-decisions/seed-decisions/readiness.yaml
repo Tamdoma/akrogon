@@ -1,0 +1,70 @@
+inputs: []
+produces: []
+grants:
+  - approved:
+      by: operator
+      date: '2026-11-19'
+      answer: "4a (seed-writer round: one throwaway create, edit, read-back and delete cycle in tamdoma-framework)"
+    principal: door seat A (claude, terminal t126)
+    account: ivanjuras (GitHub, admin on Tamdoma/tamdoma-framework)
+    credential:
+      name: gh keyring login
+      holder: operator machine gh config
+    targets: [Tamdoma/tamdoma-framework]
+    fixtures:
+      - account: ivanjuras
+        purpose: prove the seed-issue edit route on a real issue
+        marker: title "[akrogon probe] delete me"
+        naming: "[akrogon probe] delete me"
+        count: 1
+        cleanup:
+          - step: gh issue delete <n> -R Tamdoma/tamdoma-framework --yes
+            identity: ivanjuras
+        absence_check: gh issue view <n> -R Tamdoma/tamdoma-framework fails with "Could not resolve"
+    operations: [gh issue create, gh issue view, gh issue edit --body-file, gh api graphql (issue author and userContentEdits read), gh issue delete]
+    effects: one private issue created and deleted; possible watcher notification; no other issue touched
+    bounds: at most 2 create/edit/delete cycles, counting every cycle that creates an issue; 1 used at charting (Tamdoma/tamdoma-framework#717, deleted and absent)
+    stop_line: the leaf runs none of these operations; never edit or delete any other issue
+    expires: '2026-11-19, at charting (spent; grants the leaf nothing)'
+retained: []
+proofs:
+  - operation: issue author and body-editor read
+    command: "gh api graphql -f query='{repository(owner:\"Tamdoma\",name:\"tamdoma-framework\"){issue(number:714){author{login} userContentEdits(first:50){totalCount nodes{editor{login} editedAt}}}}}'"
+    identity: ivanjuras (gh keyring)
+    target: Tamdoma/tamdoma-framework#714 (private); Tamdoma/akrogon#144 (public) via gh issue view --json author
+    version: gh 2.104.0
+    date: '2026-11-19'
+    result: "#714: one author, 5 edits, all by the author; #144: same author, 0 edits"
+    cleanup: none (read only)
+    limits: "proves the logins are readable in one call; not that the person at the account is the operator; comments not covered"
+    record: issues/chart/operator-decisions/forks/marker.md
+  - operation: per-login repository permission read
+    command: "gh api repos/Tamdoma/akrogon/collaborators/<login>/permission --jq '{permission,role_name}'"
+    identity: ivanjuras (admin)
+    target: Tamdoma/akrogon (public), Tamdoma/tamdoma-framework (private)
+    version: gh 2.104.0
+    date: '2026-11-19'
+    result: "one admin, one write-level and one read-level (outsider) login read as expected on akrogon; admin on tamdoma-framework"
+    cleanup: none (read only)
+    limits: "proven only with an admin caller; a write-level caller and the Moderate role mapping are unobserved; org team grants not tried"
+    record: issues/chart/operator-decisions/forks/marker.md
+  - operation: seed-issue edit route (read, insert, whole-body write, read-back, lastEditedAt)
+    command: "gh issue create -R Tamdoma/tamdoma-framework --title \"[akrogon probe] delete me\" --body-file -; gh issue view 717 --json body; gh issue edit 717 -R Tamdoma/tamdoma-framework --body-file -; gh issue view 717 --json body; gh api graphql lastEditedAt; gh issue delete 717 --yes"
+    identity: ivanjuras (admin)
+    target: Tamdoma/tamdoma-framework#717 (throwaway)
+    version: gh 2.104.0
+    date: '2026-11-19'
+    result: "section landed after Unverified intake., rest unchanged; read-back differed by one trailing newline; lastEditedAt 2026-11-18T23:24:25Z, 2 edits by ivanjuras"
+    cleanup: "deleted; gh issue view 717 could not resolve (absent)"
+    limits: "admin caller on a private repo only; no concurrent edit, no public repo"
+    record: issues/chart/operator-decisions/forks/seed-writer.md
+  - operation: taken-fork count reads a filled Taken section
+    command: akrogon status --charts
+    identity: local operator checkout, no credentials
+    target: /home/ivan/Work/infra/akrogon at main 5efc625d, chart operator-decisions
+    version: akrogon release 5efc625d
+    date: '2026-11-19'
+    result: "operator-decisions 6/6 taken"
+    cleanup: none needed
+    limits: "proves chartRow counts non-blank Taken text; an empty Taken followed by another section is also counted (recorded-only bug)"
+    record: issues/chart/operator-decisions/CHART.md

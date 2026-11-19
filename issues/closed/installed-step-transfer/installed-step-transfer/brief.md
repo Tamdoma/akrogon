@@ -1,0 +1,18 @@
+# Brief: installed-step-transfer
+
+## What
+
+Widen the lesson rule's Transfer so a judgment lesson may also transfer to an installed akrogon step: a plan-issue or check-issue step, or a standing-design line those apply, reached on the leaf path where the lesson's case happened. When that step already states the lesson's rule, the pass adds nothing at the step, deletes the line and appends `Transferred <YYYY-MM-DD> to <installed akrogon file> § <section> "<line's opening words>" at release <sha>, approved by <who>` to its history file, classified by where the step's file resolves (`realpath`): inside the consumer's registered repo it is that repo's own step and uses today's same-repo Transfer; outside it, it is an installed akrogon step, cited with the release sha when it resolves under `<akrogon home>/releases/<sha>/` (`AKROGON_HOME`, else `~/.akrogon`), else with that akrogon checkout's git HEAD (B,C). Inside the same Transfer outcome, a lesson the installed step contradicts or only partly covers gets a proposed rewrite of its line in the same uncommitted diff with `<YYYY-MM-DD>: rewritten against <installed citation>, approved by <who>: <reason>` appended to its history file; a kept lesson that recommends a script check on model output with no named one-right-answer source is such a contradiction. A rewritten line counts as "stay" in the printed footer. The existing operator approval of the diff completes both; a decline reverts. "A checkable lesson never transfers", the Sort order and Retire are unchanged.
+
+Owned files: `skills/lesson-rule.md` (Transfer; the five `skills/<skill>/lesson-rule.md` files are tracked symlinks to it and stay symlinks) (B), `skills/learn-issues/SKILL.md` (Sort's Transfer bullet, Apply's Transfer bullet), `docs/use/learn-from-work.md` (Transfer bullet). Prose only; no script, registry, record kind or test.
+
+## Why
+
+A consumer repo's judgment lessons whose rule is now an installed akrogon standing line have no way out of `learnings/LESSONS.md`: Transfer requires a step in the same repo, and Retire requires a mechanical stop (Tamdoma/akrogon#143). The framework holds seven such lines that keep gaining cases, and lessons pointing the other way keep teaching seats both ways.
+
+## Done-criteria
+
+1. Under the new text, a `/learn-issues` sort in the framework checkout would offer each of these framework history cases a Transfer or a rewrite with the installed step cited, or keep it with a stated reason: `2026-09-30-resolver-guidance-prose-tests`, `2026-09-30-offer-analytics-guide-checks`, `2026-10-01-discovery-prose-assertions`, `2026-10-03-prefix-regex-does-not-prove-meaning`, `2026-10-05-analytics-guard-proof`, `2026-10-08-residue-triage-prose-proof-layout`, `2026-10-17-noop-step-commit-proof`, `2026-09-12-injector-and-routes`, `2026-10-29-cross-site-repeat-fix-layer`; and `2026-10-16-stash-shared-across-worker-worktrees` (checkable) still does not transfer. The report walks each case and names the sentence that decides it; judged by the reviewing seat.
+2. The five skill-local lesson-rule.md files are still symlinks to `skills/lesson-rule.md` on the leaf head (git mode 120000), and (B) learn-issues SKILL.md Sort and Apply, the lesson rule and docs/use/learn-from-work.md state the same Transfer.
+3. Links in the changed files resolve on the leaf head (the `test` check). (B,D)
+4. The report states that the framework lines leave only in a later framework `/learn-issues` pass with operator approval (Tamdoma/tamdoma-framework#650), that naming a one-right-answer source in kept lessons' histories stays framework work, and that an orphaned transfer after a later akrogon edit goes undetected.

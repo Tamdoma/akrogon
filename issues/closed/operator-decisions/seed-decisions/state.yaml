@@ -1,0 +1,47 @@
+slug: seed-decisions
+phase: merged
+created: 2026-11-19
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#144"
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: ak79291d8b49262c79e87ad86f49aff8
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t2db
+  B:
+    session: infra
+    address: t2dc
+prompted:
+  B:
+    turn: 3
+    address: t2dc
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-19T00:41:39.727Z
+broadcast:
+  kind: issue
+  name: operator-decisions
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/operator-decisions
+  pushed: f0f853a5974e0214db353ee44d2e846ad2e5c67c
+  sources:
+    - "Tamdoma/akrogon#144"
+frozen:
+  tests/chart-shapes.test.ts: fb17b3b4d9115c69ca8d84672d8b754d212c30f5
+frozen_cited: []

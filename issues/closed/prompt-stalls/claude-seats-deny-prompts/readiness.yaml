@@ -1,0 +1,44 @@
+{
+  "inputs": [],
+  "produces": [],
+  "grants": [],
+  "retained": [],
+  "proofs": [
+    {
+      "operation": "Claude Code honors permissions.denyInsteadOfPrompting from one merged inline --settings object, in a subagent, keeping the object's env",
+      "command": "env ANTHROPIC_BASE_URL=http://127.0.0.1:18747 ANTHROPIC_AUTH_TOKEN=probe-token claude --model haiku --effort low --settings '{\"env\":{\"CLAUDE_CODE_SUBAGENT_MODEL\":\"claude-sonnet-5-5\",\"CLAUDE_CODE_SUBAGENT_MODEL_FORCE\":\"1\"},\"permissions\":{\"denyInsteadOfPrompting\":true}}' --dangerously-skip-permissions --disallowedTools=AskUserQuestion \"probe\", in a throwaway hc terminal from the akrogon root, against a local stub API that makes a general-purpose subagent run the #139-shaped rm -rf $D/$n loop and then echo permitted-after-deny",
+      "identity": "local stub API with a fake token (probe-token); no Anthropic account reached",
+      "target": "interactive Claude Code session and its subagent",
+      "version": "Claude Code 2.1.325, hc 0.1.21",
+      "date": "2026-11-16",
+      "result": "the subagent ran on claude-sonnet-5-5 (env kept); the rm was denied at once with the built-in safety-check text naming the safe rewrite, no prompt shown; the target directories stayed; the next command ran and returned permitted-after-deny",
+      "cleanup": "terminal killed and removed (hc ls --all shows none); stub process stopped (pgrep empty)",
+      "limits": "does not prove the claude.ai login path, a later Claude Code version, the real model choosing the safe rewrite after a denial, or startup dialogs (workspace trust, project MCP approval)",
+      "record": "issues/chart/prompt-stalls/forks/stall-removal.md"
+    },
+    {
+      "operation": "without the setting, the same rm in a subagent waits on a permission prompt with no countdown (the defect)",
+      "command": "env ANTHROPIC_BASE_URL=http://127.0.0.1:18743 ANTHROPIC_AUTH_TOKEN=probe-token claude --model haiku --effort low --dangerously-skip-permissions \"probe\", same stub in subagent mode",
+      "identity": "local stub API with a fake token (probe-token); no Anthropic account reached",
+      "target": "interactive Claude Code session and its subagent",
+      "version": "Claude Code 2.1.325, hc 0.1.21",
+      "date": "2026-11-16",
+      "result": "hc status blocked, kind permission, msg 'approve Bash: <command>'; screen shows 'Bash command, from the general-purpose agent', the dangerous rm text and 'Do you want to proceed?' with no countdown",
+      "cleanup": "terminal killed and removed; stub process stopped",
+      "limits": "observed for this rm shape only; the top-level prompt has a 2-minute auto-deny that this does not show",
+      "record": "issues/chart/prompt-stalls/forks/stall-removal.md"
+    },
+    {
+      "operation": "two --settings flags on the claude command line: the second replaces the first",
+      "command": "the same stub run with --settings carrying the env object, then a second --settings carrying the permissions object; control with the env flag alone",
+      "identity": "local stub API with a fake token (probe-token); no Anthropic account reached",
+      "target": "interactive Claude Code session and its subagent",
+      "version": "Claude Code 2.1.325, hc 0.1.21",
+      "date": "2026-11-16",
+      "result": "with two flags the subagent ran on the main model (env lost); with the env flag alone it ran on claude-sonnet-5-5",
+      "cleanup": "terminals killed and removed; stub processes stopped",
+      "limits": "observed for env only; does not enumerate other keys",
+      "record": "issues/chart/prompt-stalls/forks/stall-removal.md"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: git trailer reading of a wrapped Test-Change citation
+    command: "git log -1 --format=%(trailers:key=Test-Change,valueonly,unfold) on flush-left and space-indented wrapped commits; same on framework 106ac8ce"
+    identity: local operator account, no credentials
+    target: "scratch git repo; framework checkout (read only)"
+    version: git 2.56.1
+    date: '2026-11-17'
+    result: "flush-left wrap printed nothing; indented wrap printed one unfolded value; 106ac8ce printed nothing"
+    cleanup: scratch repo deleted
+    limits: "git 2.56.1 only; does not prove the new message text"
+    record: issues/chart/consumer-lesson-fixes/forks/trailer-message.md
+  - operation: existing citation tests
+    command: "bun test tests/phase.test.ts -t \"Test-Change trailer on every guarded move|frozen record refuses drifted\""
+    identity: local operator checkout, no credentials
+    target: "/home/ivan/Work/infra/akrogon at main 39e203a7"
+    version: bun 1.4.4
+    date: '2026-11-17'
+    result: "2 pass, 0 fail, 39 expect calls (C: the earlier -t citation filter selected other tests)"
+    cleanup: none needed
+    limits: "proves the fixture and both \"final trailer block\" assertions pass today, not the new case"
+    record: issues/chart/consumer-lesson-fixes/forks/trailer-message.md

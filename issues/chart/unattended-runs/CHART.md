@@ -29,6 +29,7 @@ none
 ## Pending steps
 
 - Tamdoma/akrogon#135 stays open as a partial match: claude seats lose the question tool and blocked seats notify at once (epic unattended-runs, issue blocked-seats), while the asked-for watch confirming prompts in tabs is not built by design (signposts 1a, 3a; blocked-prompts Q3). It is in no leaf's `sources`. Close or re-scope it is the operator's call.
+  - 2026-11-16: the operator handed #135 to chart issues/chart/prompt-stalls, which put it in the `sources` of prompt-stalls/claude-seats-deny-prompts.
 
 - Lesson learnings/history/2026-11-15-background-wait-fails-leaf.md (uncommitted on main): no leaf stops it on every path (plain background shell jobs stay unseen), so the line stays; count-silent-turns and refuse-failed-runs each say so.
 

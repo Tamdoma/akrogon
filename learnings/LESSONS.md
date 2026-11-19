@@ -2,6 +2,8 @@
 
 These lessons record what happened, not what is true.
 
+- Nested negative-test output: a child can print FAIL and exit 1 while its parent deliberately asserts that failure and exits 0. Trace the parent command and final result before assigning a merge failure to a suite. 2026-11-18. history/2026-11-18-nested-negative-output.md
+
 One line per lesson: mechanism, date, history file. A line leaves when the leaf that stops its mechanism retires it, when `/learn-issues` removes a stopped line, or when an operator-approved transfer moves a judgment lesson into its review step.
 
 - Review of red-merge repairs must distinguish the recorded aggregate from its permitted narrow reproducer; requiring an aggregate rerun when the implementation skill allows failing test suites adds a false gate. 2026-10-18. history/2026-10-18-aggregate-vs-reproducer-review.md
@@ -53,3 +55,4 @@ One line per lesson: mechanism, date, history file. A line leaves when the leaf 
 - run-check drops kept evidence (2026-11-15): `akrogon run-check` sets the child's `TMPDIR` to its run root (src/run-check.ts:68) and removes it on exit, so a capture's "failure evidence kept at <os.tmpdir() path>" was gone before anyone could read it; keep evidence outside that root (evidence-root flag or `env TMPDIR=` inside the command) for bounded paid runs. History: [case](history/2026-11-15-run-check-tmpdir-drops-kept-evidence.md)
 - paid driver step on model text (2026-11-15): a capture driver that picks input from text the model writes in the same paid run (a plant sentence) failed after 5 paid sessions twice, while the free preflight on old output passed; give such a rule a fallback that cannot come up empty, or let the driver author the input. History: [case](history/2026-11-15-paid-driver-step-on-model-text.md)
 - background wait fails the leaf (2026-11-15): a seat that runs a slow paid capture in the background and ends its turn to wait is re-prompted, and after 3 such turns `src/next.ts:509-515` moves the leaf to `failed` ("ended 3 turns without reporting"); `akrogon run-check` still launched 3 more paid runs for the failed leaf and only logged `phase: failed`. Run slow runs in the foreground. History: [case](history/2026-11-15-background-wait-fails-leaf.md)
+- design names capture tools unchecked (2026-11-17): a leaf design said its fresh model stages run "with existing capture tools" while no driver case ran them (IA `targeted`, a seeded mid-build rerun, write-content prep on spine inputs), so plan.synthesis stopped for new proof machinery; name the driver file and case for each fresh stage at charting, or chart the machinery leaf first. History: [case](history/2026-11-17-design-names-capture-tools-unchecked.md)

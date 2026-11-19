@@ -1,0 +1,47 @@
+slug: trailer-rule-refusal
+phase: merged
+created: 2026-11-17
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#142"
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: ak92f7297caec317d7909dfad76c699e
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t242
+  B:
+    session: infra
+    address: t246
+prompted:
+  B:
+    turn: 3
+    address: t246
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-17T23:09:40.922Z
+broadcast:
+  kind: issue
+  name: trailer-rule-refusal
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/trailer-rule-refusal
+  pushed: 64dbcf933703c0cc0863069048277f85131e4ca3
+  sources:
+    - "Tamdoma/akrogon#142"
+frozen:
+  tests/phase.test.ts: 56b64f0019625923387d89ef3028fc5624aca75d
+frozen_cited: []

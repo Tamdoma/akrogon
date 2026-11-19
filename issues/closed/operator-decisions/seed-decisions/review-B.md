@@ -1,0 +1,50 @@
+# Review B | seed-decisions
+
+Phase `check.review`, 2026-11-19. Base `5efc625d9624a30c7ff09e5ad2073449690a3eca`. Reviewed head `781b720481e506e41a5b7cb44d60d937c1bc75f2`.
+
+Verdict: **fix**.
+
+## Fixes
+
+- **F1. The marker test misses a renamed writer template (C1).** The live writer template is at `skills/seed-issue/SKILL.md:44`. In a disposable copy of the reviewed head I renamed only that heading to `## Settled decision (<name>, <date>)` and ran the planned test. It passed. The prose mention on line 34 still satisfies `tests/chart-shapes.test.ts:75-82`, since the regex stops recognizing the changed heading altogether. An ordinary template rename can ship with a green check and cause decisions written using that template to arrive as plain intake. Require agreement at the actual writer template and reader rule. Evidence: `check review-b-marker-template-rename: 0 implementation/check-review-b-marker-template-rename-1795048544623-2092576.log`.
+- **F2. The reader treats the prefix alone as the whole marker (C3, Marker 1).** The binding design requires the name and date inside the parentheses before the free suffix starts. `skills/chart-issues/SKILL.md:37` makes the free suffix begin immediately after the opening parenthesis, so a decision-like heading with a name but no date qualifies after the account check. The live source is an issue-body edit on a mirrored GitHub report, the same add-to-existing-report route recorded for #714. A malformed marker from an authorized editor would bind its body where Marker 1 requires the opening map to say “marked differently, not taken.” Plan D6 repeats the shortened rule. Keep the shared literal start and state the full binding marker in the reader.
+- **F3. The edit check does not identify when the mirrored body was read (C3, Marker 2).** `skills/chart-issues/SKILL.md:31,37` checks `lastEditedAt` against “the pull” without defining the timestamp. The real pull at `src/pull.ts:62-79` reads pages before writing mirrors and reporting completion. An authorized body replacement through the #714 edit route can land after its page was fetched and before the pull finishes. Comparing against completion or the file's write time accepts the stale decision and binds it even though the edit occurred after the mirrored version was read. Tie the cutoff to a timestamp captured before the pull reads the bodies, and apply it again on the retry. The readiness record for #717 confirms that a replacement updates `lastEditedAt`. This is the door's stale-read window, separate from the accepted whole-body write limitation in seed-issue.
+- **F4. The seed docs describe filing checks as mandatory for direct edits (C4).** `docs/reference/skills.md:51` applies repository routing to the newly documented edit outcome. `docs/use/report-an-observation.md:20-25` presents inspection, routing and lookups as required and describes editing only after a covering report is found. A user following the #714 workflow by naming an open report takes the direct edit route in `skills/seed-issue/SKILL.md:94,104`, on the named repository with none of those steps. The reference points the user to the wrong target for a named report in another repository. Qualify routing and lookups as filing steps and document the named-report route in the existing pages.
+
+## Criteria and evidence
+
+- C1. The report's case-only deliberate break is red in `implementation/check-marker-deliberate-break-1795048207807-1300921.log`. Restoring the heading is green in `implementation/check-marker-agreement-1795048207962-1301493.log`. F1 shows the proof misses a change to the writer's actual heading. The planned command and runner remain intact.
+- C2. Read cases (a) through (c) against the writer. A settled prior decision goes below `Unverified intake.` with the git name and date, and is acknowledged without text. The tentative suggestion creates no section. The named open report takes the read, insert, whole-body write and read-back route. The ban on the agent's own fixes and the lifecycle and lesson exclusions remain.
+- C3. The plan's valid example produces one first-listed taken fork, including the section, label and permission record. The #144 body in chart intake contains a mention in a sentence and creates no fork. The “one exception” and “operator answer” lines still read consistently because a counting seed section is now an operator answer. Checked conflict handling, later sections, held disagreements and leaf carry against the binding decisions. F2 and F3 are additional concrete failures of the reader rule.
+- C4. Read the affected human docs and followed the reference index and relevant area pointers. The old fix ban, every-fork language and six-section list are qualified. F4 remains. No new docs page or changed AREA.md.
+- C5. Read the green docs-links log `implementation/check-lane-after-u3-1795048207673-1300696.log` (13 passed) and final configured test log `implementation/check-test-1795048444598-1827968.log` (1,227 passed). The final setup, format and typecheck also passed. No changes to the runner, lockfile or link test. The initial full suite's hc dispatch failure was outside the diff and marked inconsistent after the identical retry passed. The subsequent full verify was green on this head.
+- Grants. This pass made no covered calls. The charting grant expired before the leaf. All 26 completed check entries for the leaf match kept logs, with no unmatched starts.
+
+## Test-Change trailers
+
+`c07722ff` has the only trailer in `origin/main..HEAD`: `Test-Change: tests/chart-shapes.test.ts adds the operator decision marker agreement case for done-criterion 1; no existing expectation changed`. The path matches `src/test-files.ts` and the diff only adds the case. Done-criterion 1 is the right source for the test. F1 concerns what the new assertion actually covers.
+
+## check.repair | 2026-11-19
+
+Reviewed head `781b720481e506e41a5b7cb44d60d937c1bc75f2`. B's repair head is `9b3e62e33c764fa26db94cb205df6a015dd9def7`. A's review listed no Fixes.
+
+- **F2** repaired in `382e2e76`. Before, the chart rule made the line free immediately after `## Operator decision (`. It now requires the name and the `YYYY-MM-DD` date before the closing parenthesis, then allows a suffix. C3 case (d) still produces one taken fork, #144's prose mention still produces none, and a heading with a name but no date is reported as marked differently.
+- **F3** repaired in `7acba8f1`. Before, the rule compared `lastEditedAt` with an undefined pull time. It now records UTC immediately before each pull, refreshes the cutoff on the retry, and treats a matching timestamp as ambiguous at GitHub's precision. An edit between the issue page fetch and the end of the pull now triggers the retry instead of binding the stale mirror. The plan's no-edit case still counts, and the previously recorded #717 proof supplies the edit-time evidence.
+- **F4** repaired in `9b3e62e3`. Before, the reference applied filing destination rules to both outcomes and the guide only described edits after filing lookups. Now both pages explain that a named open report is edited in its own repository. The guide places the direct edit before the filing steps and describes checking the written body.
+
+On B's committed head, the planned marker check passed its existing case (`check marker-agreement: 0 implementation/check-marker-agreement-1795048709473-2102721.log`). The planned link check passed all 13 tests (`check docs-links: 0 implementation/check-docs-links-1795048709461-2102719.log`). C3 and C4 were reread against the plan and the three repairs. The worktree is clean. No covered operations ran.
+
+### Handed to A
+
+- **F1 (C1).** Correct the existing assertion in `tests/chart-shapes.test.ts`, which the repair rule assigns to A. Use the existing planned Bun test to verify that renaming only the actual seed writer template fails even while the exact prose mention remains, then restore it and run the same test green. The review log above gives the previously missed case.
+
+## check.review re-check | 2026-11-19
+
+Base `5efc625d9624a30c7ff09e5ad2073449690a3eca`. Prior reviewed head `781b720481e506e41a5b7cb44d60d937c1bc75f2`. B's repair head `9b3e62e33c764fa26db94cb205df6a015dd9def7`. Reviewed head `f0f853a5974e0214db353ee44d2e846ad2e5c67c`. The base did not move. Reviewed the repair diff only.
+
+- F1 is resolved. The assertion now requires the literal at the start of a seed-issue heading line, so a surviving prose mention cannot cover a renamed writer template. The previous checks still require both skills to use the same literal. The planned focused command failed on the original rename at the new assertion (`implementation/check-f1-template-rename-red-1795048769635-2107071.log`) and on the case-only break (`implementation/check-f1-case-break-red-1795048769767-2107239.log`). It passed with the correct template (`implementation/check-f1-corrected-green-1795048769495-2106933.log`), and the restored file passed all three cases (`implementation/check-f1-restored-green-1795048769933-2107388.log`). No proof command changed.
+- F2–F4 remain resolved. A's repair changes only the marker test. The full marker, pull-start check and named-edit docs match the repair entry above. No new doc claim or changed AREA.md in A's repair.
+- Trailers in `origin/main..HEAD`. The initial `c07722ff` trailer still cites C1. The new `f0f853a5` trailer names the matched path `tests/chart-shapes.test.ts` and correctly cites the F1 log showing the missed rename. No existing behavior assertion was dropped.
+- Current-head `akrogon verify` passed setup, format and typecheck. The final test log `implementation/check-test-1795048838543-2108046.log` shows the repaired marker case, the documentation link test and 1,227 passing tests. All 37 check starts for the leaf have a completion and matching kept log. No covered operation ran. No live door run was part of this leaf's proof.
+
+Verdict: **ready**. All four findings are resolved and the repair introduced no blocking finding.

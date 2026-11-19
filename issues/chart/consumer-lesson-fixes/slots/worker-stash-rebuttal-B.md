@@ -1,0 +1,3 @@
+Pick 1a + 2b after the run-check probe. A clone fixes the swap but breaks a required worker command. My original probe used a normal local clone, not `--shared`; that distinction does not fix checkout identity. The report covers delegated workers. Keep A’s existing refresh rule rather than declaring a new ban in every leaf or telling standalone workers to make WIP commits on a detached HEAD they do not have.
+
+“The rule reaches every harness” is supportable; “the swap is stopped” is not. The proof should read a worker-facing brief for the safe return: fold any WIP into the returned commit so A can cherry-pick that commit alone.

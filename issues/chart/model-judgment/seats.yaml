@@ -1,0 +1,27 @@
+opened: '2026-11-17T11:05:39Z'
+seats:
+  - seat: A
+    address: t126
+    name: null
+    recipe:
+      harness: claude
+    session: /home/ivan/.claude/projects/-home-ivan-Work-infra-akrogon/6f5a1336-78ad-4830-8698-bc0b8b6b4223.jsonl
+  - seat: B
+    address: t217
+    name: ak-slot-b
+    recipe:
+      harness: claude
+      model: claude-fable-5-2
+      effort: high
+    session: /home/ivan/.claude/projects/-home-ivan-Work-infra-akrogon/59fe5ab4-72f5-4ce4-ab36-2cc2a094145a.jsonl
+  - seat: C
+    address: t218
+    name: ak-slot-c
+    recipe:
+      harness: pi
+      model: muse-wonder-full-1.0-contributor
+      effort: high
+    session: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon--/2026-11-17T11-06-42-159Z_93f66d7d-eb86-4623-8cfc-64fb3c2d1b54.jsonl
+spans:
+  - from: '2026-11-17T11:05:39Z'
+    to: '2026-11-17T11:30:33Z'

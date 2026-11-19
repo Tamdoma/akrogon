@@ -1,0 +1,19 @@
+opened: '2026-11-18T22:40:46Z'
+seats:
+  - seat: A
+    address: t126
+    name: null
+    recipe:
+      harness: claude
+    session: /home/ivan/.claude/projects/-home-ivan-Work-infra-akrogon/48f33098-9add-4352-b6e7-36b108a68792.jsonl
+  - seat: B
+    address: t2d3
+    name: ak-slot-b
+    recipe:
+      harness: claude
+      model: claude-fable-5-2
+      effort: high
+    session: /home/ivan/.claude/projects/-home-ivan-Work-infra-akrogon/7d4fc911-b197-4973-b69f-39945842e341.jsonl
+spans:
+  - from: '2026-11-18T22:40:46Z'
+    to: '2026-11-19T00:20:10Z'

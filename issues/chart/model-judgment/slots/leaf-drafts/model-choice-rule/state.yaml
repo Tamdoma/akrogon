@@ -1,0 +1,7 @@
+slug: model-choice-rule
+phase: plan.synthesis
+created: '2026-11-17'
+repo: akrogon
+blocked-by: []
+sources:
+  - Tamdoma/akrogon#140

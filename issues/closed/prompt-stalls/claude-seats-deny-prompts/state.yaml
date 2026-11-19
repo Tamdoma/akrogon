@@ -1,0 +1,49 @@
+slug: claude-seats-deny-prompts
+phase: merged
+created: 2026-11-16
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#135"
+  - "Tamdoma/akrogon#139"
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak1427be2381e4f80ebb81a3e6726331
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t1zk
+  B:
+    session: infra
+    address: t1zn
+prompted:
+  B:
+    turn: 1
+    address: t1zn
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-16T20:47:31.394Z
+broadcast:
+  kind: issue
+  name: prompt-stalls
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/prompt-stalls
+  pushed: 994e2f997c3728e5b2381b81566a618f80140c01
+  sources:
+    - "Tamdoma/akrogon#135"
+    - "Tamdoma/akrogon#139"
+frozen:
+  tests/seat.test.ts: 7a8c68b2a2afbc8c8bc4914fb9cb64861c5f2164
+frozen_cited: []

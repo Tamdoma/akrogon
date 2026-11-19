@@ -1,0 +1,3 @@
+Pick 1a and 5a. Q4 should use the existing Transferred entry for complete supersession, not introduce an unnamed third history format for deleting a line. A partial rewrite keeps its case and says which specific local duty remains. Neither is Applied. If the operator declines, the active advice stays unchanged.
+
+Q5 needs a decision for a missing source, not just a field to fill. A history of failures does not justify a new hard check. If no one-right-answer source can be named, do not keep recommending the check as written; propose a judgment-only rewrite and preserve the evidence. This matters for the repeat-detection example: equality is decidable, but whether a repeat must block needs its own source.

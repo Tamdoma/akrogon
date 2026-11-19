@@ -1,0 +1,7 @@
+# Nested negative-test output
+
+Case: framework leaf `bun-test-exit-cleanup`, merge attempt `970d8f58-db5e-45b5-ab9f-a9be1011c23e`, 2026-11-18. B attributed `[FAIL] no network attempts during build: CONNECT cdn.shopify.com:443` to a failing remote-image lane in the aggregate merge log. A's narrow reruns showed the lane passed without changes.
+
+Evidence: `.claude/skills/dev-build-astro/test/remote-image/proxy-control.js` injects a build-time fetch, forwards the child's stdout and stderr, and asserts the child's exit status is 1. Its own successful completion prints `remote-image proxy control: attempted fetch rejected`. The parent script then runs the remaining remote-image checks. `implementation/check-repro-remote-image-1795009139601-2961062.log` contains the FAIL output and the successful control and ordinary run; its recorded exit is 0. `check-repro-proxy-1795009269041-3115897.log` independently records the control exiting 0. `check-repro-runjs-1795009390554-3167354.log` records the ordinary child passing. These files are under `/home/ivan/Work/infra/tamdoma/framework/issues/open/bun-test-exit-cleanup/bun-test-exit-cleanup/` at review time. Actual aggregate failures were in discard tests and, on retry, storefront evidence tests.
+
+Learning: read the parent script and its final exit or runner summary before attributing an aggregate failure to forwarded child diagnostics. A negative test's expected inner failure is evidence of its success. This was a review judgment error, not a defect in a script gate, so no code change or intake report is proposed.

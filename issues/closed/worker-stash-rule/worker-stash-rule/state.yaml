@@ -1,0 +1,46 @@
+slug: worker-stash-rule
+phase: merged
+created: 2026-11-17
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#141"
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak5504a99de110e6eb8a11455dcc0112
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t241
+  B:
+    session: infra
+    address: t245
+prompted:
+  B:
+    turn: 1
+    address: t245
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-17T23:02:51.780Z
+broadcast:
+  kind: issue
+  name: worker-stash-rule
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/worker-stash-rule
+  pushed: 868cac1b071ea34adf5e5e58e89dc2f8192714a3
+  sources:
+    - "Tamdoma/akrogon#141"
+frozen: {}
+frozen_cited: []

@@ -1,0 +1,25 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: shared refs/stash across detached worktrees
+    command: git worktree add --detach (x2); git stash in w1; git stash and git stash pop (x2) in w2
+    identity: local operator account, no credentials
+    target: scratch git repo
+    version: git 2.56.1
+    date: '2026-11-17'
+    result: the second pop in w2 applied w1 edit
+    cleanup: scratch repo deleted
+    limits: proves the shared stash on this git version; does not prove workers follow the new text
+    record: issues/chart/consumer-lesson-fixes/forks/worker-stash.md
+  - operation: existing link check
+    command: bun test tests/docs-links.test.ts
+    identity: local operator checkout, no credentials
+    target: /home/ivan/Work/infra/akrogon at main 39e203a7
+    version: bun 1.4.4
+    date: '2026-11-17'
+    result: 12 pass, 0 fail
+    cleanup: none needed (read-only)
+    limits: proves the checker runs on today's text, not on the edited files
+    record: issues/chart/consumer-lesson-fixes/forks/worker-stash.md

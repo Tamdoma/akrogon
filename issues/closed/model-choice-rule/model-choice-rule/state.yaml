@@ -1,0 +1,46 @@
+slug: model-choice-rule
+phase: merged
+created: 2026-11-17
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#140"
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: akea42606cccabff30d86ed487f1b661
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t219
+  B:
+    session: infra
+    address: t21c
+prompted:
+  B:
+    turn: 2
+    address: t21c
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-17T12:13:07.354Z
+broadcast:
+  kind: issue
+  name: model-choice-rule
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/model-choice-rule
+  pushed: 39e203a79c5c4ebeef51d1e76a3d8ea43389debc
+  sources:
+    - "Tamdoma/akrogon#140"
+frozen: {}
+frozen_cited: []

@@ -1,0 +1,25 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: installed release sha from the running skill path
+    command: realpath ~/.claude/skills/learn-issues/SKILL.md
+    identity: local operator account, no credentials
+    target: this machine's akrogon install
+    version: akrogon release 39e203a7
+    date: '2026-11-17'
+    result: resolves under ~/.akrogon/releases/39e203a79c5c4ebeef51d1e76a3d8ea43389debc/skills/learn-issues/SKILL.md
+    cleanup: none needed (read-only)
+    limits: proves the layout on this machine; another install layout is the not-under-releases case the text covers
+    record: issues/chart/consumer-lesson-fixes/forks/installed-transfer.md
+  - operation: existing link check
+    command: bun test tests/docs-links.test.ts
+    identity: local operator checkout, no credentials
+    target: /home/ivan/Work/infra/akrogon at main 39e203a7
+    version: bun 1.4.4
+    date: '2026-11-17'
+    result: 12 pass, 0 fail
+    cleanup: none needed
+    limits: proves the checker runs on today's text, not on the edited files
+    record: issues/chart/consumer-lesson-fixes/forks/installed-transfer.md

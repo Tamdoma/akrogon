@@ -1,0 +1,47 @@
+slug: installed-step-transfer
+phase: merged
+created: 2026-11-17
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#143"
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 2
+verdict: {}
+tab: akb0bea2301f909a152294c83613e54e
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t243
+  B:
+    session: infra
+    address: t244
+prompted:
+  B:
+    turn: 5
+    address: t244
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-17T23:10:34.015Z
+broadcast:
+  kind: issue
+  name: installed-step-transfer
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/installed-step-transfer
+  pushed: 5efc625d9624a30c7ff09e5ad2073449690a3eca
+  sources:
+    - "Tamdoma/akrogon#143"
+frozen:
+  tests/docs-links.test.ts: edc65b145fbb20b309470ef4a7ee131481943836
+frozen_cited: []

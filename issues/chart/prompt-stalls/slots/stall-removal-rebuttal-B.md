@@ -1,0 +1,9 @@
+# Disagreement-only rebuttal, B
+
+- D1. Keep last-value semantics for repeated settings flags. A correct merge already enforces the policy. Refusing these flags breaks a valid configuration without strengthening that guarantee. Map-A O5 already established which value Claude uses. Merge that value, discard shadowed flags, enforce the policy once. Never combine the shadowed objects.
+
+- D2. A template's `--` must delimit option parsing even though akrogon appends the task later. That ordering makes the delimiter useful, not invalid. Appending the enforced settings after it makes those settings task text, defeating Q1. Insert policy options before it and do not interpret later strings as flags. The merged Q2 explanation does not resolve this.
+
+- D3. Prior trusted worktrees do not prove fresh worktrees or another watched repo cannot wait. Framework's MCP setting proves that configuration only. `firstTask` returning `unconfirmed` reports lack of progress; it neither denies nor answers a dialog. Under signpost 2a, reporting is insufficient for an in-scope eligible class. Either prove these startup classes removed for the claimed deployment paths, or explicitly narrow the completion contract through a recorded scope decision before closing #135. I do not require a generic startup-dialog feature. I reject treating historical trust and a notice as removal proof.
+
+- D4. The inventory overstates B's Pi evidence. I did not establish “only dialog tool” or exhaustively prove that no extension can open UI during a turn. My notes establish the configured request_user_input exclusion, selected worker resources and inspected user-command UI calls. The installed security text says Pi does not ask before every call, which alone does not prove zero approval surfaces. Attribute any stronger exhaustive inventory to A's actual inspection and name its resource/configuration boundary. My 3a remains conditional on that bounded proof.

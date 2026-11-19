@@ -1,0 +1,5 @@
+# Fork notes, slot A: marker Q2 reshaped, 2026-11-19
+- Pick: the section counts when the issue author and every body editor have write, maintain or admin on the issue's own repo, read per login with `gh api repos/<r>/collaborators/<login>/permission`. Reason: colleagues decide, strangers (read) do not; GitHub already keeps that list, so nothing new to maintain. Cost: one call per distinct login; anyone the operator gives write access can decide.
+- Rejected: marker alone (akrogon is public with open issues, interaction-limits {}); org membership (wider than repo access, and needs org read scope); a config list of accounts (a second list to keep beside GitHub's, needs code or a config key, against signposts 5a).
+- Evidence: probes in forks/marker.md Findings (ivanjuras admin, one write-level colleague write, octocat read).
+- Pitfalls: a write collaborator's agent writes the marker unasked, left to seed-writer; a removed collaborator's old decision stops counting at the next import, which is the safe side.
