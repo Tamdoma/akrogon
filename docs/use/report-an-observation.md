@@ -1,6 +1,6 @@
 # Report an observation
 
-Optional: the [seed-issue](../../skills/seed-issue/SKILL.md) skill files something you saw go wrong as one GitHub issue, marked as unverified intake. Use it when you want a problem written down for later charting, even while its details are incomplete. It never proposes a fix.
+Optional: the [seed-issue](../../skills/seed-issue/SKILL.md) skill files something you saw go wrong as one GitHub issue, marked as unverified intake. Use it when you want a problem written down for later charting, even while its details are incomplete. It never proposes a fix of its own. When your request states a settled decision, it writes that decision into the report as an operator decision section, which charting then treats as already taken. The chart door counts the section only when the issue author and every body editor have write or admin on the repository.
 
 [A working day](a-working-day.md) shows where this intake sits in a normal day.
 
@@ -18,10 +18,10 @@ The skill needs an authenticated `gh` and nothing else. It works without `akrogo
 
 1. It reads the files the failure names and follows them one step to their caller. It only reads. It runs no project commands and edits nothing.
 2. It picks where to post. That is the `issues_repo` in the repository's root `akrogon.yaml`, or the GitHub `origin` when that file is missing. When the failure names a path that belongs to akrogon itself, the report goes to akrogon's own issue destination. If it cannot settle the destination, it stops and names the path and reason.
-3. It searches that repository twice with `gh`: your reports from the last two days, and a short keyword search. If an existing report already covers the same failure, it files nothing and prints that report's URL.
-4. Otherwise it creates one issue. The body holds Observation, Location, Reproduction, Expected behavior, Urgency and Suspected cause. Details you did not give read "Not provided". The suspected cause is a hypothesis the evidence supports, or "no supported hypothesis" plus the evidence needed next.
+3. It searches that repository twice with `gh`: your reports from the last two days, and a short keyword search. If an existing report already covers the same failure, it files nothing and prints that report's URL. When your request states a decision and that report is open, it adds the decision to that report instead: it reads the body, puts the section after "Unverified intake.", writes the whole body back and reads it again to check.
+4. Otherwise it creates one issue. The body holds Observation, Location, Reproduction, Expected behavior, Urgency and Suspected cause. When your words decided something, an operator decision section goes after "Unverified intake.". Background sections you ask for are added too, marked proposed, not decided. Details you did not give read "Not provided". The suspected cause is a hypothesis the evidence supports, or "no supported hypothesis" plus the evidence needed next.
 
-It ends with two lines: `Last operation:` with the issue URL, the found report's URL or the failure, and `Next: none`. When several open reports share one suspected cause, it may also print one `/seed-issue` line you can run to file a root report.
+It ends with two lines: `Last operation:` with the issue URL, the edited report's URL, the found report's URL or the failure, and `Next: none`. `Last operation:` also says when a decision section was written, without its text. When several open reports share one suspected cause, it may also print one `/seed-issue` line you can run to file a root report.
 
 ## Bring reports into your checkout
 

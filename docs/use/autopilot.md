@@ -8,7 +8,7 @@ It is one of the ways to run work shown in [Plan work](plan-work.md). The full m
 
 Autopilot needs the door to run inside hc. Outside hc the door says it cannot start.
 
-Three modes exist. In the default manual mode you answer the signposts and every fork. Under autopilot you answer the signposts once, for the whole session, and A answers every fork after. Under full autopilot — "autopilot signposts" — A answers the signposts and every fork. If your words hand over only the signposts while you keep the forks, that matches no mode, so the door asks which you meant.
+Three modes exist. In the default manual mode you answer the signposts and every fork. Under autopilot you answer the signposts once, for the whole session, and A answers every fork after. Under full autopilot — "autopilot signposts" — A answers the signposts and every fork. In every mode, a fork already taken from an operator decision section in an imported seed is not asked again, and A never answers it. If your words hand over only the signposts while you keep the forks, that matches no mode, so the door asks which you meant.
 
 In the chart door's own pane, say it in plain words. Name autopilot, the work you are handing it, and the chart consultants to use, or none:
 
@@ -24,7 +24,7 @@ The door's first reply repeats the mode, the handed work and the consultants. Wi
 
 The door runs every normal charting step. Under autopilot the signposts round is presented and answered once — a presented round, not a chart wait, so no chart parks on it; under full autopilot A answers it, echoes its picks in the first reply, and records them as A's — it may order the charts you handed it but never drop one, and a drop it would make is recorded for you.
 
-Where it would ask you a fork, seat A writes the full question in its pane and answers it itself. It picks by the evidence, the session's signposts, and where they are silent your standing values: simplicity, function over form, removing over adding, systems thinking, speed and price. A recommendation names the signpost that decided it. Each pick is recorded as A's, with its reason and the rejected options, never as your words.
+Where it would ask you a fork, seat A writes the full question in its pane and answers it itself. It picks by the evidence, the session's signposts, and where they are silent your standing values: simplicity, function over form, removing over adding, systems thinking, speed and price. A recommendation names the signpost that decided it. Each pick is recorded as A's, with its reason and the rejected options, never as your words. A never answers a seed's operator decision, or a finding against it. A decision counted from a seed stays yours.
 
 Chart consultants are the helper panes (B, C, D and so on) that give A a second view while it charts. They are not the seats A and B that later work on a leaf. A consultant that fails or stops answering is dropped for the rest of the session.
 
@@ -39,6 +39,8 @@ These make a chart wait while the door moves on to the next chart not waiting, i
 - A proof call that changes something or costs money.
 - A need or wider authority found after the signposts round that cannot stay inside what the sheet recorded: the chart parks and the door sends one `akrogon notice --attention` naming the chart, what blocks it and where the record is; outside hc or an unregistered repo it writes the statement and record only.
 - A step only a person can do.
+- A blocking finding against a seed decision, where the decision cannot be built or proven as written. The door sends one `akrogon notice --attention`.
+- A conflict between your answers: two seed decisions, or a seed decision against a reply.
 
 Your next message in that door, such as a supplied key, resumes it.
 
