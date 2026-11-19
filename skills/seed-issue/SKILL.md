@@ -31,7 +31,7 @@ A report whose named paths all exist relative to the consumer root never reaches
 
 Before authoring and before destination resolution, open the files the failure names and follow them one hop to the caller or shared contract, reading files only with no project commands, installs or edits, then stop at a supported hypothesis or a named evidence gap and post whichever was reached, with the filing standing alone and no later verification pass assumed. This inspection runs before destination resolution because the owner test needs the paths the report names.
 
-Use the reporter's statement and only nearby context needed to understand it to author one title describing what was seen, naming a cause only when the reporter's statement is itself a cause and marking it suspected, and the six body sections below, keeping Observation to what was seen and placing supplied or inferred cause reasoning in Suspected cause, identifying the report as unverified intake, preserving useful supplied facts, paths and commands, stating missing details as “Not provided” rather than inventing them or blocking thin intake, with urgency describing impact and any known workaround, and adding no recommended fixes or planning metadata.
+Use the reporter's statement and only nearby context needed to understand it to author one title describing what was seen, naming a cause only when the reporter's statement is itself a cause and marking it suspected, and the six body sections below, keeping Observation to what was seen and placing supplied or inferred cause reasoning in Suspected cause, identifying the report as unverified intake, preserving useful supplied facts, paths and commands, stating missing details as “Not provided” rather than inventing them or blocking thin intake, with urgency describing impact and any known workaround, and adding no recommended fixes or planning metadata, except an operator decision section and the background sections the person's own words ask for. The `## Operator decision (<name>, <date>)` section is written only when the person's own words in the request to seed, or to add to a filed report, state a settled decision: the agent infers the decided points from those words, including words pointing at a fix settled earlier in the same session such as "record the fix we agreed", and writes them with no confirmation step and no display of the section, while unclear words such as "I think we should do X" write no section; the section holds only what the person's words decided, never the agent's own advice, and never a grant, live or paid approval, secret or handoff authorization, and its heading names that person by `git config user.name` and the day as `YYYY-MM-DD`, never an agent or model, so a colleague's decision is written by the colleague's own run under the colleague's own name. Background sections are written only when the person's words ask for them, before or after a decision, each headed with wording to the effect of "proposed, not decided" plus author and date; they lock nothing, hold no research tier of their own because each claim takes the tier of the source that confirms it, and lose to the decision where they differ. `## Lifecycle filing` callers, lesson-triggered reports and passes with no person's request write neither section.
 
 The body opens with `Origin repo:` naming the owner/repo identity of the current repository, and a `Lesson history:` line naming the lesson's history path only when a lesson triggered the report.
 
@@ -40,6 +40,10 @@ Origin repo: <owner/repo identity of the current repository>
 Lesson history: <lesson history path; line present only when a lesson triggered this report>
 
 Unverified intake.
+
+## Operator decision (<name>, <date>)
+
+<Present only under the Report exception: the decided points from the person's words; the lock is the text up to the next `## ` heading; sub-headings use `### `; optional `Not in scope:` and `Done when:` lines>
 
 ## Observation
 
@@ -68,9 +72,13 @@ Unverified intake.
 <Files read; installed or vendored copies flagged as not the destination source by inspected provenance, with unverified links to it named>
 <Not inspected or would disprove>
 <Related reports: owner/repo#n each with a reason, or “none found”, or “search failed” with the error, plus the repo, query, states and limit searched>
+
+## <Heading to the effect of "proposed, not decided", with author and date>
+
+<Present only when the person's words ask for background, under the Report exception>
 ```
 
-Before authoring, also run two read-only lookups on the routed repo, the filing account's reports from the last two days and a 2-3 word keyword search on a file, command or component this failure names, retrying a failed call once with a visible warning, judging candidates by body, using `gh issue view <n> -R <repo> --json number,title,state,body` only on reporter-supplied links including cross-repo without searching other repos, and never commenting, labeling or changing state on a linked issue. Exit 0 with `[]` means none found and non-zero means search failed. When a found report covers the same failure, judged by the mechanism or defect in its body rather than shared keywords, the pass posts nothing and the final outcome prints that report's URL, on every run including manual ones; a closed report covers a failure only through an open report it names that covers it (closed as a duplicate), so a supported recurrence of a defect whose closed report's fix was delivered, or a current defect with no open covering report, posts with the closed report on its `Related reports` line, never reopening or commenting on it; a related but different report still posts with the related line, and a failed lookup still posts with the related line and the final outcome stating “search failed” plus the command and error:
+Before authoring, also run two read-only lookups on the routed repo, the filing account's reports from the last two days and a 2-3 word keyword search on a file, command or component this failure names, retrying a failed call once with a visible warning, judging candidates by body, using `gh issue view <n> -R <repo> --json number,title,state,body` only on reporter-supplied links including cross-repo without searching other repos, and never commenting, labeling or changing state on a linked issue. Exit 0 with `[]` means none found and non-zero means search failed. When a found report covers the same failure, judged by the mechanism or defect in its body rather than shared keywords, the pass posts nothing and the final outcome prints that report's URL, on every run including manual ones, except that when the request states a decision or asks for background and the covering report is open, the pass adds the section to that report by the edit route in Submit and finish instead, a closed report never being edited; a closed report covers a failure only through an open report it names that covers it (closed as a duplicate), so a supported recurrence of a defect whose closed report's fix was delivered, or a current defect with no open covering report, posts with the closed report on its `Related reports` line, never reopening or commenting on it; a related but different report still posts with the related line, and a failed lookup still posts with the related line and the final outcome stating “search failed” plus the command and error:
 
 ```bash
 gh issue list -R <repo> --state all --author @me --search "created:>=<YYYY-MM-DD two days back>" --limit <n> --json number,title,state,body
@@ -83,7 +91,7 @@ A lifecycle seat (implement-issue, check-issue, merge-issue or the chart-issues 
 
 ## Submit and finish
 
-When the lookups found a covering report, post nothing and print only the final two lines below with the found report's URL; otherwise pass the title as one safely quoted argument and the authored body as literal stdin to the command below, assigning `repo` and `title` with shell-safe quoting and selecting a quoted heredoc delimiter absent from the body.
+A request naming a filed report to add a decision or background to goes straight to the edit route below on that report, without the inspection, routing or lookups above. When the lookups found a covering report, post nothing and print only the final two lines below with the found report's URL, unless the request states a decision or asks for background and that report is open, which takes the edit route below; otherwise pass the title as one safely quoted argument and the authored body as literal stdin to the command below, assigning `repo` and `title` with shell-safe quoting and selecting a quoted heredoc delimiter absent from the body.
 
 ```bash
 gh issue create -R "$repo" --title "$title" --body-file - <<'SEED_ISSUE_BODY'
@@ -93,11 +101,19 @@ SEED_ISSUE_BODY
 
 Create one report without persistent local staging, interactive selection, labels, templates, import comments or lifecycle operations.
 
+The edit route targets the open report the person names, with `repo` set to that report's owner/repo, else the covering report the lookups found on the routed repo, and never a closed report, a named closed report stopping visibly with the reason. Read the body with `gh issue view <n> -R "$repo" --json body`, put the decision section directly after the `Unverified intake.` line (at the top of the body when that line is absent), replacing an existing operator decision section, which runs up to the next `## ` heading, with the new one and the new date so a report holds one, put requested background sections at the end of the body, and change nothing else; write the whole edited body as literal stdin to the command below with a quoted heredoc delimiter absent from the body, as the create command does, then read the body back with `gh issue view <n> -R "$repo" --json body` and confirm that the text outside the written sections is unchanged and each written section equals what was written, ignoring trailing whitespace, a mismatch being a failure printed with the report's URL. Comments, labels and state stay untouched. A body edit by someone else between the read and the write is not detected, a stated limit, and GraphQL `lastEditedAt` records this edit as the body-edit time.
+
+```bash
+gh issue edit <n> -R "$repo" --body-file - <<'SEED_ISSUE_BODY'
+<The full edited Markdown body>
+SEED_ISSUE_BODY
+```
+
 After successful creation only, when all five hold — this report's Suspected cause is a supported hypothesis, at least one other open linked report shares that condition, no found report open or closed already covers that shared condition and its cases, the lookup did not fail, and this report is not itself a cause statement — print `/seed-issue Suspected root cause: <condition>. Seen in <owner/repo#n>, … <evidence limit>.` naming the condition, the report identities and the evidence limit but never a fix, before the final two lines.
 
-Print the actual outcome, the created issue URL, the covering report's URL, or the failure's exit status and useful error context without claiming creation, switching targets or blindly retrying an ambiguous creation failure that could duplicate the issue, using these final two lines including failures, then stop:
+Print the actual outcome, the created issue URL, the edited report's URL, the covering report's URL, or the failure's exit status and useful error context without claiming creation, switching targets or blindly retrying an ambiguous creation failure that could duplicate the issue, using these final two lines including failures, where the bracketed clauses appear only when that section was written and never carry its text, then stop:
 
 ```text
-Last operation: <created issue URL, found report URL, or failure and reason>
-Next: none <intake submitted, existing report found, or stopped with reason; the reason names a printed root-report line and any lookup failure>
+Last operation: <created issue URL, edited report URL, found report URL, or failure and reason>[; operator decision section written][; background section written]
+Next: none <intake submitted, existing report edited, existing report found, or stopped with reason; the reason names a printed root-report line and any lookup failure>
 ```
