@@ -70,3 +70,15 @@ test('draft readiness.yaml gaps without state.yaml', async () => {
     f.clean();
   }
 });
+
+test('seed-issue and chart-issues share the operator decision heading start', () => {
+  const marker: string = '## Operator decision (';
+  const mention: RegExp = /#{1,6}\s*operator\s+decision\s*\(/gi;
+  const copies: string[] = ['../skills/seed-issue/SKILL.md', '../skills/chart-issues/SKILL.md'];
+  for (const copy of copies) {
+    const md: string = readFileSync(resolve(import.meta.dir, copy), 'utf8');
+    const found: string[] = md.match(mention) ?? [];
+    expect({ copy, mentions: found.length > 0 }).toEqual({ copy, mentions: true });
+    expect({ copy, differing: found.filter((m: string) => m !== marker) }).toEqual({ copy, differing: [] });
+  }
+});
