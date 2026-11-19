@@ -16,6 +16,10 @@ The skill needs an authenticated `gh` and nothing else. It works without `akrogo
 
 ## What the skill does
 
+To add a decision to an open report, name the report and state your decision. The skill reads and edits that report in its own repository, then checks the body it wrote. It skips the filing steps below.
+
+When you ask it to file an observation, it follows these steps.
+
 1. It reads the files the failure names and follows them one step to their caller. It only reads. It runs no project commands and edits nothing.
 2. It picks where to post. That is the `issues_repo` in the repository's root `akrogon.yaml`, or the GitHub `origin` when that file is missing. When the failure names a path that belongs to akrogon itself, the report goes to akrogon's own issue destination. If it cannot settle the destination, it stops and names the path and reason.
 3. It searches that repository twice with `gh`: your reports from the last two days, and a short keyword search. If an existing report already covers the same failure, it files nothing and prints that report's URL. When your request states a decision and that report is open, it adds the decision to that report instead: it reads the body, puts the section after "Unverified intake.", writes the whole body back and reads it again to check.

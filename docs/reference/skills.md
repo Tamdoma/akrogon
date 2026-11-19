@@ -48,7 +48,7 @@ Chart consultants are different from seats A and B. A consultant is an hc termin
 
 ## seed-issue
 
-- **Result:** one GitHub issue that records an observation as unverified intake, or adds your stated decision to an open report. It goes to the repository named by `issues_repo` in the root `akrogon.yaml`, else to the GitHub `origin`. When the failure names a path that belongs to akrogon, it goes to akrogon's own issue destination.
+- **Result:** files an observation as unverified intake or adds your stated decision to an open report. If you name an open report for the edit, the skill uses that report's repository. For filing, it uses `issues_repo` in the root `akrogon.yaml`, or the GitHub `origin` if that file is absent. When the failure names a path that belongs to akrogon, it files in akrogon's own issue destination.
 - **When to use:** you saw something wrong and want it filed for later charting. It needs only an authenticated `gh`, with no install, registration or leaf.
 - **Who starts it:** you. A seat that writes a checkable lesson, or a lesson about a check that refused valid work, also runs it, following the lesson rule.
 - **Source:** [`skills/seed-issue/SKILL.md`](../../skills/seed-issue/SKILL.md)
