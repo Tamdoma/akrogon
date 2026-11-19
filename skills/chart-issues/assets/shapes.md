@@ -166,6 +166,28 @@ GitHub identity comes from the mirror's `Source: owner/repo#n` line. Compare exa
 
 One fork file holds one or more questions that are always presented together on one screen. A fork is taken when every material question in it is taken; partial answers stay under `## Findings` and `## Taken` is written only then. Append each explicit operator correction with its date, preserve earlier answers, and treat the last appended correction as binding only for the answer it changes. Unresolved questions have no invented Taken. A question sharp enough to travel alone gets its own fork file even while blocked. Work whose question is not sharp stays in Fog. Ruling work out records the reason in Off route instead of pretending a fork was taken. Reshape the remaining questions after each answer. A fork file with no operator answer — or, under autopilot, no pick recorded as A's — under `## Taken` is open and appears in CHART.md's Open forks list in the order it will be taken, next first.
 
+A counting decision section in an imported seed ([Open](../SKILL.md#open)) is written as its own taken fork at import:
+
+```markdown
+# <fork title>
+
+## Question
+
+<the seed's GitHub identity and the decision section's heading line>
+
+## Findings
+
+<check record: each login with its `permission`, `lastEditedAt`, the pull time and the commands run>
+
+## Taken
+
+<the decision section verbatim, from its heading line to the end of its lock>
+
+seed decision from <owner/repo#n>, taken at import on <date>, not asked, decided by <login>
+```
+
+A reason or alternative the section does not state is written "not stated". An operator objection is a dated correction appended under `## Taken`, earlier text kept. CHART.md `## Forks taken` points to the fork file without restating the answer. Each `Not in scope:` item goes to `## Off route` with the decision as the reason and into each affected design as an exclusion; nothing is filed for it unless the operator asks.
+
 ## Handoff tree
 
 One issue uses `issues/open/<issue>/<leaf>/`. Two or more grouped issues use:
@@ -277,12 +299,16 @@ foreclosed alternatives>
 
 <installed path of standing-design.md, then the current interpretation: how its rules apply to this leaf>
 
+## Held disagreements
+
+<present only when needed; each entry opens "not a decision, the decision stands" and names what it is against, the fact, evidence, consequence, who raised it and its state: kept by the operator on <date>, or unanswered>
+
 ## Leaf architecture
 
 <owned surfaces, literal interfaces, exclusions with their owners and necessary dependencies; for each state or precondition the change alters, the consumer (file and function) that relies on it and either the decision or an `Open for the plan:` question; existing code is called reusable only when its preconditions were checked against the changed state, otherwise it is an `Open for the plan:` question; functions are named without line numbers>
 ```
 
-Each design is self-contained. Copy every binding decision into each affected leaf, with explicit exclusions for binding decisions that do not belong there. Cross-leaf claims name an owner whose own brief/design accepts that responsibility. Known human-only prerequisites have a named owner and recorded completion before handoff.
+Each design is self-contained. Copy every binding decision into each affected leaf, with explicit exclusions for binding decisions that do not belong there. A seed-decision fork's `## Taken` is copied whole under `## Binding decisions, verbatim`. Each brief done-criterion that covers a `Done when:` clause names that clause, and a restatement keeps the same observable result; a clause the shapes audit refuses is a blocking finding ([Take](../SKILL.md#take)), never a silent rewrite. Door criteria for what the decision leaves open are labelled the door's, and a decision with no `Done when:` leaves the criteria an ordinary open fork. `## Held disagreements` holds each finding against a decision that the operator kept or left unanswered. Cross-leaf claims name an owner whose own brief/design accepts that responsibility. Known human-only prerequisites have a named owner and recorded completion before handoff.
 
 ### readiness.yaml
 
