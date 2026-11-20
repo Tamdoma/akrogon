@@ -413,8 +413,17 @@ test.serial('each due runs one check with its receipt first; busy dues each run 
     await waitLabel(rig, nextDue + 1, 25_000);
     expect(tickLines(rig, nextDue)).toHaveLength(1);
     expect(tickLines(rig, nextDue + 1)).toHaveLength(1);
-    const statuses: number = statusCalls(rig);
-    for (let n: number = 0; n < 80 && statusCalls(rig) < statuses + 0; n += 1) await Bun.sleep(200);
+    // The receipt lands before the check call, so the count is provable only by the due's own
+    // turn: the last accept line carries t=<turn>, and its status call shares it.
+    const heldTurn: string | null =
+      / t=(\d+)/.exec(hooks(rig)[hooks(rig).findLastIndex((l) => /tick exit=0 accept/.test(l))] ?? '')?.[1] ?? null;
+    expect(heldTurn).not.toBeNull();
+    for (
+      let n: number = 0;
+      n < 80 && !calls(rig).some((l) => l.startsWith('call status') && l.endsWith(`t=${heldTurn}`));
+      n += 1
+    )
+      await Bun.sleep(200);
     // one status call per delivered due: start + due1 + the two accrued dues
     expect(statusCalls(rig)).toBeGreaterThanOrEqual(4);
 
@@ -751,6 +760,41 @@ test.serial('the timer exits on a finished watcher, wrong start time and pin dea
     await waitFinished(f.core, pinDeath);
     expect(await screenOf(f.core, pinDeath)).toContain(`pinned process ${shellPid} gone`);
     await f.core.hc(['rm', pinDeath]);
+
+    // A watcher terminal finishing → `watcher <w> finished`: the pin must outlive the watcher
+    // (the pin check runs first), so pin a separate sleeper; the shell is killed before the
+    // timer launches so its first poll sees a finished watcher, not a live one whose
+    // foreground fails the pin check.
+    const sleeper: { pid: number; kill: () => void } = Bun.spawn(['sleep', '30']);
+    try {
+      const shell2Run: SpawnResult = await f.core.hc([
+        'run',
+        '--bg',
+        '--json',
+        '--name',
+        'xw-shell3',
+        '--',
+        '/usr/bin/env',
+        `XDG_RUNTIME_DIR=${f.env.XDG_RUNTIME_DIR}`,
+        `HOME=${f.home}`,
+        'bash',
+      ]);
+      expect(shell2Run.code).toBe(0);
+      const shell2: string = z.object({ address: z.string() }).parse(JSON.parse(shell2Run.stdout)).address;
+      await f.core.hc(['kill', shell2]);
+      run = await f.core.hc(
+        timerArgv(['--pin-pid', String(sleeper.pid), '--pin-start', startOf(sleeper.pid)]).map((arg) =>
+          arg === shell ? shell2 : arg,
+        ),
+      );
+      const fin: string = z.object({ address: z.string() }).parse(JSON.parse(run.stdout)).address;
+      await waitFinished(f.core, fin);
+      expect(await screenOf(f.core, fin)).toContain(`exit: watcher ${shell2} finished`);
+      await f.core.hc(['rm', fin]);
+      await f.core.hc(['rm', shell2]);
+    } finally {
+      sleeper.kill();
+    }
   } finally {
     await f.clean();
   }
@@ -828,24 +872,66 @@ test.serial('a foreground swap and a transcript flip each end the timer', async 
     process.kill(pin, 'SIGKILL');
     await f.core.hc(['rm', timerAddr]);
 
-    // Transcript flip: a watcher with a claude-shaped config dir latches a path, then exits on change.
+    // Transcript flip: a watcher with a claude-shaped config dir latches a path, then exits on
+    // change. The timer is direct-launched (no --rm) so the `transcript moved` reason stays
+    // readable on its screen (criterion 14).
     const claudeDir: string = resolve(f.home, 'claude-cfg');
     const rig: Rig = await watchUp(f, { name: 'watcher-tx', claudeDir, interval: '3600' });
-    rig.timer = await started(rig);
-    const wPid: number = z.number().parse((await get(f.core, rig.watcher)).foreground?.pid);
-    const record: string = resolve(claudeDir, 'sessions', `${wPid}.json`);
+    // The watcher's foreground is bash until the agent execs: wait for a foreground whose
+    // claude session record exists (the record proves the agent pid and config dir).
+    let wPid: number | null = null;
+    for (let n: number = 0; n < 80 && wPid === null; n += 1) {
+      const fg: number | undefined = (await get(f.core, rig.watcher)).foreground?.pid;
+      if (fg !== undefined && existsSync(resolve(claudeDir, 'sessions', `${fg}.json`))) wPid = fg;
+      else await Bun.sleep(200);
+    }
+    const pid: number = z.number().parse(wPid);
+    const stat2: string = readFileSync(`/proc/${pid}/stat`, 'utf8');
+    const txRun: SpawnResult = await f.core.hc([
+      'run',
+      '--bg',
+      '--json',
+      '--no-notify',
+      '--label',
+      `akrogon.watch-timer=${f.repo}`,
+      '--',
+      '/usr/bin/env',
+      `XDG_RUNTIME_DIR=${f.env.XDG_RUNTIME_DIR}`,
+      `HOME=${f.home}`,
+      `PATH=${dirname(bun)}:${systemPath}`,
+      'WATCH_TICK_SECONDS=2',
+      bun,
+      resolve(skilldir, 'scripts/timer.ts'),
+      '--session',
+      f.core.session,
+      '--watcher',
+      rig.watcher,
+      '--root',
+      f.root,
+      '--repo',
+      f.repo,
+      '--pin-pid',
+      String(pid),
+      '--pin-start',
+      stat2.slice(stat2.lastIndexOf(')') + 2).split(' ')[19],
+    ]);
+    expect(txRun.code).toBe(0);
+    rig.timer = z.object({ address: z.string() }).parse(JSON.parse(txRun.stdout)).address;
+    const record: string = resolve(claudeDir, 'sessions', `${pid}.json`);
     for (let n: number = 0; n < 80 && !existsSync(record); n += 1) await Bun.sleep(200);
     const seen = z
       .object({ sessionId: z.string(), procStart: z.string() })
       .parse(JSON.parse(readFileSync(record, 'utf8')));
+    // Latch first (one full poll), then flip the session record to a different transcript.
+    await Bun.sleep(2600);
     writeFileSync(
       record,
       JSON.stringify({ sessionId: 'bbbbbbbb-0000-0000-0000-000000000002', procStart: seen.procStart }),
     );
     writeFileSync(resolve(claudeDir, 'projects', 'p', 'bbbbbbbb-0000-0000-0000-000000000002.jsonl'), '');
-    await waitGone(f.core, rig.timer, 15_000);
-    // The run-created timer carries --rm: the transcript-moved reason is proven on the direct
-    // launch above; here the removal itself is the exit.
+    await waitFinished(f.core, rig.timer, 15_000);
+    expect(await screenOf(f.core, rig.timer)).toContain('exit: transcript moved');
+    await f.core.hc(['rm', rig.timer]);
   } finally {
     await f.clean();
   }
