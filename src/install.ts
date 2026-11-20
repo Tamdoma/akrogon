@@ -24,7 +24,13 @@ export function planSkillLinks(
   ownedRoots: string[],
   listRoot: string = sourceRoot,
 ): { links: Link[]; conflicts: Link[]; stale: string[] } {
-  const roots: string[] = ['.claude/skills', '.agents/skills', '.codex/skills', '.pi/agent/skills'];
+  const roots: string[] = [
+    '.claude/skills',
+    '.agents/skills',
+    '.codex/skills',
+    '.pi/agent/skills',
+    '.gemini/config/skills',
+  ];
   const skills: string[] = readdirSync(resolve(listRoot, 'skills'), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name);

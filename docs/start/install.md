@@ -69,7 +69,7 @@ bun src/akrogon.ts install
 Install creates these links:
 
 - `~/.local/bin/akrogon`, the command.
-- Each skill folder into `~/.claude/skills`, `~/.agents/skills`, `~/.codex/skills` and `~/.pi/agent/skills`, so every supported agent CLI finds the same skills.
+- Each skill folder into `~/.claude/skills`, `~/.agents/skills`, `~/.codex/skills`, `~/.pi/agent/skills` and `~/.gemini/config/skills`, so every supported agent CLI finds the same skills.
 - `~/.config/systemd/user/akrogon.slice`, the systemd slice that holds everything Akrogon runs. Install then reloads the systemd user manager.
 - `~/.config/systemd/user/akrogon-listener.service`, when the release ships the listener unit. Install then enables and restarts it.
 
