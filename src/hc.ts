@@ -329,8 +329,10 @@ export async function send(
   session: string,
   address: string,
   text: string,
+  options: { if?: 'idle' } = {},
 ): Promise<{ started: boolean | null; status: string | null; turn: number }> {
-  return sendSchema.parse(JSON.parse(await hc(session, ['send', '--json', '--', address, text])));
+  const condition: string[] = options.if === undefined ? [] : ['--if', options.if];
+  return sendSchema.parse(JSON.parse(await hc(session, ['send', '--json', ...condition, '--', address, text])));
 }
 
 export async function keys(session: string, address: string, key: string): Promise<void> {

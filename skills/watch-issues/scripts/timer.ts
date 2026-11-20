@@ -1,11 +1,9 @@
 // watch-timer: dues numbered 1,2,… accrue at every WATCH_TICK_SECONDS boundary (default 1200 s).
 // The oldest unreceipted due goes out as soon as the watcher is ready; each due is delivered at
-// most once plus one resend. Readiness = watcher status idle/done, or status null (hc does not
-// detect a shell-launched agent, so its status never sets — queued input still serializes there,
-// each tick runs its own check after the previous turn ends, none merge). The send is one untagged
-// `watch-issues tick timer=<self> pid=<pin> due=<n> <root>`; delivery is the timer's own
-// akrogon.watch-due label reading n, and an undelivered due resends once when its interval window
-// lapses then drops while later dues continue. The loop exits (and --rm frees the name) when the
+// most once plus one resend. Readiness requires hc's idle or done status. The send is one untagged
+// `watch-issues tick timer=<self> pid=<pin> due=<n> <root>`; delivery requires the watcher's turn to
+// advance and the timer's own akrogon.watch-due receipt. An undelivered due resends once then
+// drops while later dues continue. The loop exits (and --rm frees the name) when the
 // pinned watcher foreground dies or is swapped, the watcher terminal goes away, or the resolved
 // transcript stays off the pinned one. Every refused read, skipped send, failed send and exit
 // reason prints to this terminal's own output.
@@ -61,7 +59,7 @@ function note(line: string): void {
   lastNote = line;
   console.log(`[watch-timer] ${line}`);
 }
-type Due = { n: number; attempts: number; lastSent: number | null };
+type Due = { n: number; attempts: number; sent: { at: number; turn: number } | null };
 
 const dues: Due[] = [];
 let dueCount: number = 0;
@@ -76,14 +74,7 @@ async function receipt(): Promise<string | null> {
   return me.labels['akrogon.watch-due'] ?? null;
 }
 
-async function poll(): Promise<'exit' | 'stay'> {
-  const now: number = Date.now();
-  while (nextBoundary <= now) {
-    dueCount += 1;
-    dues.push({ n: dueCount, attempts: 0, lastSent: null });
-    nextBoundary += intervalMs;
-  }
-
+async function readWatcher(): Promise<Seen | 'exit' | 'stay'> {
   const start: string | null = procStart(args.pinPid);
   if (start === null || start !== args.pinStart) {
     console.log(`[watch-timer] exit: pinned process ${args.pinPid} ${start === null ? 'gone' : `replaced (start ${start} != ${args.pinStart})`}`);
@@ -118,6 +109,19 @@ async function poll(): Promise<'exit' | 'stay'> {
     console.log(`[watch-timer] exit: watcher foreground ${tracked} is not the pinned ${args.pinPid} or its descendant`);
     return 'exit';
   }
+  return w;
+}
+
+async function poll(): Promise<'exit' | 'stay'> {
+  const now: number = Date.now();
+  while (nextBoundary <= now) {
+    dueCount += 1;
+    dues.push({ n: dueCount, attempts: 0, sent: null });
+    nextBoundary += intervalMs;
+  }
+
+  const watcher = await readWatcher();
+  if (typeof watcher === 'string') return watcher;
 
   let resolved: string | null;
   try {
@@ -141,9 +145,6 @@ async function poll(): Promise<'exit' | 'stay'> {
     } else transcriptMiss = 0;
   } else transcriptMiss = 0;
 
-  // Delivery check on every poll: the receipt stamp is the whole proof, so no turn tracking is
-  // needed (an untracked watcher's turn never moves). A due whose window lapses unreceipted
-  // resends once, then drops while later dues continue.
   let rcpt: string | null;
   try {
     rcpt = await receipt();
@@ -152,33 +153,46 @@ async function poll(): Promise<'exit' | 'stay'> {
     note(`receipt read failed: ${error.kind}`);
     return 'stay';
   }
-  while (dues.length > 0 && rcpt !== null && dues[0].n <= Number(rcpt)) {
+  const oldest: Due | undefined = dues[0];
+  if (oldest === undefined) return 'stay';
+
+  const status: string | null = watcher.status?.state ?? null;
+  if (status !== 'idle' && status !== 'done') {
+    note(`hold due=${oldest.n}: watcher ${status ?? 'has no reported status'}`);
+    return 'stay';
+  }
+  if (oldest.sent !== null && watcher.turn > oldest.sent.turn && Number(rcpt) >= oldest.n) {
     dues.shift();
   }
-
-  if (dues.length === 0) return 'stay';
-  const due: Due = dues[0];
-  if (due.lastSent !== null) {
-    if (now - due.lastSent < intervalMs) return 'stay';
+  const due: Due | undefined = dues[0];
+  if (due === undefined) return 'stay';
+  if (due.sent !== null) {
+    if (now - due.sent.at < intervalMs) return 'stay';
     if (due.attempts >= 2) {
       dues.shift();
-      console.log(`[watch-timer] due=${due.n} dropped: no receipt after ${due.attempts} sends`);
+      console.log(`[watch-timer] due=${due.n} dropped: no completed turn and receipt after ${due.attempts} sends`);
       return 'stay';
     }
-    due.lastSent = null; // unreceipted after one interval: the one allowed resend
   }
-  if (w.status !== null && w.status.state !== 'idle' && w.status.state !== 'done') {
-    note(`hold due=${due.n}: watcher busy (${w.status.state})`);
+
+  const current = await readWatcher();
+  if (typeof current === 'string') return current;
+  const ready: string | null = current.status?.state ?? null;
+  if (ready !== 'idle' && ready !== 'done') {
+    note(`hold due=${due.n}: watcher ${ready ?? 'has no reported status'}`);
     return 'stay';
   }
   try {
+    // hc can guard idle at delivery. It has no conditional send for done.
     const sent = await send(
       args.session,
       args.watcher,
       `watch-issues tick timer=${self} pid=${args.pinPid} due=${due.n} ${args.root}`,
+      ready === 'idle' ? { if: 'idle' } : {},
     );
     due.attempts += 1;
-    if (sent.started === false) {
+    if (sent.started !== true || (sent.status !== 'idle' && sent.status !== 'done')) {
+      due.sent = null;
       note(`send due=${due.n} not started (status=${sent.status})`);
       if (due.attempts >= 2) {
         dues.shift();
@@ -186,7 +200,7 @@ async function poll(): Promise<'exit' | 'stay'> {
       }
       return 'stay';
     }
-    due.lastSent = Date.now();
+    due.sent = { at: Date.now(), turn: sent.turn };
     console.log(`[watch-timer] due=${due.n} sent (attempt ${due.attempts}, turn=${sent.turn})`);
   } catch (error) {
     if (error instanceof HcError && error.kind === 'not_found') {
@@ -194,8 +208,13 @@ async function poll(): Promise<'exit' | 'stay'> {
       return 'exit';
     }
     if (!(error instanceof HcError)) throw error;
+    if (error.kind === 'status_mismatch') {
+      note(`hold due=${due.n}: watcher changed status before send`);
+      return 'stay';
+    }
     note(`send due=${due.n} failed: ${error.kind}`);
     due.attempts += 1;
+    due.sent = null;
     if (due.attempts >= 2) {
       dues.shift();
       console.log(`[watch-timer] due=${due.n} dropped: send failed (${error.kind})`);
