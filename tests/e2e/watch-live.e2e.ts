@@ -11,6 +11,7 @@
 //      WATCH_TICK_SECONDS=30 bun test --timeout=30000 ./tests/e2e/watch-live.e2e.ts
 import { test, expect } from 'bun:test';
 import {
+  readlinkSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -319,14 +320,28 @@ test('watch live: one watcher session per harness and shape', async () => {
   // operator-home skill links. pi: --no-skills --skill <leaf> (a same-named user copy outranks
   // --skill otherwise). agy and codex: the tier root's .agents/skills/watch-issues, with codex's
   // two user copies disabled by -c skills.config. claude: .claude/skills + --setting-sources.
+  const agyLink: string = resolve(realHome, '.gemini/config/skills/watch-issues');
+  // The user's watch-issues is a symlink; /tmp and ~ may not share a filesystem, so keep the
+  // link's target string rather than moving the file.
+  let agyLinkTarget: string | null = null;
   try {
     await observeReady(tier);
+    // agy reads user skills at ~/.gemini/config/skills, never .agents/skills: repoint the user
+    // watch-issues link at the leaf for the run, restored in finally.
     if (kind === 'claude') {
       mkdirSync(resolve(tier.root, '.claude/skills'), { recursive: true });
       symlinkSync(skill, resolve(tier.root, '.claude/skills/watch-issues'));
-    } else if (kind === 'codex' || kind === 'agy') {
+    } else if (kind === 'codex') {
       mkdirSync(resolve(tier.root, '.agents/skills'), { recursive: true });
       symlinkSync(skill, resolve(tier.root, '.agents/skills/watch-issues'));
+    } else if (kind === 'agy') {
+      try {
+        agyLinkTarget = readlinkSync(agyLink);
+      } catch {
+        agyLinkTarget = null;
+      }
+      rmSync(agyLink, { force: true });
+      symlinkSync(skill, agyLink);
     }
     const leafPath: string = resolve(tier.root, 'issues/open/e2e', slug);
     mkdirSync(leafPath, { recursive: true });
@@ -542,6 +557,10 @@ test('watch live: one watcher session per harness and shape', async () => {
     }
     await dropTrust(tier, tier.root);
   } finally {
+    if (agyLinkTarget !== null || existsSync(agyLink)) {
+      rmSync(agyLink, { force: true });
+      if (agyLinkTarget !== null) symlinkSync(agyLinkTarget, agyLink);
+    }
     const left: string[] = await stopWatchTier(tier, [leafTemp]);
     tier.record('absence.json', { left });
     expect(left).toEqual([]);
