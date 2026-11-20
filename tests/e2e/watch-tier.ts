@@ -48,17 +48,19 @@ export function absent(): string[] {
 }
 
 // `name` names the registered repo root `<leaf temp>/<name>`; every folder the run creates is
-// recorded in <out>/paths.json before use.
+// recorded in <out>/paths.json before use. `rootName` overrides the root's folder name so a run
+// can hold a space in the repo path while keeping the akr-e2e-watch-<kind>-* marker.
 export async function startWatchTier(
   name: string,
   slots: object,
   harnesses: Record<string, string>,
+  opts: { rootName?: string } = {},
 ): Promise<WatchTier> {
   const leafTemp: string = required('AKROGON_E2E_ROOT');
   const out: string = required('AKROGON_E2E_OUT');
   const left: string[] = absent();
   if (left.length > 0) throw new Error(`akr-e2e-watch leftovers before the run: ${left.join(', ')}`);
-  const root: string = resolve(leafTemp, name);
+  const root: string = resolve(leafTemp, opts.rootName ?? name);
   const home: string = resolve(leafTemp, `${name}-home`);
   const scratch: string = resolve(leafTemp, `${name}-scratch`);
   const runtime: string = resolve(leafTemp, `${name}-rt`);
