@@ -60,6 +60,7 @@ interface RawCall {
   allLiteral: boolean;
   editOld: string;
   editNew: string;
+  scan?: ScannedCall[];
 }
 
 interface RawResult {
@@ -70,6 +71,23 @@ interface RawResult {
   isError: boolean;
   texts: string[];
   termination?: { kind?: string; exitCode?: number };
+  traces?: RawTrace[];
+}
+
+interface RawTrace {
+  name: string;
+  status: string;
+  input: Record<string, unknown> | undefined;
+  result?: RawResult;
+}
+
+interface ScannedCall {
+  name: string;
+  kind: 'shell' | 'edit' | 'other';
+  target: string;
+  allLiteral: boolean;
+  editOld: string;
+  editNew: string;
 }
 
 interface Entry {
@@ -81,6 +99,8 @@ interface Entry {
   allLiteral: boolean;
   editOld: string;
   editNew: string;
+  scan?: ScannedCall[];
+  statusOverride?: string;
   result?: RawResult;
 }
 
@@ -164,9 +184,8 @@ function skipWs(src: string, i: number): number {
   return i;
 }
 
-// Read the value of key: at depth 1 of the object literal opened at openBrace.
-// Returns the decoded string, a number literal as string, or null for non-literals.
-function readArg(src: string, openBrace: number, key: string): string | null {
+// Index of key's value start at depth 1 of the object literal opened at openBrace, or -1.
+function argValueAt(src: string, openBrace: number, key: string): number {
   let i: number = openBrace + 1;
   let depth: number = 1;
   while (i < src.length && depth > 0) {
@@ -185,22 +204,66 @@ function readArg(src: string, openBrace: number, key: string): string | null {
       const m: RegExpMatchArray | null = /^[A-Za-z_$][A-Za-z0-9_$]*/.exec(src.slice(i));
       const word: string = m === null ? '' : m[0];
       const after: number = skipWs(src, i + word.length);
-      if (word === key && src[after] === ':') {
-        const v: number = skipWs(src, after + 1);
-        const vc: string | undefined = src[v];
-        if (vc === "'" || vc === '"' || vc === BT) {
-          const literal: { value: string | null; next: number } = readString(src, v);
-          const end: string = src[skipWs(src, literal.next)];
-          return end === ',' || end === '}' ? literal.value : null;
-        }
-        const num: RegExpMatchArray | null = /^-?\d+(\.\d+)?/.exec(src.slice(v));
-        if (num !== null) return num[0];
-        return null;
-      }
+      if (word === key && src[after] === ':') return skipWs(src, after + 1);
       i += word.length;
       continue;
     }
     i++;
+  }
+  return -1;
+}
+
+// Read the value of key: at depth 1 of the object literal opened at openBrace.
+// Returns the decoded string, a number literal as string, or null for non-literals.
+function readArg(src: string, openBrace: number, key: string): string | null {
+  const v: number = argValueAt(src, openBrace, key);
+  if (v === -1) return null;
+  const vc: string | undefined = src[v];
+  if (vc === "'" || vc === '"' || vc === BT) {
+    const literal: { value: string | null; next: number } = readString(src, v);
+    const end: string = src[skipWs(src, literal.next)];
+    return end === ',' || end === '}' ? literal.value : null;
+  }
+  const num: RegExpMatchArray | null = /^-?\d+(\.\d+)?/.exec(src.slice(v));
+  return num === null ? null : num[0];
+}
+
+// Index just past the closing '}' of the object literal opened at open, src.length if unterminated.
+function objEnd(src: string, open: number): number {
+  let i: number = open + 1;
+  let depth: number = 1;
+  while (i < src.length && depth > 0) {
+    const ch: string = src[i];
+    if (ch === "'" || ch === '"' || ch === BT) {
+      i = readString(src, i).next;
+      continue;
+    }
+    if (ch === '/' && (src[i + 1] === '/' || src[i + 1] === '*')) {
+      i = skipWs(src, i);
+      continue;
+    }
+    if (ch === '{' || ch === '(' || ch === '[') depth++;
+    else if (ch === '}' || ch === ')' || ch === ']') depth--;
+    i++;
+  }
+  return i;
+}
+
+// The edits: [{oldText,newText}] value at openBrace when every element is fully literal, else null.
+function readEditsArg(src: string, openBrace: number): { old: string; new: string }[] | null {
+  const v: number = argValueAt(src, openBrace, 'edits');
+  if (v === -1 || src[v] !== '[') return null;
+  const out: { old: string; new: string }[] = [];
+  let i: number = skipWs(src, v + 1);
+  while (i < src.length) {
+    if (src[i] === ']') return out;
+    if (src[i] === ',') { i = skipWs(src, i + 1); continue; }
+    if (src[i] !== '{') return null;
+    const oldT: string | null = readArg(src, i, 'oldText');
+    const newT: string | null = readArg(src, i, 'newText');
+    if (oldT === null || newT === null) return null;
+    out.push({ old: oldT, new: newT });
+    i = skipWs(src, objEnd(src, i));
   }
   return null;
 }
@@ -222,6 +285,75 @@ function scanExecSource(src: string): { target: string; allLiteral: boolean } {
     }
   }
   return { target: parts.join(' ; '), allLiteral: parts.length > 0 && allLiteral };
+}
+
+// Scan pi exec source for tools.bash/edit/read/write/ls calls, in order. Only string-literal
+// args give targets and identities; anything else degrades that call, never its siblings.
+function scanPiExecSource(src: string): ScannedCall[] {
+  const out: ScannedCall[] = [];
+  const re: RegExp = /\btools\.(bash|edit|read|write|ls)\s*\(/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(src)) !== null) {
+    const name: string = m[1];
+    const i: number = skipWs(src, m.index + m[0].length);
+    const open: number = src[i] === '{' ? i : -1;
+    if (name === 'bash') {
+      const cmd: string | null = open === -1 ? null : readArg(src, open, 'command');
+      out.push({ name, kind: 'shell', target: cmd === null ? '<expr>' : cmd, allLiteral: cmd !== null, editOld: '', editNew: '' });
+    } else if (name === 'edit') {
+      const path: string | null = open === -1 ? null : readArg(src, open, 'path');
+      const edits: { old: string; new: string }[] | null = open === -1 ? null : readEditsArg(src, open);
+      if (path !== null && edits !== null) {
+        out.push({ name, kind: 'edit', target: path, allLiteral: true, editOld: edits.map((e) => e.old).join(''), editNew: edits.map((e) => e.new).join('') });
+      } else {
+        out.push({ name, kind: 'other', target: path === null ? '<expr>' : path, allLiteral: true, editOld: '', editNew: '' });
+      }
+    } else {
+      const path: string | null = open === -1 ? null : readArg(src, open, 'path');
+      out.push({ name, kind: 'other', target: path === null ? '<expr>' : path, allLiteral: true, editOld: '', editNew: '' });
+    }
+  }
+  return out;
+}
+
+// A details.traces entry of a finished pi exec becomes one line: name, input and status from
+// the trace, bash's exit code from the inner result's capture.termination.
+function traceEntry(r: RawResult, t: RawTrace): Entry {
+  const input: Record<string, unknown> | undefined = t.input;
+  let kind: 'shell' | 'edit' | 'other' = 'other';
+  let target: string = genericTarget(input);
+  let editOld: string = '';
+  let editNew: string = '';
+  if (t.name === 'bash') {
+    kind = 'shell';
+    target = strOf(input?.command);
+  } else if (t.name === 'edit') {
+    kind = 'edit';
+    const list: Record<string, unknown>[] = Array.isArray(input?.edits)
+      ? input.edits.map(objOf).filter((e): e is Record<string, unknown> => e !== undefined)
+      : [];
+    editOld = list.map((e) => strOf(e.oldText)).join('');
+    editNew = list.map((e) => strOf(e.newText)).join('');
+  }
+  const e: Entry = {
+    index: r.index, ts: r.ts, name: t.name, kind, target, allLiteral: true, editOld, editNew,
+    statusOverride: t.status === 'running' ? undefined : t.status === 'done' ? (t.result === undefined ? 'ok' : undefined) : 'unknown',
+  };
+  if (t.status === 'done' && t.result !== undefined) e.result = t.result;
+  return e;
+}
+
+// An exec line expands to its observed inner calls: details.traces when the result carries
+// them, the scanned tools.* calls when it is still running, else today's one #- line.
+function piExecEntries(e: Entry): Entry[] {
+  const r: RawResult | undefined = e.result;
+  if (r !== undefined) {
+    return r.traces !== undefined && r.traces.length > 0 ? r.traces.map((t) => traceEntry(r, t)) : [e];
+  }
+  if (e.scan !== undefined && e.scan.length > 0) {
+    return e.scan.map((s): Entry => ({ index: e.index, ts: e.ts, name: s.name, kind: s.kind, target: s.target, allLiteral: s.allLiteral, editOld: s.editOld, editNew: s.editNew }));
+  }
+  return [e];
 }
 
 function genericTarget(obj: Record<string, unknown> | undefined): string {
@@ -312,8 +444,7 @@ function collectPi(records: unknown[]): { calls: RawCall[]; results: RawResult[]
         if (name === 'bash') {
           calls.push({ index: i, id: strOf(b.id), ts, name, kind: 'shell', target: strOf(args?.command), allLiteral: true, editOld: '', editNew: '' });
         } else if (name === 'exec') {
-          const scanned = scanExecSource(strOf(args?.code));
-          calls.push({ index: i, id: strOf(b.id), ts, name, kind: 'shell', target: scanned.target, allLiteral: scanned.allLiteral, editOld: '', editNew: '' });
+          calls.push({ index: i, id: strOf(b.id), ts, name, kind: 'shell', target: '', allLiteral: false, editOld: '', editNew: '', scan: scanPiExecSource(strOf(args?.code)) });
         } else if (name === 'edit') {
           const edits: unknown = args?.edits;
           const list: Record<string, unknown>[] = Array.isArray(edits)
@@ -329,10 +460,34 @@ function collectPi(records: unknown[]): { calls: RawCall[]; results: RawResult[]
         }
       }
     } else if (msg.role === 'toolResult') {
-      const term: Record<string, unknown> | undefined = objOf(objOf(objOf(msg.details)?.capture)?.termination);
+      const det = msg.details;
+      const term: Record<string, unknown> | undefined = objOf(objOf(det?.capture)?.termination);
+      const traces: RawTrace[] | undefined = Array.isArray(det?.traces)
+        ? (det.traces as unknown[]).map((t): RawTrace => {
+            const to: Record<string, unknown> | undefined = objOf(t);
+            const tres: Record<string, unknown> | undefined = objOf(to?.result);
+            const tterm: Record<string, unknown> | undefined = objOf(objOf(objOf(tres?.details)?.capture)?.termination);
+            return {
+              name: strOf(to?.name),
+              status: strOf(to?.status),
+              input: objOf(to?.input),
+              result:
+                tres === undefined
+                  ? undefined
+                  : {
+                      index: i, id: '', ts, name: strOf(to?.name),
+                      isError: tres.isError === true, texts: textsOf(tres.content),
+                      termination:
+                        tterm === undefined
+                          ? undefined
+                          : { kind: typeof tterm.kind === 'string' ? tterm.kind : undefined, exitCode: typeof tterm.exitCode === 'number' ? tterm.exitCode : undefined },
+                    },
+            };
+          })
+        : undefined;
       results.push({
         index: i, id: strOf(msg.toolCallId), ts, name: strOf(msg.toolName) || '?',
-        isError: msg.isError === true, texts: textsOf(msg.content),
+        isError: msg.isError === true, texts: textsOf(msg.content), traces,
         termination: term === undefined
           ? undefined
           : { kind: typeof term.kind === 'string' ? term.kind : undefined, exitCode: typeof term.exitCode === 'number' ? term.exitCode : undefined },
@@ -416,8 +571,8 @@ function render(format: Format, e: Entry): string {
       : e.kind === 'edit'
         ? 'old#' + hash8(e.editOld) + ' new#' + hash8(e.editNew)
         : '-';
-  const status: string = e.result === undefined ? 'running' : statusOf(format, e.name, e.result);
-  const excerpt: string = e.result === undefined ? '' : excerptOf(format, e.name, e.result);
+  const status: string = e.statusOverride ?? (e.result === undefined ? 'running' : statusOf(format, e.name, e.result));
+  const excerpt: string = e.result === undefined || e.statusOverride !== undefined ? '' : excerptOf(format, e.name, e.result);
   return (e.ts + ' ' + e.name + ' ' + cut(e.target) + ' ' + identity + ' -> ' + status + ': ' + cut(excerpt)).trimEnd();
 }
 
@@ -467,7 +622,7 @@ function main(): void {
 
   const byCallId = new Map<string, Entry>();
   const entries: Entry[] = collected.calls.map((c): Entry => {
-    const e: Entry = { index: c.index, ts: c.ts, name: c.name, kind: c.kind, target: c.target, allLiteral: c.allLiteral, editOld: c.editOld, editNew: c.editNew };
+    const e: Entry = { index: c.index, ts: c.ts, name: c.name, kind: c.kind, target: c.target, allLiteral: c.allLiteral, editOld: c.editOld, editNew: c.editNew, scan: c.scan };
     if (c.id !== '') byCallId.set(c.id, e);
     return e;
   });
@@ -481,9 +636,11 @@ function main(): void {
       entries.push({ index: r.index, ts: r.ts, name: r.name, kind: 'orphan', target: '', allLiteral: false, editOld: '', editNew: '', result: r });
     }
   }
-  entries.sort((a, b) => a.index - b.index);
+  // pi exec lines expand to one line per inner call; same-index lines keep insertion order.
+  const expanded: Entry[] = format === 'pi' ? entries.flatMap((e) => (e.name === 'exec' ? piExecEntries(e) : [e])) : entries;
+  expanded.sort((a, b) => a.index - b.index);
 
-  for (const e of entries.slice(-20)) {
+  for (const e of expanded.slice(-20)) {
     console.log(render(format, e));
   }
 }

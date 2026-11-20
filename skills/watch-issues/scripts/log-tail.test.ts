@@ -114,61 +114,6 @@ function piExecCall(id: string, ts: string, code: string): string {
   });
 }
 
-// pi-exec-u1-excerpt.jsonl exec results' details.traces entries, read straight from the fixture so
-// expected targets and identities come from the recorded strings, not hand-copied ones.
-type PiTrace = {
-  ts: string;
-  name: string;
-  status: string;
-  input: Record<string, unknown>;
-  texts: string[];
-  exitCode: number | undefined;
-  isError: boolean;
-};
-
-function piExecTraces(): PiTrace[] {
-  const out: PiTrace[] = [];
-  for (const line of readFileSync(join(fixtures, 'pi-exec-u1-excerpt.jsonl'), 'utf8').split('\n')) {
-    if (line === '') continue;
-    const rec = JSON.parse(line) as {
-      timestamp?: string;
-      message?: {
-        role?: string;
-        toolName?: string;
-        details?: {
-          traces?: Array<{
-            name?: string;
-            status?: string;
-            input?: Record<string, unknown>;
-            result?: {
-              isError?: boolean;
-              content?: Array<{ type?: string; text?: string }>;
-              details?: { capture?: { termination?: { exitCode?: number } } };
-            };
-          }>;
-        };
-      };
-    };
-    const msg = rec.message ?? {};
-    if (msg.role !== 'toolResult' || msg.toolName !== 'exec') continue;
-    for (const t of msg.details?.traces ?? []) {
-      const texts: string[] = (t.result?.content ?? [])
-        .filter((b): b is { type?: string; text: string } => b?.type === 'text' && typeof b.text === 'string')
-        .map((b) => b.text);
-      out.push({
-        ts: rec.timestamp ?? '',
-        name: t.name ?? '',
-        status: t.status ?? '',
-        input: t.input ?? {},
-        texts,
-        exitCode: t.result?.details?.capture?.termination?.exitCode,
-        isError: t.result?.isError === true,
-      });
-    }
-  }
-  return out;
-}
-
 function flat(s: string): string {
   return s.replace(/\r/g, '␍').replace(/\n/g, '⏎');
 }
@@ -560,65 +505,128 @@ test('pi exec running: literal tools.bash commands print command and #hash', asy
 
 // ---- fixture: pi-exec-u1-excerpt.jsonl ----
 
+// Expected output lines for the fixture, derived by walking its records in order: every exec call
+// without a result yields one scanned line per literal tools.* call, every traced result yields one
+// line per inner call, an untraced result yields the single `exec  #- -> unknown:` line.
 test('pi exec traced: per-inner-call lines from details.traces', async (): Promise<void> => {
   const r: RunResult = await runLogTail(join(fixtures, 'pi-exec-u1-excerpt.jsonl'));
   expect(r.code, r.stderr).toBe(0);
   const out: string[] = lines(r.stdout);
-  const traces: PiTrace[] = piExecTraces();
-  // 11 traced inner calls plus the one untraced exec line (source line 95's syntax-error result)
-  expect(out.length).toBe(traces.length + 1);
-  const expectedPrefix = (t: PiTrace): { target: string; identity: string; status: string } => {
-    if (t.status === 'running') return { target: str(t.input.command ?? t.input.path), identity: '', status: 'running' };
-    if (t.name === 'bash') {
-      const cmd: string = str(t.input.command);
-      return {
-        target: cmd,
-        identity: '#' + sha8(cmd),
-        status: t.exitCode === undefined ? (t.isError ? 'error' : 'ok') : t.exitCode === 0 ? 'ok' : 'exit ' + t.exitCode,
-      };
-    }
-    if (t.name === 'edit') {
-      const edits = (t.input.edits ?? []) as Array<{ oldText: string; newText: string }>;
-      return {
-        target: str(t.input.path),
-        identity: 'old#' + sha8(edits.map((e) => e.oldText).join('')) + ' new#' + sha8(edits.map((e) => e.newText).join('')),
-        status: t.isError ? 'error' : 'ok',
-      };
-    }
-    return { target: str(t.input.path), identity: '-', status: t.isError ? 'error' : 'ok' };
-  };
+
+  const recs: unknown[] = readFileSync(join(fixtures, 'pi-exec-u1-excerpt.jsonl'), 'utf8')
+    .split('\n')
+    .filter((l) => l !== '')
+    .map((l) => JSON.parse(l));
   const str = (v: unknown): string => (typeof v === 'string' ? v : '');
-  let i: number = 0;
-  for (const t of traces) {
-    const e = expectedPrefix(t);
-    if (t.status === 'running') {
-      // a still-running inner call prints its identity and 'running' with no excerpt
-      const cmd: string = str(t.input.command);
-      expect(out[i]).toBe(t.ts + ' ' + t.name + ' ' + cutLike(cmd) + ' #' + sha8(cmd) + ' -> running:');
-    } else {
-      const prefix: string = t.ts + ' ' + t.name + ' ' + cutLike(e.target) + ' ' + e.identity + ' -> ' + e.status + ':';
-      expect(out[i].startsWith(prefix), 'trace line ' + i + ' (' + t.name + '): ' + out[i]).toBe(true);
-      // excerpt is the first non-empty result text line, never the [exit N. metadata line
-      if (t.name === 'bash') expect(out[i]).not.toContain('[exit ');
-      const excerpt: string = t.texts.join('\n').split('\n').find((l) => l.trim() !== '' && !l.startsWith('[exit ')) ?? '';
-      if (excerpt !== '') expect(out[i]).toContain(cutLike(excerpt).slice(0, 60));
+  // the arg regex reads the first literal for key in the remainder; fixture scan code is literal-only
+  const litArg = (rest: string, key: string): string | null => {
+    const mm = new RegExp('\\b' + key + '\\s*:\\s*([\'"`])((?:\\\\.|(?!\\1)[^])*)\\1').exec(rest);
+    return mm === null ? null : mm[2].replace(/\\(.)/g, '$1');
+  };
+  const resultIds: Set<string> = new Set();
+  const callTs: Map<string, string> = new Map();
+  for (const rec of recs) {
+    const msg = (rec as { message?: { role?: string; toolCallId?: string; content?: Array<{ type?: string; name?: string; id?: string }> } }).message;
+    const ts: string = str((rec as { timestamp?: string }).timestamp);
+    if (msg?.role === 'toolResult') resultIds.add(str(msg.toolCallId));
+    if (msg?.role === 'assistant') {
+      for (const c of msg.content ?? []) if (c.type === 'toolCall' && c.name === 'exec') callTs.set(str(c.id), ts);
     }
-    i++;
-    // the untraced exec (source line 95) prints exactly one line at position 5 (0-based) between
-    // the first running-bash trace and the edit+bash pair
-    if (i === 5) {
-      expect(out[i]).toBe('2026-11-20T14:56:33.652Z exec  #- -> unknown:');
-      expect(out[i]).not.toMatch(/#[0-9a-f]{8}/);
-      i++;
+  }
+
+  const ordered: string[] = [];
+  for (const rec of recs) {
+    const ts: string = str((rec as { timestamp?: string }).timestamp);
+    const msg = (rec as {
+      message?: {
+        role?: string;
+        toolName?: string;
+        content?: Array<{ type?: string; name?: string; id?: string; arguments?: { code?: string } }>;
+        details?: {
+          traces?: Array<{
+            name?: string;
+            status?: string;
+            input?: Record<string, unknown>;
+            result?: {
+              isError?: boolean;
+              details?: { capture?: { termination?: { exitCode?: number } } };
+            };
+          }>;
+        };
+      };
+      toolCallId?: string;
+    }).message;
+    if (msg?.role === 'assistant') {
+      // unpaired exec calls print their scanned literal tools.* calls as running lines
+      for (const c of msg.content ?? []) {
+        if (c.type !== 'toolCall' || c.name !== 'exec' || resultIds.has(str(c.id))) continue;
+        const code: string = str(c.arguments?.code);
+        for (const m of code.matchAll(/\btools\.(bash|edit|read|write|ls)\s*\(/g)) {
+          const rest: string = code.slice(m.index);
+          const name: string = m[1];
+          if (name === 'bash') {
+            const cmd: string | null = litArg(rest, 'command');
+            ordered.push(cmd === null ? ts + ' bash <expr> #- -> running:' : ts + ' bash ' + cutLike(cmd) + ' #' + sha8(cmd) + ' -> running:');
+          } else if (name === 'edit') {
+            const path: string | null = litArg(rest, 'path');
+            const oldT: string | null = litArg(rest, 'oldText');
+            const newT: string | null = litArg(rest, 'newText');
+            ordered.push(
+              path !== null && oldT !== null && newT !== null
+                ? ts + ' edit ' + cutLike(path) + ' old#' + sha8(oldT) + ' new#' + sha8(newT) + ' -> running:'
+                : ts + ' edit ' + (path === null ? '<expr>' : cutLike(path)) + ' - -> running:',
+            );
+          } else {
+            const path: string | null = litArg(rest, 'path');
+            ordered.push(ts + ' ' + name + ' ' + (path === null ? '<expr>' : cutLike(path)) + ' - -> running:');
+          }
+        }
+      }
+    } else if (msg?.role === 'toolResult' && msg.toolName === 'exec') {
+      const traces = msg.details?.traces;
+      if (traces === undefined || traces.length === 0) {
+        // the kept exec line stamps the call's time, not the result's
+        ordered.push((callTs.get(str(msg.toolCallId)) ?? ts) + ' exec  #- -> unknown:');
+        continue;
+      }
+      for (const t of traces) {
+        const input = t.input ?? {};
+        const name: string = str(t.name);
+        const term = t.result?.details?.capture?.termination;
+        const isError: boolean = t.result?.isError === true;
+        if (t.status === 'running' || name === 'bash') {
+          const cmd: string = str(input.command);
+          const status: string =
+            t.status === 'running' ? 'running' : term?.exitCode === undefined ? (isError ? 'error' : 'ok') : term.exitCode === 0 ? 'ok' : 'exit ' + term.exitCode;
+          ordered.push(ts + ' ' + name + ' ' + cutLike(cmd) + ' #' + sha8(cmd) + ' -> ' + status + (t.status === 'running' ? ':' : ': '));
+        } else if (name === 'edit') {
+          const edits = (input.edits ?? []) as Array<{ oldText: string; newText: string }>;
+          const idt: string = 'old#' + sha8(edits.map((e) => e.oldText).join('')) + ' new#' + sha8(edits.map((e) => e.newText).join(''));
+          ordered.push(ts + ' edit ' + cutLike(str(input.path)) + ' ' + idt + ' -> ' + (isError ? 'error' : 'ok') + ': ');
+        } else {
+          ordered.push(ts + ' ' + name + ' ' + cutLike(str(input.path)) + ' - -> ' + (isError ? 'error' : 'ok') + ': ');
+        }
+      }
     }
+  }
+
+  expect(out.length).toBe(ordered.length);
+  // lines ending ': ' assert a prefix (excerpt follows); the rest assert full equality
+  for (let i = 0; i < ordered.length; i++) {
+    const exp: string = ordered[i];
+    if (exp.endsWith(': ')) expect(out[i].startsWith(exp), 'line ' + i + ': ' + out[i]).toBe(true);
+    else expect(out[i], 'line ' + i).toBe(exp);
   }
   // identical commands in different execs share one identity (the two grep -v pairs)
   const hashes: string[] = out.map((l) => (l.match(/#([0-9a-f]{8})/) ?? ['', ''])[1]).filter((h) => h !== '');
   const counts: Map<string, number> = new Map();
   for (const h of hashes) counts.set(h, (counts.get(h) ?? 0) + 1);
   expect([...counts.values()].some((c) => c === 2)).toBe(true);
-  // no exec line survives except the untraced one
-  expect(out.filter((l) => l.includes(' exec ')).length).toBe(1);
+  // the only surviving exec line is the untraced one, and it carries no counting identity
+  const execLines: string[] = out.filter((l) => l.includes(' exec '));
+  expect(execLines).toEqual(['2026-11-20T14:56:33.649Z exec  #- -> unknown:']);
+  // no bash line excerpt is the [exit N. metadata line
+  for (const l of out.filter((l) => l.includes(' bash '))) expect(l).not.toContain('[exit ');
 });
 
 test('pi exec running: tools calls in code print one line each, in order', async (): Promise<void> => {
