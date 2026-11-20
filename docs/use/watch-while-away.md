@@ -1,22 +1,22 @@
 # Watch while you are away
 
-Optional: the [watch-issues](../../skills/watch-issues/SKILL.md) skill checks every open leaf of one repository every 20 minutes while you step away. You start it and you stop it. Your leaves run the same without it.
+Optional: the [watch-issues](../../skills/watch-issues/SKILL.md) skill checks every open leaf of one repository every 20 minutes while you step away. It works in claude, codex, pi and agy. You start it and you stop it. Your leaves run the same without it.
 
 ## Start the watch
 
-Open Claude Code in an hc terminal of the session that holds the repository's space, in the registered repository, and run:
+Open your agent CLI — claude, codex, pi or agy — in an hc terminal of the session that holds the repository's space, in the registered repository, and send:
 
 ```text
-/watch-issues
+watch-issues <root>
 ```
 
-It runs one check right away. Then it creates one Claude Code cron job that repeats the check every 20 minutes and prints the job id and its 7-day expiry. If a watch job already exists, it reports that job and creates no second one. The watch needs Claude Code cron, so it does not run in other agent CLIs.
+(Claude also accepts `/watch-issues`.) It runs one check right away and starts a timer terminal named `<prefix>-watch` in the same session, which sends a `watch-issues tick` line to your agent every 20 minutes. If a watch is already running, it reports it and starts no second one.
 
 A tick that queues up while a check runs gets its own check afterwards.
 
 ## What each check does
 
-![The watch loop: a 20-minute cron reads status, stops if the repository is paused, then either acts within allowed steps or reports, and notifies you.](../pictures/watch-loop.svg)
+![The watch loop: a 20-minute timer reads status, stops if the repository is paused, then either acts within allowed steps or reports, and notifies you.](../pictures/watch-loop.svg)
 
 1. It runs `akrogon status`. If the repository is paused with `akrogon pause`, the check does nothing else.
 2. It reads each open leaf's phase, seats and failure record.
@@ -33,12 +33,12 @@ The watch never kills an agent, kills or removes a terminal, answers a seat, or 
 
 ## Stop the watch
 
-Stop it with:
+Stop it from any terminal of the session, in the watching agent or another one, with:
 
 ```text
-/watch-issues stop
+watch-issues stop <root>
 ```
 
-Clearing the watch's conversation with `/clear` also stops it: Claude Code keeps the cron job through a clear, so the next tick deletes the job instead of checking, as long as that tick is the first thing the cleared conversation receives. The job also ends when the Claude Code session ends or the 7-day expiry passes. It never stops itself otherwise, even when no open leaves are left.
+(Claude also accepts `/watch-issues stop`.) Besides a stop, the watch ends when the watching agent exits, when its terminal finishes or is reused for another program, and on a conversation reset the harness shows: `/clear` on claude or agy stops it. Codex and pi `/new` may leave the watch running into the new conversation — the first tick tries to stop it, but this is a stated limit, not a guarantee. A tick hc holds back while you have an unfinished draft typed may land in the shell left behind if you exit a shell-launched agent in that window; any agent that gets it refuses it. The watch never ends on its own otherwise, even when no open leaves are left.
 
 Next: [Commands](../reference/commands.md)

@@ -69,9 +69,9 @@ Chart consultants are different from seats A and B. A consultant is an hc termin
 
 ## watch-issues
 
-- **Result:** a Claude Code cron job that checks every open leaf of one repo every 20 minutes. It moves waiting leaves on, recovers some failures, steers looping seats once and notifies you when a leaf needs you.
+- **Result:** a timer terminal that checks every open leaf of one repo every 20 minutes through your agent. It moves waiting leaves on, recovers some failures, steers looping seats once and notifies you when a leaf needs you.
 - **When to use:** you are stepping away and want open leaves to keep moving.
-- **Who starts it:** you, and only you stop it with `/watch-issues stop`. It works only in Claude Code. The job also ends with the session or its own 7-day expiry.
+- **Who starts it:** you, and only you stop it with `watch-issues stop`. It works in claude, codex, pi and agy. The watch also ends when the agent exits, when its terminal is reused, or on a reset the harness shows (codex and pi `/new` are a stated limit); it never ends on its own.
 - **Source:** [`skills/watch-issues/SKILL.md`](../../skills/watch-issues/SKILL.md)
 
 ## learn-issues

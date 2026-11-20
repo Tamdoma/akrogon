@@ -1,6 +1,6 @@
 ---
 name: watch-issues
-description: Watch every open leaf of one repo on a 20-minute cron while the operator is away, started and stopped only by the operator.
+description: Watch every open leaf of one repo on a 20-minute timer while the operator is away, started and stopped only by the operator.
 ---
 
 # Watch issues
@@ -9,13 +9,13 @@ Operator-invoked watch over every leaf under `issues/open` of the registered rep
 
 ## Invocations
 
-Claude Code only. When CronCreate is absent, say "This watch needs Claude Code cron, so no watch is running." and claim no watch.
+The same on every harness — claude, codex, pi and agy. The operator sends `watch-issues <root>` (claude alias `/watch-issues <root>`) to start, `watch-issues stop <root>` (claude alias `/watch-issues stop <root>`) to stop, and the watch sends its own ticks as `watch-issues tick timer=<address> pid=<pid> due=<n> <root>`. `<root>` is the registered repo root and the cwd of every akrogon command. One watch runs per repo: an hc terminal named `<prefix>-watch` in the repo's session sends one tick every 20 minutes.
 
-Job identity is the exact prompt `/watch-issues tick <root>`. The watch ends on `/watch-issues stop`, session loss, the job's own expiry or a `/clear` of its conversation.
+- `watch-issues <root>`: run `bun <skill-folder>/scripts/start.ts <root>` and read its line. `started <address>` or `running <address>` runs the one check of `akrogon status <root>` — the check still runs on a paused repo, since starting the watch is not an act on a leaf — then reports the line. `refused` or `conflict` is reported with no check, and nothing was started.
+- `watch-issues tick timer=<address> pid=<pid> due=<n> <root>`: run `bun <skill-folder>/scripts/tick.ts <tick tail>` — the tail is everything after `tick`, verbatim — and read its line. `accept` runs the one check: the script already verified the timer and set its `akrogon.watch-due` receipt first. `no-watch` or `stopped` is reported and runs no check; a tick never starts or recreates a timer. A tick that is the first prompt of its conversation while a verified timer is live means a reset ended the watching conversation: it runs the stop steps below, replies with their result and runs no check, and for codex and pi `/new` this stop is attempted, not guaranteed. A compaction summary before the tick is not a reset, and another prompt after a reset before the first tick spends that chance, leaving the watch running until `watch-issues stop`. Ticks queued while a check runs each run their own check, as the harness submits each as its own turn.
+- `watch-issues stop <root>`: run `bun <skill-folder>/scripts/stop.ts <root>` and report its line. It works from any terminal in the session.
 
-- `/watch-issues` from `<root>`: run one check now, then use CronList to find jobs with the exact prompt: zero matches creates one job with CronCreate, schedule `*/20 * * * *` recurring and that exact prompt, then reports its id and 7-day expiry; one match is reported and no job is created; several matches are reported and no job is created or deleted. A paused check still runs the CronList and creation step: creation is not an act on a leaf.
-- `/watch-issues tick <root>`: Claude Code keeps the job through `/clear`, so a tick that is the first prompt of its conversation while CronList finds a job with the exact prompt means the operator cleared the watch: it runs the stop steps below, replies with their result and runs no check. A compaction summary before the tick means the conversation was not cleared. Another prompt typed after the clear and before the first tick spends that chance, and the watch then runs until `/watch-issues stop`. Any other tick runs one check only and never creates a job, even when zero match; ticks queued while a check ran each run their own check, as Claude Code submits each as its own turn.
-- `/watch-issues stop`: use CronList for the exact prompt: one match is deleted with CronDelete and reported; zero matches is reported as already stopped; several matches are reported and none are deleted.
+The watch ends on `watch-issues stop`, on the watching agent's exit, on the watcher terminal finishing or changing its foreground (the timer stops itself when the terminal is reused or its transcript changes), or on a reset the harness shows. It never ends on its own otherwise. Stated limits: a tick hc holds behind an unfinished operator draft may land in the shell left behind when the operator exits a shell-launched agent in that window — or in a program the operator starts there — and a replacement agent running this skill refuses it by the tick's `pid=`; codex and pi `/new` may leave the watch running into the new conversation.
 
 ## Observe
 
@@ -47,14 +47,13 @@ Required seats by phase: plan.synthesis A, implement A, check.review A+B (B only
 ## Never
 
 - Kill an agent process.
-- Kill or remove an hc terminal.
+- Kill or remove an hc terminal — allowed only for the verified watch timer on `watch-issues stop` and when a tick's `pid=` mismatches.
 - Stop one seat twice per watch.
 - Use `hc send --force`.
 - Run `phase failed`.
 - Edit `state.yaml`, worktrees or `issues/`.
 - Open `.env`.
 - Answer a seat.
-- Create a job from a tick.
 - Put a Bash timeout on `next`/`phase`.
 
 ## Reply

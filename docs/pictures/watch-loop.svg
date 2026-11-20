@@ -18,7 +18,7 @@
   <rect x="1" y="1" width="558" height="508" rx="12" fill="#ffffff" stroke="#d0d7de" stroke-width="2"/>
 
   <rect class="node" x="160" y="24" width="240" height="56" rx="8" style="stroke: #0969da;"/>
-  <text x="280" y="59">cron every 20 min</text>
+  <text x="280" y="59">timer every 20 min</text>
   <line class="edge" x1="280" y1="80" x2="280" y2="106" marker-end="url(#arrow)"/>
 
   <rect class="node" x="80" y="110" width="400" height="76" rx="8"/>
