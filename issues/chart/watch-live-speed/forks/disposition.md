@@ -67,3 +67,14 @@ S4. check.fix F2: on a watcher showing `done` (most ticks), hc has no guarded se
 - S4a: accept it as a stated limit, named in the skill and docs, plus an in-leaf mitigation: the tick carries the turn the timer read and tick.ts refuses a tick arriving in a later turn, so no check runs inside the person's turn and the timer resends (E D3; unproven, free stand-in proof).
 - S4b: add `--if done` (and a refuse-on-draft option) to hc first, as its own chart, then watch-timer uses it; no window remains; changes 5a.
 Recommended: S4a (A).
+
+S4 and grant, operator 2026-11-21, verbatim: "S4a, gamrsnt 8 stop" then "Grant 8 stop". Read as: S4a taken; a new grant of 8 prompted sessions, each within 10 minutes, with a written stop at the bound.
+
+Correction 5 draft (A, S4a as taken; slots/correction-5-draft.md), sent for final-shape check 5.
+
+Correction 5 draft not taken, 2026-11-21, after final-shape check 5 (slots/final-shape-5-{b,c,e}.md). hc's send reply gives the program's last status word, not who owns the turn (B F3). The timer learns it only after the text is typed, so a label handshake races tick.ts (B F1, C D1, E D1). Detection after a draft hold, the common case, is unobserved and not testable free (E D2). Making it work needs a per-attempt label, a bounded wait in tick.ts, a new tick outcome and skill line, and an hc wrapper test (B F2, E D4), and it still covers only the rare case. A shell-hosted harness exiting between the pin read and an unguarded send, with no draft, is also uncovered by S2a (B F6). Asked as S5:
+
+S5. S4a's guard:
+- S5a: drop the guard and keep only the stated limit, named in the skill and docs (E D3 wording): a prompt typed into the watcher terminal when a tick is due can receive the tick; claude and agy run the check inside that turn; on codex the prompt's task is dropped and must be retyped; and a shell-hosted agent that exits right as a tick goes out can leave the tick in the shell. No code change; check.fix touches only the skill and docs.
+- S5b: build the guard as E describes, covering only ticks hc reports as joined; the draft-hold case stays a limit.
+Recommended: S5a (A).
