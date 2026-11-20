@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test';
 import { z } from 'zod';
-import { basename, resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import {
   fixture,
@@ -151,6 +151,7 @@ await import(${JSON.stringify(entry)});
     const refusals: string[] = [...new Bun.Glob('**/run-*/refusal.json').scanSync({ cwd: leafTempRoot(f) })];
     expect(refusals).toHaveLength(1);
     expect(readFileSync(resolve(leafTempRoot(f), refusals[0]), 'utf8')).toContain('owner gone');
+    expect(existsSync(resolve(dirname(resolve(leafTempRoot(f), refusals[0])), '.akrogon-kept'))).toBe(false);
   } finally {
     f.clean();
   }
@@ -258,7 +259,7 @@ test('run-check sets AKROGON_BASE to the merge base', async () => {
   }
 });
 
-test('run-check TMPDIR is a fresh run root under the leaf temp dir and is removed on success and failure', async () => {
+test('run-check TMPDIR is a fresh run root under the leaf temp dir and is removed on success', async () => {
   const f: Fixture = await fixture();
   try {
     const { worktree } = await leafWorktree(f, 'tmpdir-leaf');
@@ -267,9 +268,48 @@ test('run-check TMPDIR is a fresh run root under the leaf temp dir and is remove
     expect(ok.stdout.startsWith(leafTempRoot(f))).toBe(true);
     expect(basename(ok.stdout).startsWith('run-')).toBe(true);
     expect(existsSync(ok.stdout)).toBe(false);
-    const bad = await cli(f, ['run-check', '--', ...sh('printf %s "$TMPDIR" >&2; exit 7')], worktree, baseEnv(f));
-    expect(bad.code).toBe(7);
-    expect(existsSync(bad.stderr)).toBe(false);
+    expect(scratchRuns(f)).toEqual([]);
+  } finally {
+    f.clean();
+  }
+});
+
+// A red run marks its run root with .akrogon-kept and leaves it where the
+// command printed it, so evidence the child wrote under $TMPDIR stays
+// readable until the leaf temp is released.
+test('a red run-check run keeps its run root marked .akrogon-kept and its files readable', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { worktree } = await leafWorktree(f, 'tmpdir-red');
+    const result = await cli(
+      f,
+      [
+        'run-check',
+        '--',
+        ...sh('mkdir -p "$TMPDIR/evidence" && echo kept > "$TMPDIR/evidence/f"; printf %s "$TMPDIR"; exit 7'),
+      ],
+      worktree,
+      baseEnv(f),
+    );
+    expect(result.code).toBe(7);
+    const root: string = result.stdout.split('\n').pop()!;
+    expect(existsSync(resolve(root, '.akrogon-kept'))).toBe(true);
+    expect(existsSync(resolve(root, '.owner'))).toBe(true);
+    expect(readFileSync(resolve(root, 'evidence/f'), 'utf8')).toBe('kept\n');
+    expect(scratchRuns(f)).toEqual([root]);
+  } finally {
+    f.clean();
+  }
+});
+
+// A command that deleted its own $TMPDIR still exits with its code and leaves
+// no run root: there is nothing left to mark.
+test('a red run-check command that deleted its own TMPDIR keeps its exit and leaves no run root', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { worktree } = await leafWorktree(f, 'tmpdir-gone');
+    const result = await cli(f, ['run-check', '--', ...sh('rm -rf "$TMPDIR"; exit 7')], worktree, baseEnv(f));
+    expect(result.code).toBe(7);
     expect(scratchRuns(f)).toEqual([]);
   } finally {
     f.clean();

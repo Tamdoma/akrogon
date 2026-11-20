@@ -13,7 +13,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
-import { dirname, resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 import {
   fixture,
   cli,
@@ -289,6 +289,41 @@ test('run root with a dead owner pid is removed, live owner kept', async () => {
     expect(existsSync(live)).toBe(true);
     const out: Result = await status(f, 'scratch-leaf');
     expect(out.stdout).toContain(live);
+    expect(keptReport(f).find((entry) => entry.path === live)?.reason).toBe('run in progress');
+  } finally {
+    await f.clean();
+  }
+});
+
+// A marked run root (.akrogon-kept) is never swept and never reported: it
+// lives until the leaf temp goes with the tab, even when its .owner still
+// names a live pid.
+test('a marked run root stays silently while its leaf lives and goes with the leaf temp release', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  f.env = { ...f.env, ...fakeSystemctl(f).env };
+  try {
+    const path: string = await dispatchLeaf(f, 'marked-leaf');
+    const scratch: string = scratchFor(f, 'marked-leaf');
+    const boot: string = readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim();
+    const deadMarked: string = mkdtempSync(resolve(scratch, 'run-'));
+    writeFileSync(
+      resolve(deadMarked, '.owner'),
+      JSON.stringify({ pid: 4194303, boot_id: boot, started: new Date().toISOString() }),
+    );
+    writeFileSync(resolve(deadMarked, '.akrogon-kept'), '');
+    const liveMarked: string = mkdtempSync(resolve(scratch, 'run-'));
+    writeFileSync(resolve(liveMarked, '.owner'), ownerRecord(process.pid));
+    writeFileSync(resolve(liveMarked, '.akrogon-kept'), '');
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(deadMarked)).toBe(true);
+    expect(existsSync(liveMarked)).toBe(true);
+    const kept: { path: string; reason: string }[] = keptReport(f);
+    expect(kept.some((entry) => entry.path === deadMarked || entry.path === liveMarked)).toBe(false);
+    expect((await status(f, 'marked-leaf')).stdout).not.toContain(basename(deadMarked));
+    expect((await cli(f, ['leftovers'], f.root, f.env)).stdout).not.toContain(basename(deadMarked));
+    await closeTab(f, readState(path).tab!);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(existsSync(scratch)).toBe(false);
   } finally {
     await f.clean();
   }
