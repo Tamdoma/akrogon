@@ -61,9 +61,6 @@ function note(line: string): void {
   lastNote = line;
   console.log(`[watch-timer] ${line}`);
 }
-const errText = (error: unknown): string =>
-  error instanceof HcError ? `${error.kind}` : error instanceof Error ? error.message : String(error);
-
 type Due = { n: number; attempts: number; lastSent: number | null };
 
 const dues: Due[] = [];
@@ -72,16 +69,11 @@ let nextBoundary: number = Date.now() + intervalMs;
 let effectiveTranscript: string | null = args.transcript;
 let transcriptMiss: number = 0;
 
-// The timer's own akrogon.watch-due label; null when it can't be read (foreign runs read no receipt).
+// The timer's own akrogon.watch-due label. A missing label and a failed read are distinct.
 async function receipt(): Promise<string | null> {
   if (self === '') return null;
-  try {
-    const me: Seen = await terminal(args.session, self);
-    return me.labels['akrogon.watch-due'] ?? null;
-  } catch (error) {
-    if (error instanceof HcError) return null;
-    throw error;
-  }
+  const me: Seen = await terminal(args.session, self);
+  return me.labels['akrogon.watch-due'] ?? null;
 }
 
 async function poll(): Promise<'exit' | 'stay'> {
@@ -127,7 +119,14 @@ async function poll(): Promise<'exit' | 'stay'> {
     return 'exit';
   }
 
-  const resolved: string | null = await transcriptFor({ session: args.session, address: args.watcher });
+  let resolved: string | null;
+  try {
+    resolved = await transcriptFor({ session: args.session, address: args.watcher });
+  } catch (error) {
+    if (!(error instanceof HcError)) throw error;
+    note(`hc transcript lookup failed: ${error.kind}`);
+    return 'stay';
+  }
   if (resolved !== null) {
     if (effectiveTranscript === null) effectiveTranscript = resolved;
     else if (resolved !== effectiveTranscript) {
@@ -145,11 +144,12 @@ async function poll(): Promise<'exit' | 'stay'> {
   // Delivery check on every poll: the receipt stamp is the whole proof, so no turn tracking is
   // needed (an untracked watcher's turn never moves). A due whose window lapses unreceipted
   // resends once, then drops while later dues continue.
-  let rcpt: string | null = null;
+  let rcpt: string | null;
   try {
     rcpt = await receipt();
   } catch (error) {
-    note(`receipt read failed: ${errText(error)}`);
+    if (!(error instanceof HcError)) throw error;
+    note(`receipt read failed: ${error.kind}`);
     return 'stay';
   }
   while (dues.length > 0 && rcpt !== null && dues[0].n <= Number(rcpt)) {
