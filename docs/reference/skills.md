@@ -71,7 +71,7 @@ Chart consultants are different from seats A and B. A consultant is an hc termin
 
 - **Result:** a timer terminal that checks every open leaf of one repo every 20 minutes through your agent. It moves waiting leaves on, recovers some failures, steers looping seats once and notifies you when a leaf needs you.
 - **When to use:** you are stepping away and want open leaves to keep moving.
-- **Who starts it:** you, and only you stop it with `watch-issues stop`. It works in claude, codex, pi and agy. The watch also ends when the agent exits, when its terminal is reused, or on a reset the harness shows (codex and pi `/new` are a stated limit); it never ends on its own.
+- **Who starts it:** you. It works in claude, codex, pi and agy. Use `watch-issues stop` to end it. It also ends on agent exit, terminal reuse, or a reset the harness shows. A compaction summary before a tick keeps it running. See the reset and held-draft limits in [Watch while away](../use/watch-while-away.md#stop-the-watch).
 - **Source:** [`skills/watch-issues/SKILL.md`](../../skills/watch-issues/SKILL.md)
 
 ## learn-issues

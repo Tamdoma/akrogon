@@ -39,6 +39,8 @@ Stop it from any terminal of the session, in the watching agent or another one, 
 watch-issues stop <root>
 ```
 
-(Claude also accepts `/watch-issues stop`.) Besides a stop, the watch ends when the watching agent exits, when its terminal finishes or is reused for another program, and on a conversation reset the harness shows: `/clear` on claude or agy stops it. Codex and pi `/new` may leave the watch running into the new conversation — the first tick tries to stop it, but this is a stated limit, not a guarantee. A tick hc holds back while you have an unfinished draft typed may land in the shell left behind if you exit a shell-launched agent in that window; any agent that gets it refuses it. The watch never ends on its own otherwise, even when no open leaves are left.
+(Claude also accepts `/watch-issues stop`.) The watch also ends when the agent exits, when its terminal finishes or is reused, and when claude or agy shows a `/clear` reset. Codex and pi `/new` may leave the watch running into the new conversation. The first tick attempts to stop it. A compaction summary before a tick keeps the watch running, as does having no open leaves.
+
+If you exit a shell-launched agent while hc holds a tick behind your unfinished draft, the tick can reach the shell or a program you start in it during that hold. A replacement agent running `watch-issues` refuses the tick when its process ID differs.
 
 Next: [Commands](../reference/commands.md)

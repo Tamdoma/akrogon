@@ -13,7 +13,7 @@ A usual day takes a request, charts it into leaves, runs the leaves and ends wit
 5. The seats work the leaf. Seat A plans it, A builds it, they review it, and B repairs what the review finds or hands it back to A. Akrogon prompts the next seat from the leaf's state, so you do not copy prompts between panes. See [plan-issue](../../skills/plan-issue/SKILL.md), [implement-issue](../../skills/implement-issue/SKILL.md) and [check-issue](../../skills/check-issue/SKILL.md).
 6. The command lands it. When a merge attempt is ready, `akrogon next` runs `akrogon land`, which checks the attempt, pushes it and moves the leaf to `merged`. If a check fails or a rebase is needed, seat B takes over with the [merge-issue](../../skills/merge-issue/SKILL.md) skill.
 
-Optional: run `/watch-issues` beside steps 4 to 6 to keep leaves moving while you step away. See [Watch while away](watch-while-away.md).
+Run `watch-issues <root>` beside steps 4 to 6 to keep leaves moving while you step away. See [Watch while away](watch-while-away.md).
 
 Optional: when you set Discord targets under `broadcast` in [config.md](../reference/config.md), seat B sends one plain update per finished issue or epic after it merges. See [broadcast-issue](../../skills/broadcast-issue/SKILL.md).
 

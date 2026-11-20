@@ -26,7 +26,7 @@ One page per job.
 - [When work fails](use/when-work-fails.md): read why a leaf stopped in `failed` and send it back to work.
 - [Merge and announce](use/merge-and-announce.md): how a leaf that passed review is landed, and the update sent when an issue or epic completes.
 - [Save records](use/save-records.md): save plans, reviews, state and logs under `issues/` with `akrogon sync`.
-- [Watch while away](use/watch-while-away.md): keep leaves moving with `/watch-issues` while you step away.
+- [Watch while away](use/watch-while-away.md): keep leaves moving with `watch-issues <root>` while you step away.
 - [Report an observation](use/report-an-observation.md): file something you saw go wrong as an unverified GitHub issue with seed-issue.
 - [Learn from work](use/learn-from-work.md): how seats write lessons, and how `/learn-issues` clears the ones that no longer apply.
 - [Roll back a release](use/roll-back-a-release.md): go back to the previous release when a deploy breaks the `akrogon` command.
