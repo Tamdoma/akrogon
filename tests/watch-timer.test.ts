@@ -496,6 +496,23 @@ test.serial('an unreceipted due is resent once then dropped while later dues con
   }
 });
 
+test.serial('a receipt without a watcher turn does not suppress the one resend', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    const rig: Rig = await watchUp(f, { mode: 'idle' });
+    const timer: string = await started(rig);
+    const before: number = (await get(f.core, rig.watcher)).turn;
+    await waitTick(rig, 1);
+    const receipt: SpawnResult = await f.core.hc(['label', timer, 'akrogon.watch-due=1']);
+    expect(receipt.code).toBe(0);
+    await waitTick(rig, 2, 20_000);
+    expect((await get(f.core, rig.watcher)).turn).toBe(before);
+    expect(tickLines(rig, 1)).toHaveLength(2);
+  } finally {
+    await f.clean();
+  }
+});
+
 // Criteria 5, 6: stop from any terminal, restart, refusal forms.
 test.serial('stop kills the verified timer; stale and forged ticks run nothing', async () => {
   const f: HcFixture = await hcFixture();
