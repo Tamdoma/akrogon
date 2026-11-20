@@ -598,6 +598,39 @@ test.serial('stop kills the verified timer; stale and forged ticks run nothing',
 });
 
 // Criterion 7: every exit key ends the timer and frees the name, without sending.
+test.serial('the timer reports a failed hc receipt read', async () => {
+  const f: HcFixture = await hcFixture();
+  const bin: string = resolve(f.home, 'watch-logbin');
+  const failedRead: string = resolve(f.home, 'failed-receipt-read');
+  const hc: string = z.string().parse(Bun.which('hc'));
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(
+    resolve(bin, 'hc'),
+    `#!/bin/sh
+if [ "$1" = get ] && [ -f '${failedRead}' ] && [ "$3" = "$(cat '${failedRead}')" ]; then
+  printf '%s\\n' '{"error":{"kind":"unavailable","message":"receipt lookup unavailable"}}' >&2
+  exit 1
+fi
+exec '${hc}' "$@"
+`,
+    { mode: 0o755 },
+  );
+  try {
+    const rig: Rig = await watchUp(f);
+    const timer: string = await started(rig);
+    writeFileSync(failedRead, timer);
+    const reason: string = 'receipt read failed: unavailable';
+    let screen: string = await screenOf(f.core, timer);
+    for (let n: number = 0; n < 30 && !screen.includes(reason); n += 1) {
+      await Bun.sleep(100);
+      screen = await screenOf(f.core, timer);
+    }
+    expect(screen).toContain(reason);
+  } finally {
+    await f.clean();
+  }
+});
+
 test.serial('the timer exits on a finished watcher, wrong start time and pin death', async () => {
   const f: HcFixture = await hcFixture();
   try {
