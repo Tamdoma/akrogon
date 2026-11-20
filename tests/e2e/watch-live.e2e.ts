@@ -191,11 +191,13 @@ async function waitCalls(file: string, match: (l: string) => boolean, n: number,
   throw new Error(`calls never reached ${n}: ${JSON.stringify(calls(file))}`);
 }
 
+// The receipt label is monotonic (each check stamps its due): a fast watcher can push it past
+// the asked due before the first poll, so due n is proven delivered by label >= n, not == n.
 async function waitDue(tier: WatchTier, timer: string, due: number, ms: number): Promise<void> {
   const deadline: number = Date.now() + ms;
   while (Date.now() < deadline) {
     const t: Term = await get(tier, timer);
-    if (t.labels['akrogon.watch-due'] === String(due)) return;
+    if (Number(t.labels['akrogon.watch-due'] ?? '0') >= due) return;
     await Bun.sleep(500);
   }
   const term: Term = await get(tier, timer);

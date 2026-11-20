@@ -183,11 +183,13 @@ async function waitTick(rig: Rig, due: number, ms: number = 15_000): Promise<voi
   throw new Error(`due ${due} not delivered: tasks=${JSON.stringify(tasks(rig))}`);
 }
 
+// The receipt label is monotonic: a fast watcher stamps past dues before the first poll, so
+// due n is proven delivered by label >= n, not == n.
 async function waitLabel(rig: Rig, due: number, ms: number = 15_000): Promise<void> {
   const deadline: number = Date.now() + ms;
   while (Date.now() < deadline) {
     const t: Term = await get(rig.core, rig.timer);
-    if (t.labels['akrogon.watch-due'] === String(due)) return;
+    if (Number(t.labels['akrogon.watch-due'] ?? '0') >= due) return;
     await Bun.sleep(200);
   }
   throw new Error(`receipt due=${due} missing: ${JSON.stringify(await get(rig.core, rig.timer))}`);
