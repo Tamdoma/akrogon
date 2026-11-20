@@ -345,16 +345,43 @@ test.serial('each due runs one check with its receipt first; busy dues each run 
     // one status call per delivered due: start + due1 + the two accrued dues
     expect(statusCalls(rig)).toBeGreaterThanOrEqual(4);
 
-    // Paused: a due still counts delivered (receipt set) but acts on nothing.
+    // Paused: a due still counts delivered (receipt set) but acts on nothing. The no-next proof
+    // is turn-attributed: an earlier check's `next` may still be landing when pause takes effect,
+    // so a bare count flakes. The paused check's own task turn carries `t=<turn>` on both the
+    // hook's tick line and the wrapper's call lines; its `next` would share that turn.
     const paused: Result = await cli(f, ['pause']);
     expect(paused.code).toBe(0);
     const pauseDue: number = Math.max(...tickLines(rig).map((l) => Number(/due=(\d+)/.exec(l)?.[1]))) + 1;
-    const beforeNext: number = nextCalls(rig);
     const beforeStatus: number = statusCalls(rig);
     await waitTick(rig, pauseDue, 25_000);
     await waitLabel(rig, pauseDue, 25_000);
     for (let n: number = 0; n < 60 && statusCalls(rig) <= beforeStatus; n += 1) await Bun.sleep(200);
-    expect(nextCalls(rig)).toBe(beforeNext);
+    const pTickIdx: number = hooks(rig).findLastIndex((l) => /tick exit=0 accept/.test(l));
+    const pTurn: string | null = / t=(\d+)/.exec(hooks(rig)[pTickIdx] ?? '')?.[1] ?? null;
+    expect(pTurn).not.toBeNull();
+    // The wrapper logs `call status` when the call starts; the hook's `status <out>` line lands
+    // only when it finishes — wait for this task's line so the check provably ran while paused
+    // (the hook logs only the first output line, so paused may not be in it; the no-next proof
+    // below is the criterion).
+    for (
+      let n: number = 0;
+      n < 60 && !hooks(rig).slice(pTickIdx).some((l) => l.startsWith('status '));
+      n += 1
+    )
+      await Bun.sleep(200);
+    expect(hooks(rig).slice(pTickIdx).some((l) => l.startsWith('status '))).toBe(true);
+    // A would-be next call lands right after its status call inside the same task; give it a
+    // beat, then require no `call next` at the paused check's turn after its status line.
+    await Bun.sleep(2500);
+    const pStatusIdx: number = calls(rig).findLastIndex(
+      (l) => l.startsWith('call status') && l.endsWith(`t=${pTurn}`),
+    );
+    expect(pStatusIdx).toBeGreaterThanOrEqual(0);
+    expect(
+      calls(rig)
+        .slice(pStatusIdx)
+        .some((l) => l.startsWith('call next') && l.endsWith(`t=${pTurn}`)),
+    ).toBe(false);
     const unpaused: Result = await cli(f, ['unpause']);
     expect(unpaused.code).toBe(0);
   } finally {
@@ -367,6 +394,7 @@ test.serial('an unreceipted due is resent once then dropped while later dues con
   try {
     const rig: Rig = await watchUp(f, { mode: 'idle' }); // hook never runs: no receipt, no check
     rig.timer = await started(rig);
+    for (let n: number = 0; n < 50 && statusCalls(rig) < 1; n += 1) await Bun.sleep(200);
     expect(statusCalls(rig)).toBe(1); // start's own check only
     await waitTick(rig, 1);
     const deadline: number = Date.now() + 25_000;
