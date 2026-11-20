@@ -65,6 +65,8 @@ const kinds: Record<string, { argv: (model: string) => string[]; trust: string |
     trust: 'Trust and continue',
   },
   pi: {
+    // --no-skills suppresses auto discovery: a same-named user skill still wins over --skill
+    // when discovery is on, and the operator's copy may be the old cron version (criterion 13).
     argv: (m) => [
       'pi',
       '--model',
@@ -74,6 +76,7 @@ const kinds: Record<string, { argv: (model: string) => string[]; trust: string |
       '-a',
       '--exclude-tools',
       'request_user_input',
+      '--no-skills',
       '--skill',
       skill,
     ],
