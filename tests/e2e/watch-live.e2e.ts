@@ -459,15 +459,12 @@ test('watch live: one watcher session per harness and shape', async () => {
     await waitDue(tier, timer, 2, 120_000);
     await waitCalls(callLog, (l) => l.startsWith('call status'), startCalls2 + 2, 90_000);
     expect(nextCalls(callLog)).toBeGreaterThanOrEqual(2);
-
-    // Busy: the next status call is held ~2.5 intervals; accrued dues each run their own check.
-    writeFileSync(resolve(flags, 'hold-status'), '75');
-    const heldAt: number = statusCalls(callLog);
+    // A later due keeps the rhythm after the first checks.
     await waitDue(tier, timer, 3, 180_000);
-    await waitDue(tier, timer, 4, 180_000);
-    // The hold makes each status call sleep inside the wrapper, so the log line lands only
-    // when the sleep ends; the busy dues' turns plus their held checks can take several holds.
-    await waitCalls(callLog, (l) => l.startsWith('call status'), heldAt + 2, 240_000);
+
+    // Busy-accrual (dues piling while a check runs, each running its own check after) is proven
+    // deterministically in tests/watch-timer.test.ts with the stand-in; a live model defers or
+    // batches those checks at its own discretion, so the live tier does not reproduce that window.
 
     // Old cron tick: no timer= → no check. Stamp a huge receipt first so every pending due
     // drains without sending; the watcher is then quiet for the probe's status assertion.
