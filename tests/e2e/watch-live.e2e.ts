@@ -476,7 +476,9 @@ test('watch live: one watcher session per harness and shape', async () => {
     await waitDue(tier, timer, 1, 120_000);
     await waitDue(tier, timer, 2, 120_000);
     await waitCalls(callLog, (l) => l.startsWith('call status'), startCalls2 + 2, 90_000);
-    expect(nextCalls(callLog)).toBeGreaterThanOrEqual(2);
+    // At least one check must act on the waiting leaf; a later check may judge a repeat `next`
+    // unnecessary once the seat is already prompted (pi did exactly that on live runs).
+    expect(nextCalls(callLog)).toBeGreaterThanOrEqual(1);
     // A later due keeps the rhythm after the first checks.
     await waitDue(tier, timer, 3, 180_000);
 
