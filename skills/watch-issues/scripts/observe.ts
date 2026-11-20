@@ -13,56 +13,7 @@ import {
   type LeafFailure,
   type State,
 } from '../../../src/state';
-
-type RunResult = { code: number; stdout: string; stderr: string };
-
-async function run(argv: string[], cwd: string): Promise<RunResult> {
-  const child: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn(argv, {
-    cwd,
-    stdin: 'ignore',
-    stdout: 'pipe',
-    stderr: 'pipe',
-  });
-  const [stdout, stderr, code]: [string, string, number] = await Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-    child.exited,
-  ]);
-  return { code, stdout: stdout.trimEnd(), stderr: stderr.trimEnd() };
-}
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-async function resolveRepoKey(root: string, bin: string): Promise<string> {
-  let result: RunResult;
-  try {
-    result = await run([bin, 'config'], root);
-  } catch (error) {
-    throw new Error(`akrogon config failed to spawn ${bin}: ${messageOf(error)}`);
-  }
-  if (result.code !== 0) {
-    throw new Error(`akrogon config failed: exit ${result.code} ${result.stderr} ${result.stdout}`.trim());
-  }
-  let parsed: unknown;
-  try {
-    parsed = Bun.YAML.parse(result.stdout);
-  } catch (error) {
-    throw new Error(`akrogon config returned invalid YAML: ${messageOf(error)}`);
-  }
-  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new Error('akrogon config has no usable repo: expected object with repo field');
-  }
-  const repo: unknown = (parsed as Record<string, unknown>).repo;
-  if (repo === 'none') {
-    throw new Error(`akrogon config reports repo "none": no registered repo for ${root}`);
-  }
-  if (typeof repo !== 'string' || repo.trim() === '') {
-    throw new Error('akrogon config has no usable repo: missing or invalid repo field');
-  }
-  return repo;
-}
+import { resolveRepoKey } from './repo';
 
 // A finished seat or hc's keep shell (a lost program, status cleared) is absent; a live seat that never
 // reported prints unknown.
@@ -110,7 +61,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
   const akrogonBin: string = process.env.OBSERVE_AKROGON ?? 'akrogon';
-  const repoKey: string = await resolveRepoKey(root, akrogonBin);
+  const { repo: repoKey } = await resolveRepoKey(root, akrogonBin);
   const repo: Repo = readRepo(repoKey, root);
   const resolved: SpaceResolution = await repoSpace(repo);
   if (!resolved.ok) throw new Error(resolved.reason);

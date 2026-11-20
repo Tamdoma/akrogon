@@ -910,6 +910,7 @@ export async function statusCommand(
           'm',
       );
   }
+  for (const name of [...paused].sort()) console.log(`paused: ${name}`);
   console.log(await listenerLine());
   for (const scan of scans) {
     if (!scan.ok) continue;
