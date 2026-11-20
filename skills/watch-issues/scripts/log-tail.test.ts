@@ -664,3 +664,12 @@ test('pi exec recorded edit failure prints error', async (): Promise<void> => {
     expect.stringMatching(/^\S+ edit .+ old#[0-9a-f]{8} new#[0-9a-f]{8} -> error: \S/),
   ]);
 });
+
+// Verbatim lines 1, 364–367 of the resolver-log-path-u4 pi recording
+// 2026-11-12T23-00-45-260Z_01a1d1fd-fa4c-7494-a60c-f399eca2d400.jsonl (review B F2).
+test('pi exec recorded wait completes bash trace', async (): Promise<void> => {
+  const r: RunResult = await runLogTail(join(fixtures, 'pi-exec-wait-excerpt.jsonl'));
+  expect(r.code, r.stderr).toBe(0);
+  const bashLines: string[] = lines(r.stdout).filter((line) => /^\S+ bash /.test(line));
+  expect(bashLines).toEqual([expect.stringMatching(/ #15457a9c -> exit 1:/)]);
+});
