@@ -654,3 +654,13 @@ test('pi exec running: tools calls in code print one line each, in order', async
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// Verbatim lines 1, 49–50 of the design-close-evidence-u3 pi recording
+// 2026-11-18T19-54-32-148Z_01a1f039-a554-765a-a7d2-21860b1c24dc.jsonl (review B F1).
+test('pi exec recorded edit failure prints error', async (): Promise<void> => {
+  const r: RunResult = await runLogTail(join(fixtures, 'pi-exec-error-excerpt.jsonl'));
+  expect(r.code, r.stderr).toBe(0);
+  expect(lines(r.stdout)).toEqual([
+    expect.stringMatching(/^\S+ edit .+ old#[0-9a-f]{8} new#[0-9a-f]{8} -> error: \S/),
+  ]);
+});
