@@ -60,3 +60,10 @@ Correction 3, A under autopilot, 2026-11-20, after final-shape check 3 (slots/fi
 - Item 8 (B F4, B F5): a live-only diagnostic launch must name an observation no earlier run produced, and no further paid launch of that operation runs when it repeats the known failure without producing it. "Red-first proof at plan is free" binds watch-timer only (in its Corrections), not the shared plan skill.
 
 N1, operator 2026-11-20, verbatim: "n1 - approved", then "Let's jsut go with your recommendations". Read as A's recommendation N1 12 stop: 12 prompted sessions from the Corrections, each within 10 minutes, a written stop at the bound.
+
+Correction 4 draft (slots/correction-4-draft.md) withdrawn, 2026-11-21, after final-shape check 4 (slots/final-shape-4-{b,c,e}.md): its "same window as Claude cron" claim is false (cron fires only while the REPL is idle; E D2), the window is the whole draft hold, not a moment (B F3, E D1), a merged tick is not resent (B F2, C D1), and on codex a send into a running turn drops the task (P5). Accepting it would waive signpost 6a, and an hc guard for `done` would change 5a ("no listener/herdr/harness change"). Both are operator decisions. Asked as S4:
+
+S4. check.fix F2: on a watcher showing `done` (most ticks), hc has no guarded send, so a tick can land in a turn a person starts in that terminal (claude/agy join it; codex drops the running task). Today's Claude cron never does this.
+- S4a: accept it as a stated limit, named in the skill and docs, plus an in-leaf mitigation: the tick carries the turn the timer read and tick.ts refuses a tick arriving in a later turn, so no check runs inside the person's turn and the timer resends (E D3; unproven, free stand-in proof).
+- S4b: add `--if done` (and a refuse-on-draft option) to hc first, as its own chart, then watch-timer uses it; no window remains; changes 5a.
+Recommended: S4a (A).

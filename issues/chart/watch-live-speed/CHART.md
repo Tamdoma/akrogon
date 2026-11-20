@@ -36,6 +36,8 @@ none
 - route: lifecycle
 - N1: answered by the operator 2026-11-20, "n1 - approved" then "Let's jsut go with your recommendations": 12 stop (watch-timer readiness.yaml grants[1])
 - recorded only: mechanical paid-launch stop (forks/disposition.md Taken 7)
+- wait: S4 (forks/disposition.md), F2 done-status send, operator-only (6a/5a)
+- wait: new paid grant for watch-timer re-proof; grants[1] overrun (>=24 vs 12), operator-only
 
 Handed off 2026-11-20: issues/open/watch-live-speed (pi-exec-tail, paid-red-stop); watch-timer corrections pending N1. Leaf review: slots/leaf-review-{b,c,e}.md, all fixes applied.
 watch-timer Corrections written 2026-11-20 after N1 (brief.md, design.md, readiness.yaml grants[1] and proofs P1-P3).

@@ -1,0 +1,7 @@
+Correction 4, A under autopilot, 2026-11-21, settles check.fix F2's open item (LEAF/review-B.md F2; LEAF/implementation/report.md check.repair F2; failure reason in LEAF/state.yaml):
+
+- Fact: hc offers a guarded send only for `idle` and `working` (`hc send --help`: `--if <STATUS> ... [possible values: idle, working]`), and `done` is the program's own OSC 7501 report, which hc never turns into `idle` (`hc --skill`, Status). A watcher left alone after a check can stay `done` for the whole watch, so an `idle`-only send would stall it.
+- Taken: the timer sends with `--if idle` when the watcher reads `idle`, and without a guard when it reads `done`, after re-reading the watcher and pin right before the send and checking the reply's status (timer.ts as of def416a0, :160-:194). No code change.
+- Stated limit added to design item 4: on a `done` watcher, a turn a person starts in the moment between that re-read and the send can take the tick. The receipt-and-turn rule then resends once (criterion 4). The watch runs while the operator is away, and today's Claude cron prompt has the same window, so this is no regression (signpost 6a).
+- Criterion 4's "none merged into a running turn" is read as: never sent into a turn the timer saw running, and guarded by hc on `idle`.
+- Not changed: hc itself (`--if done` would be an hc feature outside this leaf), the grant, and every other check.fix item.
