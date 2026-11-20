@@ -203,7 +203,10 @@ async function settleIdle(tier: WatchTier, address: string, ms: number): Promise
 }
 
 // The wrapper logs `call <argv> t=<watcher turn>` per akrogon invocation, holds one `status`
-// call while <flags>/hold-status exists, then forwards to the tier shim.
+// call while <flags>/hold-status exists, then forwards to the tier shim. The call line is
+// written first and the flag removed before the sleep: a model that wraps the check in
+// `timeout` (codex does: `timeout 30s akrogon status`) would otherwise kill the sleep and keep
+// every later status call unlogged under a leftover flag.
 function logbin(tier: WatchTier, name: string, flags: string): { bin: string; calls: string } {
   const bin: string = resolve(leafTemp, `${name}-logbin`);
   const calls: string = resolve(tier.out, `${name}-calls.log`);
@@ -213,12 +216,13 @@ function logbin(tier: WatchTier, name: string, flags: string): { bin: string; ca
   writeFileSync(
     resolve(bin, 'akrogon'),
     `#!/bin/sh
-if [ "$1" = "status" ] && [ -f '${flags}/hold-status' ]; then
-  sleep "$(cat '${flags}/hold-status')"
-  rm -f '${flags}/hold-status'
-fi
 turn=$(hc get --json "$HC_TERMINAL_ID" 2>/dev/null | grep -o '"turn":[0-9]*' | head -1 | cut -d: -f2)
 echo "call $* t=\${turn:-?}" >> '${calls}'
+if [ "$1" = "status" ] && [ -f '${flags}/hold-status' ]; then
+  held=$(cat '${flags}/hold-status')
+  rm -f '${flags}/hold-status'
+  sleep "$held"
+fi
 exec '${tier.shimBin}/akrogon' "$@"
 `,
   );
