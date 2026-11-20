@@ -335,12 +335,14 @@ function traceEntry(r: RawResult, t: RawTrace): Entry {
     editOld = list.map((e) => strOf(e.oldText)).join('');
     editNew = list.map((e) => strOf(e.newText)).join('');
   }
-  const e: Entry = {
+  return {
     index: r.index, ts: r.ts, name: t.name, kind, target, allLiteral: true, editOld, editNew,
-    statusOverride: t.status === 'running' ? undefined : t.status === 'done' ? (t.result === undefined ? 'ok' : undefined) : 'unknown',
+    statusOverride:
+      t.status === 'error' ? 'error' :
+      t.status === 'running' ? undefined :
+      t.status === 'done' ? (t.result === undefined ? 'ok' : undefined) : 'unknown',
+    result: t.status === 'done' || t.status === 'error' ? t.result : undefined,
   };
-  if (t.status === 'done' && t.result !== undefined) e.result = t.result;
-  return e;
 }
 
 // An exec line expands to its observed inner calls: details.traces when the result carries
@@ -465,18 +467,20 @@ function collectPi(records: unknown[]): { calls: RawCall[]; results: RawResult[]
       const traces: RawTrace[] | undefined = Array.isArray(det?.traces)
         ? (det.traces as unknown[]).map((t): RawTrace => {
             const to: Record<string, unknown> | undefined = objOf(t);
+            const status: string = strOf(to?.status);
+            const error: string = status === 'error' ? strOf(to?.error) : '';
             const tres: Record<string, unknown> | undefined = objOf(to?.result);
             const tterm: Record<string, unknown> | undefined = objOf(objOf(objOf(tres?.details)?.capture)?.termination);
             return {
               name: strOf(to?.name),
-              status: strOf(to?.status),
+              status,
               input: objOf(to?.input),
               result:
-                tres === undefined
+                tres === undefined && error === ''
                   ? undefined
                   : {
                       index: i, id: '', ts, name: strOf(to?.name),
-                      isError: tres.isError === true, texts: textsOf(tres.content),
+                      isError: tres?.isError === true, texts: error === '' ? textsOf(tres?.content) : [error],
                       termination:
                         tterm === undefined
                           ? undefined
@@ -572,7 +576,7 @@ function render(format: Format, e: Entry): string {
         ? 'old#' + hash8(e.editOld) + ' new#' + hash8(e.editNew)
         : '-';
   const status: string = e.statusOverride ?? (e.result === undefined ? 'running' : statusOf(format, e.name, e.result));
-  const excerpt: string = e.result === undefined || e.statusOverride !== undefined ? '' : excerptOf(format, e.name, e.result);
+  const excerpt: string = e.result === undefined ? '' : excerptOf(format, e.name, e.result);
   return (e.ts + ' ' + e.name + ' ' + cut(e.target) + ' ' + identity + ' -> ' + status + ': ' + cut(excerpt)).trimEnd();
 }
 
