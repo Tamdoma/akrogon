@@ -258,11 +258,21 @@ async function waitCalls(
   throw new Error(`calls never reached ${n}: ${JSON.stringify(calls(file))}`);
 }
 
-async function waitHook(tier: WatchTier, watcher: string, match: RegExp, ms: number): Promise<number> {
+// Wait for a hook line at index `from` or later (default 0). Restarts and repeated sends emit
+// the same line a second time, so callers pass the log length taken before the send — matching
+// an older line would let the test assert on state that has not landed yet.
+async function waitHook(
+  tier: WatchTier,
+  watcher: string,
+  match: RegExp,
+  ms: number,
+  from: number = 0,
+): Promise<number> {
   const deadline: number = Date.now() + ms;
   while (Date.now() < deadline) {
-    const hit: number = hookLines(tier, watcher).findIndex((l) => match.test(l));
-    if (hit >= 0) return hit;
+    const lines: string[] = hookLines(tier, watcher);
+    const hit: number = lines.slice(from).findIndex((l) => match.test(l));
+    if (hit >= 0) return hit + from;
     await Bun.sleep(500);
   }
   throw new Error(`hook line ${match} never appeared: ${JSON.stringify(hookLines(tier, watcher))}`);
@@ -817,8 +827,9 @@ test.serial('watch standin cell: criteria 1-9 and 12 end to end', async () => {
     await waitGone(tier, timer.address, 60_000);
 
     // Restart: a new verified timer at a new address; a tick naming the old one runs nothing (5).
+    const restartFrom: number = hookLines(tier, cell.watcher).length;
     await send(tier, cell.watcher, `watch-issues ${tier.root}`);
-    await waitHook(tier, cell.watcher, /start exit=0 started/, 60_000);
+    await waitHook(tier, cell.watcher, /start exit=0 started/, 60_000, restartFrom);
     const timer2: Term = await verifiedTimer(cell);
     expect(timer2.address).not.toBe(timer.address);
     await tickRunsNoCheck(
@@ -837,8 +848,9 @@ test.serial('watch standin cell: criteria 1-9 and 12 end to end', async () => {
     expect(hookLines(tier, cell.watcher).filter((l) => /stop exit=0/.test(l)).length).toBeGreaterThanOrEqual(2);
 
     // Agent exit: the pinned program dies; a fresh timer exits on its own (no send).
+    const lastFrom: number = hookLines(tier, cell.watcher).length;
     await send(tier, cell.watcher, `watch-issues ${tier.root}`);
-    await waitHook(tier, cell.watcher, /start exit=0 started/, 60_000);
+    await waitHook(tier, cell.watcher, /start exit=0 started/, 60_000, lastFrom);
     const timer3: Term = await verifiedTimer(cell);
     const agentPid: number = z.number().parse((await get(tier, cell.watcher)).foreground?.pid);
     process.kill(agentPid, 'SIGTERM');
