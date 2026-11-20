@@ -541,6 +541,7 @@ test('pi exec traced: per-inner-call lines from details.traces', async (): Promi
       message?: {
         role?: string;
         toolName?: string;
+        toolCallId?: string;
         content?: Array<{ type?: string; name?: string; id?: string; arguments?: { code?: string } }>;
         details?: {
           traces?: Array<{
@@ -554,7 +555,6 @@ test('pi exec traced: per-inner-call lines from details.traces', async (): Promi
           }>;
         };
       };
-      toolCallId?: string;
     }).message;
     if (msg?.role === 'assistant') {
       // unpaired exec calls print their scanned literal tools.* calls as running lines
