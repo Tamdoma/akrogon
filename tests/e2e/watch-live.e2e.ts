@@ -428,10 +428,15 @@ async function wireSkill(cell: Cell): Promise<void> {
     symlinkSync(skill, resolve(root, '.claude/skills/watch-issues'));
   } else if (cell.kind === 'agy') {
     // agy 1.5.13 does not follow a symlinked workspace skill (its /skills list omits it and
-    // falls back to the global copy); a real directory under .agents/skills is listed and
-    // shadows the same-named global one (P1, and the agy preflight).
-    mkdirSync(resolve(root, '.agents/skills'), { recursive: true });
-    cpSync(skill, resolve(root, '.agents/skills/watch-issues'), { recursive: true });
+    // falls back to the global copy); a real directory is listed and shadows the global one
+    // (P1, and the agy preflight). The copy must be shallow: SKILL.md is copied so the listing
+    // carries the marker, while scripts/ etc. stay symlinks into the leaf — a real copy of
+    // scripts would break their `../../../src/shell` imports from the tier root.
+    const agyDir: string = resolve(root, '.agents/skills/watch-issues');
+    mkdirSync(agyDir, { recursive: true });
+    cpSync(resolve(skill, 'SKILL.md'), resolve(agyDir, 'SKILL.md'));
+    for (const entry of ['scripts', 'package.json', 'tsconfig.json', 'bun.lock'])
+      symlinkSync(resolve(skill, entry), resolve(agyDir, entry));
   } else if (cell.kind === 'codex') {
     mkdirSync(resolve(root, '.agents/skills'), { recursive: true });
     symlinkSync(skill, resolve(root, '.agents/skills/watch-issues'));
