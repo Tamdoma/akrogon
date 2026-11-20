@@ -75,6 +75,7 @@ interface RawResult {
 }
 
 interface RawTrace {
+  id: string;
   name: string;
   status: string;
   input: Record<string, unknown> | undefined;
@@ -347,15 +348,32 @@ function traceEntry(r: RawResult, t: RawTrace): Entry {
 
 // An exec line expands to its observed inner calls: details.traces when the result carries
 // them, the scanned tools.* calls when it is still running, else today's one #- line.
-function piExecEntries(e: Entry): Entry[] {
+function piExecEntries(e: Entry, completedWaitTraces: ReadonlyMap<string, RawTrace>): Entry[] {
   const r: RawResult | undefined = e.result;
   if (r !== undefined) {
-    return r.traces !== undefined && r.traces.length > 0 ? r.traces.map((t) => traceEntry(r, t)) : [e];
+    if (r.traces === undefined || r.traces.length === 0) return [e];
+    return r.traces.map((trace) => {
+      const pending: boolean = trace.status === 'running' || trace.status === 'blocked';
+      return traceEntry(r, pending ? completedWaitTraces.get(trace.id) ?? trace : trace);
+    });
   }
   if (e.scan !== undefined && e.scan.length > 0) {
     return e.scan.map((s): Entry => ({ index: e.index, ts: e.ts, name: s.name, kind: s.kind, target: s.target, allLiteral: s.allLiteral, editOld: s.editOld, editNew: s.editNew }));
   }
   return [e];
+}
+
+function expandPiExecEntries(entries: Entry[], results: RawResult[]): Entry[] {
+  const completedWaitTraces: Map<string, RawTrace> = new Map();
+  for (const result of results) {
+    if (result.name !== 'wait' || result.traces === undefined) continue;
+    for (const trace of result.traces) {
+      if (trace.id !== '' && (trace.status === 'done' || trace.status === 'error')) {
+        completedWaitTraces.set(trace.id, trace);
+      }
+    }
+  }
+  return entries.flatMap((entry) => (entry.name === 'exec' ? piExecEntries(entry, completedWaitTraces) : [entry]));
 }
 
 function genericTarget(obj: Record<string, unknown> | undefined): string {
@@ -472,6 +490,7 @@ function collectPi(records: unknown[]): { calls: RawCall[]; results: RawResult[]
             const tres: Record<string, unknown> | undefined = objOf(to?.result);
             const tterm: Record<string, unknown> | undefined = objOf(objOf(objOf(tres?.details)?.capture)?.termination);
             return {
+              id: strOf(to?.id),
               name: strOf(to?.name),
               status,
               input: objOf(to?.input),
@@ -641,7 +660,7 @@ function main(): void {
     }
   }
   // pi exec lines expand to one line per inner call; same-index lines keep insertion order.
-  const expanded: Entry[] = format === 'pi' ? entries.flatMap((e) => (e.name === 'exec' ? piExecEntries(e) : [e])) : entries;
+  const expanded: Entry[] = format === 'pi' ? expandPiExecEntries(entries, collected.results) : entries;
   expanded.sort((a, b) => a.index - b.index);
 
   for (const e of expanded.slice(-20)) {
