@@ -335,6 +335,59 @@ test.serial('start runs the check and claims the labelled timer; refusals and co
   }
 });
 
+test.serial('a start reports the verified timer claimed after its first list', async () => {
+  const f: HcFixture = await hcFixture();
+  const bin: string = resolve(f.home, 'watch-logbin');
+  const gate: string = resolve(f.home, 'hold-list');
+  const captured: string = resolve(f.home, 'list-captured');
+  const release: string = resolve(f.home, 'release-list');
+  const hc: string = z.string().parse(Bun.which('hc'));
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(gate, '');
+  writeFileSync(
+    resolve(bin, 'hc'),
+    `#!/bin/sh
+if [ "$1" = connect ]; then
+  request=$(cat)
+  case "$request" in
+    *terminal.list*akrogon.watch-timer*)
+      if mv '${gate}' '${gate}-taken' 2>/dev/null; then
+        snapshot=$(printf '%s\\n' "$request" | '${hc}' "$@") || exit $?
+        touch '${captured}'
+        while [ ! -f '${release}' ]; do sleep 0.05; done
+        printf '%s\\n' "$snapshot"
+        exit
+      fi ;;
+  esac
+  printf '%s\\n' "$request" | '${hc}' "$@"
+else
+  exec '${hc}' "$@"
+fi
+`,
+    { mode: 0o755 },
+  );
+  try {
+    const racing: Rig = await watchUp(f, { name: 'racing-start', interval: '3600' });
+    for (let n: number = 0; n < 100 && !existsSync(captured); n += 1) await Bun.sleep(50);
+    expect(existsSync(captured)).toBe(true);
+
+    const winner: Rig = await watchUp(f, { name: 'winning-start', interval: '3600' });
+    const timer: string = await started(winner);
+    writeFileSync(release, '');
+
+    let outcome: string | undefined;
+    for (let n: number = 0; n < 100 && outcome === undefined; n += 1) {
+      outcome = tasks(racing).find((line) => line.startsWith('start exit='));
+      if (outcome === undefined) await Bun.sleep(50);
+    }
+    expect(outcome).toBe(`start exit=0 running ${timer}`);
+    expect(await labelled(f.core, f.repo)).toHaveLength(1);
+  } finally {
+    writeFileSync(release, '');
+    await f.clean();
+  }
+});
+
 // Criteria 3, 4, 8: per-due delivery with receipt before the check, busy dues, paused repo.
 test.serial('each due runs one check with its receipt first; busy dues each run their own check', async () => {
   const f: HcFixture = await hcFixture();
