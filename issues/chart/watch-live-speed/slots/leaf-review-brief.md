@@ -1,0 +1,5 @@
+# Brief: leaf review, watch-live-speed (slot B, C or E)
+
+Review the draft leaf contracts under /tmp/claude-1000/-home-ivan-Work-infra-akrogon/2b32091a-f4f9-4382-8ed3-14ed9495e28b/scratchpad/leaves/watch-live-speed: ISSUE.md; pi-exec-tail/ and paid-red-stop/ (brief.md, design.md, readiness.yaml); watch-timer/brief-corrections.md and watch-timer/design-corrections.md, which will be appended to /home/ivan/Work/infra/akrogon/issues/open/watch-any-harness/watch-timer/brief.md and design.md. Check them against /home/ivan/Work/infra/akrogon/issues/chart/watch-live-speed/forks/disposition.md Taken, Probes and Corrections 1-3. Return only defects a seat would hit: a criterion that cannot be proven, a binding decision missing or misquoted, a contradiction with the existing watch-timer contract, a surface missing from Leaf architecture. Each with evidence and consequence. Under 12 lines; "no defects" is valid. Read-only, no paid sessions.
+
+Write to /home/ivan/Work/infra/akrogon/issues/chart/watch-live-speed/slots/leaf-review-<your slot letter lowercase>.md, then run: hc send t126 "done <letter>: <path>"
