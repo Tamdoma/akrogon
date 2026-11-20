@@ -437,9 +437,7 @@ test('verify keeps a red command TMPDIR marked .akrogon-kept and removes a green
     const { worktree } = await callerWorktree(f);
     expect((await verify(f, [], worktree)).code).toBe(1);
     const commands = records(f)[0].commands;
-    const byName: Map<string, VerifyRun['commands'][number]> = new Map(
-      commands.map((item) => [item.name, item]),
-    );
+    const byName: Map<string, VerifyRun['commands'][number]> = new Map(commands.map((item) => [item.name, item]));
     const okTmp: string = readFileSync(byName.get('ok')!.log, 'utf8').trim();
     const badTmp: string = readFileSync(byName.get('bad')!.log, 'utf8').trim();
     expect(byName.get('gone')!.exit).toBe(5);
