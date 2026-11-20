@@ -9,6 +9,7 @@ task=$2
 skilldir=${WATCH_SKILLDIR:?}
 root=${WATCH_ROOT:?}
 hooks="${STANDIN_DIR:?}/${terminal}.hooks"
+turn=$(hc get --json "$terminal" 2>/dev/null | grep -o '"turn":[0-9]*' | head -1 | cut -d: -f2)
 case "$task" in
 "watch-issues tick "*)
 	if [ -f "$STANDIN_DIR/noreceipt" ]; then
@@ -17,7 +18,7 @@ case "$task" in
 	fi
 	out=$(bun "$skilldir/scripts/tick.ts" ${task#watch-issues tick } 2>&1)
 	code=$?
-	printf 'tick exit=%s %s\n' "$code" "$out" >> "$hooks"
+	printf 'tick exit=%s %s t=%s\n' "$code" "$out" "${turn:-?}" >> "$hooks"
 	[ "$code" = 0 ] || exit 0
 	timer=$(printf '%s' "$task" | sed -n 's/.*timer=\([^ ]*\).*/\1/p')
 	due=$(hc get --json "$timer" 2>/dev/null | grep -o '"akrogon.watch-due":"[0-9]*"' | cut -d'"' -f4)
@@ -26,7 +27,7 @@ case "$task" in
 "watch-issues stop "*)
 	out=$(bun "$skilldir/scripts/stop.ts" ${task#watch-issues stop } 2>&1)
 	code=$?
-	printf 'stop exit=%s %s\n' "$code" "$out" >> "$hooks"
+	printf 'stop exit=%s %s t=%s\n' "$code" "$out" "${turn:-?}" >> "$hooks"
 	exit 0
 	;;
 "watch-issues "*)

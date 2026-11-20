@@ -1,6 +1,6 @@
 ---
 name: watch-issues
-description: Watch every open leaf of one repo on a 20-minute timer while the operator is away, started and stopped only by the operator.
+description: Watch every open leaf of one repo on a 20-minute hc timer while the operator is away, started and stopped only by the operator.
 ---
 
 # Watch issues

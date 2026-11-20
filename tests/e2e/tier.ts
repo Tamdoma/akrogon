@@ -206,7 +206,7 @@ export async function answerTrust(
     const shown: string = live === null ? '' : (await tier.hc(['read', live])).stdout;
     if (shown.includes(trust)) {
       const line: string = shown.split('\n').find((l: string) => l.includes(trust)) ?? '';
-      const answer: string[] = /[❯›]/.test(line) ? ['enter'] : ['down', 'enter'];
+      const answer: string[] = /[❯›>]/.test(line) ? ['enter'] : ['down', 'enter'];
       tier.record(`${kind}-trust.txt`, `${shown}\nkeys: ${answer.join(' ')}\n`);
       const pressed: SpawnResult = await tier.hc(['keys', z.string().parse(live), ...answer]);
       if (pressed.code !== 0) throw new Error(`hc keys failed: ${JSON.stringify(pressed)}`);

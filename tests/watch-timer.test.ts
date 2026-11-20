@@ -115,7 +115,7 @@ exec env -u HC_SESSION -u HC_TERMINAL_ID -u HC_TERMINAL_SOCKET -u HC_SCOPE ${env
 // Runs the watcher terminal; start's outcome line lands in the task log when the agent reports.
 async function watchUp(
   f: HcFixture,
-  opts: { root?: string; mode?: string; name?: string; claudeDir?: string } = {},
+  opts: { root?: string; mode?: string; name?: string; claudeDir?: string; interval?: string } = {},
 ): Promise<Rig> {
   const flags: string = resolve(f.home, `watch-flags-${opts.name ?? 'watcher'}`);
   mkdirSync(flags, { recursive: true });
@@ -132,7 +132,7 @@ async function watchUp(
     `STANDIN_DIR=${standin}`,
     `WATCH_SKILLDIR=${skilldir}`,
     `WATCH_ROOT=${root}`,
-    `WATCH_TICK_SECONDS=2`,
+    `WATCH_TICK_SECONDS=${opts.interval ?? '2'}`,
     `WATCHER_MODE=${opts.mode ?? 'work'}`,
     ...(opts.claudeDir === undefined ? [] : [`WATCH_AGENT_CLAUDE=${opts.claudeDir}`]),
   ];
@@ -232,7 +232,7 @@ const directEnv = (f: HcFixture, bin: string): NodeJS.ProcessEnv => ({
 test.serial('start runs the check and claims the labelled timer; refusals and conflicts hold', async () => {
   const f: HcFixture = await hcFixture();
   try {
-    const rig: Rig = await watchUp(f);
+    const rig: Rig = await watchUp(f, { interval: '3600' });
     rig.timer = await started(rig);
     const t: Term = await get(f.core, rig.timer);
     expect(t.name).toBe(`${f.prefix}-watch`);
@@ -392,18 +392,31 @@ test.serial('stop kills the verified timer; stale and forged ticks run nothing',
     const pinPid: number = z.number().parse(w.foreground?.pid);
 
     // Old cron-style tick: no timer= → no check.
-    const before: number = statusCalls(rig);
+    const hookLines: number = hooks(rig).length;
     await send(rig, `watch-issues tick ${f.root}`);
     await waitHooks(rig, /tick exit=\d+/);
-    expect(statusCalls(rig)).toBe(before);
+    // Dues keep delivering meanwhile, so count no-check inside this task's own hook block:
+    // it starts at its `tick exit=` line and ends at the next task's boundary line; a check
+    // would have written a `status` line inside it.
+    const boundary = (l: string): boolean => /exit=|ignored |skipped /.test(l);
+    const tail: string[] = hooks(rig).slice(hookLines);
+    const own: string[] = tail.slice(0, Math.max(1, tail.slice(1).findIndex(boundary) + 1));
+    expect(own.some((l) => /tick exit=[^0]/.test(l))).toBe(true);
+    expect(own.some((l) => l.startsWith('status '))).toBe(false);
 
     // Stale due (≤ receipt) is refused without a check. Seed the receipt first.
     await waitTick(rig, 1);
     await waitLabel(rig, 1);
-    const afterSeed: number = statusCalls(rig);
     await send(rig, `watch-issues tick timer=${rig.timer} pid=${pinPid} due=1 ${f.root}`);
     await waitHooks(rig, /tick exit=\d+ no-watch/, 15_000);
-    expect(statusCalls(rig)).toBe(afterSeed);
+    // Later dues keep delivering during this window, so the no-check proof is hook order:
+    // a task's check writes a `status` line right after its `tick exit=0` line; a `status`
+    // immediately after `no-watch` would mean the stale tick ran its check anyway.
+    const staleIndex: number = hooks(rig).findLastIndex((l) => /tick exit=\d+ no-watch/.test(l));
+    expect(staleIndex).toBeGreaterThanOrEqual(0);
+    const staleTail: string[] = hooks(rig).slice(staleIndex);
+    const staleOwn: string[] = staleTail.slice(0, Math.max(1, staleTail.slice(1).findIndex(boundary) + 1));
+    expect(staleOwn.some((l) => l.startsWith('status '))).toBe(false);
 
     // Stop from a non-watcher terminal (the test process stands in for it).
     const env: NodeJS.ProcessEnv = directEnv(f, rig.bin);
@@ -467,7 +480,7 @@ test.serial('stop kills the verified timer; stale and forged ticks run nothing',
 test.serial('the timer exits on a finished watcher, wrong start time and pin death', async () => {
   const f: HcFixture = await hcFixture();
   try {
-    const rig: Rig = await watchUp(f);
+    const rig: Rig = await watchUp(f, { interval: '3600' });
     rig.timer = await started(rig);
 
     // Watcher terminal finished → the timer exits and the name frees.
@@ -624,7 +637,7 @@ test.serial('a foreground swap and a transcript flip each end the timer', async 
 
     // Transcript flip: a watcher with a claude-shaped config dir latches a path, then exits on change.
     const claudeDir: string = resolve(f.home, 'claude-cfg');
-    const rig: Rig = await watchUp(f, { name: 'watcher-tx', claudeDir });
+    const rig: Rig = await watchUp(f, { name: 'watcher-tx', claudeDir, interval: '3600' });
     rig.timer = await started(rig);
     const wPid: number = z.number().parse((await get(f.core, rig.watcher)).foreground?.pid);
     const record: string = resolve(claudeDir, 'sessions', `${wPid}.json`);

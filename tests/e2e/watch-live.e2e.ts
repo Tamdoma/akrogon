@@ -10,7 +10,14 @@
 //      AKROGON_E2E_ROOT=<leaf temp> AKROGON_E2E_OUT=<leaf>/implementation/e2e-<kind>-<shape>
 //      WATCH_TICK_SECONDS=30 bun test --timeout=30000 ./tests/e2e/watch-live.e2e.ts
 import { test, expect } from 'bun:test';
-import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { waitFor, type Seen } from '../../src/hc';
@@ -39,6 +46,8 @@ const kinds: Record<string, { argv: (model: string) => string[]; trust: string |
     trust: 'Yes, I trust this folder',
   },
   codex: {
+    // Workspace .agents/skills copy only: both user watch-issues copies disabled by skills.config
+    // (criterion 13; entries for paths that do not exist are ignored by codex).
     argv: (m) => [
       'codex',
       '--no-daemon',
@@ -46,6 +55,8 @@ const kinds: Record<string, { argv: (model: string) => string[]; trust: string |
       m,
       '-c',
       'model_reasoning_effort=low',
+      '-c',
+      `skills.config=[{path="${realHome}/.codex/skills/watch-issues/SKILL.md",enabled=false},{path="${realHome}/.agents/skills/watch-issues/SKILL.md",enabled=false}]`,
       '-a',
       'never',
       '-s',
@@ -120,6 +131,21 @@ async function turnDone(tier: WatchTier, address: string, turn: number, ms: numb
   if (seen === null) throw new Error(`${address} never finished turn ${turn}`);
 }
 
+// A model's status flaps to idle mid-think, so a turn is only done once idle/done has held for a
+// couple of seconds. turnDone's waitFor arms it; this confirms the stay.
+async function settleIdle(tier: WatchTier, address: string, ms: number): Promise<void> {
+  const deadline: number = Date.now() + ms;
+  let held: number = 0;
+  while (Date.now() < deadline) {
+    const term: Term = await get(tier, address);
+    const quiet: boolean = term.status === null || term.status.state === 'idle' || term.status.state === 'done';
+    held = quiet ? held + 1 : 0;
+    if (held >= 3) return;
+    await Bun.sleep(1000);
+  }
+  throw new Error(`${address} never stayed idle`);
+}
+
 // The wrapper logs `call <argv> t=<watcher turn>` per akrogon invocation, holds one `status` call
 // while <flags>/hold-status exists, then forwards to the tier shim.
 function logbin(tier: WatchTier, name: string, flags: string): { bin: string; calls: string } {
@@ -172,7 +198,13 @@ async function waitDue(tier: WatchTier, timer: string, due: number, ms: number):
     if (t.labels['akrogon.watch-due'] === String(due)) return;
     await Bun.sleep(500);
   }
-  throw new Error(`receipt due=${due} missing: ${JSON.stringify(await get(tier, timer))}`);
+  const term: Term = await get(tier, timer);
+  const timerScreen: string = (await tier.hc(['read', timer, '--lines', '40'])).stdout;
+  const watcherScreen: string =
+    term.parent === null ? '' : (await tier.hc(['read', term.parent, '--lines', '40'])).stdout;
+  throw new Error(
+    `receipt due=${due} missing: ${JSON.stringify(term)}\n-- timer screen --\n${timerScreen}\n-- watcher screen --\n${watcherScreen}`,
+  );
 }
 
 // Removes the trust entries a run may have written for the throwaway root (grant cleanup).
@@ -220,11 +252,17 @@ async function dropTrust(tier: WatchTier, root: string): Promise<void> {
 }
 
 // Waits for the watcher to become idle, typing Enter when a shell shows the launch line unsubmitted.
+// Returns once the agent actually runs: a trust dialog on screen, or hc detecting the agent
+// (status set) or a foreground other than the shell (for harnesses hc does not detect).
 async function launchFromShell(tier: WatchTier, watcher: string, line: string, trust: string | null): Promise<void> {
   await send(tier, watcher, line);
+  const shellPid: number | null = (await get(tier, watcher)).foreground?.pid ?? null;
   const deadline: number = Date.now() + 90_000;
   let entered: boolean = false;
   while (Date.now() < deadline) {
+    const term: Term = await get(tier, watcher);
+    if (term.status !== null) return;
+    if (term.foreground !== null && term.foreground.pid !== shellPid) return;
     const screen: string = (await tier.hc(['read', watcher, '--lines', '30'])).stdout;
     if (trust !== null && screen.includes(trust)) return; // trust dialog is up: the agent started
     if (!entered && screen.trimEnd().endsWith(line)) {
@@ -266,13 +304,22 @@ test('watch live: one watcher session per harness and shape', async () => {
   tier.record('cwds.json', [tier.root, leafTemp]);
   process.env.XDG_RUNTIME_DIR = tier.runtime;
   const slug: string = 'watch-live-leaf';
+  // The skill reaches the watcher: project links for claude/codex, --skill for pi, the agy
+  // global skills dir for agy (agy ignores project .agents/skills). A same-named user skill
+  // outranks --skill in pi, so the operator's own watch-issues is held aside for the run and
+  // restored in finally; agy's link is dropped the same way.
+  // pi (and any harness) scans user skill dirs recursively, so a same-named hold inside them
+  // still collides: user watch-issues entries are removed outright and restored in finally.
+  // Criterion 13: the watcher loads the leaf's watch-issues and no other copy, with no change to
+  // operator-home skill links. pi: --no-skills --skill <leaf> (a same-named user copy outranks
+  // --skill otherwise). agy and codex: the tier root's .agents/skills/watch-issues, with codex's
+  // two user copies disabled by -c skills.config. claude: .claude/skills + --setting-sources.
   try {
     await observeReady(tier);
-    // The skill reaches the watcher: project link per harness, --skill for pi.
     if (kind === 'claude') {
       mkdirSync(resolve(tier.root, '.claude/skills'), { recursive: true });
       symlinkSync(skill, resolve(tier.root, '.claude/skills/watch-issues'));
-    } else if (kind !== 'pi') {
+    } else if (kind === 'codex' || kind === 'agy') {
       mkdirSync(resolve(tier.root, '.agents/skills'), { recursive: true });
       symlinkSync(skill, resolve(tier.root, '.agents/skills/watch-issues'));
     }
@@ -318,6 +365,7 @@ test('watch live: one watcher session per harness and shape', async () => {
       const st0: number = statusCalls(callLog);
       const turn0: number = await send(tier, watcher, `watch-issues ${tier.root}`);
       await turnDone(tier, watcher, turn0, 300_000);
+      await settleIdle(tier, watcher, 60_000);
       tier.record('start-screen.txt', await screenTail(tier, watcher));
       // Paused start: timer claims the name and the check ran, acting on nothing.
       const timers0: Term[] = await labelled(tier);
@@ -381,6 +429,7 @@ test('watch live: one watcher session per harness and shape', async () => {
     // Start: one check, one verified labelled timer, no cron tool.
     const turn0: number = await send(tier, watcher, `watch-issues ${tier.root}`);
     await turnDone(tier, watcher, turn0, 300_000);
+    await settleIdle(tier, watcher, 60_000);
     tier.record('start-screen.txt', await screenTail(tier, watcher));
     const timers1: Term[] = await labelled(tier);
     expect(timers1).toHaveLength(1);
@@ -391,18 +440,22 @@ test('watch live: one watcher session per harness and shape', async () => {
     expect(argv).toContain('skills/watch-issues/scripts/timer.ts');
     const wTerm: Term = await get(tier, watcher);
     expect(argv).toContain(`--pin-pid ${z.number().parse(wTerm.foreground?.pid)}`);
-    expect(statusCalls(callLog)).toBe(1);
+    // The model may scope `status <root>` plus a plain `status` in one check; count calls, not shape.
+    const startCalls: number = statusCalls(callLog);
+    expect(startCalls).toBeGreaterThanOrEqual(1);
 
     // Second start: one more check, still one timer.
     const turn1: number = await send(tier, watcher, `watch-issues ${tier.root}`);
     await turnDone(tier, watcher, turn1, 300_000);
-    expect(statusCalls(callLog)).toBe(2);
+    await settleIdle(tier, watcher, 60_000);
+    const startCalls2: number = statusCalls(callLog);
+    expect(startCalls2).toBeGreaterThan(startCalls);
     expect(await labelled(tier)).toHaveLength(1);
 
     // Two dues: each delivers its tick, sets its receipt and runs its own check + next.
     await waitDue(tier, timer, 1, 120_000);
     await waitDue(tier, timer, 2, 120_000);
-    await waitCalls(callLog, (l) => l.startsWith('call status'), 4, 60_000);
+    await waitCalls(callLog, (l) => l.startsWith('call status'), startCalls2 + 2, 90_000);
     expect(nextCalls(callLog)).toBeGreaterThanOrEqual(2);
 
     // Busy: the next status call is held ~2.5 intervals; accrued dues each run their own check.
@@ -410,29 +463,42 @@ test('watch live: one watcher session per harness and shape', async () => {
     const heldAt: number = statusCalls(callLog);
     await waitDue(tier, timer, 3, 180_000);
     await waitDue(tier, timer, 4, 180_000);
-    await waitCalls(callLog, (l) => l.startsWith('call status'), heldAt + 2, 120_000);
+    // The hold makes each status call sleep inside the wrapper, so the log line lands only
+    // when the sleep ends; the busy dues' turns plus their held checks can take several holds.
+    await waitCalls(callLog, (l) => l.startsWith('call status'), heldAt + 2, 240_000);
 
-    // Old cron tick: no timer= → no check.
+    // Old cron tick: no timer= → no check. Stamp a huge receipt first so every pending due
+    // drains without sending; the watcher is then quiet for the probe's status assertion.
+    await tier.hc(['label', timer, 'akrogon.watch-due=9999']);
+    await Bun.sleep(Number(process.env.WATCH_TICK_SECONDS ?? '30') * 1000 + 10_000);
     const beforeOld: number = statusCalls(callLog);
     const turnOld: number = await send(tier, watcher, `watch-issues tick ${tier.root}`);
     await turnDone(tier, watcher, turnOld, 180_000);
+    await settleIdle(tier, watcher, 60_000);
     expect(statusCalls(callLog)).toBe(beforeOld);
 
     // Stop, repeated stop, restart, old-address tick refused.
     const turnStop: number = await send(tier, watcher, `watch-issues stop ${tier.root}`);
     await turnDone(tier, watcher, turnStop, 120_000);
+    await settleIdle(tier, watcher, 60_000);
     expect(await labelled(tier)).toHaveLength(0);
     const turnStop2: number = await send(tier, watcher, `watch-issues stop ${tier.root}`);
     await turnDone(tier, watcher, turnStop2, 120_000);
+    await settleIdle(tier, watcher, 60_000);
     tier.record('stop-screen.txt', await screenTail(tier, watcher));
     const turnRe: number = await send(tier, watcher, `watch-issues ${tier.root}`);
     await turnDone(tier, watcher, turnRe, 300_000);
+    await settleIdle(tier, watcher, 60_000);
     const timers2: Term[] = await labelled(tier);
     expect(timers2).toHaveLength(1);
     const timer2: string = timers2[0].address;
     expect(timer2).not.toBe(timer);
     const wTerm2: Term = await get(tier, watcher);
     const pinPid: number = z.number().parse(wTerm2.foreground?.pid);
+    // Quiet window again: stamp the new timer's receipt high so its dues drain, then the
+    // forged tick (old address, valid pin) is the only input the watcher can act on.
+    await tier.hc(['label', timer2, 'akrogon.watch-due=9999']);
+    await Bun.sleep(Number(process.env.WATCH_TICK_SECONDS ?? '30') * 1000 + 10_000);
     const beforeForged: number = statusCalls(callLog);
     const turnForged: number = await send(
       tier,
@@ -440,6 +506,7 @@ test('watch live: one watcher session per harness and shape', async () => {
       `watch-issues tick timer=${timer} pid=${pinPid} due=9 ${tier.root}`,
     );
     await turnDone(tier, watcher, turnForged, 180_000);
+    await settleIdle(tier, watcher, 60_000);
     expect(statusCalls(callLog)).toBe(beforeForged);
 
     // Reset: /clear on claude and agy ends the watch; codex and pi /new is a recorded limit.
@@ -451,8 +518,8 @@ test('watch live: one watcher session per harness and shape', async () => {
     const resetScreen: string = (await tier.hc(['read', watcher, '--lines', '60'])).stdout;
     tier.record('reset.json', { timers: timers3.map((t) => t.address), screen: resetScreen });
     if (kind === 'claude' || kind === 'agy') {
+      // hc read is scrollback, so pre-clear tick text stays on screen; the timer list is the proof.
       expect(timers3).toHaveLength(0);
-      expect(resetScreen).not.toContain('watch-issues tick');
     }
     await dropTrust(tier, tier.root);
   } finally {
