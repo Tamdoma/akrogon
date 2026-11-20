@@ -9,6 +9,12 @@
 //   ~/.pi/agent/sessions/--home-ivan-Work-infra-tamdoma-framework-issues-worktrees-emdash-launch--/2026-10-01T10-40-07-084Z_01a0f70c-cfac-7437-a9a0-f4ec47260613.jsonl (recorded 2026-10-01, emdash-launch incident; excerpt, no capture command).
 // - codex-exec-excerpt.jsonl: verbatim source lines 1, 18, 460, 466 of codex-cli 0.160.0 rollout log
 //   ~/.codex/sessions/2026/10/02/rollout-2026-10-02T12-45-55-01a0fc38-7cb2-7f31-8388-738b9b09bf4b.jsonl (recorded 2026-10-02; excerpt, no capture command).
+// - pi-exec-u1-excerpt.jsonl: verbatim source lines 1, 30, 31, 78, 79, 94, 95, 102, 103, 178, 179, 185, 186,
+//   187, 188 of pi session log
+//   ~/.pi/agent/sessions/--home-ivan-.akrogon-worktrees-akrogon-watch-timer-u1--/2026-11-20T14-25-44-288Z_01a1f959-5760-75b0-ba6d-92fd661f2b43.jsonl
+//   (recorded 2026-11-20, watch-timer U1 worker; excerpt, no capture command). Pairs were chosen for a
+//   multi-call trace, a running trace, an untraced syntax-error result, an edit and a write trace, a
+//   non-zero bash exit, and two identical bash commands.
 // Expected lines below are derived from fixture contents and the output contract only; expected
 // identity hashes are computed in-test with sha8() over the recorded strings.
 
@@ -97,6 +103,80 @@ function codexOutput(id: string, ts: string, blocks: string[]): string {
 }
 
 const CODEX_META: string = JSON.stringify({ timestamp: 't0', type: 'session_meta', payload: {} });
+
+const PI_SESSION: string = JSON.stringify({ type: 'session' });
+
+function piExecCall(id: string, ts: string, code: string): string {
+  return JSON.stringify({
+    type: 'message',
+    timestamp: ts,
+    message: { role: 'assistant', content: [{ type: 'toolCall', id, name: 'exec', arguments: { code } }] },
+  });
+}
+
+// pi-exec-u1-excerpt.jsonl exec results' details.traces entries, read straight from the fixture so
+// expected targets and identities come from the recorded strings, not hand-copied ones.
+type PiTrace = {
+  ts: string;
+  name: string;
+  status: string;
+  input: Record<string, unknown>;
+  texts: string[];
+  exitCode: number | undefined;
+  isError: boolean;
+};
+
+function piExecTraces(): PiTrace[] {
+  const out: PiTrace[] = [];
+  for (const line of readFileSync(join(fixtures, 'pi-exec-u1-excerpt.jsonl'), 'utf8').split('\n')) {
+    if (line === '') continue;
+    const rec = JSON.parse(line) as {
+      timestamp?: string;
+      message?: {
+        role?: string;
+        toolName?: string;
+        details?: {
+          traces?: Array<{
+            name?: string;
+            status?: string;
+            input?: Record<string, unknown>;
+            result?: {
+              isError?: boolean;
+              content?: Array<{ type?: string; text?: string }>;
+              details?: { capture?: { termination?: { exitCode?: number } } };
+            };
+          }>;
+        };
+      };
+    };
+    const msg = rec.message ?? {};
+    if (msg.role !== 'toolResult' || msg.toolName !== 'exec') continue;
+    for (const t of msg.details?.traces ?? []) {
+      const texts: string[] = (t.result?.content ?? [])
+        .filter((b): b is { type?: string; text: string } => b?.type === 'text' && typeof b.text === 'string')
+        .map((b) => b.text);
+      out.push({
+        ts: rec.timestamp ?? '',
+        name: t.name ?? '',
+        status: t.status ?? '',
+        input: t.input ?? {},
+        texts,
+        exitCode: t.result?.details?.capture?.termination?.exitCode,
+        isError: t.result?.isError === true,
+      });
+    }
+  }
+  return out;
+}
+
+function flat(s: string): string {
+  return s.replace(/\r/g, '␍').replace(/\n/g, '⏎');
+}
+
+function cutLike(s: string): string {
+  const f: string = flat(s);
+  return f.length > 120 ? f.slice(0, 120) + '…' : f;
+}
 
 // pi-incident-excerpt.jsonl tool calls, read straight from the fixture so expected
 // identities hash the recorded strings, not hand-copied ones.
@@ -459,13 +539,109 @@ test('concatenated recorded command has no literal identity', async (): Promise<
 });
 
 // Recorded pi source: 2026-09-13T23-58-25-640Z_01a09d35-3768-73ed-8f93-ac97197d0b25.jsonl, lines 13, 15.
-test('unrecognized recorded pi exec commands have no usable identity', async (): Promise<void> => {
+test('pi exec running: literal tools.bash commands print command and #hash', async (): Promise<void> => {
   const dir: string = tmpDir();
   try {
+    const cmd1: string =
+      'wc -l /home/ivan/.pi/agent/extensions/tamdoma-subagents/{index,tools,setup-tools,formatting,command-output,ui,paths,identity,capabilities,install,read-pdf,schemas,host-proof,lifecycle-proof}.ts; echo ---; cat /home/ivan/.pi/agent/extensions/tamdoma-subagents/package.json';
+    const cmd2: string =
+      'cat -n /home/ivan/.pi/agent/extensions/tamdoma-subagents/index.ts /home/ivan/.pi/agent/extensions/tamdoma-subagents/setup-tools.ts /home/ivan/.pi/agent/extensions/tamdoma-subagents/paths.ts /home/ivan/.pi/agent/extensions/tamdoma-subagents/identity.ts /home/ivan/.pi/agent/extensions/tamdoma-subagents/capabilities.ts /home/ivan/.pi/agent/extensions/tamdoma-subagents/schemas.ts';
     const records: string[] = ["{\"type\": \"session\"}", "{\"type\": \"message\", \"timestamp\": \"2026-09-13T23:58:36.812Z\", \"message\": {\"role\": \"assistant\", \"content\": [{\"type\": \"toolCall\", \"id\": \"call_01a09d355fb07c82a4ad187ba2ca9a1a|fc_01a09d355fb07c82a4ad187ba2ca9a1a\", \"name\": \"exec\", \"arguments\": {\"code\": \"const r = await tools.bash({command:\\\"wc -l /home/ivan/.pi/agent/extensions/tamdoma-subagents/{index,tools,setup-tools,formatting,command-output,ui,paths,identity,capabilities,install,read-pdf,schemas,host-proof,lifecycle-proof}.ts; echo ---; cat /home/ivan/.pi/agent/extensions/tamdoma-subagents/package.json\\\"});\\ntext(r);\"}}]}}", "{\"type\": \"message\", \"timestamp\": \"2026-09-13T23:58:40.010Z\", \"message\": {\"role\": \"assistant\", \"content\": [{\"type\": \"toolCall\", \"id\": \"call_01a09d356bc67bb29a614f47760919d6|fc_01a09d356bc67bb29a614f47760919d6\", \"name\": \"exec\", \"arguments\": {\"code\": \"const r = await tools.bash({command:\\\"cat -n /home/ivan/.pi/agent/extensions/tamdoma-subagents/index.ts /home/ivan/.pi/agent/extensions/tamdoma-subagents/setup-tools.ts /home/ivan/.pi/agent/extensions/tamdoma-subagents/paths.ts /home/ivan/.pi/agent/extensions/tamdoma-subagents/identity.ts /home/ivan/.pi/agent/extensions/tamdoma-subagents/capabilities.ts /home/ivan/.pi/agent/extensions/tamdoma-subagents/schemas.ts\\\"});\\ntext(String(r).slice(0, 30000));\"}}]}}"];
     const r: RunResult = await runLogTail(writeLog(dir, records));
     expect(r.code, r.stderr).toBe(0);
-    expect(lines(r.stdout)).toEqual(["2026-09-13T23:58:36.812Z exec  #- -> running:", "2026-09-13T23:58:40.010Z exec  #- -> running:"]);
+    expect(lines(r.stdout)).toEqual([
+      '2026-09-13T23:58:36.812Z bash ' + cutLike(cmd1) + ' #' + sha8(cmd1) + ' -> running:',
+      '2026-09-13T23:58:40.010Z bash ' + cutLike(cmd2) + ' #' + sha8(cmd2) + ' -> running:',
+    ]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---- fixture: pi-exec-u1-excerpt.jsonl ----
+
+test('pi exec traced: per-inner-call lines from details.traces', async (): Promise<void> => {
+  const r: RunResult = await runLogTail(join(fixtures, 'pi-exec-u1-excerpt.jsonl'));
+  expect(r.code, r.stderr).toBe(0);
+  const out: string[] = lines(r.stdout);
+  const traces: PiTrace[] = piExecTraces();
+  // 11 traced inner calls plus the one untraced exec line (source line 95's syntax-error result)
+  expect(out.length).toBe(traces.length + 1);
+  const expectedPrefix = (t: PiTrace): { target: string; identity: string; status: string } => {
+    if (t.status === 'running') return { target: str(t.input.command ?? t.input.path), identity: '', status: 'running' };
+    if (t.name === 'bash') {
+      const cmd: string = str(t.input.command);
+      return {
+        target: cmd,
+        identity: '#' + sha8(cmd),
+        status: t.exitCode === undefined ? (t.isError ? 'error' : 'ok') : t.exitCode === 0 ? 'ok' : 'exit ' + t.exitCode,
+      };
+    }
+    if (t.name === 'edit') {
+      const edits = (t.input.edits ?? []) as Array<{ oldText: string; newText: string }>;
+      return {
+        target: str(t.input.path),
+        identity: 'old#' + sha8(edits.map((e) => e.oldText).join('')) + ' new#' + sha8(edits.map((e) => e.newText).join('')),
+        status: t.isError ? 'error' : 'ok',
+      };
+    }
+    return { target: str(t.input.path), identity: '-', status: t.isError ? 'error' : 'ok' };
+  };
+  const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+  let i: number = 0;
+  for (const t of traces) {
+    const e = expectedPrefix(t);
+    if (t.status === 'running') {
+      // a still-running inner call prints its identity and 'running' with no excerpt
+      const cmd: string = str(t.input.command);
+      expect(out[i]).toBe(t.ts + ' ' + t.name + ' ' + cutLike(cmd) + ' #' + sha8(cmd) + ' -> running:');
+    } else {
+      const prefix: string = t.ts + ' ' + t.name + ' ' + cutLike(e.target) + ' ' + e.identity + ' -> ' + e.status + ':';
+      expect(out[i].startsWith(prefix), 'trace line ' + i + ' (' + t.name + '): ' + out[i]).toBe(true);
+      // excerpt is the first non-empty result text line, never the [exit N. metadata line
+      if (t.name === 'bash') expect(out[i]).not.toContain('[exit ');
+      const excerpt: string = t.texts.join('\n').split('\n').find((l) => l.trim() !== '' && !l.startsWith('[exit ')) ?? '';
+      if (excerpt !== '') expect(out[i]).toContain(cutLike(excerpt).slice(0, 60));
+    }
+    i++;
+    // the untraced exec (source line 95) prints exactly one line at position 5 (0-based) between
+    // the first running-bash trace and the edit+bash pair
+    if (i === 5) {
+      expect(out[i]).toBe('2026-11-20T14:56:33.652Z exec  #- -> unknown:');
+      expect(out[i]).not.toMatch(/#[0-9a-f]{8}/);
+      i++;
+    }
+  }
+  // identical commands in different execs share one identity (the two grep -v pairs)
+  const hashes: string[] = out.map((l) => (l.match(/#([0-9a-f]{8})/) ?? ['', ''])[1]).filter((h) => h !== '');
+  const counts: Map<string, number> = new Map();
+  for (const h of hashes) counts.set(h, (counts.get(h) ?? 0) + 1);
+  expect([...counts.values()].some((c) => c === 2)).toBe(true);
+  // no exec line survives except the untraced one
+  expect(out.filter((l) => l.includes(' exec ')).length).toBe(1);
+});
+
+test('pi exec running: tools calls in code print one line each, in order', async (): Promise<void> => {
+  const dir: string = tmpDir();
+  try {
+    const code: string = [
+      'const a = await tools.bash({command: "echo hi"});',
+      'const b = await tools.bash({command: someVar});',
+      'const e = await tools.edit({path: "src/x.ts", edits: [{oldText: "a", newText: "b"}]});',
+      'const w = await tools.write({path: "src/y.ts", content: "c"});',
+      'const r = await tools.read({path: p});',
+      'const l = await tools.ls({path: "."});',
+    ].join('\n');
+    const r: RunResult = await runLogTail(writeLog(dir, [PI_SESSION, piExecCall('x1', 't1', code)]));
+    expect(r.code, r.stderr).toBe(0);
+    expect(lines(r.stdout)).toEqual([
+      't1 bash echo hi #' + sha8('echo hi') + ' -> running:',
+      't1 bash <expr> #- -> running:',
+      't1 edit src/x.ts old#' + sha8('a') + ' new#' + sha8('b') + ' -> running:',
+      't1 write src/y.ts - -> running:',
+      't1 read <expr> - -> running:',
+      't1 ls . - -> running:',
+    ]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
