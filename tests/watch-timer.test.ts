@@ -385,17 +385,22 @@ test.serial('each due runs one check with its receipt first; busy dues each run 
     // below is the criterion).
     for (
       let n: number = 0;
-      n < 60 && !hooks(rig).slice(pTickIdx).some((l) => l.startsWith('status '));
+      n < 60 &&
+      !hooks(rig)
+        .slice(pTickIdx)
+        .some((l) => l.startsWith('status '));
       n += 1
     )
       await Bun.sleep(200);
-    expect(hooks(rig).slice(pTickIdx).some((l) => l.startsWith('status '))).toBe(true);
+    expect(
+      hooks(rig)
+        .slice(pTickIdx)
+        .some((l) => l.startsWith('status ')),
+    ).toBe(true);
     // A would-be next call lands right after its status call inside the same task; give it a
     // beat, then require no `call next` at the paused check's turn after its status line.
     await Bun.sleep(2500);
-    const pStatusIdx: number = calls(rig).findLastIndex(
-      (l) => l.startsWith('call status') && l.endsWith(`t=${pTurn}`),
-    );
+    const pStatusIdx: number = calls(rig).findLastIndex((l) => l.startsWith('call status') && l.endsWith(`t=${pTurn}`));
     expect(pStatusIdx).toBeGreaterThanOrEqual(0);
     expect(
       calls(rig)
