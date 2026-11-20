@@ -296,7 +296,10 @@ test('a red run-check run keeps its run root marked .akrogon-kept and its files 
     expect(existsSync(resolve(root, '.akrogon-kept'))).toBe(true);
     expect(existsSync(resolve(root, '.owner'))).toBe(true);
     expect(readFileSync(resolve(root, 'evidence/f'), 'utf8')).toBe('kept\n');
-    expect(scratchRuns(f)).toEqual([root]);
+    const runs: string[] = [...new Bun.Glob('*/*/run-*').scanSync({ cwd: leafTempRoot(f), onlyFiles: false })].map(
+      (entry) => resolve(leafTempRoot(f), entry),
+    );
+    expect(runs).toEqual([root]);
   } finally {
     f.clean();
   }

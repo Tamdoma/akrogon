@@ -322,7 +322,9 @@ test('a marked run root stays silently while its leaf lives and goes with the le
     expect((await status(f, 'marked-leaf')).stdout).not.toContain(basename(deadMarked));
     expect((await cli(f, ['leftovers'], f.root, f.env)).stdout).not.toContain(basename(deadMarked));
     await closeTab(f, readState(path).tab!);
-    expect((await next(f, ['--all'])).code).toBe(0);
+    // A targeted dispatch of another leaf runs the reconcile pass without
+    // reopening marked-leaf's tab, which --all would re-dispatch.
+    await dispatchLeaf(f, 'release-trigger');
     expect(existsSync(scratch)).toBe(false);
   } finally {
     await f.clean();
