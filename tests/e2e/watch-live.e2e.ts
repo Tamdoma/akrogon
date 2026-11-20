@@ -361,7 +361,16 @@ test('watch live: one watcher session per harness and shape', async () => {
       watcher = z.object({ address: z.string() }).parse(JSON.parse(run.stdout)).address;
       await Bun.sleep(1000);
       const ready: Promise<Seen | null> = waitFor(session, watcher, idle, 120_000);
-      await launchFromShell(tier, watcher, `env ${launchEnv.join(' ')} ${spec.argv(model).join(' ')}`, spec.trust);
+      // The argv is typed into bash, so inline quoting would be parsed (codex's `-c` value has
+      // braces/quotes the shell expands or mangles). Send a script path instead.
+      const launchSh: string = resolve(leafTemp, `${name}-launch.sh`);
+      const q = (s: string): string => `'${s.replaceAll(`'`, `'\\''`)}'`;
+      writeFileSync(
+        launchSh,
+        `#!/bin/sh\nexec env ${launchEnv.map(q).join(' ')} ${spec.argv(model).map(q).join(' ')}\n`,
+      );
+      Bun.spawnSync(['chmod', '+x', launchSh]);
+      await launchFromShell(tier, watcher, `sh ${q(launchSh)}`, spec.trust);
       if (spec.trust !== null) await answerTrust(tier, 'watcher', async () => watcher, spec.trust, ready);
       expect(await ready).not.toBeNull();
       const st0: number = statusCalls(callLog);
@@ -400,10 +409,16 @@ test('watch live: one watcher session per harness and shape', async () => {
       const goneDeadline: number = Date.now() + 90_000;
       while (Date.now() < goneDeadline && !(await gone(tier, timer0))) await Bun.sleep(500);
       expect(await gone(tier, timer0)).toBe(true);
+      // Scrollback keeps earlier tick text; the criterion is that nothing new arrives. Count
+      // tick lines now and again after a full interval.
+      const countTicks = async (): Promise<number> =>
+        ((await tier.hc(['read', watcher, '--lines', '60'])).stdout.match(/watch-issues tick /g) ?? [])
+          .length;
+      const ticksAtExit: number = await countTicks();
       await Bun.sleep(Number(process.env.WATCH_TICK_SECONDS ?? '30') * 1000 + 15_000);
-      const screen: string = (await tier.hc(['read', watcher, '--lines', '40'])).stdout;
+      const screen: string = (await tier.hc(['read', watcher, '--lines', '60'])).stdout;
       tier.record('after-exit-screen.txt', screen);
-      expect(screen).not.toContain('watch-issues tick');
+      expect(await countTicks()).toBe(ticksAtExit);
       await dropTrust(tier, tier.root);
       return;
     }
