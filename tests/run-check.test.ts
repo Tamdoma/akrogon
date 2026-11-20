@@ -313,7 +313,8 @@ test('a red run-check command that deleted its own TMPDIR keeps its exit and lea
     const { worktree } = await leafWorktree(f, 'tmpdir-gone');
     const result = await cli(f, ['run-check', '--', ...sh('rm -rf "$TMPDIR"; exit 7')], worktree, baseEnv(f));
     expect(result.code).toBe(7);
-    expect(scratchRuns(f)).toEqual([]);
+    const runs: string[] = [...new Bun.Glob('*/*/run-*').scanSync({ cwd: leafTempRoot(f), onlyFiles: false })];
+    expect(runs).toEqual([]);
   } finally {
     f.clean();
   }
