@@ -68,7 +68,12 @@ export async function startWatchTier(
   const shimBin: string = resolve(leafTemp, `${name}-shimbin`);
   const standin: string = resolve(leafTemp, `${name}-standin`);
   const standinBin: string = resolve(leafTemp, `${name}-standinbin`);
-  const paths: string[] = [root, home, scratch, runtime, appBin, shimBin, standin, standinBin];
+  // Criterion 12: the repo's worktree store is its own folder, a sibling of the runtime and
+  // helper folders — `akrogon unpause` worktree cleanup must not be able to reach the core's
+  // socket symlink (leafTemp as the store let it delete <rt> and every hc call after unpause
+  // answered `unavailable`, which starved the timer's dues in shell-shape runs).
+  const worktrees: string = resolve(leafTemp, `${name}-wtr`);
+  const paths: string[] = [root, home, scratch, runtime, appBin, shimBin, standin, standinBin, worktrees];
   mkdirSync(out, { recursive: true });
   const record = (file: string, value: unknown): void =>
     writeFileSync(resolve(out, file), typeof value === 'string' ? value : JSON.stringify(value, null, 2));
@@ -90,7 +95,7 @@ export async function startWatchTier(
   writeFileSync(resolve(root, '.gitignore'), '.env\n.claude/\n');
   writeFileSync(
     resolve(root, 'issues/config.yaml'),
-    Bun.YAML.stringify({ checks: { test: 'true' }, grounding: 'none', worktree_root: leafTemp }),
+    Bun.YAML.stringify({ checks: { test: 'true' }, grounding: 'none', worktree_root: worktrees }),
   );
   await command(['git', 'add', '.'], root);
   await command(['git', 'commit', '-m', 'e2e'], root);
