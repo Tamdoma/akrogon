@@ -4,7 +4,13 @@ import { expect } from 'bun:test';
 import { fixture, cli, procFixture, type Fixture } from './helpers';
 import { command } from '../src/shell';
 
-export const roots: string[] = ['.claude/skills', '.agents/skills', '.codex/skills', '.pi/agent/skills'];
+export const roots: string[] = [
+  '.claude/skills',
+  '.agents/skills',
+  '.codex/skills',
+  '.pi/agent/skills',
+  '.gemini/config/skills',
+];
 
 export type DeployFixture = {
   f: Fixture;

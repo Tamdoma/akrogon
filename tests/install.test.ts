@@ -20,7 +20,13 @@ import { command, quote, type Result } from '../src/shell';
 import { selfUpdate } from '../src/self-update';
 import { fixture, cli, herdrCalls, herdrStub, leafTempRoot, registerTemp, yaml, type Fixture } from './helpers';
 
-const roots: string[] = ['.claude/skills', '.agents/skills', '.codex/skills', '.pi/agent/skills'];
+const roots: string[] = [
+  '.claude/skills',
+  '.agents/skills',
+  '.codex/skills',
+  '.pi/agent/skills',
+  '.gemini/config/skills',
+];
 const skills: string[] = readdirSync(resolve(toolRoot, 'skills'), { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name);
@@ -101,6 +107,9 @@ test('install creates all four absent harness roots, links no herdr-app mod, cal
     ];
     const targets: string[] = destinations.map((destination) => readlinkSync(destination));
     expect(realpathSync(destinations[0])).toBe(resolve(toolRoot, 'src/akrogon.ts'));
+    const agySkill: string = resolve(f.home, '.gemini/config/skills', skills[0]);
+    expect(readlinkSync(agySkill)).toBe(resolve(f.home, 'current', 'skills', skills[0]));
+    expect(realpathSync(agySkill)).toBe(resolve(toolRoot, 'skills', skills[0]));
     for (const root of roots) {
       expect(readdirSync(resolve(f.home, root)).sort()).toEqual([...skills].sort());
       for (const skill of skills) {
@@ -163,12 +172,13 @@ test('install prunes only dangling owned links and preserves real entries and fo
       symlinkSync(f.root, resolve(directory, 'resolving-foreign'));
       symlinkSync(resolve(f.home, 'foreign-missing'), resolve(directory, 'dangling-foreign'));
       symlinkSync(resolve(toolRoot, 'skills-old/missing'), resolve(directory, 'sibling-prefix'));
+      symlinkSync(resolve(f.home, 'releases', 'old-release', 'skills', 'ghost'), resolve(directory, 'release-link'));
     }
     const result: Result = await cli(f, ['install'], f.root, env);
     expect(result).toMatchObject({ code: 0, stderr: '' });
     for (const root of roots) {
       const directory: string = resolve(f.home, root);
-      for (const stale of ['stale-absolute', 'stale-relative', 'stale-nested'])
+      for (const stale of ['stale-absolute', 'stale-relative', 'stale-nested', 'release-link'])
         expect(lstatSync(resolve(directory, stale), { throwIfNoEntry: false })).toBeUndefined();
       expect(lstatSync(resolve(directory, 'real-directory')).isDirectory()).toBe(true);
       expect(readFileSync(resolve(directory, 'real-directory/keep'), 'utf8')).toBe('contents');
@@ -341,6 +351,9 @@ test('install from a listener release links, enables and restarts the unit and c
     expect(await cli(f, ['install'], f.root, env)).toMatchObject({ code: 0 });
     const unit: string = resolve(f.home, '.config/systemd/user/akrogon-listener.service');
     expect(readlinkSync(unit)).toBe(resolve(f.home, 'current', 'systemd/akrogon-listener.service'));
+    const agy: string = resolve(f.home, '.gemini/config/skills', 'skill-one');
+    expect(readlinkSync(agy)).toBe(resolve(f.home, 'current', 'skills', 'skill-one'));
+    expect(realpathSync(agy)).toBe(resolve(f.home, 'release', 'skills', 'skill-one'));
     expect(sequence(f)).toEqual(listenerCalls);
     expect(calls(f)).toEqual([]);
   } finally {
