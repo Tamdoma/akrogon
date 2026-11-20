@@ -1,0 +1,135 @@
+       LEAF                PHASE           TIME  BLOCKED BY  NOTE                    TURN
+     … +2 lines (ctrl+o to expand)
+
+● Bash(bun /tmp/akr-e2e/akr-e2e-watch-claude-root/.claude/skills/watch-issues/scripts/observe.ts /tmp/akr-e2e/akr-e2e-watch-claude-root)
+  ⎿  session=akr-e2e-watch
+     slug=watch-live-leaf phase=plan.synthesis attempts=A0,B0 blocked= A=t3/idle B=-/- notified=
+
+● Bash(akrogon next watch-live-leaf)
+  ⎿  (No output)
+
+● Bash(bun /tmp/akr-e2e/akr-e2e-watch-claude-root/.claude/skills/watch-issues/scripts/observe.ts /tmp/akr-e2e/akr-e2e-watch-claude-root)
+  ⎿  session=akr-e2e-watch
+     slug=watch-live-leaf phase=plan.synthesis attempts=A0,B0 blocked= A=t3/idle B=-/- notified=
+
+● The tick was accepted (timer t2, pid matched), and this check ran.
+
+  - Leaf watch-live-leaf is still in plan.synthesis. Seat A (t3) is idle, the prompt shows not_confirmed, and there are no attempts recorded.
+  - I ran akrogon next watch-live-leaf again, with no output, and re-observed. The state is unchanged.
+  - Nothing is busy to judge. The leaf is not advancing, so the next tick will check again.
+
+✻ Cogitated for 10s · done 5:45 PM
+
+❯ watch-issues tick timer=t2 pid=3340461 due=2 /tmp/akr-e2e/akr-e2e-watch-claude-root
+
+● Bash(bun /tmp/akr-e2e/akr-e2e-watch-claude-root/.claude/skills/watch-issues/scripts/tick.ts timer=t2 pid=3340461 due=2 /tmp/akr-e2e/akr-e2e-watch-claude-root)
+  ⎿  accept
+
+● Bash(akrogon status)
+  ⎿  Listener: live
+     akre2e
+       LEAF                PHASE           TIME  BLOCKED BY  NOTE                    TURN
+     … +2 lines (ctrl+o to expand)
+
+● Bash(bun /tmp/akr-e2e/akr-e2e-watch-claude-root/.claude/skills/watch-issues/scripts/observe.ts /tmp/akr-e2e/akr-e2e-watch-claude-root)
+  ⎿  session=akr-e2e-watch
+     slug=watch-live-leaf phase=plan.synthesis attempts=A0,B0 blocked= A=t3/idle B=-/- notified=
+
+● Bash(akrogon next watch-live-leaf)
+  ⎿  (No output)
+
+● Bash(bun /tmp/akr-e2e/akr-e2e-watch-claude-root/.claude/skills/watch-issues/scripts/observe.ts /tmp/akr-e2e/akr-e2e-watch-claude-root)
+  ⎿  session=akr-e2e-watch
+     slug=watch-live-leaf phase=plan.synthesis attempts=A0,B0 blocked= A=t3/idle B=-/- notified=
+
+● The tick was accepted (timer t2, pid matched), and this check ran.
+
+  - Leaf watch-live-leaf is still in plan.synthesis. Seat A (t3) is idle, the prompt shows not_confirmed, and there are no attempts recorded.
+  - I ran akrogon next watch-live-leaf again, with no output, and re-observed. The state is unchanged.
+  - Nothing is busy to judge. This is the same stall as the last two ticks, so the leaf may need an operator look.
+
+✻ Cogitated for 10s · done 5:46 PM
+
+❯ watch-issues tick timer=t2 pid=3340461 due=3 /tmp/akr-e2e/akr-e2e-watch-claude-root
+
+● Bash(bun /tmp/akr-e2e/akr-e2e-watch-claude-root/.claude/skills/watch-issues/scripts/tick.ts timer=t2 pid=3340461 due=3 /tmp/akr-e2e/akr-e2e-watch-claude-root)
+  ⎿  accept
+
+● Bash(akrogon status)
+  ⎿  Listener: live
+     akre2e
+       LEAF                PHASE           TIME  BLOCKED BY  NOTE                    TURN
+     … +2 lines (ctrl+o to expand)
+
+● Bash(bun /tmp/akr-e2e/akr-e2e-watch-claude-root/.claude/skills/watch-issues/scripts/observe.ts /tmp/akr-e2e/akr-e2e-watch-claude-root)
+  ⎿  session=akr-e2e-watch
+     slug=watch-live-leaf phase=plan.synthesis attempts=A0,B0 blocked= A=t3/idle B=-/- notified=
+
+● Bash(akrogon next watch-live-leaf)
+  ⎿  (No output)
+
+● Bash(bun /tmp/akr-e2e/akr-e2e-watch-claude-root/.claude/skills/watch-issues/scripts/observe.ts /tmp/akr-e2e/akr-e2e-watch-claude-root)
+  ⎿  session=akr-e2e-watch
+     slug=watch-live-leaf phase=plan.synthesis attempts=A0,B0 blocked= A=t3/idle B=-/- notified=
+
+● The tick was accepted (timer t2, pid matched), and this check ran.
+
+  - Leaf watch-live-leaf is still in plan.synthesis. Seat A (t3) is idle, the prompt shows not_confirmed, and there are no attempts recorded.
+  - I ran akrogon next watch-live-leaf again, with no output, and re-observed. The state is unchanged.
+  - Nothing is busy to judge. This is the fourth tick with the same stall, so it needs an operator look. I have not stopped the watch.
+
+✻ Worked for 1m 25s · done 5:48 PM
+
+❯ watch-issues tick timer=t2 pid=3340461 due=4 /tmp/akr-e2e/akr-e2e-watch-claude-root
+
+● Bash(bun /tmp/akr-e2e/akr-e2e-watch-claude-root/.claude/skills/watch-issues/scripts/tick.ts timer=t2 pid=3340461 due=4 /tmp/akr-e2e/akr-e2e-watch-claude-root)
+  ⎿  accept
+
+● Bash(akrogon status)
+  ⎿  Listener: live
+     akre2e
+       LEAF                PHASE           TIME  BLOCKED BY  NOTE                    TURN
+     … +2 lines (ctrl+o to expand)
+
+● Bash(bun /tmp/akr-e2e/akr-e2e-watch-claude-root/.claude/skills/watch-issues/scripts/observe.ts /tmp/akr-e2e/akr-e2e-watch-claude-root)
+  ⎿  session=akr-e2e-watch
+     slug=watch-live-leaf phase=plan.synthesis attempts=A0,B0 blocked= A=t3/idle B=-/- notified=
+
+❯ watch-issues tick /tmp/akr-e2e/akr-e2e-watch-claude-root
+
+● Bash(bun /tmp/akr-e2e/akr-e2e-watch-claude-root/.claude/skills/watch-issues/scripts/tick.ts /tmp/akr-e2e/akr-e2e-watch-claude-root)
+  ⎿  Error: Exit code 1
+     no-watch
+
+● The tick you sent had no timer=, pid= or due= fields, so the script answered no-watch and I ran no check. The earlier ticks from timer t2 are unaffected, and the watch is still running.
+
+  The last real check (tick 4) found watch-live-leaf still in plan.synthesis, seat A (t3) idle, prompt not_confirmed, no attempts recorded. This is the same stall as the previous three ticks. It needs
+  an operator look. I have not stopped the watch.
+
+✻ Churned for 9s · done 5:48 PM
+
+❯ watch-issues stop /tmp/akr-e2e/akr-e2e-watch-claude-root
+
+● Bash(bun /tmp/akr-e2e/akr-e2e-watch-claude-root/.claude/skills/watch-issues/scripts/stop.ts /tmp/akr-e2e/akr-e2e-watch-claude-root)
+  ⎿  stopped t2
+
+● The watch on /tmp/akr-e2e/akr-e2e-watch-claude-root is stopped (timer t2). No further ticks will run checks.
+
+  When it stopped, watch-live-leaf was still in plan.synthesis with seat A (t3) idle and the prompt not_confirmed. Four ticks in a row showed the same stall, so the leaf needs an operator look.
+
+✻ Baked for 3s · done 5:48 PM
+
+❯ watch-issues stop /tmp/akr-e2e/akr-e2e-watch-claude-root
+
+● Bash(bun /tmp/akr-e2e/akr-e2e-watch-claude-root/.claude/skills/watch-issues/scripts/stop.ts /tmp/akr-e2e/akr-e2e-watch-claude-root)
+  ⎿  stopped
+
+● The watch on /tmp/akr-e2e/akr-e2e-watch-claude-root is stopped. The script printed only stopped this time and gave no timer address. The earlier stop ended timer t2, so this one most likely found
+  nothing left to stop. Ticks will not run checks now.
+
+✽ Frosting… (3s · ↓ 155 tokens)
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ don't ask on (shift+tab to cycle) · esc to interrupt · ← 2 agents

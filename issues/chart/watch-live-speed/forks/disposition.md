@@ -58,3 +58,5 @@ Correction 3, A under autopilot, 2026-11-20, after final-shape check 3 (slots/fi
 - Item 4 codex (B F1): route proven by P3; the free preflight still shows the leaf's `watch-issues/SKILL.md` as the only enabled match per harness, and an empty or ambiguous list stops before any paid cell.
 - Item 5 grant (B F2, C D3): the N1 row offers warn and continue (grant-run-count 2b) or a written stop at the bound; no tier refusal (it would be new machinery, standing design).
 - Item 8 (B F4, B F5): a live-only diagnostic launch must name an observation no earlier run produced, and no further paid launch of that operation runs when it repeats the known failure without producing it. "Red-first proof at plan is free" binds watch-timer only (in its Corrections), not the shared plan skill.
+
+N1, operator 2026-11-20, verbatim: "n1 - approved", then "Let's jsut go with your recommendations". Read as A's recommendation N1 12 stop: 12 prompted sessions from the Corrections, each within 10 minutes, a written stop at the bound.

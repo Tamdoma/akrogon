@@ -1,0 +1,187 @@
+inputs: []
+produces: []
+grants:
+  - approved:
+      by: operator
+      date: '2026-11-20'
+      answer: 'Yes, you have the permission N1 (forks/signposts.md Needs N1: at most 8 sessions for the leaf, each ending within 10 minutes, on the existing logged-in accounts, no outside writes)'
+    principal: the leaf's implementing seat running the live runs through akrogon run-check
+    account: operator's logged-in harness accounts on this host (claude, codex, pi devin, agy Google AI Ultra)
+    credential:
+      name: existing harness logins in the operator's home (no repo env key)
+      holder: operator home
+    targets: [claude CLI, codex CLI, pi CLI, agy CLI]
+    fixtures:
+      - account: local host
+        purpose: throwaway watch tier for the live runs
+        marker: hc session akr-e2e-watch; registered roots under the leaf temp named akr-e2e-watch-<kind>-*
+        naming: akr-e2e-watch-<kind>-<run>
+        count: 8
+        cleanup:
+          - step: stopWatchTier kills and removes every terminal of akr-e2e-watch, stops its core, removes its state and every recorded folder
+            identity: the leaf's implementing seat
+          - step: remove the folder-trust entries the runs saved for their roots (codex ~/.codex/config.toml [projects."<root>"], agy ~/.gemini/antigravity-cli/settings.json trustedWorkspaces, claude's trust record for the root)
+            identity: the leaf's implementing seat
+        absence_check: watch-tier absent() returns no paths (no hc call after stop, which would start a core); no trust entry names a run root
+    operations: [launch claude, codex, pi and agy watcher sessions in akr-e2e-watch, hc send, hc keys, hc read, hc get, hc label, hc kill, hc rm, the checkout's akrogon through the tier shim]
+    effects: paid model usage on the operator's accounts; local files under the leaf temp, the trust entries above, and the session records each harness writes in the operator's home on every launch (claude projects and sessions, codex sessions, pi sessions, agy conversations), kept like any session; no push, GitHub or other outside write (the registered roots push to a local bare remote)
+    bounds: at most 8 harness sessions, counting every launch that reaches a paid session whatever its outcome; each session ends within 10 minutes of its launch
+    stop_line: no write outside the leaf temp, the akr-e2e-watch session, the trust entries the runs created and the harnesses' own session records; no session on another account or model provider than the logged-in ones
+  - approved:
+      by: operator
+      date: '2026-11-20'
+      answer: 'n1 - approved; then "Let''s jsut go with your recommendations" (A recommended N1 12 stop: 12 more paid sessions counted from the Corrections, each ending within 10 minutes, a written stop at the bound; issues/chart/watch-live-speed/forks/disposition.md Correction 3 item 5)'
+    principal: the leaf's implementing seat running the live runs through akrogon run-check
+    account: operator's logged-in harness accounts on this host (claude, codex, pi devin, agy Google AI Ultra)
+    credential:
+      name: existing harness logins in the operator's home (no repo env key)
+      holder: operator home
+    targets: [claude CLI, codex CLI, pi CLI, agy CLI]
+    fixtures:
+      - account: local host
+        purpose: throwaway watch tier for the live runs and the no-prompt preflight launches
+        marker: hc session akr-e2e-watch; registered roots in the tier's own worktree folder under the leaf temp named akr-e2e-watch-<kind>-*
+        naming: akr-e2e-watch-<kind>-<run>
+        count: 12
+        cleanup:
+          - step: stopWatchTier kills and removes every terminal of akr-e2e-watch, stops its core, removes its state and every recorded folder
+            identity: the leaf's implementing seat
+          - step: remove the folder-trust entries the runs saved for their roots (codex ~/.codex/config.toml [projects."<root>"], agy ~/.gemini/antigravity-cli/settings.json trustedWorkspaces, claude ~/.claude.json projects entry)
+            identity: the leaf's implementing seat
+        absence_check: watch-tier absent() returns no paths (no hc call after stop, which would start a core); no trust entry names an akr-e2e root
+    operations: [launch claude, codex, pi and agy watcher sessions in akr-e2e-watch, hc send, hc keys, hc read, hc get, hc label, hc kill, hc rm, the checkout's akrogon through the tier shim]
+    effects: paid model usage on the operator's accounts; local files under the leaf temp, the trust entries above, and the session records each harness writes in the operator's home on every launch, kept like any session; no skill link or other home file changed; no push, GitHub or other outside write
+    bounds: at most 12 harness sessions that receive a prompt, counted from the 2026-11-20 Corrections, whatever their outcome; preflight launches that send no prompt do not count; each session ends within 10 minutes of its launch
+    stop_line: no 13th prompted harness session under this grant; no write outside the leaf temp, the akr-e2e-watch session, the trust entries the runs created and the harnesses' own session records; no session on another account or model provider than the logged-in ones
+retained: []
+proofs:
+  - operation: hc run --bg child of the starting terminal; parent-exit rule
+    command: hc run --bg --name wp-par1 -- bash -c 'hc run --bg --name wp-kid1 -- sleep 600; sleep 5'; and the same from an interactive shell
+    identity: operator's hc on this host
+    target: hc core 0.1.x session infra
+    version: hc of 2026-11-20
+    date: '2026-11-20'
+    result: a child ends (killed) when the parent's root program exits; a child started from a shell inside a terminal survives that inner program's exit
+    cleanup: terminals killed and removed
+    limits: keep-shell replacement not observed
+    record: issues/chart/watch-any-harness/forks/timer-design.md (P1)
+  - operation: plain-text tick starts the watch-issues skill in claude, codex, pi and agy
+    command: hc send <agent> "watch-issues tick <scratch root>" from a plain bash terminal
+    identity: operator's logged-in accounts; claude-sonnet-5-5, codex gpt-6.2-sol, pi devin/swe-2-max, agy neon
+    target: the four harness CLIs
+    version: CLIs installed on 2026-11-20
+    date: '2026-11-20'
+    result: claude loaded the skill; codex used it; pi ran its observe.ts; agy read the repo copy
+    cleanup: sessions killed and removed
+    limits: one wording without timer=, pid=, due=; one model per harness
+    record: issues/chart/watch-any-harness/forks/timer-design.md (P2)
+  - operation: skill discovery from the registered root (codex and agy .agents/skills, pi --skill) and agy trust dialog
+    command: one session each in a throwaway git repo holding .agents/skills/zprobe-agents and a --skill folder for pi
+    identity: operator's logged-in codex, pi and agy accounts
+    target: codex, pi and agy CLIs
+    version: CLIs installed on 2026-11-20 (codex 0.171.0, pi 1.6.0)
+    date: '2026-11-20'
+    result: all three ran the probe skill; codex asked "Trust and continue", agy "Yes, I trust this folder"
+    cleanup: terminals removed; saved trust entries removed; folder deleted
+    limits: the prompt named the skill; claude's project skill route is proven by tests/e2e/watch-check.e2e.ts
+    record: issues/chart/watch-any-harness/forks/timer-design.md (P9)
+  - operation: hc run from a harness tool shell gets the agent terminal as parent and HC_TERMINAL_ID/HC_SESSION
+    command: each agent ran echo HC=$HC_TERMINAL_ID SESS=$HC_SESSION; hc run --bg --json --no-notify --name wp-<kind>-kid -- sleep 900
+    identity: operator's logged-in accounts (P2 sessions)
+    target: the four harness CLIs and hc
+    version: as P2
+    date: '2026-11-20'
+    result: every kid's parent was the agent terminal; kids ended when the agents' terminals were killed
+    cleanup: terminals killed and removed
+    limits: harness process identification inside the tool shell not observed (plan question)
+    record: issues/chart/watch-any-harness/forks/timer-design.md (P4)
+  - operation: a send while the watcher works joins the running turn
+    command: hc send "Reply with the single word PONG." 10 s into a 45 s tool call
+    identity: P2 sessions
+    target: the four harness CLIs
+    version: as P2
+    date: '2026-11-20'
+    result: turn counter rose by one only on all four; codex dropped its task
+    cleanup: as P2
+    limits: one timing
+    record: issues/chart/watch-any-harness/forks/timer-design.md (P5)
+  - operation: reset visibility through akrogon's transcript resolver
+    command: bun skills/chart-issues/scripts/transcript.ts <address> before and after /clear or /new
+    identity: P2 sessions
+    target: claude, codex, pi, agy
+    version: as P2
+    date: '2026-11-20'
+    result: claude and agy path changed; codex unchanged and a tick 3 s after /new was lost; pi '-' both times
+    cleanup: as P2
+    limits: codex and pi resets not visible by path
+    record: issues/chart/watch-any-harness/forks/timer-design.md (P6)
+  - operation: hc send --if idle, --name uniqueness, hc ls --label
+    command: hc send --if idle <shell>; second live --name wz-uniq; hc ls --json --label akrogon.watch=probe
+    identity: operator's hc
+    target: hc core
+    version: hc of 2026-11-20
+    date: '2026-11-20'
+    result: status_mismatch exit 10 with nothing typed; name_taken exit 1; only the labelled terminal listed
+    cleanup: terminals removed
+    limits: none beyond the calls
+    record: issues/chart/watch-any-harness/forks/timer-design.md (P7)
+  - operation: hc run --rm, hc get --json pid/argv/foreground, hc label set and remove
+    command: hc run --bg --json --no-notify --rm --name wz-rm -- sleep 2; hc get --json on a shell running sleep 300; hc label <t> akrogon.watch-check=3 and key=
+    identity: operator's hc
+    target: hc core
+    version: hc of 2026-11-20
+    date: '2026-11-20'
+    result: removed terminal not_found; top-level pid and argv plus foreground {argv, pid}; label shown, then removed
+    cleanup: terminals removed
+    limits: foreground of a harness's own tool children not observed
+    record: issues/chart/watch-any-harness/forks/timer-design.md (P10)
+  - operation: hc get --json foreground under job control (the pinned harness process)
+    command: a python3 stand-in harness with a same-group tool child and an own-group child, run as a terminal root and from a shell; ctrl+z; a new program started in the shell
+    identity: operator's hc
+    target: hc core
+    version: hc of 2026-11-20
+    date: '2026-11-20'
+    result: root mode foreground the stand-in; shell mode the stand-in while it runs, bash after ctrl+z, sleep after a new program; the tool child's parent was the stand-in
+    cleanup: terminals removed; orphaned own-group sleeps killed
+    limits: real harness process groups unobserved; the start step refuses loudly when its rule fails
+    record: issues/chart/watch-any-harness/forks/timer-design.md (P11)
+  - operation: real harness holds the terminal foreground while running its tool (pin rule of item 2)
+    command: hc get --json $HC_TERMINAL_ID foreground and the tool shell's ancestor chain, run in each agent's own tool shell
+    identity: operator's hc and logged-in harness accounts
+    target: claude, codex, agy and pi, each as the terminal's program and launched from a shell (claude, codex and pi through their ! command; agy by one paid turn)
+    version: CLIs installed on 2026-11-20
+    date: '2026-11-20'
+    result: foreground was the harness and an ancestor of the tool shell in every observed case
+    cleanup: probe terminals removed
+    limits: one observation per harness and shape; one charting breach recorded in CHART.md (P12)
+    record: issues/chart/watch-any-harness/forks/timer-design.md (P12, P13)
+  - operation: per-harness skill isolation (agy workspace copy, pi --no-skills --skill)
+    command: same-named skill in <cwd>/.agents/skills/herdr with global copies present; agy /skills; pi with and without --no-skills --skill <dir>
+    identity: operator's logged-in agy and pi on this host
+    target: agy CLI, pi CLI
+    version: installed 2026-11-20
+    date: '2026-11-20'
+    result: agy lists only the workspace copy; pi without --no-skills keeps the user copy over --skill; with --no-skills --skill <dir> no collision
+    cleanup: terminals killed, temp .agents removed, pi trust.json unchanged
+    limits: no prompt sent; codex not settled here
+    record: issues/chart/watch-live-speed/forks/disposition.md Probe P1
+  - operation: codex user skill roots and skills.config disable
+    command: codex with <cwd>/.agents/skills/herdr, then with -c skills.config disabling the user copy by path
+    identity: operator's logged-in codex on this host
+    target: codex CLI
+    version: installed 2026-11-20
+    date: '2026-11-20'
+    result: codex lists workspace and user copies side by side; user copies come from ~/.codex/skills and ~/.agents/skills; disabling by path hides that copy; config.toml unchanged
+    cleanup: terminals killed and removed, temp .agents removed
+    limits: no prompt sent; workspace plus disabled user copy observed only in P3
+    record: issues/chart/watch-live-speed/forks/disposition.md Probe P2
+  - operation: codex workspace skill with both user copies disabled
+    command: codex -c 'skills.config=[{path="/home/ivan/.codex/skills/herdr/SKILL.md",enabled=false},{path="/home/ivan/.agents/skills/herdr/SKILL.md",enabled=false}]' with <cwd>/.agents/skills/herdr present
+    identity: operator's logged-in codex on this host
+    target: codex CLI
+    version: installed 2026-11-20
+    date: '2026-11-20'
+    result: only the workspace copy listed (its PROBEWORKSPACE description); config.toml gained no skills line
+    cleanup: terminal killed and removed, temp .agents removed
+    limits: no prompt sent
+    record: issues/chart/watch-live-speed/forks/disposition.md Probe P3

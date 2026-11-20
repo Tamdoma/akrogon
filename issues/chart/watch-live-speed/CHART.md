@@ -22,7 +22,7 @@ none
 
 ## Pending steps
 
-- After N1 is answered: append slots/watch-timer-draft/brief-corrections.md and design-corrections.md to issues/open/watch-any-harness/watch-timer brief.md and design.md, add grants[1] and the P1-P3 proofs to its readiness.yaml (slots/leaf-review-c.md D5), then the operator runs `akrogon start watch-timer` and, after seat A takes failed, `akrogon phase watch-timer plan.synthesis`.
+- Operator: `akrogon start watch-timer`; after seat A takes failed, `akrogon phase watch-timer plan.synthesis`.
 
 ## Mode record
 
@@ -34,7 +34,8 @@ none
 - consultant: B codex gpt-6.2-astra high (t2pz); C agy neon high (t2q0); E claude claude-fable-5-2 high (t2q1)
 - signposts: operator, this door session (issues/chart/watch-any-harness/forks/signposts.md)
 - route: lifecycle
-- wait: N1 grant for watch-timer's live proof (pending, operator-only)
+- N1: answered by the operator 2026-11-20, "n1 - approved" then "Let's jsut go with your recommendations": 12 stop (watch-timer readiness.yaml grants[1])
 - recorded only: mechanical paid-launch stop (forks/disposition.md Taken 7)
 
 Handed off 2026-11-20: issues/open/watch-live-speed (pi-exec-tail, paid-red-stop); watch-timer corrections pending N1. Leaf review: slots/leaf-review-{b,c,e}.md, all fixes applied.
+watch-timer Corrections written 2026-11-20 after N1 (brief.md, design.md, readiness.yaml grants[1] and proofs P1-P3).

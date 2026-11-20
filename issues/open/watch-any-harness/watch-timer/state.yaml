@@ -1,0 +1,42 @@
+slug: watch-timer
+phase: implement
+created: 2026-11-20
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since:
+  A: 2026-11-20T17:25:22.708Z
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 1
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak97a87dd1e8f228c3d53cd247106328
+worktree: /home/ivan/.akrogon/worktrees/akrogon/watch-timer
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t2p5
+prompted:
+  A:
+    turn: 2
+    address: t2p5
+prompted_at: {}
+delivery_error: {}
+frozen:
+  tests/e2e/watch-check.e2e.ts: null
+  tests/e2e/watch-live.e2e.ts: 9d90053ffe2df47ee2c7892fcb2f5258ed0aec6d
+  tests/e2e/watch-tier.ts: b66af31d427b423b4f42e58f8dc28ffa93ac6b86
+  tests/fixtures/watch-agent.sh: 1fdcd9cb8dd1e57d3b687b0b04d9c03613f42c23
+  tests/fixtures/watch-hook.sh: f8baa9ffcf6172abdc5dcf84583b3f369d6ea3a4
+  tests/watch-timer.test.ts: 457dff7d98ecc7c72391e0519482d5eb8c86a124
+frozen_cited: []
