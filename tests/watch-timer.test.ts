@@ -65,6 +65,24 @@ type Rig = {
 
 const calls = (rig: Rig): string[] =>
   existsSync(rig.calls) ? readFileSync(rig.calls, 'utf8').split('\n').filter(Boolean) : [];
+// Timers a test launches without --rm stay as finished terminals, so their printed reasons
+// (criterion 14) stay readable on the screen after exit.
+const screenOf = async (core: HcCore, address: string): Promise<string> =>
+  (await core.hc(['read', address, '--lines', '60'])).stdout;
+
+// The address may be live, finished or already removed: settle into a readable finished screen.
+async function waitFinished(core: HcCore, address: string, ms: number = 15_000): Promise<void> {
+  const deadline: number = Date.now() + ms;
+  while (Date.now() < deadline) {
+    const reply: SpawnResult = await core.hc(['get', '--json', address]);
+    if (reply.code === 0) {
+      const t: Term = termSchema.parse(JSON.parse(reply.stdout));
+      if (t.state !== 'live') return;
+    }
+    await Bun.sleep(250);
+  }
+  throw new Error(`terminal ${address} still live`);
+}
 const statusCalls = (rig: Rig): number => calls(rig).filter((l) => l.startsWith('call status')).length;
 const nextCalls = (rig: Rig): number => calls(rig).filter((l) => l.startsWith('call next')).length;
 const tasks = (rig: Rig): string[] => rig.f.core.tasks(rig.watcher);
@@ -302,7 +320,7 @@ test.serial('start runs the check and claims the labelled timer; refusals and co
       env: directEnv(f, rig.bin),
     });
     expect(noId.code).toBe(1);
-    expect(noId.stdout).toContain('refused');
+    expect(noId.stdout).toMatch(/refused \S+/); // criterion 14: the refusal names its reason
     const otherCore: HcCore = await hcCore(f, { doc: false });
     f.core.link(otherCore);
     const outside: SpawnResult = await spawnCaptured([bun, resolve(skilldir, 'scripts/start.ts'), f.root], {
@@ -310,7 +328,7 @@ test.serial('start runs the check and claims the labelled timer; refusals and co
       env: { ...directEnv(f, rig.bin), HC_TERMINAL_ID: 'tOutside' },
     });
     expect(outside.code).toBe(1);
-    expect(outside.stdout).toContain('refused');
+    expect(outside.stdout).toMatch(/refused \S+/);
     await otherCore.discard();
   } finally {
     await f.clean();
@@ -405,7 +423,16 @@ test.serial('an unreceipted due is resent once then dropped while later dues con
     await waitTick(rig, 2);
     while (Date.now() < deadline && tickLines(rig, 2).length < 2) await Bun.sleep(200);
     expect(tickLines(rig, 2)).toHaveLength(2); // due 1 never sends a third time; the rule repeats for due 2
+    await waitTick(rig, 3);
     expect(statusCalls(rig)).toBe(1); // no check ran for any due
+    // Criterion 14: the timer prints each skipped send and each drop to its own screen.
+    // The run-created timer carries --rm, so it is removed only when it exits; it lives here.
+    const screen: string = await screenOf(f.core, rig.timer);
+    for (const due of [1, 2]) {
+      expect(screen).toContain(`due=${due} dropped`);
+    }
+    expect(screen).toMatch(/due=1 (not started|failed|sent)/);
+    expect(screen).not.toContain('due=1 sent (attempt 3');
   } finally {
     await f.clean();
   }
@@ -431,18 +458,20 @@ test.serial('stop kills the verified timer; stale and forged ticks run nothing',
     const boundary = (l: string): boolean => /exit=|ignored |skipped /.test(l);
     const tail: string[] = hooks(rig).slice(hookLines);
     const own: string[] = tail.slice(0, Math.max(1, tail.slice(1).findIndex(boundary) + 1));
-    expect(own.some((l) => /tick exit=[^0]/.test(l))).toBe(true);
+    // The reason must sit between `no-watch` and the hook's ` t=` suffix — `no-watch t=0` alone
+    // is the bare line this criterion forbids (14).
+    expect(own.some((l) => /tick exit=[^0]+ no-watch (?!t=)\S/.test(l))).toBe(true);
     expect(own.some((l) => l.startsWith('status '))).toBe(false);
 
     // Stale due (≤ receipt) is refused without a check. Seed the receipt first.
     await waitTick(rig, 1);
     await waitLabel(rig, 1);
     await send(rig, `watch-issues tick timer=${rig.timer} pid=${pinPid} due=1 ${f.root}`);
-    await waitHooks(rig, /tick exit=\d+ no-watch/, 15_000);
+    await waitHooks(rig, /tick exit=\d+ no-watch stale/, 15_000);
     // Later dues keep delivering during this window, so the no-check proof is hook order:
     // a task's check writes a `status` line right after its `tick exit=0` line; a `status`
     // immediately after `no-watch` would mean the stale tick ran its check anyway.
-    const staleIndex: number = hooks(rig).findLastIndex((l) => /tick exit=\d+ no-watch/.test(l));
+    const staleIndex: number = hooks(rig).findLastIndex((l) => /tick exit=\d+ no-watch (?!t=)\S/.test(l));
     expect(staleIndex).toBeGreaterThanOrEqual(0);
     const staleTail: string[] = hooks(rig).slice(staleIndex);
     const staleOwn: string[] = staleTail.slice(0, Math.max(1, staleTail.slice(1).findIndex(boundary) + 1));
@@ -481,6 +510,10 @@ test.serial('stop kills the verified timer; stale and forged ticks run nothing',
     await waitGone(f.core, restarted);
     expect(statusCalls(rig)).toBeLessThanOrEqual(oldTick + 1); // a legit due may have landed; the forged one ran none
 
+    // A tick on a root the session does not hold is refused with its reason (14).
+    await send(rig, `watch-issues tick timer=${rig.timer} pid=${pinPid} due=5 /no/such/root`);
+    await waitHooks(rig, /tick exit=\d+ no-watch (?!t=)\S/, 15_000);
+
     // pid mismatch: restart once more, forge a tick with a wrong pid → the timer is killed.
     await send(rig, `watch-issues ${f.root}`);
     let third: string = '';
@@ -516,6 +549,8 @@ test.serial('the timer exits on a finished watcher, wrong start time and pin dea
     // Watcher terminal finished → the timer exits and the name frees.
     await f.core.hc(['kill', rig.watcher]);
     await waitGone(f.core, rig.timer);
+    // The finished screen is gone with --rm; the not_found/watcher-finished reasons are read
+    // on the direct-launched timers below, which run without --rm.
     const reclaim: SpawnResult = await f.core.hc([
       'run',
       '--bg',
@@ -553,12 +588,13 @@ test.serial('the timer exits on a finished watcher, wrong start time and pin dea
       const stat: string = readFileSync(`/proc/${pid}/stat`, 'utf8');
       return stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
     };
+    // No --rm on these direct launches: the printed exit reasons stay readable on the screen
+    // (criterion 14); the test removes each terminal itself.
     const timerArgv = (extra: string[]): string[] => [
       'run',
       '--bg',
       '--json',
       '--no-notify',
-      '--rm',
       '--label',
       `akrogon.watch-timer=${f.repo}`,
       '--',
@@ -579,18 +615,34 @@ test.serial('the timer exits on a finished watcher, wrong start time and pin dea
       f.repo,
       ...extra,
     ];
-    // Wrong pin-start → first poll exits.
-    let run: SpawnResult = await f.core.hc(timerArgv(['--pin-pid', String(shellPid), '--pin-start', '1']));
-    expect(run.code).toBe(0);
-    await waitGone(f.core, z.object({ address: z.string() }).parse(JSON.parse(run.stdout)).address);
+    // A watcher address that never resolves → not_found reason on the first poll.
+    let run: SpawnResult = await f.core.hc(
+      timerArgv(['--pin-pid', String(shellPid), '--pin-start', startOf(shellPid)]).map((arg) =>
+        arg === shell ? 'tGone' : arg,
+      ),
+    );
+    const nf: string = z.object({ address: z.string() }).parse(JSON.parse(run.stdout)).address;
+    await waitFinished(f.core, nf);
+    expect(await screenOf(f.core, nf)).toContain('exit: watcher tGone not_found');
+    await f.core.hc(['rm', nf]);
 
-    // Correct pin, then the pinned process dies → exit.
+    // Wrong pin-start → first poll exits with the replaced reason.
+    run = await f.core.hc(timerArgv(['--pin-pid', String(shellPid), '--pin-start', '1']));
+    expect(run.code).toBe(0);
+    const wrong: string = z.object({ address: z.string() }).parse(JSON.parse(run.stdout)).address;
+    await waitFinished(f.core, wrong);
+    expect(await screenOf(f.core, wrong)).toContain('replaced (start');
+    await f.core.hc(['rm', wrong]);
+
+    // Correct pin, then the pinned process dies → exit with the gone reason.
     run = await f.core.hc(timerArgv(['--pin-pid', String(shellPid), '--pin-start', startOf(shellPid)]));
     const pinDeath: string = z.object({ address: z.string() }).parse(JSON.parse(run.stdout)).address;
     await Bun.sleep(2500);
     expect((await f.core.hc(['get', '--json', pinDeath])).code).toBe(0); // alive while the pin lives
     process.kill(shellPid, 'SIGKILL');
-    await waitGone(f.core, pinDeath);
+    await waitFinished(f.core, pinDeath);
+    expect(await screenOf(f.core, pinDeath)).toContain(`pinned process ${shellPid} gone`);
+    await f.core.hc(['rm', pinDeath]);
   } finally {
     await f.clean();
   }
@@ -599,8 +651,9 @@ test.serial('the timer exits on a finished watcher, wrong start time and pin dea
 test.serial('a foreground swap and a transcript flip each end the timer', async () => {
   const f: HcFixture = await hcFixture();
   try {
-    // Shell watcher: run a stand-in in the shell so foreground=standin, pin it, then kill it:
-    // the foreground returns to bash ≠ pin → the timer exits.
+    // Shell watcher: run a stand-in in the shell so foreground=standin, pin it, then suspend
+    // it: bash takes back the foreground while the pin lives → `not the pinned` exit (7, 14).
+    // (Killing it instead prints `gone`: the pin-dead check runs before the foreground check.)
     const standinBin: string = resolve(f.home, 'watch-standin-bin');
     mkdirSync(standinBin, { recursive: true });
     symlinkSync(resolve(import.meta.dir, 'stand-in.sh'), resolve(standinBin, 'fake'));
@@ -636,7 +689,6 @@ test.serial('a foreground swap and a transcript flip each end the timer', async 
       '--bg',
       '--json',
       '--no-notify',
-      '--rm',
       '--name',
       'xw-fg',
       '--',
@@ -662,8 +714,11 @@ test.serial('a foreground swap and a transcript flip each end the timer', async 
     ]);
     expect(timerRun.code).toBe(0);
     const timerAddr: string = z.object({ address: z.string() }).parse(JSON.parse(timerRun.stdout)).address;
-    process.kill(pin, 'SIGKILL'); // stand-in dies; bash resumes the foreground
-    await waitGone(f.core, timerAddr, 15_000);
+    process.kill(pin, 'SIGTSTP'); // the stand-in suspends; bash resumes the foreground
+    await waitFinished(f.core, timerAddr, 15_000);
+    expect(await screenOf(f.core, timerAddr)).toContain('is not the pinned');
+    process.kill(pin, 'SIGKILL');
+    await f.core.hc(['rm', timerAddr]);
 
     // Transcript flip: a watcher with a claude-shaped config dir latches a path, then exits on change.
     const claudeDir: string = resolve(f.home, 'claude-cfg');
@@ -681,6 +736,8 @@ test.serial('a foreground swap and a transcript flip each end the timer', async 
     );
     writeFileSync(resolve(claudeDir, 'projects', 'p', 'bbbbbbbb-0000-0000-0000-000000000002.jsonl'), '');
     await waitGone(f.core, rig.timer, 15_000);
+    // The run-created timer carries --rm: the transcript-moved reason is proven on the direct
+    // launch above; here the removal itself is the exit.
   } finally {
     await f.clean();
   }
@@ -770,6 +827,10 @@ test.serial('docs describe the timer watch for all harnesses with no cron wordin
   expect(skill).toContain('/new'); // the codex/pi reset limit
   expect(skill).toMatch(/compaction/i);
   expect(skill).toMatch(/draft/i); // the held-draft limit
+  // Criterion 15: the check runs `akrogon status` at <root>; `akrogon status <root>` errors
+  // "Missing leaf" and must not appear in the skill text.
+  expect(skill).toContain('akrogon status');
+  expect(skill).not.toContain('akrogon status <root>');
   const guide: string = readFileSync(files[1], 'utf8');
   for (const harness of ['claude', 'codex', 'pi', 'agy']) expect(guide).toContain(harness);
 });

@@ -19,19 +19,21 @@ case "$task" in
 	out=$(bun "$skilldir/scripts/tick.ts" ${task#watch-issues tick } 2>&1)
 	code=$?
 	printf 'tick exit=%s %s t=%s\n' "$code" "$out" "${turn:-?}" >> "$hooks"
-	[ "$code" = 0 ] || exit 0
+	# Only `accept` runs a check: `stopped` (pid mismatch) and `no-watch` run none, matching
+	# the skill's tick rule.
+	[ "$code" = 0 ] && [ "$out" = "accept" ] || exit 0
 	timer=$(printf '%s' "$task" | sed -n 's/.*timer=\([^ ]*\).*/\1/p')
 	due=$(hc get --json "$timer" 2>/dev/null | grep -o '"akrogon.watch-due":"[0-9]*"' | cut -d'"' -f4)
 	printf 'receipt=%s\n' "$due" >> "$hooks"
 	;;
 "watch-issues stop "*)
-	out=$(bun "$skilldir/scripts/stop.ts" ${task#watch-issues stop } 2>&1)
+	out=$(bun "$skilldir/scripts/stop.ts" "${task#watch-issues stop }" 2>&1)
 	code=$?
 	printf 'stop exit=%s %s t=%s\n' "$code" "$out" "${turn:-?}" >> "$hooks"
 	exit 0
 	;;
 "watch-issues "*)
-	out=$(bun "$skilldir/scripts/start.ts" ${task#watch-issues } 2>&1)
+	out=$(bun "$skilldir/scripts/start.ts" "${task#watch-issues }" 2>&1)
 	code=$?
 	printf 'start exit=%s %s\n' "$code" "$out" >> "$hooks"
 	case "$out" in

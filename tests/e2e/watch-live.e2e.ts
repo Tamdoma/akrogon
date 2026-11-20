@@ -1,33 +1,75 @@
-// Criterion 11 (watch-any-harness): one attended paid run per harness and launch shape in
-// akr-e2e-watch, under readiness grants[0] (at most 8 harness sessions, each under 10 minutes).
-// shape=root: the harness is the terminal's program (start, second start, ticks with receipts,
-// busy dues, old cron tick, stop, repeated stop, restart, old-address tick refused, reset).
-// shape=shell: the harness runs from a bash in a root path with a space (paused start, unpause
-// tick, paused check, agent exit leaves no tick text).
-// A logging `akrogon` wrapper on the watcher's PATH counts checks and `next` calls per hc turn.
+// Criterion 11 (watch-any-harness, as replaced by the 2026-11-20 Corrections) plus criteria 12
+// and 13, run as cells in the throwaway hc session akr-e2e-watch under readiness grants[1].
+//
+//   AKROGON_E2E=watch-preflight AKROGON_E2E_KIND=<claude|codex|pi|agy>
+//     Free, no prompt sent: real tier, real launch flags, read the skill list and stop.
+//   AKROGON_E2E=watch-live AKROGON_E2E_KIND=standin AKROGON_E2E_SHAPE=<root|shell>
+//     Free: the stand-in watcher (tests/stand-in.sh + tests/fixtures/watch-hook.sh playing the
+//     model) through the same tier, proving every behavior of criteria 1-9 and 12 end to end.
+//   AKROGON_E2E=watch-live AKROGON_E2E_KIND=<claude|codex|pi|agy> AKROGON_E2E_SHAPE=<root|shell>
+//     Paid. root: start with its check and timer (1), one tick with its receipt and the Judge's
+//     next (3), one tick held behind a busy check (4), stop with no stray tick (5), a second
+//     start, then /clear (claude, agy ends it) or /new (codex, pi records the outcome) (7).
+//     shell: bash in a root holding a space → start (1), one tick with receipt (3), the held
+//     tick (4), agent exit leaving no new tick text (7).
+//
+// Writes stay under AKROGON_E2E_ROOT (must resolve inside the process TMPDIR) and
+// AKROGON_E2E_OUT; no operator-home file beyond the grant-named trust entries is touched.
 // Run: akrogon run-check --name watch-live-<kind>-<shape> -- env AKROGON_E2E=watch-live
-//      AKROGON_E2E_KIND=<claude|codex|pi|agy> AKROGON_E2E_SHAPE=<root|shell>
-//      AKROGON_E2E_ROOT=<leaf temp> AKROGON_E2E_OUT=<leaf>/implementation/e2e-<kind>-<shape>
-//      WATCH_TICK_SECONDS=30 bun test --timeout=30000 ./tests/e2e/watch-live.e2e.ts
+//      AKROGON_E2E_KIND=<kind> AKROGON_E2E_SHAPE=<shape> AKROGON_E2E_ROOT=<tmp>
+//      AKROGON_E2E_OUT=<leaf>/implementation/e2e-<kind>-<shape>
+//      WATCH_TICK_SECONDS=<10 standin|30 paid>
+//      bun test --timeout=30000 ./tests/e2e/watch-live.e2e.ts --test-name-pattern <pattern>
+// A cell runs exactly its own test: preflight cells use the first, stand-in the second, paid
+// the third (patterns 'preflight', 'standin', 'real harness').
 import { test, expect } from 'bun:test';
 import {
-  readlinkSync,
+  cpSync,
   existsSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
-  rmSync,
+  realpathSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { z } from 'zod';
 import { waitFor, type Seen } from '../../src/hc';
-import { type SpawnResult } from '../../src/shell';
+import { spawnCaptured, type SpawnResult } from '../../src/shell';
 import { answerTrust, realHome, required } from './tier';
-import { lines, observeReady, session, startWatchTier, stopWatchTier, type WatchTier } from './watch-tier';
+import { observeReady, session, startWatchTier, stopWatchTier, type WatchTier } from './watch-tier';
 
 const skill: string = resolve(import.meta.dir, '../../skills/watch-issues');
-const leafTemp: string = required('AKROGON_E2E_ROOT');
+const timerScript: string = resolve(skill, 'scripts/timer.ts');
+const hookSource: string = resolve(import.meta.dir, '../fixtures/watch-hook.sh');
+// AKROGON_E2E_ROOT: the run's throwaway root. It must sit under a real /var/tmp-style tmp root
+// (never a fixed path, never operator home): the tier's hc-socket symlink lives at
+// <root>/<name>-rt/herdr-core/akr-e2e-watch.sock and the unix socket path limit is 107 bytes,
+// so a deeply nested TMPDIR (like the suite preload's) would break the run. Unset: a fresh
+// mktemp under /var/tmp or TMPDIR, whichever is shorter.
+const leafTemp: string = realpathSync(
+  process.env.AKROGON_E2E_ROOT ??
+    mkdtempSync(
+      join(
+        ['/var/tmp', process.env.TMPDIR ?? '/tmp'].sort((a, b) => a.length - b.length)[0],
+        'akr-e2e-',
+      ),
+    ),
+);
+process.env.AKROGON_E2E_ROOT = leafTemp; // the tier helpers require it by name
+const marker: string = 'hc timer'; // SKILL.md description marker identifying the leaf copy (13)
+const intervalSec: number = Number(process.env.WATCH_TICK_SECONDS ?? '30');
+const realRuntime: string = `/run/user/${process.getuid!()}`;
+
+// Criterion 13: codex user watch-issues copies are disabled by path; entries for paths that do
+// not exist are ignored (probe P3).
+const codexSkillConfig: string =
+  'skills.config=[' +
+  ['.codex', '.agents']
+    .map((dir) => `{path="${resolve(realHome, `${dir}/skills/watch-issues/SKILL.md`)}",enabled=false}`)
+    .join(',') +
+  ']';
 
 const kinds: Record<string, { argv: (model: string) => string[]; trust: string | null }> = {
   claude: {
@@ -47,8 +89,6 @@ const kinds: Record<string, { argv: (model: string) => string[]; trust: string |
     trust: 'Yes, I trust this folder',
   },
   codex: {
-    // Workspace .agents/skills copy only: both user watch-issues copies disabled by skills.config
-    // (criterion 13; entries for paths that do not exist are ignored by codex).
     argv: (m) => [
       'codex',
       '--no-daemon',
@@ -57,7 +97,7 @@ const kinds: Record<string, { argv: (model: string) => string[]; trust: string |
       '-c',
       'model_reasoning_effort=low',
       '-c',
-      `skills.config=[{path="${realHome}/.codex/skills/watch-issues/SKILL.md",enabled=false},{path="${realHome}/.agents/skills/watch-issues/SKILL.md",enabled=false}]`,
+      codexSkillConfig,
       '-a',
       'never',
       '-s',
@@ -67,7 +107,7 @@ const kinds: Record<string, { argv: (model: string) => string[]; trust: string |
   },
   pi: {
     // --no-skills suppresses auto discovery: a same-named user skill still wins over --skill
-    // when discovery is on, and the operator's copy may be the old cron version (criterion 13).
+    // when discovery is on (P1), and the operator's copy may be the old cron version (13).
     argv: (m) => [
       'pi',
       '--model',
@@ -87,12 +127,17 @@ const kinds: Record<string, { argv: (model: string) => string[]; trust: string |
     argv: (m) => ['agy', '--model', m, '--effort', 'low', '--mode', 'auto'],
     trust: 'Yes, I trust this folder',
   },
+  standin: {
+    argv: () => ['fake', '--model', 'work'],
+    trust: null,
+  },
 };
 const models: Record<string, string> = {
   claude: 'claude-haiku-5-5',
   codex: 'gpt-6.1-sol',
   pi: 'devin/swe-2-max',
   agy: 'gemini-3.8-flash-low',
+  standin: 'work',
 };
 
 const termSchema = z.object({
@@ -123,6 +168,8 @@ const gone = async (tier: WatchTier, address: string): Promise<boolean> =>
   (await tier.hc(['get', '--json', address])).code !== 0;
 
 const idle = (t: Seen): boolean => t.status?.state === 'idle' || t.status?.state === 'done';
+const screen = async (tier: WatchTier, address: string, n: number = 60): Promise<string> =>
+  (await tier.hc(['read', address, '--lines', String(n)])).stdout;
 
 async function send(tier: WatchTier, address: string, text: string): Promise<number> {
   const sent: SpawnResult = await tier.hc(['send', '--json', address, text]);
@@ -132,17 +179,22 @@ async function send(tier: WatchTier, address: string, text: string): Promise<num
 
 async function turnDone(tier: WatchTier, address: string, turn: number, ms: number): Promise<void> {
   const seen: Seen | null = await waitFor(session, address, (t: Seen) => t.turn > turn && idle(t), ms);
-  if (seen === null) throw new Error(`${address} never finished turn ${turn}`);
+  if (seen === null) {
+    const term: Term = await get(tier, address);
+    throw new Error(
+      `${address} never finished turn ${turn}: ${JSON.stringify(term)}\n${await screen(tier, address)}`,
+    );
+  }
 }
 
-// A model's status flaps to idle mid-think, so a turn is only done once idle/done has held for a
-// couple of seconds. turnDone's waitFor arms it; this confirms the stay.
+// A model's status flaps to idle mid-think, so a turn is only done once idle/done has held.
 async function settleIdle(tier: WatchTier, address: string, ms: number): Promise<void> {
   const deadline: number = Date.now() + ms;
   let held: number = 0;
   while (Date.now() < deadline) {
     const term: Term = await get(tier, address);
-    const quiet: boolean = term.status === null || term.status.state === 'idle' || term.status.state === 'done';
+    const quiet: boolean =
+      term.status === null || term.status.state === 'idle' || term.status.state === 'done';
     held = quiet ? held + 1 : 0;
     if (held >= 3) return;
     await Bun.sleep(1000);
@@ -150,8 +202,8 @@ async function settleIdle(tier: WatchTier, address: string, ms: number): Promise
   throw new Error(`${address} never stayed idle`);
 }
 
-// The wrapper logs `call <argv> t=<watcher turn>` per akrogon invocation, holds one `status` call
-// while <flags>/hold-status exists, then forwards to the tier shim.
+// The wrapper logs `call <argv> t=<watcher turn>` per akrogon invocation, holds one `status`
+// call while <flags>/hold-status exists, then forwards to the tier shim.
 function logbin(tier: WatchTier, name: string, flags: string): { bin: string; calls: string } {
   const bin: string = resolve(leafTemp, `${name}-logbin`);
   const calls: string = resolve(tier.out, `${name}-calls.log`);
@@ -176,8 +228,14 @@ exec '${tier.shimBin}/akrogon' "$@"
 
 const calls = (file: string): string[] =>
   existsSync(file) ? readFileSync(file, 'utf8').split('\n').filter(Boolean) : [];
-const statusCalls = (file: string): number => calls(file).filter((l) => l.startsWith('call status')).length;
-const nextCalls = (file: string): number => calls(file).filter((l) => l.startsWith('call next')).length;
+const statusCalls = (file: string): number =>
+  calls(file).filter((l) => l.startsWith('call status')).length;
+const nextCalls = (file: string): number =>
+  calls(file).filter((l) => l.startsWith('call next')).length;
+const hookLines = (tier: WatchTier, watcher: string): string[] => {
+  const file: string = resolve(tier.standin, `${watcher}.hooks`);
+  return existsSync(file) ? readFileSync(file, 'utf8').split('\n').filter(Boolean) : [];
+};
 
 async function labelled(tier: WatchTier): Promise<Term[]> {
   const listed = z
@@ -186,13 +244,28 @@ async function labelled(tier: WatchTier): Promise<Term[]> {
   return listed.terminals.filter((t) => t.state === 'live');
 }
 
-async function waitCalls(file: string, match: (l: string) => boolean, n: number, ms: number): Promise<void> {
+async function waitCalls(
+  file: string,
+  match: (l: string) => boolean,
+  n: number,
+  ms: number,
+): Promise<void> {
   const deadline: number = Date.now() + ms;
   while (Date.now() < deadline) {
     if (calls(file).filter(match).length >= n) return;
     await Bun.sleep(500);
   }
   throw new Error(`calls never reached ${n}: ${JSON.stringify(calls(file))}`);
+}
+
+async function waitHook(tier: WatchTier, watcher: string, match: RegExp, ms: number): Promise<number> {
+  const deadline: number = Date.now() + ms;
+  while (Date.now() < deadline) {
+    const hit: number = hookLines(tier, watcher).findIndex((l) => match.test(l));
+    if (hit >= 0) return hit;
+    await Bun.sleep(500);
+  }
+  throw new Error(`hook line ${match} never appeared: ${JSON.stringify(hookLines(tier, watcher))}`);
 }
 
 // The receipt label is monotonic (each check stamps its due): a fast watcher can push it past
@@ -205,12 +278,26 @@ async function waitDue(tier: WatchTier, timer: string, due: number, ms: number):
     await Bun.sleep(500);
   }
   const term: Term = await get(tier, timer);
-  const timerScreen: string = (await tier.hc(['read', timer, '--lines', '40'])).stdout;
-  const watcherScreen: string =
-    term.parent === null ? '' : (await tier.hc(['read', term.parent, '--lines', '40'])).stdout;
   throw new Error(
-    `receipt due=${due} missing: ${JSON.stringify(term)}\n-- timer screen --\n${timerScreen}\n-- watcher screen --\n${watcherScreen}`,
+    `receipt due=${due} missing: ${JSON.stringify(term)}\n-- timer screen --\n${await screen(tier, timer)}\n-- watcher screen --\n${await screen(tier, term.parent ?? '')}`,
   );
+}
+
+async function waitGone(tier: WatchTier, address: string, ms: number): Promise<void> {
+  const deadline: number = Date.now() + ms;
+  while (Date.now() < deadline) {
+    if (await gone(tier, address)) return;
+    await Bun.sleep(500);
+  }
+  throw new Error(`${address} still live: ${await screen(tier, address)}`);
+}
+
+// A failed cell records the watcher screen and each timer's printed reason into the out folder.
+async function failRecord(tier: WatchTier, watcher: string, timers: string[]): Promise<void> {
+  if (watcher !== '') tier.record('watcher-screen.txt', await screen(tier, watcher, 80));
+  for (const timer of timers) {
+    if (!(await gone(tier, timer))) tier.record(`timer-screen-${timer}.txt`, await screen(tier, timer, 80));
+  }
 }
 
 // Removes the trust entries a run may have written for the throwaway root (grant cleanup).
@@ -257,10 +344,15 @@ async function dropTrust(tier: WatchTier, root: string): Promise<void> {
   tier.record('trust-cleanup.txt', notes.length === 0 ? 'no trust entries\n' : `${notes.join('\n')}\n`);
 }
 
-// Waits for the watcher to become idle, typing Enter when a shell shows the launch line unsubmitted.
-// Returns once the agent actually runs: a trust dialog on screen, or hc detecting the agent
-// (status set) or a foreground other than the shell (for harnesses hc does not detect).
-async function launchFromShell(tier: WatchTier, watcher: string, line: string, trust: string | null): Promise<void> {
+// Waits for the watcher to become ready, typing Enter when a shell shows the launch line
+// unsubmitted. Returns once the agent actually runs: a trust dialog on screen, hc detecting the
+// agent (status set), or a foreground other than the shell.
+async function launchFromShell(
+  tier: WatchTier,
+  watcher: string,
+  line: string,
+  trust: string | null,
+): Promise<void> {
   await send(tier, watcher, line);
   const shellPid: number | null = (await get(tier, watcher)).foreground?.pid ?? null;
   const deadline: number = Date.now() + 90_000;
@@ -269,31 +361,33 @@ async function launchFromShell(tier: WatchTier, watcher: string, line: string, t
     const term: Term = await get(tier, watcher);
     if (term.status !== null) return;
     if (term.foreground !== null && term.foreground.pid !== shellPid) return;
-    const screen: string = (await tier.hc(['read', watcher, '--lines', '30'])).stdout;
-    if (trust !== null && screen.includes(trust)) return; // trust dialog is up: the agent started
-    if (!entered && screen.trimEnd().endsWith(line)) {
+    const shown: string = await screen(tier, watcher, 30);
+    if (trust !== null && shown.includes(trust)) return;
+    if (!entered && shown.trimEnd().endsWith(line)) {
       await tier.hc(['keys', watcher, 'enter']);
       entered = true;
     }
-    if (!entered && /\$\s*$/.test(screen.trimEnd()) && !screen.includes(line)) {
+    if (!entered && /\$\s*$/.test(shown.trimEnd()) && !shown.includes(line)) {
       await tier.hc(['keys', watcher, 'enter']);
       entered = true;
     }
     await Bun.sleep(1000);
   }
-  throw new Error(`shell launch never started: ${await screenTail(tier, watcher)}`);
+  throw new Error(`shell launch never started: ${await screen(tier, watcher)}`);
 }
 
-async function screenTail(tier: WatchTier, watcher: string): Promise<string> {
-  return (await tier.hc(['read', watcher, '--lines', '15'])).stdout;
-}
+type Cell = {
+  tier: WatchTier;
+  bin: string;
+  watcher: string;
+  callLog: string;
+  flags: string;
+  kind: string;
+  shape: string;
+  timers: string[];
+};
 
-test('watch live: one watcher session per harness and shape', async () => {
-  expect(required('AKROGON_E2E')).toBe('watch-live');
-  const kind = z.enum(['claude', 'codex', 'pi', 'agy']).parse(required('AKROGON_E2E_KIND'));
-  const shape = z.enum(['root', 'shell']).parse(required('AKROGON_E2E_SHAPE'));
-  const model: string = process.env.AKROGON_E2E_WATCHER_MODEL ?? models[kind];
-  const spec = kinds[kind];
+async function setupCell(kind: string, shape: string): Promise<Cell> {
   const name: string = `akr-e2e-watch-${kind}-${shape}`;
   const rootName: string = shape === 'shell' ? `${name} sp` : name;
   const tier: WatchTier = await startWatchTier(
@@ -309,147 +403,91 @@ test('watch live: one watcher session per harness and shape', async () => {
   const { bin, calls: callLog } = logbin(tier, name, flags);
   tier.record('cwds.json', [tier.root, leafTemp]);
   process.env.XDG_RUNTIME_DIR = tier.runtime;
-  const slug: string = 'watch-live-leaf';
-  // The skill reaches the watcher: project links for claude/codex, --skill for pi, the agy
-  // global skills dir for agy (agy ignores project .agents/skills). A same-named user skill
-  // outranks --skill in pi, so the operator's own watch-issues is held aside for the run and
-  // restored in finally; agy's link is dropped the same way.
-  // pi (and any harness) scans user skill dirs recursively, so a same-named hold inside them
-  // still collides: user watch-issues entries are removed outright and restored in finally.
-  // Criterion 13: the watcher loads the leaf's watch-issues and no other copy, with no change to
-  // operator-home skill links. pi: --no-skills --skill <leaf> (a same-named user copy outranks
-  // --skill otherwise). agy and codex: the tier root's .agents/skills/watch-issues, with codex's
-  // two user copies disabled by -c skills.config. claude: .claude/skills + --setting-sources.
-  const agyLink: string = resolve(realHome, '.gemini/config/skills/watch-issues');
-  // The user's watch-issues is a symlink; /tmp and ~ may not share a filesystem, so keep the
-  // link's target string rather than moving the file.
-  let agyLinkTarget: string | null = null;
-  try {
-    await observeReady(tier);
-    // agy reads user skills at ~/.gemini/config/skills, never .agents/skills: repoint the user
-    // watch-issues link at the leaf for the run, restored in finally.
-    if (kind === 'claude') {
-      mkdirSync(resolve(tier.root, '.claude/skills'), { recursive: true });
-      symlinkSync(skill, resolve(tier.root, '.claude/skills/watch-issues'));
-    } else if (kind === 'codex') {
-      mkdirSync(resolve(tier.root, '.agents/skills'), { recursive: true });
-      symlinkSync(skill, resolve(tier.root, '.agents/skills/watch-issues'));
-    } else if (kind === 'agy') {
-      try {
-        agyLinkTarget = readlinkSync(agyLink);
-      } catch {
-        agyLinkTarget = null;
-      }
-      rmSync(agyLink, { force: true });
-      symlinkSync(skill, agyLink);
-    }
-    const leafPath: string = resolve(tier.root, 'issues/open/e2e', slug);
-    mkdirSync(leafPath, { recursive: true });
-    await Bun.write(
-      resolve(leafPath, 'state.yaml'),
-      Bun.YAML.stringify({ slug, phase: 'plan.synthesis', created: '2026-11-20', repo: 'akre2e', 'blocked-by': [] }),
-    );
+  return { tier, bin, watcher: '', callLog, flags, kind, shape, timers: [] };
+}
 
-    const watcherPath: string = `${bin}:${tier.shimBin}:${tier.corePath}`;
-    const launchEnv: string[] = [
-      `XDG_RUNTIME_DIR=${tier.runtime}`,
-      `HOME=${realHome}`,
-      `PATH=${watcherPath}`,
-      `WATCH_TICK_SECONDS=${process.env.WATCH_TICK_SECONDS ?? '30'}`,
-    ];
-    let watcher: string;
-    if (shape === 'shell') {
-      const paused0: SpawnResult = await tier.akrogon(['pause']);
-      tier.record('pause.txt', `${paused0.code}\n${paused0.stdout}\n${paused0.stderr}`);
-      expect(paused0.code).toBe(0);
-      const run: SpawnResult = await tier.hc([
-        'run',
-        '--bg',
-        '--json',
-        '--name',
-        'akr-e2e-watcher',
-        '--cwd',
-        tier.root,
-        '--',
-        '/usr/bin/env',
-        ...launchEnv,
-        'bash',
-      ]);
-      expect(run.code).toBe(0);
-      watcher = z.object({ address: z.string() }).parse(JSON.parse(run.stdout)).address;
-      await Bun.sleep(1000);
-      const ready: Promise<Seen | null> = waitFor(session, watcher, idle, 120_000);
-      // The argv is typed into bash, so inline quoting would be parsed (codex's `-c` value has
-      // braces/quotes the shell expands or mangles). Send a script path instead.
-      const launchSh: string = resolve(leafTemp, `${name}-launch.sh`);
-      const q = (s: string): string => `'${s.replaceAll(`'`, `'\\''`)}'`;
-      writeFileSync(
-        launchSh,
-        `#!/bin/sh\nexec env ${launchEnv.map(q).join(' ')} ${spec.argv(model).map(q).join(' ')}\n`,
-      );
-      Bun.spawnSync(['chmod', '+x', launchSh]);
-      await launchFromShell(tier, watcher, `sh ${q(launchSh)}`, spec.trust);
-      if (spec.trust !== null) await answerTrust(tier, 'watcher', async () => watcher, spec.trust, ready);
-      expect(await ready).not.toBeNull();
-      const st0: number = statusCalls(callLog);
-      const turn0: number = await send(tier, watcher, `watch-issues ${tier.root}`);
-      await turnDone(tier, watcher, turn0, 300_000);
-      await settleIdle(tier, watcher, 60_000);
-      tier.record('start-screen.txt', await screenTail(tier, watcher));
-      // Paused start: timer claims the name and the check ran, acting on nothing.
-      const timers0: Term[] = await labelled(tier);
-      expect(timers0).toHaveLength(1);
-      expect(timers0[0].name).toBe('aw-watch');
-      expect(statusCalls(callLog)).toBeGreaterThanOrEqual(st0 + 1);
-      expect(nextCalls(callLog)).toBe(0);
-      const timer0: string = timers0[0].address;
-      expect(timers0[0].parent).toBe(watcher);
-      expect(z.string().parse(timers0[0].argv?.join(' '))).toContain('skills/watch-issues/scripts/timer.ts');
-      // Unpause → next due acts on the waiting leaf.
-      const unpaused: SpawnResult = await tier.akrogon(['unpause']);
-      expect(unpaused.code).toBe(0);
-      await waitDue(tier, timer0, 1, 120_000);
-      await waitCalls(callLog, (l) => l.startsWith('call next'), 1, 120_000);
-      // Pause again → the next due counts delivered but acts on nothing.
-      const paused1: SpawnResult = await tier.akrogon(['pause']);
-      expect(paused1.code).toBe(0);
-      const beforeNext: number = nextCalls(callLog);
-      await waitDue(tier, timer0, 2, 120_000);
-      await waitCalls(callLog, (l) => l.startsWith('call status'), statusCalls(callLog) + 1, 120_000);
-      expect(nextCalls(callLog)).toBe(beforeNext);
-      // Agent exit: kill the harness; the timer exits and no tick text lands in the shell.
-      const wTerm: Term = await get(tier, watcher);
-      const agentPid: number = z.number().parse(wTerm.foreground?.pid);
-      process.kill(agentPid, 'SIGTERM');
-      const deadline: number = Date.now() + 15_000;
-      while ((await get(tier, watcher)).foreground?.pid === agentPid && Date.now() < deadline) await Bun.sleep(300);
-      if ((await get(tier, watcher)).foreground?.pid === agentPid) process.kill(agentPid, 'SIGKILL');
-      const goneDeadline: number = Date.now() + 90_000;
-      while (Date.now() < goneDeadline && !(await gone(tier, timer0))) await Bun.sleep(500);
-      expect(await gone(tier, timer0)).toBe(true);
-      // Scrollback keeps earlier tick text; the criterion is that nothing new arrives. Count
-      // tick lines now and again after a full interval.
-      const countTicks = async (): Promise<number> =>
-        ((await tier.hc(['read', watcher, '--lines', '60'])).stdout.match(/watch-issues tick /g) ?? [])
-          .length;
-      const ticksAtExit: number = await countTicks();
-      await Bun.sleep(Number(process.env.WATCH_TICK_SECONDS ?? '30') * 1000 + 15_000);
-      const screen: string = (await tier.hc(['read', watcher, '--lines', '60'])).stdout;
-      tier.record('after-exit-screen.txt', screen);
-      expect(await countTicks()).toBe(ticksAtExit);
-      await dropTrust(tier, tier.root);
-      return;
-    }
+// Skill wiring per criterion 13; the model-playing hook is installed for stand-in cells only.
+async function wireSkill(cell: Cell): Promise<void> {
+  const root: string = cell.tier.root;
+  if (cell.kind === 'claude') {
+    mkdirSync(resolve(root, '.claude/skills'), { recursive: true });
+    symlinkSync(skill, resolve(root, '.claude/skills/watch-issues'));
+  } else if (cell.kind === 'agy') {
+    // agy 1.5.13 does not follow a symlinked workspace skill (its /skills list omits it and
+    // falls back to the global copy); a real directory under .agents/skills is listed and
+    // shadows the same-named global one (P1, and the agy preflight).
+    mkdirSync(resolve(root, '.agents/skills'), { recursive: true });
+    cpSync(skill, resolve(root, '.agents/skills/watch-issues'), { recursive: true });
+  } else if (cell.kind === 'codex') {
+    mkdirSync(resolve(root, '.agents/skills'), { recursive: true });
+    symlinkSync(skill, resolve(root, '.agents/skills/watch-issues'));
+  }
+  if (cell.kind === 'standin') {
+    writeFileSync(resolve(cell.tier.standin, 'hook'), readFileSync(hookSource));
+    Bun.spawnSync(['chmod', '+x', resolve(cell.tier.standin, 'hook')]);
+  }
+}
 
-    // shape=root
-    const run: SpawnResult = await tier.hc([
+function launchEnvFor(cell: Cell): string[] {
+  const envs: string[] = [
+    `XDG_RUNTIME_DIR=${cell.tier.runtime}`,
+    `HOME=${realHome}`,
+    `PATH=${cell.bin}:${cell.tier.shimBin}:${cell.tier.corePath}`,
+    `WATCH_TICK_SECONDS=${intervalSec}`,
+    `WATCH_SKILLDIR=${skill}`,
+    `WATCH_ROOT=${cell.tier.root}`,
+  ];
+  if (cell.kind === 'standin') envs.push(`STANDIN_DIR=${cell.tier.standin}`);
+  return envs;
+}
+
+// Launches the watcher for the cell's shape (root: as the terminal's program; shell: typed into
+// bash through a launch script, so argv quoting can't be mangled), answers trust, sends
+// `watch-issues <root>` and waits out the model's start step. Returns the verified timer.
+async function startCell(cell: Cell): Promise<Term> {
+  const spec = kinds[cell.kind];
+  const model: string = process.env.AKROGON_E2E_WATCHER_MODEL ?? models[cell.kind];
+  const launchEnv: string[] = launchEnvFor(cell);
+  const readyTimeout: number = cell.kind === 'standin' ? 60_000 : 120_000;
+  let watcher: string;
+  if (cell.shape === 'shell') {
+    const run: SpawnResult = await cell.tier.hc([
       'run',
       '--bg',
       '--json',
       '--name',
       'akr-e2e-watcher',
       '--cwd',
-      tier.root,
+      cell.tier.root,
+      '--',
+      '/usr/bin/env',
+      ...launchEnv,
+      'bash',
+    ]);
+    expect(run.code).toBe(0);
+    watcher = z.object({ address: z.string() }).parse(JSON.parse(run.stdout)).address;
+    cell.watcher = watcher;
+    await Bun.sleep(1000);
+    const ready: Promise<Seen | null> = waitFor(session, watcher, idle, readyTimeout);
+    const launchSh: string = resolve(leafTemp, `launch-${cell.kind}-${cell.shape}.sh`);
+    const q = (s: string): string => `'${s.replaceAll(`'`, `'\\''`)}'`;
+    writeFileSync(
+      launchSh,
+      `#!/bin/sh\nexec env ${launchEnv.map(q).join(' ')} ${spec.argv(model).map(q).join(' ')}\n`,
+    );
+    Bun.spawnSync(['chmod', '+x', launchSh]);
+    await launchFromShell(cell.tier, watcher, `sh ${q(launchSh)}`, spec.trust);
+    if (spec.trust !== null) await answerTrust(cell.tier, 'watcher', async () => watcher, spec.trust, ready);
+    expect(await ready).not.toBeNull();
+  } else {
+    const run: SpawnResult = await cell.tier.hc([
+      'run',
+      '--bg',
+      '--json',
+      '--name',
+      'akr-e2e-watcher',
+      '--cwd',
+      cell.tier.root,
       '--',
       '/usr/bin/env',
       ...launchEnv,
@@ -457,112 +495,458 @@ test('watch live: one watcher session per harness and shape', async () => {
     ]);
     expect(run.code).toBe(0);
     watcher = z.object({ address: z.string() }).parse(JSON.parse(run.stdout)).address;
-    const ready: Promise<Seen | null> = waitFor(session, watcher, idle, 120_000);
-    if (spec.trust !== null) await answerTrust(tier, 'watcher', async () => watcher, spec.trust, ready);
+    cell.watcher = watcher;
+    const ready: Promise<Seen | null> = waitFor(session, watcher, idle, readyTimeout);
+    if (spec.trust !== null) await answerTrust(cell.tier, 'watcher', async () => watcher, spec.trust, ready);
+    expect(await ready).not.toBeNull();
+  }
+  const startTurn: number = await send(cell.tier, watcher, `watch-issues ${cell.tier.root}`);
+  if (cell.kind === 'standin') {
+    // The hook logs the script outcome per task; wait for its start line, then its status call.
+    await waitHook(cell.tier, watcher, /start exit=0 (started|running)/, 60_000);
+  } else {
+    await turnDone(cell.tier, watcher, startTurn, 300_000);
+    await settleIdle(cell.tier, watcher, 60_000);
+  }
+  cell.tier.record('start-screen.txt', await screen(cell.tier, watcher));
+  return verifiedTimer(cell);
+}
+
+// One live labelled terminal named aw-watch whose argv runs the leaf's timer.ts by absolute
+// path, parented to the watcher (criteria 1, 13).
+async function verifiedTimer(cell: Cell): Promise<Term> {
+  const timers: Term[] = await labelled(cell.tier);
+  expect(timers).toHaveLength(1);
+  const timer: Term = timers[0];
+  cell.timers.push(timer.address);
+  expect(timer.name).toBe('aw-watch');
+  expect(timer.parent).toBe(cell.watcher);
+  const argv: string = z.string().parse(timer.argv?.join(' '));
+  expect(argv).toContain(timerScript);
+  return timer;
+}
+
+// Kill the watcher's foreground (the agent) and wait until the shell shows it gone.
+async function exitAgent(cell: Cell): Promise<number> {
+  const wTerm: Term = await get(cell.tier, cell.watcher);
+  const agentPid: number = z.number().parse(wTerm.foreground?.pid);
+  process.kill(agentPid, 'SIGTERM');
+  const deadline: number = Date.now() + 15_000;
+  while ((await get(cell.tier, cell.watcher)).foreground?.pid === agentPid && Date.now() < deadline)
+    await Bun.sleep(300);
+  if ((await get(cell.tier, cell.watcher)).foreground?.pid === agentPid)
+    process.kill(agentPid, 'SIGKILL');
+  return agentPid;
+}
+
+async function noNewTicks(cell: Cell, ms: number): Promise<void> {
+  const count = async (): Promise<number> =>
+    ((await screen(cell.tier, cell.watcher)).match(/watch-issues tick /g) ?? []).length;
+  const atStart: number = await count();
+  await Bun.sleep(ms);
+  expect(await count()).toBe(atStart);
+}
+
+// A probe tick that must run no check: wait for the hook's `tick exit=` boundary, then read the
+// task's own hook block (up to the next boundary) — a check would have written `status` inside.
+async function tickRunsNoCheck(
+  cell: Cell,
+  text: string,
+  boundary: RegExp,
+): Promise<string[]> {
+  const watcher: string = cell.watcher;
+  const base: number = hookLines(cell.tier, watcher).length;
+  await send(cell.tier, watcher, text);
+  const deadline: number = Date.now() + 60_000;
+  let idx: number = -1;
+  while (Date.now() < deadline && idx === -1) {
+    idx = hookLines(cell.tier, watcher)
+      .slice(base)
+      .findIndex((l) => boundary.test(l));
+    if (idx >= 0) idx += base;
+    else await Bun.sleep(500);
+  }
+  if (idx === -1) throw new Error(`no ${boundary} in ${JSON.stringify(hookLines(cell.tier, watcher))}`);
+  const tail: string[] = hookLines(cell.tier, watcher).slice(idx);
+  const end: number = tail.slice(1).findIndex((l) => /exit=|ignored |skipped /.test(l));
+  const own: string[] = end === -1 ? tail : tail.slice(0, end + 1);
+  expect(own.some((l) => l.startsWith('status '))).toBe(false);
+  return own;
+}
+
+async function teardownCell(cell: Cell): Promise<void> {
+  await dropTrust(cell.tier, cell.tier.root);
+  const left: string[] = await stopWatchTier(cell.tier, [leafTemp]);
+  cell.tier.record('absence.json', { left });
+  expect(left).toEqual([]);
+}
+
+// Writes stay under the run's AKROGON_E2E_ROOT and AKROGON_E2E_OUT: an operator-supplied root
+// must live under a tmp root (/var/tmp, /tmp or the suite's TMPDIR) so logbins, flags and
+// launch scripts never land outside temp space, and the socket-link path must fit the unix
+// limit with the longest cell name.
+function tmpdirGuard(): void {
+  const allowed: string[] = [realpathSync(process.env.TMPDIR ?? '/tmp'), '/var/tmp', '/tmp'];
+  expect(allowed.some((dir) => leafTemp === dir || leafTemp.startsWith(`${dir}/`))).toBe(true);
+  const longest: string = resolve(
+    leafTemp,
+    'akr-e2e-watch-standin-shell-rt/herdr-core/akr-e2e-watch.sock',
+  );
+  expect(Buffer.byteLength(longest) < 107, `socket path too long: ${longest}`).toBe(true);
+}
+
+// ---------------------------------------------------------------------------
+// Preflight cells (criterion 13): real tier + real launch flags, no prompt sent.
+
+test.serial('watch preflight: the leaf skill is the only watch-issues the harness sees', async () => {
+  expect(required('AKROGON_E2E')).toBe('watch-preflight');
+  const kind = z.enum(['claude', 'codex', 'pi', 'agy']).parse(required('AKROGON_E2E_KIND'));
+  tmpdirGuard();
+  const cell: Cell = await setupCell(kind, 'preflight');
+  try {
+    await observeReady(cell.tier);
+    await wireSkill(cell);
+    const spec = kinds[kind];
+    const run: SpawnResult = await cell.tier.hc([
+      'run',
+      '--bg',
+      '--json',
+      '--name',
+      'akr-e2e-preflight',
+      '--cwd',
+      cell.tier.root,
+      '--',
+      '/usr/bin/env',
+      ...launchEnvFor(cell),
+      ...spec.argv(models[kind]),
+    ]);
+    expect(run.code).toBe(0);
+    cell.watcher = z.object({ address: z.string() }).parse(JSON.parse(run.stdout)).address;
+    const ready: Promise<Seen | null> = waitFor(session, cell.watcher, idle, 120_000);
+    if (spec.trust !== null)
+      await answerTrust(cell.tier, 'watcher', async () => cell.watcher, spec.trust, ready);
     expect(await ready).not.toBeNull();
 
-    // Start: one check, one verified labelled timer, no cron tool.
-    const turn0: number = await send(tier, watcher, `watch-issues ${tier.root}`);
-    await turnDone(tier, watcher, turn0, 300_000);
-    await settleIdle(tier, watcher, 60_000);
-    tier.record('start-screen.txt', await screenTail(tier, watcher));
-    const timers1: Term[] = await labelled(tier);
-    expect(timers1).toHaveLength(1);
-    const timer: string = timers1[0].address;
-    expect(timers1[0].name).toBe('aw-watch');
-    expect(timers1[0].parent).toBe(watcher);
-    const argv: string = z.string().parse(timers1[0].argv?.join(' '));
-    expect(argv).toContain('skills/watch-issues/scripts/timer.ts');
-    const wTerm: Term = await get(tier, watcher);
-    expect(argv).toContain(`--pin-pid ${z.number().parse(wTerm.foreground?.pid)}`);
-    // The model may scope `status <root>` plus a plain `status` in one check; count calls, not shape.
-    const startCalls: number = statusCalls(callLog);
-    expect(startCalls).toBeGreaterThanOrEqual(1);
+    if (kind === 'pi') {
+      const shown: string = await screen(cell.tier, cell.watcher);
+      cell.tier.record('preflight.txt', shown);
+      expect(shown).not.toContain('watch-issues collision');
+    } else if (kind === 'codex') {
+      // codex debug prompt-input renders the model-visible input with the same config and cwd;
+      // its skills entry lists the enabled copies. The cell's own argv runs the identical -c.
+      const probe: SpawnResult = await spawnCaptured(
+        ['codex', 'debug', 'prompt-input', '-c', codexSkillConfig],
+        {
+          cwd: cell.tier.root,
+          env: { ...process.env, HOME: realHome, XDG_RUNTIME_DIR: realRuntime },
+        },
+      );
+      cell.tier.record('preflight.txt', `${probe.code}\n${probe.stdout}\n${probe.stderr}`);
+      cell.tier.record('preflight-screen.txt', await screen(cell.tier, cell.watcher));
+      expect(probe.code).toBe(0);
+      expect(probe.stdout).toContain('watch-issues');
+      expect(probe.stdout).toContain(marker);
+      expect(probe.stdout).toContain(cell.tier.root);
+    } else if (kind === 'agy') {
+      // /skills is a client-side overlay (no prompt); the workspace copy must carry the
+      // marker and shadow the same-named global one: exactly one watch-issues entry lists.
+      await cell.tier.hc(['keys', cell.watcher, '/', 's', 'k', 'i', 'l', 'l', 's', 'enter']);
+      await Bun.sleep(5000);
+      const shown: string = await screen(cell.tier, cell.watcher);
+      cell.tier.record('preflight.txt', shown);
+      expect(shown).toContain(marker);
+      expect(shown.match(/watch-issues/g) ?? []).toHaveLength(1);
+    } else {
+      // claude: the project skills link resolves into the leaf and carries the marker; the
+      // screen shows no skill-load error. The paid cell's timer argv is the runtime proof.
+      const shown: string = await screen(cell.tier, cell.watcher);
+      cell.tier.record('preflight.txt', shown);
+      expect(shown).not.toMatch(/skill.*(error|fail)/i);
+      expect(realpathSync(resolve(cell.tier.root, '.claude/skills/watch-issues'))).toBe(skill);
+      expect(
+        readFileSync(resolve(cell.tier.root, '.claude/skills/watch-issues/SKILL.md'), 'utf8'),
+      ).toContain(marker);
+    }
+    await teardownCell(cell);
+  } catch (error) {
+    await failRecord(cell.tier, cell.watcher, cell.timers).catch(() => {});
+    await teardownCell(cell).catch(() => {});
+    throw error;
+  }
+}, 300_000);
 
-    // Second start: one more check, still one timer.
-    const turn1: number = await send(tier, watcher, `watch-issues ${tier.root}`);
-    await turnDone(tier, watcher, turn1, 300_000);
-    await settleIdle(tier, watcher, 60_000);
-    const startCalls2: number = statusCalls(callLog);
-    expect(startCalls2).toBeGreaterThan(startCalls);
+// ---------------------------------------------------------------------------
+// Stand-in cells (free): the full mechanical sequence on real hc through the tier.
+
+test.serial('watch standin cell: criteria 1-9 and 12 end to end', async () => {
+  expect(required('AKROGON_E2E')).toBe('watch-live');
+  expect(required('AKROGON_E2E_KIND')).toBe('standin');
+  const shape = z.enum(['root', 'shell']).parse(required('AKROGON_E2E_SHAPE'));
+  tmpdirGuard();
+  const cell: Cell = await setupCell('standin', shape);
+  const { tier, callLog } = cell;
+  try {
+    // Criterion 12: the worktree store is its own folder, apart from root, runtime and helpers.
+    const configured = z
+      .object({ worktree_root: z.string() })
+      .parse(Bun.YAML.parse(readFileSync(resolve(tier.root, 'issues/config.yaml'), 'utf8')));
+    expect(tier.paths).toContain(configured.worktree_root);
+    expect(tier.root).not.toBe(configured.worktree_root);
+    expect(tier.runtime).not.toBe(configured.worktree_root);
+    expect(tier.standin).not.toBe(configured.worktree_root);
+    await observeReady(tier);
+    await wireSkill(cell);
+    const leafPath: string = resolve(tier.root, 'issues/open/e2e', 'watch-live-leaf');
+    mkdirSync(leafPath, { recursive: true });
+    await Bun.write(
+      resolve(leafPath, 'state.yaml'),
+      Bun.YAML.stringify({
+        slug: 'watch-live-leaf',
+        phase: 'plan.synthesis',
+        created: '2026-11-20',
+        repo: 'akre2e',
+        'blocked-by': [],
+      }),
+    );
+
+    if (shape === 'shell') {
+      // Paused start: the timer still starts (criterion 8: starting is not an act on a leaf).
+      const paused0: SpawnResult = await tier.akrogon(['pause']);
+      expect(paused0.code).toBe(0);
+      const timer: Term = await startCell(cell);
+      await waitCalls(callLog, (l) => l.startsWith('call status'), 1, 30_000);
+      expect(nextCalls(callLog)).toBe(0); // the paused check acts on nothing
+
+      // Criterion 12: the tier socket keeps answering after a real akrogon unpause.
+      const unpaused: SpawnResult = await tier.akrogon(['unpause']);
+      expect(unpaused.code).toBe(0);
+      const listed: SpawnResult = await tier.hc(['ls', '--json']);
+      expect(listed.code).toBe(0);
+      tier.record('after-unpause.txt', listed.stdout);
+
+      // One tick with its receipt and the acting check (3).
+      await waitDue(tier, timer.address, 1, 90_000);
+      await waitCalls(callLog, (l) => l.startsWith('call next'), 1, 90_000);
+
+      // A due that falls due while the previous check runs is held, then runs once (4):
+      // hold due 2's status call across an interval boundary; due 3 accrues and is sent once.
+      writeFileSync(resolve(cell.flags, 'hold-status'), String(intervalSec * 2 + 5));
+      await waitDue(tier, timer.address, 2, 90_000);
+      const beforeHeld: number = statusCalls(callLog);
+      await waitDue(tier, timer.address, 3, 90_000 + intervalSec * 2000);
+      await waitCalls(callLog, (l) => l.startsWith('call status'), beforeHeld + 2, 90_000);
+      const timerScreen: string = await screen(tier, timer.address);
+      expect(timerScreen.match(/due=3 sent/g) ?? []).toHaveLength(1);
+      expect(timerScreen).not.toContain('due=3 dropped');
+
+      // Pause again: the next due receipts and checks but acts on nothing (8).
+      const paused1: SpawnResult = await tier.akrogon(['pause']);
+      expect(paused1.code).toBe(0);
+      const beforeNext: number = nextCalls(callLog);
+      await waitDue(tier, timer.address, 4, 90_000);
+      await waitCalls(callLog, (l) => l.startsWith('call status'), statusCalls(callLog) + 1, 90_000);
+      expect(nextCalls(callLog)).toBe(beforeNext);
+
+      // Agent exit leaves no new tick text in the shell (7).
+      await exitAgent(cell);
+      await waitGone(tier, timer.address, 60_000);
+      await noNewTicks(cell, intervalSec * 1000 + 15_000);
+      await teardownCell(cell);
+      return;
+    }
+
+    // shape=root: start with its check and verified timer (1).
+    const timer: Term = await startCell(cell);
+    await waitCalls(callLog, (l) => l.startsWith('call status'), 1, 30_000);
+    const wTerm: Term = await get(tier, cell.watcher);
+    const pinPid: number = z.number().parse(wTerm.foreground?.pid);
+    expect(z.string().parse(timer.argv?.join(' '))).toContain(`--pin-pid ${pinPid}`);
+
+    // Second start: one more check, still one timer (2).
+    await send(tier, cell.watcher, `watch-issues ${tier.root}`);
+    await waitHook(tier, cell.watcher, /start exit=0 running/, 60_000);
+    await waitCalls(callLog, (l) => l.startsWith('call status'), 2, 30_000);
     expect(await labelled(tier)).toHaveLength(1);
 
-    // Two dues: each delivers its tick, sets its receipt and runs its own check + next.
-    await waitDue(tier, timer, 1, 120_000);
-    await waitDue(tier, timer, 2, 120_000);
-    await waitCalls(callLog, (l) => l.startsWith('call status'), startCalls2 + 2, 90_000);
-    // At least one check must act on the waiting leaf; a later check may judge a repeat `next`
-    // unnecessary once the seat is already prompted (pi did exactly that on live runs).
-    expect(nextCalls(callLog)).toBeGreaterThanOrEqual(1);
-    // A later due keeps the rhythm after the first checks.
-    await waitDue(tier, timer, 3, 180_000);
+    // One tick per due with its receipt and the Judge's next on the waiting leaf (3, 11).
+    await waitDue(tier, timer.address, 1, 90_000);
+    await waitCalls(callLog, (l) => l.startsWith('call status'), 3, 90_000);
+    await waitCalls(callLog, (l) => l.startsWith('call next'), 1, 90_000);
+    expect(hookLines(tier, cell.watcher).some((l) => l === 'receipt=1')).toBe(true);
 
-    // Busy-accrual (dues piling while a check runs, each running its own check after) is proven
-    // deterministically in tests/watch-timer.test.ts with the stand-in; a live model defers or
-    // batches those checks at its own discretion, so the live tier does not reproduce that window.
+    // One tick held behind a busy check (4): due 2's status call is held while due 3 accrues.
+    writeFileSync(resolve(cell.flags, 'hold-status'), String(intervalSec * 2 + 5));
+    await waitDue(tier, timer.address, 2, 90_000);
+    const beforeHeld: number = statusCalls(callLog);
+    await waitDue(tier, timer.address, 3, 90_000 + intervalSec * 2000);
+    await waitCalls(callLog, (l) => l.startsWith('call status'), beforeHeld + 2, 90_000);
+    const heldScreen: string = await screen(tier, timer.address);
+    expect(heldScreen.match(/due=3 sent/g) ?? []).toHaveLength(1);
+    expect(heldScreen).not.toContain('due=3 dropped');
 
-    // Old cron tick: no timer= → no check. Stamp a huge receipt first so every pending due
-    // drains without sending; the watcher is then quiet for the probe's status assertion.
-    await tier.hc(['label', timer, 'akrogon.watch-due=9999']);
-    await Bun.sleep(Number(process.env.WATCH_TICK_SECONDS ?? '30') * 1000 + 10_000);
-    const beforeOld: number = statusCalls(callLog);
-    const turnOld: number = await send(tier, watcher, `watch-issues tick ${tier.root}`);
-    await turnDone(tier, watcher, turnOld, 180_000);
-    await settleIdle(tier, watcher, 60_000);
-    expect(statusCalls(callLog)).toBe(beforeOld);
+    // Pause: the next due receipts and checks but acts on nothing; unpause resumes (8, 12).
+    const paused: SpawnResult = await tier.akrogon(['pause']);
+    expect(paused.code).toBe(0);
+    const beforeNext: number = nextCalls(callLog);
+    await waitDue(tier, timer.address, 4, 90_000);
+    await waitCalls(callLog, (l) => l.startsWith('call status'), statusCalls(callLog) + 1, 90_000);
+    expect(nextCalls(callLog)).toBe(beforeNext);
+    const unpaused: SpawnResult = await tier.akrogon(['unpause']);
+    expect(unpaused.code).toBe(0);
+    const listed: SpawnResult = await tier.hc(['ls', '--json']);
+    expect(listed.code).toBe(0); // criterion 12: the socket still answers
+    await waitDue(tier, timer.address, 5, 90_000);
+    await waitCalls(callLog, (l) => l.startsWith('call next'), beforeNext + 1, 90_000);
 
-    // Stop, repeated stop, restart, old-address tick refused.
-    const turnStop: number = await send(tier, watcher, `watch-issues stop ${tier.root}`);
-    await turnDone(tier, watcher, turnStop, 120_000);
-    await settleIdle(tier, watcher, 60_000);
-    expect(await labelled(tier)).toHaveLength(0);
-    const turnStop2: number = await send(tier, watcher, `watch-issues stop ${tier.root}`);
-    await turnDone(tier, watcher, turnStop2, 120_000);
-    await settleIdle(tier, watcher, 60_000);
-    tier.record('stop-screen.txt', await screenTail(tier, watcher));
-    const turnRe: number = await send(tier, watcher, `watch-issues ${tier.root}`);
-    await turnDone(tier, watcher, turnRe, 300_000);
-    await settleIdle(tier, watcher, 60_000);
-    const timers2: Term[] = await labelled(tier);
-    expect(timers2).toHaveLength(1);
-    const timer2: string = timers2[0].address;
-    expect(timer2).not.toBe(timer);
-    const wTerm2: Term = await get(tier, watcher);
-    const pinPid: number = z.number().parse(wTerm2.foreground?.pid);
-    // Quiet window again: stamp the new timer's receipt high so its dues drain, then the
-    // forged tick (old address, valid pin) is the only input the watcher can act on.
-    await tier.hc(['label', timer2, 'akrogon.watch-due=9999']);
-    await Bun.sleep(Number(process.env.WATCH_TICK_SECONDS ?? '30') * 1000 + 10_000);
-    const beforeForged: number = statusCalls(callLog);
-    const turnForged: number = await send(
-      tier,
-      watcher,
-      `watch-issues tick timer=${timer} pid=${pinPid} due=9 ${tier.root}`,
+    // Old cron tick (no timer=): refused with a reason, no check (6, 14).
+    await tickRunsNoCheck(cell, `watch-issues tick ${tier.root}`, /tick exit=\d+ no-watch (?!t=)\S/);
+    // Stale due refused (6).
+    await tickRunsNoCheck(
+      cell,
+      `watch-issues tick timer=${timer.address} pid=${pinPid} due=1 ${tier.root}`,
+      /tick exit=\d+ no-watch stale/,
     );
-    await turnDone(tier, watcher, turnForged, 180_000);
-    await settleIdle(tier, watcher, 60_000);
-    expect(statusCalls(callLog)).toBe(beforeForged);
 
-    // Reset: /clear on claude and agy ends the watch; codex and pi /new is a recorded limit.
+    // Forged pid: the tick's pid mismatches the watcher → the timer is stopped, no check (6).
+    const forged: string[] = await tickRunsNoCheck(
+      cell,
+      `watch-issues tick timer=${timer.address} pid=${pinPid + 40000} due=99 ${tier.root}`,
+      /tick exit=0 stopped/,
+    );
+    expect(forged.some((l) => /stopped/.test(l))).toBe(true);
+    await waitGone(tier, timer.address, 60_000);
+
+    // Restart: a new verified timer at a new address; a tick naming the old one runs nothing (5).
+    await send(tier, cell.watcher, `watch-issues ${tier.root}`);
+    await waitHook(tier, cell.watcher, /start exit=0 started/, 60_000);
+    const timer2: Term = await verifiedTimer(cell);
+    expect(timer2.address).not.toBe(timer.address);
+    await tickRunsNoCheck(
+      cell,
+      `watch-issues tick timer=${timer.address} pid=${pinPid} due=99 ${tier.root}`,
+      /tick exit=\d+ no-watch (?!t=)\S/,
+    );
+
+    // Stop, repeated stop (5); the terminal-program exit then ends the timer (7).
+    await send(tier, cell.watcher, `watch-issues stop ${tier.root}`);
+    await waitHook(tier, cell.watcher, /stop exit=0/, 60_000);
+    await waitGone(tier, timer2.address, 60_000);
+    await send(tier, cell.watcher, `watch-issues stop ${tier.root}`);
+    for (let n: number = 0; n < 60 && hookLines(tier, cell.watcher).filter((l) => /stop exit=0/.test(l)).length < 2; n += 1)
+      await Bun.sleep(500);
+    expect(hookLines(tier, cell.watcher).filter((l) => /stop exit=0/.test(l)).length).toBeGreaterThanOrEqual(2);
+
+    // Agent exit: the pinned program dies; a fresh timer exits on its own (no send).
+    await send(tier, cell.watcher, `watch-issues ${tier.root}`);
+    await waitHook(tier, cell.watcher, /start exit=0 started/, 60_000);
+    const timer3: Term = await verifiedTimer(cell);
+    const agentPid: number = z.number().parse((await get(tier, cell.watcher)).foreground?.pid);
+    process.kill(agentPid, 'SIGTERM');
+    await waitGone(tier, timer3.address, 60_000);
+    await teardownCell(cell);
+  } catch (error) {
+    await failRecord(tier, cell.watcher, cell.timers).catch(() => {});
+    await teardownCell(cell).catch(() => {});
+    throw error;
+  }
+}, 420_000);
+
+// ---------------------------------------------------------------------------
+// Paid cells (criterion 11 as corrected): the smallest sequence a real harness must show.
+
+test.serial('watch live cell: a real harness in the tier', async () => {
+  expect(required('AKROGON_E2E')).toBe('watch-live');
+  const kindRaw: string = required('AKROGON_E2E_KIND');
+  expect(kindRaw).not.toBe('standin');
+  const kind = z.enum(['claude', 'codex', 'pi', 'agy']).parse(kindRaw);
+  const shape = z.enum(['root', 'shell']).parse(required('AKROGON_E2E_SHAPE'));
+  tmpdirGuard();
+  const cell: Cell = await setupCell(kind, shape);
+  const { tier, callLog } = cell;
+  try {
+    await observeReady(tier);
+    await wireSkill(cell);
+    const leafPath: string = resolve(tier.root, 'issues/open/e2e', 'watch-live-leaf');
+    mkdirSync(leafPath, { recursive: true });
+    await Bun.write(
+      resolve(leafPath, 'state.yaml'),
+      Bun.YAML.stringify({
+        slug: 'watch-live-leaf',
+        phase: 'plan.synthesis',
+        created: '2026-11-20',
+        repo: 'akre2e',
+        'blocked-by': [],
+      }),
+    );
+    const timer: Term = await startCell(cell);
+
+    if (shape === 'shell') {
+      // start (1), one tick with its receipt (3).
+      expect(statusCalls(callLog)).toBeGreaterThanOrEqual(1);
+      await waitDue(tier, timer.address, 1, 120_000);
+      await waitCalls(callLog, (l) => l.startsWith('call status'), statusCalls(callLog) + 1, 120_000);
+      // One tick held behind a busy check, running once after it (4): due 2's check is held
+      // while due 3 accrues; it is sent once after the check and runs its own check.
+      writeFileSync(resolve(cell.flags, 'hold-status'), String(intervalSec * 2 + 15));
+      await waitDue(tier, timer.address, 2, 120_000);
+      const beforeHeld: number = statusCalls(callLog);
+      await waitDue(tier, timer.address, 3, 120_000 + intervalSec * 2000);
+      await waitCalls(callLog, (l) => l.startsWith('call status'), beforeHeld + 2, 120_000);
+      const timerScreen: string = await screen(tier, timer.address);
+      expect(timerScreen.match(/due=3 sent/g) ?? []).toHaveLength(1);
+      expect(timerScreen).not.toContain('due=3 dropped');
+      // Agent exit leaves no tick text in the shell (7).
+      await exitAgent(cell);
+      await waitGone(tier, timer.address, 90_000);
+      await noNewTicks(cell, intervalSec * 1000 + 15_000);
+      await teardownCell(cell);
+      return;
+    }
+
+    // shape=root: start with its check and timer (1).
+    expect(statusCalls(callLog)).toBeGreaterThanOrEqual(1);
+    // One tick running one check with its receipt and the Judge's next (3, 11).
+    await waitDue(tier, timer.address, 1, 120_000);
+    await waitCalls(callLog, (l) => l.startsWith('call status'), statusCalls(callLog) + 1, 120_000);
+    await waitCalls(callLog, (l) => l.startsWith('call next'), 1, 120_000);
+    // One tick held behind a busy check, running once after it (4).
+    writeFileSync(resolve(cell.flags, 'hold-status'), String(intervalSec * 2 + 15));
+    await waitDue(tier, timer.address, 2, 120_000);
+    const beforeHeld: number = statusCalls(callLog);
+    await waitDue(tier, timer.address, 3, 120_000 + intervalSec * 2000);
+    await waitCalls(callLog, (l) => l.startsWith('call status'), beforeHeld + 2, 120_000);
+    const timerScreen: string = await screen(tier, timer.address);
+    expect(timerScreen.match(/due=3 sent/g) ?? []).toHaveLength(1);
+    expect(timerScreen).not.toContain('due=3 dropped');
+    // Stop with no stray tick (5).
+    const turnStop: number = await send(tier, cell.watcher, `watch-issues stop ${tier.root}`);
+    await turnDone(tier, cell.watcher, turnStop, 120_000);
+    await settleIdle(tier, cell.watcher, 60_000);
+    expect(await labelled(tier)).toHaveLength(0);
+    await noNewTicks(cell, intervalSec * 1000 + 10_000);
+    // A second start, then the reset: /clear ends claude's and agy's watch; codex and pi record
+    // their /new outcome as the stated limit (7).
+    const turnRe: number = await send(tier, cell.watcher, `watch-issues ${tier.root}`);
+    await turnDone(tier, cell.watcher, turnRe, 300_000);
+    await settleIdle(tier, cell.watcher, 60_000);
+    const timer2: Term = await verifiedTimer(cell);
+    expect(timer2.address).not.toBe(timer.address);
     const reset: string[] =
-      kind === 'claude' || kind === 'agy' ? ['/', 'c', 'l', 'e', 'a', 'r', 'enter'] : ['/', 'n', 'e', 'w', 'enter'];
-    await tier.hc(['keys', watcher, ...reset]);
+      kind === 'claude' || kind === 'agy'
+        ? ['/', 'c', 'l', 'e', 'a', 'r', 'enter']
+        : ['/', 'n', 'e', 'w', 'enter'];
+    await tier.hc(['keys', cell.watcher, ...reset]);
     await Bun.sleep(90_000);
     const timers3: Term[] = await labelled(tier);
-    const resetScreen: string = (await tier.hc(['read', watcher, '--lines', '60'])).stdout;
-    tier.record('reset.json', { timers: timers3.map((t) => t.address), screen: resetScreen });
-    if (kind === 'claude' || kind === 'agy') {
-      // hc read is scrollback, so pre-clear tick text stays on screen; the timer list is the proof.
-      expect(timers3).toHaveLength(0);
-    }
-    await dropTrust(tier, tier.root);
-  } finally {
-    if (agyLinkTarget !== null || existsSync(agyLink)) {
-      rmSync(agyLink, { force: true });
-      if (agyLinkTarget !== null) symlinkSync(agyLinkTarget, agyLink);
-    }
-    const left: string[] = await stopWatchTier(tier, [leafTemp]);
-    tier.record('absence.json', { left });
-    expect(left).toEqual([]);
+    tier.record('reset.json', {
+      timers: timers3.map((t) => t.address),
+      screen: await screen(tier, cell.watcher),
+    });
+    if (kind === 'claude' || kind === 'agy') expect(timers3).toHaveLength(0);
+    await teardownCell(cell);
+  } catch (error) {
+    await failRecord(tier, cell.watcher, cell.timers).catch(() => {});
+    await teardownCell(cell).catch(() => {});
+    throw error;
   }
 }, 600_000);
