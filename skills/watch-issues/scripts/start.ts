@@ -51,6 +51,26 @@ function bail(error: unknown): never {
   out(`refused ${error instanceof Error ? error.message : String(error)}`, 1);
 }
 
+async function reportExisting(target: WatchTarget): Promise<void> {
+  const labelled: Seen[] = (await terminals(target.session, { [TIMER_LABEL]: target.repo })).filter(
+    (t: Seen) => t.state === 'live',
+  );
+  if (labelled.length === 0) return;
+  if (labelled.length > 1) {
+    out(`conflict labelled ${labelled.map((t: Seen) => t.address).join(',')}`, 2);
+  }
+  const holder = await getTerm(target.session, labelled[0].address);
+  if (
+    holder.ok &&
+    holder.term.state === 'live' &&
+    holder.term.labels[TIMER_LABEL] === target.repo &&
+    isVerifiedTimer(target.prefix, holder.term)
+  ) {
+    out(`running ${holder.term.address}`, 0);
+  }
+  out(`conflict labelled ${labelled[0].address}${holder.ok ? '' : ` unreadable ${holder.kind}`}`, 2);
+}
+
 async function main(): Promise<void> {
   const root: string | undefined = process.argv[2];
   if (root === undefined || process.argv.length !== 3) bail('usage: start.ts <root>');
@@ -89,29 +109,7 @@ async function main(): Promise<void> {
     (await transcriptFor({ session: target.session, address: self })) ?? pinClaudeTranscript(pinPid);
 
   const watchName: string = `${target.prefix}-watch`;
-  const labelled: Seen[] = (await terminals(target.session, { [TIMER_LABEL]: target.repo })).filter(
-    (t: Seen) => t.state === 'live',
-  );
-  if (labelled.length > 1) {
-    out(`conflict labelled ${labelled.map((t: Seen) => t.address).join(',')}`, 2);
-  }
-  if (labelled.length === 1) {
-    const holder: { ok: true; term: Term } | { ok: false; kind: string } = await getTerm(
-      target.session,
-      labelled[0].address,
-    );
-    if (holder.ok && isVerifiedTimer(target.prefix, holder.term)) out(`running ${holder.term.address}`, 0);
-    out(
-      `conflict labelled ${labelled[0].address}${holder.ok ? '' : ` unreadable ${holder.kind}`}`,
-      2,
-    );
-  }
-  const named: Seen[] = (await terminals(target.session, {})).filter(
-    (t: Seen) => t.name === watchName,
-  );
-  if (named.length > 0) {
-    out(`conflict named ${named.map((t: Seen) => t.address).join(',')}`, 2);
-  }
+  await reportExisting(target);
 
   const script: string = resolve(import.meta.dir, 'timer.ts');
   const envs: string[] = ['XDG_RUNTIME_DIR', 'HOME', 'PATH'].flatMap((name: string) => {
@@ -155,16 +153,10 @@ async function main(): Promise<void> {
     out(`started ${address}`, 0);
   }
   if (reply.kind !== 'name_taken') bail(`hc run: ${reply.kind}`);
+  await reportExisting(target);
   const holders: Seen[] = (await terminals(target.session, {})).filter(
     (t: Seen) => t.name === watchName,
   );
-  if (holders.length === 1) {
-    const holder: { ok: true; term: Term } | { ok: false; kind: string } = await getTerm(
-      target.session,
-      holders[0].address,
-    );
-    if (holder.ok && isVerifiedTimer(target.prefix, holder.term)) out(`running ${holder.term.address}`, 0);
-  }
   out(`conflict name_taken ${holders.map((t: Seen) => t.address).join(',') || watchName}`, 2);
 }
 
