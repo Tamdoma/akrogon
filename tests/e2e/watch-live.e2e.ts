@@ -247,6 +247,23 @@ async function waitCalls(file: string, match: (l: string) => boolean, n: number,
   throw new Error(`calls never reached ${n}: ${JSON.stringify(calls(file))}`);
 }
 
+// Receipts land before the check call, so a bare count can be satisfied by a call that was
+// already in flight. Wait for a `call <name>` at a watcher turn after every call logged so
+// far — each check runs in its own task turn, so a newer turn is the new check's call.
+async function waitCallAfter(file: string, name: string, ms: number): Promise<void> {
+  const last: number = calls(file).reduce(
+    (m: number, l: string) => Math.max(m, Number(/ t=(\d+)/.exec(l)?.[1] ?? '0')),
+    0,
+  );
+  const deadline: number = Date.now() + ms;
+  while (Date.now() < deadline) {
+    if (calls(file).some((l: string) => l.startsWith(`call ${name}`) && Number(/ t=(\d+)/.exec(l)?.[1] ?? '0') > last))
+      return;
+    await Bun.sleep(500);
+  }
+  throw new Error(`no call ${name} after t=${last}: ${JSON.stringify(calls(file))}`);
+}
+
 // Wait for a hook line at index `from` or later (default 0). Restarts and repeated sends emit
 // the same line a second time, so callers pass the log length taken before the send — matching
 // an older line would let the test assert on state that has not landed yet.
@@ -534,10 +551,12 @@ async function exitAgent(cell: Cell): Promise<number> {
   return agentPid;
 }
 
-async function noNewTicks(cell: Cell, ms: number): Promise<void> {
+// `atStart` is the caller's tick-text baseline (before the agent's exit, or after a stop):
+// any tick the timer could still legitimately send must already be counted, or it would
+// pass a baseline taken after it landed.
+async function noNewTicks(cell: Cell, atStart: number, ms: number): Promise<void> {
   const count = async (): Promise<number> =>
     ((await screen(cell.tier, cell.watcher)).match(/watch-issues tick /g) ?? []).length;
-  const atStart: number = await count();
   await Bun.sleep(ms);
   expect(await count()).toBe(atStart);
 }
@@ -712,17 +731,17 @@ test.serial(
         expect(listed.code).toBe(0);
         tier.record('after-unpause.txt', listed.stdout);
 
-        // One tick with its receipt and the acting check (3).
+        // One tick with its receipt and the acting check (3). Due 1's calls are attributed
+        // by a newer turn: the receipt lands before the check call.
         await waitDue(tier, timer.address, 1, 90_000);
-        await waitCalls(callLog, (l) => l.startsWith('call next'), 1, 90_000);
+        await waitCallAfter(callLog, 'next', 90_000);
 
         // A due that falls due while the previous check runs is held, then runs once (4):
         // hold due 2's status call across an interval boundary; due 3 accrues and is sent once.
         writeFileSync(resolve(cell.flags, 'hold-status'), String(intervalSec * 2 + 5));
         await waitDue(tier, timer.address, 2, 90_000);
-        const beforeHeld: number = statusCalls(callLog);
         await waitDue(tier, timer.address, 3, 90_000 + intervalSec * 2000);
-        await waitCalls(callLog, (l) => l.startsWith('call status'), beforeHeld + 2, 90_000);
+        await waitCallAfter(callLog, 'status', 90_000); // due 3's check, not the held call
         const timerScreen: string = await screen(tier, timer.address);
         expect(timerScreen.match(/due=3 sent/g) ?? []).toHaveLength(1);
         expect(timerScreen).not.toContain('due=3 dropped');
@@ -732,13 +751,15 @@ test.serial(
         expect(paused1.code).toBe(0);
         const beforeNext: number = nextCalls(callLog);
         await waitDue(tier, timer.address, 4, 90_000);
-        await waitCalls(callLog, (l) => l.startsWith('call status'), statusCalls(callLog) + 1, 90_000);
+        await waitCallAfter(callLog, 'status', 90_000);
+        await Bun.sleep(2500); // a would-be next call lands right after its status call
         expect(nextCalls(callLog)).toBe(beforeNext);
 
         // Agent exit leaves no new tick text in the shell (7).
+        const ticksAtExit: number = ((await screen(tier, cell.watcher)).match(/watch-issues tick /g) ?? []).length;
         await exitAgent(cell);
         await waitGone(tier, timer.address, 60_000);
-        await noNewTicks(cell, intervalSec * 1000 + 15_000);
+        await noNewTicks(cell, ticksAtExit, intervalSec * 1000 + 15_000);
         await teardownCell(cell);
         return;
       }
@@ -757,17 +778,17 @@ test.serial(
       expect(await labelled(tier)).toHaveLength(1);
 
       // One tick per due with its receipt and the Judge's next on the waiting leaf (3, 11).
+      // Due 1's calls are attributed by a newer turn: the receipt lands before the check call.
       await waitDue(tier, timer.address, 1, 90_000);
-      await waitCalls(callLog, (l) => l.startsWith('call status'), 3, 90_000);
-      await waitCalls(callLog, (l) => l.startsWith('call next'), 1, 90_000);
+      await waitCallAfter(callLog, 'status', 90_000);
+      await waitCallAfter(callLog, 'next', 90_000);
       expect(hookLines(tier, cell.watcher).some((l) => l === 'receipt=1')).toBe(true);
 
       // One tick held behind a busy check (4): due 2's status call is held while due 3 accrues.
       writeFileSync(resolve(cell.flags, 'hold-status'), String(intervalSec * 2 + 5));
       await waitDue(tier, timer.address, 2, 90_000);
-      const beforeHeld: number = statusCalls(callLog);
       await waitDue(tier, timer.address, 3, 90_000 + intervalSec * 2000);
-      await waitCalls(callLog, (l) => l.startsWith('call status'), beforeHeld + 2, 90_000);
+      await waitCallAfter(callLog, 'status', 90_000); // due 3's check, not the held call
       const heldScreen: string = await screen(tier, timer.address);
       expect(heldScreen.match(/due=3 sent/g) ?? []).toHaveLength(1);
       expect(heldScreen).not.toContain('due=3 dropped');
@@ -777,14 +798,15 @@ test.serial(
       expect(paused.code).toBe(0);
       const beforeNext: number = nextCalls(callLog);
       await waitDue(tier, timer.address, 4, 90_000);
-      await waitCalls(callLog, (l) => l.startsWith('call status'), statusCalls(callLog) + 1, 90_000);
+      await waitCallAfter(callLog, 'status', 90_000);
+      await Bun.sleep(2500); // a would-be next call lands right after its status call
       expect(nextCalls(callLog)).toBe(beforeNext);
       const unpaused: SpawnResult = await tier.akrogon(['unpause']);
       expect(unpaused.code).toBe(0);
       const listed: SpawnResult = await tier.hc(['ls', '--json']);
       expect(listed.code).toBe(0); // criterion 12: the socket still answers
       await waitDue(tier, timer.address, 5, 90_000);
-      await waitCalls(callLog, (l) => l.startsWith('call next'), beforeNext + 1, 90_000);
+      await waitCallAfter(callLog, 'next', 90_000);
 
       // Old cron tick (no timer=): refused with a reason, no check (6, 14).
       await tickRunsNoCheck(cell, `watch-issues tick ${tier.root}`, /tick exit=\d+ no-watch (?!t=)\S/);
@@ -879,40 +901,41 @@ test.serial(
       const timer: Term = await startCell(cell);
 
       if (shape === 'shell') {
-        // start (1), one tick with its receipt (3).
+        // start (1), one tick with its receipt (3). Due 1's status call is attributed by a
+        // newer turn: the receipt lands before the check call.
         expect(statusCalls(callLog)).toBeGreaterThanOrEqual(1);
         await waitDue(tier, timer.address, 1, 120_000);
-        await waitCalls(callLog, (l) => l.startsWith('call status'), statusCalls(callLog) + 1, 120_000);
+        await waitCallAfter(callLog, 'status', 120_000);
         // One tick held behind a busy check, running once after it (4): due 2's check is held
         // while due 3 accrues; it is sent once after the check and runs its own check.
         writeFileSync(resolve(cell.flags, 'hold-status'), String(intervalSec * 2 + 15));
         await waitDue(tier, timer.address, 2, 120_000);
-        const beforeHeld: number = statusCalls(callLog);
         await waitDue(tier, timer.address, 3, 120_000 + intervalSec * 2000);
-        await waitCalls(callLog, (l) => l.startsWith('call status'), beforeHeld + 2, 120_000);
+        await waitCallAfter(callLog, 'status', 120_000); // due 3's check, not the held call
         const timerScreen: string = await screen(tier, timer.address);
         expect(timerScreen.match(/due=3 sent/g) ?? []).toHaveLength(1);
         expect(timerScreen).not.toContain('due=3 dropped');
         // Agent exit leaves no tick text in the shell (7).
+        const ticksAtExit: number = ((await screen(tier, cell.watcher)).match(/watch-issues tick /g) ?? []).length;
         await exitAgent(cell);
         await waitGone(tier, timer.address, 90_000);
-        await noNewTicks(cell, intervalSec * 1000 + 15_000);
+        await noNewTicks(cell, ticksAtExit, intervalSec * 1000 + 15_000);
         await teardownCell(cell);
         return;
       }
 
       // shape=root: start with its check and timer (1).
       expect(statusCalls(callLog)).toBeGreaterThanOrEqual(1);
-      // One tick running one check with its receipt and the Judge's next (3, 11).
+      // One tick running one check with its receipt and the Judge's next (3, 11). Due 1's
+      // calls are attributed by a newer turn: the receipt lands before the check call.
       await waitDue(tier, timer.address, 1, 120_000);
-      await waitCalls(callLog, (l) => l.startsWith('call status'), statusCalls(callLog) + 1, 120_000);
-      await waitCalls(callLog, (l) => l.startsWith('call next'), 1, 120_000);
+      await waitCallAfter(callLog, 'status', 120_000);
+      await waitCallAfter(callLog, 'next', 120_000);
       // One tick held behind a busy check, running once after it (4).
       writeFileSync(resolve(cell.flags, 'hold-status'), String(intervalSec * 2 + 15));
       await waitDue(tier, timer.address, 2, 120_000);
-      const beforeHeld: number = statusCalls(callLog);
       await waitDue(tier, timer.address, 3, 120_000 + intervalSec * 2000);
-      await waitCalls(callLog, (l) => l.startsWith('call status'), beforeHeld + 2, 120_000);
+      await waitCallAfter(callLog, 'status', 120_000); // due 3's check, not the held call
       const timerScreen: string = await screen(tier, timer.address);
       expect(timerScreen.match(/due=3 sent/g) ?? []).toHaveLength(1);
       expect(timerScreen).not.toContain('due=3 dropped');
@@ -921,7 +944,8 @@ test.serial(
       await turnDone(tier, cell.watcher, turnStop, 120_000);
       await settleIdle(tier, cell.watcher, 60_000);
       expect(await labelled(tier)).toHaveLength(0);
-      await noNewTicks(cell, intervalSec * 1000 + 10_000);
+      const ticksAtStop: number = ((await screen(tier, cell.watcher)).match(/watch-issues tick /g) ?? []).length;
+      await noNewTicks(cell, ticksAtStop, intervalSec * 1000 + 10_000);
       // A second start, then the reset: /clear ends claude's and agy's watch; codex and pi record
       // their /new outcome as the stated limit (7).
       const turnRe: number = await send(tier, cell.watcher, `watch-issues ${tier.root}`);
