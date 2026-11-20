@@ -43,9 +43,10 @@ case "$task" in
 	exit 0
 	;;
 esac
-# check steps (what the model does after an accepted start or tick)
-st=$(cd "$root" && akrogon status 2>&1 | head -1)
-printf 'status %s\n' "$st" >> "$hooks"
+# check steps (what the model does after an accepted start or tick); paused anywhere in the
+# status output acts on nothing, matching the skill's Observe paused rule.
+st=$(cd "$root" && akrogon status 2>&1)
+printf 'status %s\n' "$(printf '%s' "$st" | head -1)" >> "$hooks"
 case "$st" in
 *paused*) ;;
 *) (cd "$root" && akrogon next --all >> "$hooks" 2>&1) || true ;;

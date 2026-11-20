@@ -1,7 +1,6 @@
 // watch-timer: dues numbered 1,2,… accrue at every WATCH_TICK_SECONDS boundary (default 1200 s).
-// The oldest pending due goes out at a boundary, only after the watcher has reported idle/done
-// without interruption for a whole interval — dues accrued while the watcher works wait, one send
-// per boundary, none merged. The send is one untagged
+// With dues pending and the watcher idle or done the oldest goes out at once — dues accrued while
+// the watcher works wait for it, one due at a time after the previous turn ends, none merged. The send is one untagged
 // `watch-issues tick timer=<self> pid=<pin> due=<n> <root>`; delivery is the timer's own
 // akrogon.watch-due label reading n, and an undelivered due resends once at a later boundary then
 // drops. The loop exits (and --rm frees the name) when the pinned watcher foreground dies or is
@@ -57,7 +56,6 @@ const dues: Due[] = [];
 let dueCount: number = 0;
 let nextBoundary: number = Date.now() + intervalMs;
 let awaiting: Awaiting | null = null;
-let readySince: number | null = null;
 let effectiveTranscript: string | null = args.transcript;
 
 const ready = (w: Seen): boolean =>
@@ -107,12 +105,6 @@ async function poll(): Promise<'exit' | 'stay'> {
     else if (resolved !== effectiveTranscript) return 'exit';
   }
 
-  if (ready(w)) {
-    if (readySince === null) readySince = now;
-  } else {
-    readySince = null;
-  }
-
   if (awaiting !== null) {
     const settled: boolean = w.turn > awaiting.turn && ready(w);
     if ((settled || now >= awaiting.deadline) && dues.length > 0 && dues[0].n === awaiting.n) {
@@ -123,15 +115,8 @@ async function poll(): Promise<'exit' | 'stay'> {
     }
   }
 
-  // One send per boundary, and only after a full interval of uninterrupted readiness.
-  if (
-    !crossed ||
-    awaiting !== null ||
-    dues.length === 0 ||
-    readySince === null ||
-    now - readySince < intervalMs ||
-    !ready(w)
-  ) {
+  // One send while any due is pending and the watcher is ready, and only at a boundary.
+  if (!crossed || awaiting !== null || dues.length === 0 || !ready(w)) {
     return 'stay';
   }
   const due: Due = dues[0];

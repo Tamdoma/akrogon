@@ -12,12 +12,12 @@ import { getTerm, hcCall, isVerifiedTimer, type HcReply, type Term } from './hc'
 import { isAncestor, procStart } from './proc';
 import { watchTarget, type WatchTarget } from './repo';
 
-// The pinned foreground's claude session record, read through the caller's own env:
-// /proc/<pid>/environ only reflects exec-time exports, so an `export CLAUDE_CONFIG_DIR` not
-// yet followed by an exec is invisible to transcriptFor at start time. Same record shape as
-// src/transcript.ts: <config>/sessions/<pid>.json verified by proc stat field 22, then the
-// matching <config>/projects/*/<sessionId>.jsonl.
-function envClaudeTranscript(pid: number): string | null {
+// The pinned foreground's claude session record. transcriptFor keys the session record on the
+// terminal's own pid, but a foreground program (agent REPL or script running inside it) keeps its
+// record under its own pid, so start looks there too. Same record shape as src/transcript.ts:
+// <config>/sessions/<pid>.json verified by proc stat field 22, then the matching
+// <config>/projects/*/<sessionId>.jsonl.
+function pinClaudeTranscript(pid: number): string | null {
   const home: string | undefined = process.env.HOME;
   const config: string | undefined =
     process.env.CLAUDE_CONFIG_DIR ?? (home === undefined ? undefined : resolve(home, '.claude'));
@@ -86,7 +86,7 @@ async function main(): Promise<void> {
   const pinStart: string | null = procStart(pinPid);
   if (pinStart === null) bail(`foreground ${pinPid} is gone`);
   const transcript: string | null =
-    (await transcriptFor({ session: target.session, address: self })) ?? envClaudeTranscript(pinPid);
+    (await transcriptFor({ session: target.session, address: self })) ?? pinClaudeTranscript(pinPid);
 
   const watchName: string = `${target.prefix}-watch`;
   const labelled: Seen[] = (await terminals(target.session, { [TIMER_LABEL]: target.repo })).filter(
