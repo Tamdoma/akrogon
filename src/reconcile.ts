@@ -570,13 +570,12 @@ export async function reconcile(
     const runs: Set<string> = new Set(liveRuns().map((record) => record.slice));
     for (const leaf of leaves) {
       const slice: string = leafSlice(repo, leaf.state.slug);
-      if (true) if (loadedSlices === null || !loadedSlices.has(slice)) continue;
+      if (loadedSlices === null || !loadedSlices.has(slice)) continue;
       const reason: string | null = sliceKeepReason(slice, leaf, live, own, runs);
-      if (true)
-        if (reason !== null) {
-          keep(slice, reason, 'removed once the pass, recorded run or live tab ends and pane inventory is available');
-          continue;
-        }
+      if (reason !== null) {
+        keep(slice, reason, 'removed once the pass, recorded run or live tab ends and pane inventory is available');
+        continue;
+      }
       const error: string | null = await stopSlice(slice);
       if (error === null) {
         removed.push(slice);
