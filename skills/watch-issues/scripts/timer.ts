@@ -164,9 +164,11 @@ async function poll(): Promise<'exit' | 'stay'> {
     dues[0] !== undefined &&
     dues[0].sent !== null &&
     Number(rcpt) >= dues[0].n;
-  const pending: Due | undefined = dues.find((due: Due) => due.coalescing && due.sent === null);
+  // The pending entry is re-found each crossed boundary: several boundaries can fall inside
+  // one poll gap, and the first push in this poll must coalesce with the second.
   while (nextBoundary <= now) {
     dueCount += 1;
+    const pending: Due | undefined = dues.find((due: Due) => due.coalescing && due.sent === null);
     if (pending !== undefined) pending.n = dueCount;
     else dues.push({ n: dueCount, attempts: 0, sent: null, coalescing: backedUp });
     nextBoundary += intervalMs;
