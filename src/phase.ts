@@ -802,7 +802,7 @@ async function batchPush(
   return { kind: 'error', record, candidate: head, result: pushed, end };
 }
 
-type Restacked = { kind: 'restacked'; top: string } | { kind: 'rebase' };
+type Restacked = { kind: 'restacked'; top: string } | { kind: 'rebase'; base: string };
 
 async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<Restacked> {
   const builtOn: string = await command(['git', 'rev-parse', trackingRef(repo)], repo.root);
@@ -820,12 +820,13 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<Restacked
       throw new Error('Batch attempt superseded during restack; record left for the next pass');
     const applied: string | undefined =
       staged.ok && (await applyTop(repo, current, staged.top, holderHead)) ? staged.top : undefined;
+    if (applied === undefined) return undefined;
     saveState(current.path, {
       ...readState(current.path),
       batch: {
         ...batch,
-        built_on: applied === undefined ? batch.built_on : builtOn,
-        ...(applied === undefined ? {} : { holder: { base: batch.holder.base, head: holderHead } }),
+        built_on: builtOn,
+        holder: { base: batch.holder.base, head: holderHead },
         applied: true,
         top: applied,
         candidate: undefined,
@@ -840,7 +841,7 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<Restacked
       ? `rerun rebase ${leaf.state.slug} onto ${builtOn}`
       : `rerun tested=${record.tested_top ?? 'none'} pushed=${top}`,
   );
-  return top === undefined ? { kind: 'rebase' } : { kind: 'restacked', top };
+  return top === undefined ? { kind: 'rebase', base: builtOn } : { kind: 'restacked', top };
 }
 
 type Finished = { kind: 'landed' } | Restacked | { kind: 'error'; result: Result };
@@ -880,7 +881,7 @@ async function finishPush(
 export type LandPush =
   | { kind: 'landed' }
   | { kind: 'restacked'; top: string; stderr: string }
-  | { kind: 'rebase' }
+  | { kind: 'rebase'; base: string }
   | { kind: 'error'; stderr: string };
 
 // The land run's push: the claim and the push hold the global lock, the refusal follow-up takes it itself.

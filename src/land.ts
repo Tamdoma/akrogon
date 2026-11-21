@@ -1,6 +1,5 @@
 import { resolve } from 'node:path';
 import { readGlobal, requireRepo, globalHome, toolRoot, type GlobalConfig, type Repo } from './config';
-import { trackingRef } from './preflight';
 import { allLeaves, readState, saveState, withLock, type Batch, type Leaf, type MergeExit } from './state';
 import { command, CommandError, spawnCaptured, type SpawnResult } from './shell';
 import { commitMove, landClaim, landGates, landPush, StaleLandError, type LandPush } from './phase';
@@ -241,7 +240,7 @@ export async function land(
         attempt,
         {
           reason: await dirtyOrConflict(repo, leaf.state.worktree),
-          base: await command(['git', 'rev-parse', trackingRef(repo)], repo.root),
+          base: pushed.base,
           top,
         },
         endOf(record, pressureDir),
