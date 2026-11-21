@@ -263,7 +263,14 @@ test.serial(
       tier.record('watcher-screen.txt', await screen(tier, watcher, 200));
       tier.record('watcher-transcript.txt', (await transcriptFor({ session, address: watcher })) ?? 'none');
       expect(resumed).toContain(phase);
-      expect(await waitLabelled(tier, { 'akrogon.watch-consult': 'akre2e' }, 5000)).toBeNull();
+      // The case close trails the resume: `akrogon next` and the record write finish first,
+      // then the watch closes the consultant on the same beat.
+      const closed: Term | null = await waitLabelled(
+        tier,
+        { 'akrogon.watch-consult': 'akre2e' },
+        Math.min(120_000, Math.max(15_000, deadline - Date.now() - 3 * 60_000)),
+      );
+      expect(closed, `consultant still live after resume\n${await screen(tier, watcher, 60)}`).toBeNull();
 
       // The leaf's seat A starts on the resumed phase (akrogon next dispatched it).
       const seat: Term | null = await waitLabelled(
