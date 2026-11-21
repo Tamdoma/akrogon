@@ -277,7 +277,7 @@ async function knownRedReceipt(repo: Repo, sha: string, scope: VerifyScope): Pro
 }
 
 // Identity is command name and string + failing test name; sha is evidence, not identity.
-type Unit = { name: string; command: string; test: string };
+export type Unit = { name: string; command: string; test: string };
 
 // A unit name that is a real test title: none of Bun's nameless forms.
 function named(name: string): boolean {
@@ -338,7 +338,7 @@ async function resolvedOnMain(
 // red unit and every red unit is a named title a completed base run at or
 // before the head's merge-base already fails, still unresolved on landed main.
 // Unit names read stored `failures` first and the log second, as newRedUnits does.
-export async function mainRedCover(repo: Repo, sha: string, runId?: string): Promise<boolean> {
+export async function uncoveredMainRedUnits(repo: Repo, sha: string, runId?: string): Promise<Unit[] | undefined> {
   const runs: VerifyRun[] = readVerifyRuns(repo);
   const tree: string = await treeOf(repo, sha);
   const expected: NamedCommand[] = verifyCommands(repo.config, 'merge');
@@ -347,11 +347,10 @@ export async function mainRedCover(repo: Repo, sha: string, runId?: string): Pro
       run.tree === tree && run.compares === undefined && run.end !== undefined && sameCommands(run.commands, expected),
   );
   const head: VerifyRun | undefined = runId === undefined ? newest(heads) : heads.find((run) => run.run === runId);
-  if (head === undefined || !completed(head)) return false;
+  if (head === undefined || !completed(head)) return undefined;
   const mergeBase: string = await command(['git', 'merge-base', sha, trackingRef(repo)], repo.root);
   const { onMain, before } = await mainAncestors(repo);
   const covered = async (unit: Unit): Promise<boolean> => {
-    if (!named(unit.test)) return false;
     for (const red of runs) {
       if (red.compares === undefined || !completed(red)) continue;
       const item = matching(red, unit);
@@ -364,14 +363,21 @@ export async function mainRedCover(repo: Repo, sha: string, runId?: string): Pro
     return false;
   };
   let hasRed: boolean = false;
+  const uncovered: Unit[] = [];
   for (const item of head.commands) {
     if (item.exit === 0 || item.blocked !== undefined) continue;
     for (const test of item.failures ?? (await failedTests(repo, item.log))) {
-      if (!(await covered({ name: item.name, command: item.command, test }))) return false;
+      if (!named(test)) return undefined;
       hasRed = true;
+      const unit: Unit = { name: item.name, command: item.command, test };
+      if (!(await covered(unit))) uncovered.push(unit);
     }
   }
-  return hasRed;
+  return hasRed ? uncovered : undefined;
+}
+
+export async function mainRedCover(repo: Repo, sha: string, runId?: string): Promise<boolean> {
+  return (await uncoveredMainRedUnits(repo, sha, runId))?.length === 0;
 }
 
 // A pending notice covers only while its file waits in the folder; `error` never covers, `shown` and

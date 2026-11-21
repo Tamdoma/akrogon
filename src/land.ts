@@ -5,7 +5,7 @@ import { allLeaves, readState, saveState, withLock, type Batch, type Leaf, type 
 import { command, CommandError, spawnCaptured, type SpawnResult } from './shell';
 import { commitMove, landClaim, landGates, landPush, StaleLandError, type LandPush } from './phase';
 import { appendAttempt, readPressure, type PressureSnapshot } from './attempts';
-import { mainRedCover, readVerifyRuns, verify, verifyCommands, type VerifyRun } from './verify';
+import { readVerifyRuns, uncoveredMainRedUnits, verify, verifyCommands, type Unit, type VerifyRun } from './verify';
 import { leafSlice, sessionBusAddress } from './scope';
 import { landedWake, mergeWake, phaseWake } from './next';
 
@@ -127,16 +127,10 @@ async function commandFailed(
   await mergeWake(global, repo);
 }
 
-function nameless(test: string): boolean {
-  return (
-    test === '(no test name)' || test === '(log gone)' || test.startsWith('(script) ') || test.startsWith('(unnamed)')
-  );
-}
-
 // Taken-8: the returning leaf's last red merge run sits on exactly the recorded holder head (no
 // edit between exits), every failing unit names a real title, and at least one failing unit the
 // main-red cover misses repeats in that previous run.
-async function taken8Trigger(repo: Repo, record: Batch, runId: string): Promise<boolean> {
+async function taken8Trigger(repo: Repo, record: Batch, runId: string, uncovered: Unit[]): Promise<boolean> {
   const runs: VerifyRun[] = readVerifyRuns(repo);
   const current: VerifyRun | undefined = runs.find((run) => run.run === runId);
   if (current === undefined) return false;
@@ -155,18 +149,12 @@ async function taken8Trigger(repo: Repo, record: Batch, runId: string): Promise<
     .sort((a, b) => b.end!.localeCompare(a.end!))[0];
   if (previous?.sha !== record.holder.head) return false;
   const { failedTests } = await import('./flaky');
-  let overlap: boolean = false;
-  for (const item of current.commands) {
-    if (item.exit === 0 || item.blocked !== undefined) continue;
-    const names: string[] = item.failures ?? (await failedTests(repo, item.log));
-    for (const test of names) {
-      if (nameless(test)) return false;
-      const prev = previous.commands.find((entry) => entry.name === item.name && entry.command === item.command);
-      if (prev === undefined || prev.exit === 0 || prev.blocked !== undefined) continue;
-      if ((prev.failures ?? (await failedTests(repo, prev.log))).includes(test)) overlap = true;
-    }
+  for (const unit of uncovered) {
+    const prev = previous.commands.find((entry) => entry.name === unit.name && entry.command === unit.command);
+    if (prev === undefined || prev.exit === 0 || prev.blocked !== undefined) continue;
+    if ((prev.failures ?? (await failedTests(repo, prev.log))).includes(unit.test)) return true;
   }
-  return overlap;
+  return false;
 }
 
 // The base evidence a red exit names: the compares run just written, or the standing whole-green
@@ -210,9 +198,11 @@ export async function land(
     const result = await verify(repo.root, undefined, attempt, undefined, false);
     let coverRun: string | undefined;
     if (result.code !== 0) {
-      if (result.code === 1 && (await mainRedCover(repo, result.sha, result.id))) coverRun = result.id;
-      else if (result.code === 1) {
-        if (await taken8Trigger(repo, record, result.id)) {
+      if (result.code === 1) {
+        const uncovered: Unit[] | undefined = await uncoveredMainRedUnits(repo, result.sha, result.id);
+        if (uncovered?.length === 0) {
+          coverRun = result.id;
+        } else if (uncovered !== undefined && (await taken8Trigger(repo, record, result.id, uncovered))) {
           const verdict = await verify(repo.root, undefined, attempt, undefined, true);
           if (verdict.code === 0) {
             coverRun = result.id;
