@@ -1094,7 +1094,11 @@ test.serial('stop closes the watch consultant after the timer, tolerating none',
     await waitHooks(rig, /stop exit=0 stopped/);
     const plainAt: number = hooks(rig).findLastIndex((l) => l.startsWith('stop exit=0'));
     expect(hooks(rig)[plainAt]).toMatch(new RegExp(`^stop exit=0 stopped ${rig.timer} t=\\S+$`));
-    expect(hooks(rig).slice(plainAt + 1).some((l) => l.startsWith('stopped consultant'))).toBe(false);
+    expect(
+      hooks(rig)
+        .slice(plainAt + 1)
+        .some((l) => l.startsWith('stopped consultant')),
+    ).toBe(false);
     await waitGone(f.core, rig.timer);
 
     // Restart, then a verified consultant and a same-named foreign one share the session.
