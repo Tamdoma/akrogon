@@ -92,29 +92,20 @@ function consultsRoot(root: string, repo: string): string {
   return dir;
 }
 
-// Leaf folders nest under their issue inside issues/open; map each leaf folder name to
-// the `worktree:` its state.yaml records. YAML.parse covers both the block style
-// writeYaml emits and the flow style fixtures write.
-function leafWorktrees(root: string): Map<string, string> {
+// Leaf worktrees are read from `git worktree list`, never by walking issues/ for
+// state.yaml (tests/state-inventory forbids a second state walker): an akrogon leaf
+// worktree is <store>/<slug>, so the worktree's basename is its slug.
+async function leafWorktrees(root: string): Promise<Map<string, string>> {
   const found: Map<string, string> = new Map();
-  function visit(dir: string): void {
-    const entries: Dirent[] = readdirSync(dir, { withFileTypes: true });
-    if (entries.some((entry) => entry.name === 'state.yaml')) {
-      const file: string = resolve(dir, 'state.yaml');
-      const parsed: unknown = Bun.YAML.parse(readFileSync(file, 'utf8'));
-      const worktree: unknown =
-        parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)
-          ? undefined
-          : (parsed as Record<string, unknown>).worktree;
-      const slug: string = basename(dir);
-      if (typeof worktree === 'string' && worktree !== '' && !found.has(slug))
-        found.set(slug, worktree);
-      return;
-    }
-    for (const entry of entries.filter((e) => e.isDirectory())) visit(resolve(dir, entry.name));
+  const listed: RunResult = await run(['git', 'worktree', 'list', '--porcelain'], root);
+  if (listed.code !== 0)
+    throw new Error(`git worktree list failed: exit ${listed.code} ${listed.stderr}`.trim());
+  for (const line of listed.stdout.split('\n')) {
+    if (!line.startsWith('worktree ')) continue;
+    const path: string = line.slice('worktree '.length);
+    const slug: string = basename(path);
+    if (!found.has(slug)) found.set(slug, path);
   }
-  const open: string = resolve(root, 'issues/open');
-  if (existsSync(open)) visit(open);
   return found;
 }
 
@@ -122,7 +113,7 @@ async function computeSignature(root: string, flags: Flags, config: Config): Pro
   const base: RunResult = await run(['git', 'rev-parse', `${config.remote}/${config.branch}`], root);
   if (base.code !== 0)
     throw new Error(`git rev-parse ${config.remote}/${config.branch} failed: exit ${base.code} ${base.stderr}`.trim());
-  const worktrees: Map<string, string> = leafWorktrees(root);
+  const worktrees: Map<string, string> = await leafWorktrees(root);
   const heads: Record<string, string> = {};
   for (const slug of flags.leaves) {
     const worktree: string | undefined = worktrees.get(slug);
