@@ -139,7 +139,7 @@ test('a verify receipt records the merge-base..sha patch id, and none on an empt
         [
           'sh',
           '-c',
-          'git diff "$(git merge-base "$1" refs/remotes/origin/main)" "$1" | git patch-id --stable',
+          'git diff --unified=0 --inter-hunk-context=0 "$(git merge-base "$1" refs/remotes/origin/main)" "$1" | git patch-id --verbatim',
           'sh',
           sha,
         ],
