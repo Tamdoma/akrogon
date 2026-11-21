@@ -231,6 +231,49 @@ test('alpha', () => expect(state).toBe('readynow'));
   }
 });
 
+test('moving an identical edit to a different notice does not count as a flip', async (): Promise<void> => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', checks: { test: 'bun test attention.test.ts' } });
+    await commitIn(
+      f.root,
+      'attention.test.ts',
+      `import { expect, test } from 'bun:test';
+import { blockedSeatNotice } from './notices';
+test('blocked seats keep their attention notice', () => expect(blockedSeatNotice.attention).toBe(true));
+`,
+    );
+    const original: string = `export const blockedSeatNotice = {
+  title: 'Blocked leaf',
+  attention: true,
+};
+export const mergeStateNotice = {
+  title: 'Merged, move it back',
+  attention: true,
+};
+`;
+    await commitIn(f.root, 'notices.ts', original);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    const { worktree } = await callerWorktree(f, 'caller');
+    leaf(f, 'caller', 'merge', { worktree });
+    await commitIn(worktree, 'notices.ts', original.replace('attention: true', 'attention: false'));
+    expect((await verify(f, [], worktree)).code).toBe(1);
+
+    const last: number = original.lastIndexOf('attention: true');
+    await commitIn(worktree, 'notices.ts', original.slice(0, last) + original.slice(last).replace('true', 'false'));
+    await commitIn(f.root, 'notices.ts', '// Notice settings\n' + original);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    await command(['git', 'rebase', 'origin/main'], worktree);
+    expect((await verify(f, [], worktree)).code).toBe(0);
+
+    const result: Result = await cli(f, ['flaky']);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toBe('');
+  } finally {
+    f.clean();
+  }
+});
+
 test('verify runs checks on an explicitly selected commit with unrelated history', async (): Promise<void> => {
   const f: Fixture = await fixture();
   try {
