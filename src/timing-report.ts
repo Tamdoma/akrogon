@@ -8,7 +8,7 @@ import { originSource } from './pull';
 import { historicalSlots, type HistoricalPhase, type Slot } from './routing';
 import { retryCommand } from './shell';
 import { repoInventory, sourcePattern, type ForeignLeaf, type Inventory, type Leaf, type LeafFailure } from './state';
-import { readTimings, type TimingEvent, type WaitReason } from './timing';
+import { readTimings, waitReasonAt, type TimingEvent, type WaitReason } from './timing';
 
 // Gate bounds fixed by issues/chart/leaf-speed/forks/measure-and-revisit.md (operator 2026-10-12).
 const COHORT_SIZE: number = 20;
@@ -81,13 +81,6 @@ function pauseOpenAt(events: TimingEvent[], at: number): boolean {
   return open;
 }
 
-function reasonAt(events: TimingEvent[], slug: string, at: number): WaitReason {
-  let reason: WaitReason = 'none';
-  for (const event of events)
-    if (event.kind === 'wait' && event.slug === slug && ms(event.ts) <= at) reason = event.reason;
-  return reason;
-}
-
 function waitTotals(events: TimingEvent[], slug: string, lo: number, hi: number): Map<WaitKind | 'none', number> {
   const edges: number[] = events
     .filter((event) =>
@@ -100,7 +93,7 @@ function waitTotals(events: TimingEvent[], slug: string, lo: number, hi: number)
   for (let index = 0; index < cuts.length - 1; index++) {
     const [from, to]: [number, number] = [cuts[index], cuts[index + 1]];
     const mid: number = (from + to) / 2;
-    const kind: WaitKind | 'none' = pauseOpenAt(events, mid) ? 'repo_pause' : reasonAt(events, slug, mid);
+    const kind: WaitKind | 'none' = pauseOpenAt(events, mid) ? 'repo_pause' : waitReasonAt(events, slug, mid);
     totals.set(kind, (totals.get(kind) ?? 0) + (to - from));
   }
   return totals;

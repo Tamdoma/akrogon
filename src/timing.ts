@@ -113,11 +113,18 @@ export function currentVisit(log: LogRecord[], slug: string, phase: Phase): numb
   return Math.max(0, visitOf(log, slug, phase) - 1);
 }
 
-export function recordWait(repo: Repo, slug: string, reason: WaitReason, blocking?: string): void {
-  const last: TimingEvent | undefined = readTimings(repo.root).findLast(
-    (event) => event.kind !== 'repo_pause' && event.slug === slug && (event.kind === 'wait' || event.kind === 'prompt'),
+export function waitReasonAt(
+  events: readonly TimingEvent[],
+  slug: string,
+  at: number = Number.POSITIVE_INFINITY,
+): WaitReason {
+  const last: TimingEvent | undefined = events.findLast(
+    (event) => (event.kind === 'wait' || event.kind === 'prompt') && event.slug === slug && Date.parse(event.ts) <= at,
   );
-  const open: WaitReason = last !== undefined && last.kind === 'wait' ? last.reason : 'none';
-  if (reason === open) return;
+  return last?.kind === 'wait' ? last.reason : 'none';
+}
+
+export function recordWait(repo: Repo, slug: string, reason: WaitReason, blocking?: string): void {
+  if (reason === waitReasonAt(readTimings(repo.root), slug)) return;
   appendTiming(repo, { kind: 'wait', slug, reason, ...(blocking === undefined ? {} : { blocking }) });
 }
