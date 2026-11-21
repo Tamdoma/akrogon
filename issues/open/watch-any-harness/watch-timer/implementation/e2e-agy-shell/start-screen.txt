@@ -1,23 +1,21 @@
 
-akr-e2e-watch-agy-shell sp main ? ❯ env XDG_RUNTIME_DIR=/tmp/akr-e2e/akr-e2e-watch-agy-shell-rt HOME=/home/ivan PATH=/tmp/akr-e2e/akr-e2e-watch-agy-shell-logbin:/tmp/akr-e2e/akr-e2e-watch-agy-shell-shimbin:/tmp/akr-e2e/akr-e2e-watch-agy-shell-standinbin:/usr/bin:/home/ivan/.pi/agent/bin:/home/ivan/.local/bin:/home/ivan/.local/share/mise/command-wrappers/bin:/usr/share/omarchy/bin:/home/ivan/.local/share/mise/installs/npm-moonshot-ai-kimi-code/latest/node_modules/.bin:/home/ivan/.local/share/mise/installs/antigravity-cli/latest:/home/ivan/.local/share/mise/installs/claude/latest:/home/ivan/.local/share/mise/installs/codex/latest/bin:/home/ivan/.local/share/mise/installs/copilot/latest:/home/ivan/.local/share/mise/installs/gh/latest/gh_2.105.0_linux_amd64/bin:/home/ivan/.local/share/mise/installs/muse/latest:/home/ivan/.local/share/mise/installs/node/latest/bin:/home/ivan/.local/share/mise/installs/pi/latest/pi:/home/ivan/.local/share/mise/installs/playwright/latest/node_modules/.bin:/home/ivan/.local/share/mise/installs/uv/latest/.mise-bins:/home/ivan/.local/share/mise/shims:/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl WATCH_TICK_SECONDS=30 agy --model gemini-3.8-flash-low --effort low --mode auto
-
+akr-e2e-watch-agy-shell sp main ? ❯ sh '/var/tmp/akr-e2e-dhvEhu/launch-agy-shell.sh'
 
 
       ▄▀▀▄        Antigravity CLI 1.5.13
      ▀▀▀▀▀▀       authoritly@gmail.com (Google AI Ultra)
     ▀▀▀▀▀▀▀▀      Gemini 3.8 Flash (Low)
-   ▄▀▀    ▀▀▄     /tmp/akr-e2e/akr-e2e-watch-agy-shell sp
+   ▄▀▀    ▀▀▄     /var/tmp/akr-e2e-dhvEhu/akr-e2e-watch-agy-shell sp
   ▄▀▀      ▀▀▄
 
 ────────────────────────────────────────────────────────────
-> watch-issues /tmp/akr-e2e/akr-e2e-watch-agy-shell sp
+> watch-issues /var/tmp/akr-e2e-dhvEhu/akr-e2e-watch-agy-shell sp
 
 ● Explored 1 file (SKILL.md)
-● Ran 3 commands (bun /home/ivan/.gemi... · akrogon status "/tmp...: failed · cd "/tmp/akr-e2e/akr...) (ctrl+o to expand)
+● Ran 2 commands (+1 · cd "/var/tmp/akr-e2e-dhvEhu/akr-e2e-watch-agy-shell sp" && akrogon status) (ctrl+o to expand)
 
   started t2
-  akre2e (paused)
-  No action taken; repo is paused.
+  akre2e: watch-live-leaf at plan.synthesis
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 >

@@ -1,28 +1,15 @@
  ▐▛███▛█   Claude Code v2.1.329
 ▝▜██████▀  Haiku 5.5 with low effort · Claude Ultra
- ▝▝   ▝▝   /tmp/akr-e2e/akr-e2e-watch-claude-root
+ ▝▝   ▝▝   /var/tmp/akr-e2e-oWnlEq/akr-e2e-watch-claude-root
 
 
-❯ watch-issues /tmp/akr-e2e/akr-e2e-watch-claude-root
+❯ watch-issues /var/tmp/akr-e2e-oWnlEq/akr-e2e-watch-claude-root
 
 ● Skill(watch-issues)
   ⎿  Loaded skill
 
-● Bash(bun /tmp/akr-e2e/akr-e2e-watch-claude-root/.claude/skills/watch-issues/scripts/start.ts /tmp/akr-e2e/akr-e2e-watch-claude-root)
+● Bash(bun .claude/skills/watch-issues/scripts/start.ts /var/tmp/akr-e2e-oWnlEq/akr-e2e-watch-claude-root)
   ⎿  started t2
-
-● Bash(akrogon status /tmp/akr-e2e/akr-e2e-watch-claude-root)
-  ⎿  Error: Exit code 1
-     340 |   return `Missing leaf: ${slug}${isParked(repo, slug) ? ' (parked)' : ''}`;
-     341 | }
-     342 |
-     343 | export function findLeaf(repo: Repo, slug: string): Leaf {
-     344 |   const folders: string[] = slugFolders(repo, slug);
-     345 |   if (folders.length === 0) throw new Error(missingLeafMessage(repo, slug));
-                                                 ^
-     error: Missing leaf: /tmp/akr-e2e/akr-e2e-watch-claude-root
-           at findLeaf (/home/ivan/.akrogon/worktrees/akrogon/watch-timer/src/state.ts:345:39)
-     … +3 lines (ctrl+o to expand)
 
 ● Bash(akrogon status)
   ⎿  Listener: live
@@ -30,27 +17,25 @@
        LEAF                PHASE           TIME  BLOCKED BY  NOTE  TURN
      … +2 lines (ctrl+o to expand)
 
-● Bash(timeout 60 bun /tmp/akr-e2e/akr-e2e-watch-claude-root/.claude/skills/watch-issues/scripts/observe.ts /tmp/akr-e2e/akr-e2e-watch-claude-root)
+● Bash(bun .claude/skills/watch-issues/scripts/observe.ts /var/tmp/akr-e2e-oWnlEq/akr-e2e-watch-claude-root)
   ⎿  session=akr-e2e-watch
      slug=watch-live-leaf phase=plan.synthesis attempts=A0,B0 blocked= A=-/- B=-/- notified=
 
 ● Bash(akrogon next watch-live-leaf)
   ⎿  started, not confirmed t3
 
-● Bash(timeout 60 bun /tmp/akr-e2e/akr-e2e-watch-claude-root/.claude/skills/watch-issues/scripts/observe.ts /tmp/akr-e2e/akr-e2e-watch-claude-root)
+● Bash(bun .claude/skills/watch-issues/scripts/observe.ts /var/tmp/akr-e2e-oWnlEq/akr-e2e-watch-claude-root)
   ⎿  session=akr-e2e-watch
      slug=watch-live-leaf phase=plan.synthesis attempts=A0,B0 blocked= A=t3/idle B=-/- notified=
 
-● The watch is running on this repo, and I ran the first check.
+● Watch is running on /var/tmp/akr-e2e-oWnlEq/akr-e2e-watch-claude-root (timer t2, 20-minute ticks).
 
-  - Start: started t2. The timer is live for /tmp/akr-e2e/akr-e2e-watch-claude-root.
-  - Status: the repo is not paused. Listener is live, and the one leaf watch-live-leaf is at plan.synthesis.
-  - Action: the leaf was waiting with no plan seat, so I ran akrogon next watch-live-leaf. It reported started, not confirmed on t3.
-  - Re-observe: seat A is now t3/idle. Nothing needs steering or a notice this fire.
+  - Repo is not paused. The one check found one leaf, watch-live-leaf, at plan.synthesis, with no seat assigned yet.
+  - Ran akrogon next watch-live-leaf; it reported "started, not confirmed". Re-observe shows seat A now at t3, status idle, with plan.synthesis still the phase. Nothing is judged busy yet, so no
+    steer.
+  - Next tick will re-check; to stop the watch, send watch-issues stop /var/tmp/akr-e2e-oWnlEq/akr-e2e-watch-claude-root.
 
-  Note: akrogon status does not take the root as an argument. The skill's akrogon status <root> form failed with "Missing leaf", so I ran it from the root with no argument.
-
-✻ Cooked for 18s · done 5:59 PM
+✻ Brewed for 25s · done 10:16 PM
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 ❯ 

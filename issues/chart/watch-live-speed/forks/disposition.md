@@ -78,3 +78,5 @@ S5. S4a's guard:
 - S5a: drop the guard and keep only the stated limit, named in the skill and docs (E D3 wording): a prompt typed into the watcher terminal when a tick is due can receive the tick; claude and agy run the check inside that turn; on codex the prompt's task is dropped and must be retyped; and a shell-hosted agent that exits right as a tick goes out can leave the tick in the shell. No code change; check.fix touches only the skill and docs.
 - S5b: build the guard as E describes, covering only ticks hc reports as joined; the draft-hold case stays a limit.
 Recommended: S5a (A).
+
+S5, operator 2026-11-21, verbatim: "s5a that's perfectly fine. Just do it". S5a taken: no guard; stated limits only. Written into the leaf at 2026-11-21T06:38:13Z with grants[2] (8 stop). No further final-shape round: the operator's "Just do it" and the text is S5a as asked.

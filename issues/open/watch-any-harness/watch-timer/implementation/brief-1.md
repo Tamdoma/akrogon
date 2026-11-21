@@ -1,60 +1,92 @@
-# Worker brief 1 — watch-timer scripts (plan U1)
-
-Worktree: /home/ivan/.akrogon/worktrees/akrogon/watch-timer-u1 (created at commit 83961ae8).
-Skill folder: `skills/watch-issues/` in that worktree. Bun is the runtime; scripts run as `bun <abs path> <args>`.
+# Sub-brief U1: tick.ts refusal reasons
 
 ## 1. Goal
 
-Build the harness-neutral watch: new scripts `timer.ts`, `start.ts`, `stop.ts`, `tick.ts` plus shared helpers `hc.ts`, `repo.ts`, `proc.ts` under `skills/watch-issues/scripts/`; `observe.ts` refactored to import `resolveRepoKey`/`run` from `repo.ts` with unchanged behavior. Plan decisions D1-D10, D17, D18; done-criteria 1-9 mechanically proven by `tests/watch-timer.test.ts` (already committed red — your code makes it green; do not edit tests).
+Make `skills/watch-issues/scripts/tick.ts` print a reason on every refusal, per plan.md D4
+(criterion 14): today every refusal is a bare `no-watch`. The `accept` and `stopped` outcome
+lines are unchanged in name and exit code; `stopped` may keep its bare word (the test only
+reads `no-watch <reason>`). Exit codes stay: 0 for `accept`/`stopped`, 1 for `no-watch`.
 
-## 2. Acceptance criteria
+## 2. Numbered acceptance criteria
 
-1. `start.ts` prints exactly one outcome line (stdout) and the stated exit code: `refused <reason>` (exit 1) when `HC_TERMINAL_ID` is unset/empty, when `hc get $HC_TERMINAL_ID` fails in the repo's resolved session, or when the watcher terminal's `foreground.pid` is not an ancestor of the start process (`/proc` ppid walk); `conflict <details>` (exit 2) on >1 live terminal labelled `akrogon.watch-timer=<repo>`, on a live `<prefix>-watch`-named terminal that is unlabelled or fails verification, or on `name_taken` where the holder fails verification; `running <address>` (exit 0) on one verified timer or `name_taken` with a verified holder; `started <address>` (exit 0) after `hc run` succeeds.
-2. Verification of a labelled terminal: `name === "<prefix>-watch"` AND `hc get --json` top-level argv joined contains `skills/watch-issues/scripts/timer.ts`.
-3. The timer (`timer.ts`) counts dues numbered 1,2,… every `WATCH_TICK_SECONDS` (default 1200 s); polls at most every min(1 s, interval/8); with pending dues and watcher `status.state` ∈ {idle,done} it sends exactly `watch-issues tick timer=<own HC_TERMINAL_ID> pid=<pin-pid> due=<oldest n> <root>` via `src/hc.ts` `send` (untagged), then waits for watcher `turn` to advance and idle/done within one interval; delivery = own label `akrogon.watch-due` reads `n`; otherwise resend once at next readiness, then drop. Dues accrue while the watcher works; none merge.
-4. The timer exits with no send (pending dues discarded) on any poll when: `/proc/<pin-pid>` gone or its stat field-22 start ≠ `--pin-start`; `hc get` on watcher gives `not_found` or `state: finished`; watcher `foreground.pid` is neither `pin-pid` nor its `/proc` descendant; `transcriptFor({session,watcher})` returns a non-null path different from the effective one (null resolution never exits; while pinned is null the first non-null resolved path latches as effective).
-5. `stop.ts <root>` resolves the repo's session itself (works from any terminal): 0 labelled → prints `stopped` (already stopped); >1 → `conflict`; 1 → verify then `hc kill` + `hc rm` and `stopped <address>`; unverified single → `conflict`; name squatter → `conflict`. Nothing touched on conflict.
-6. `tick.ts` takes argv after `tick` (`timer=<a> pid=<p> due=<n> <root…>`; root = everything after `due=<n>`, spaces preserved): missing/unparseable fields, dead/unverified timer, or `parent !== HC_TERMINAL_ID` → `no-watch` exit 1; foreground-pid of own terminal ≠ `pid=` → `hc kill`+`rm` the timer, `stopped` exit 0; `due` ≤ the timer's `akrogon.watch-due` label (absent=0) → `no-watch` exit 1; else `hc label <timer> akrogon.watch-due=<n>` FIRST, then `accept` exit 0.
-7. `hc` calls `run`/`get`/`ls`/`kill`/`rm`/`label`/`send` go through `scripts/hc.ts` (spawn `hc` with env preserving `HC_TERMINAL_ID`/`HC_TERMINAL_SOCKET`, pinning `HC_SESSION=<session>` per call). Exceptions: tick `send` to the watcher and the terminal.list label-counting reuse `src/hc.ts` `send`/`terminals` (its env strips terminal vars → untagged send). `hc run` MUST preserve `HC_TERMINAL_ID` (default parent = caller terminal).
-8. Repo/session resolution: `scripts/repo.ts` holds `run` + `resolveRepoKey` factored out of `observe.ts` (`WATCH_AKROGON ?? 'akrogon'` binary, `akrogon config` at `<root>` → `repo` name AND `prefixes[repo]` for the prefix — `akrogon config` prints both), then `readRepo` + `repoSpace` from `src/` for the session. `observe.ts` imports from `repo.ts`, behavior unchanged (`bun test scripts` + `tsc -p tsconfig` stay green).
-9. `timer.ts` uses `transcriptFor`/`send`/`label`/`terminal` from `src/`, and `proc.ts` for proc-start/ancestor/descendant reads (same field-22 parse as `src/transcript.ts` `procStart`; descendants = ppid closure over `/proc/*/stat`).
+1. Every path that today prints `no-watch` prints `no-watch <reason>` exit 1, with these
+   reason families (plan D4):
+   - missing/unparseable `timer=`, `pid=`, `due=`, root, or unset/empty `HC_TERMINAL_ID`:
+     `bad fields`
+   - `watchTarget(root)` throws: `no-watch <the thrown message>`
+   - timer dead, unverified, foreign, or `parent !== own`: `no-watch timer <state|kind>` —
+     use the distinguishing data you have (e.g. `timer dead`, `timer unverified`,
+     `timer foreign`, `timer parent=<p> own=<o>`); any non-empty word family is fine, the
+     tests only require a non-empty reason.
+   - own terminal `getTerm` fails or `foreground === null`: `no-watch watcher <kind>`
+   - `due <= receipt`: exactly `no-watch stale due=<n> receipt=<r>` — the free test greps
+     `no-watch stale`.
+   - receipt label write fails: `no-watch label <kind>`
+2. The trailing `catch` binds the error message into the line (`no-watch <message>`), so no
+   catch-all hides the error.
+3. Reason text sits as the first token group after `no-watch`; the hook appends ` t=<turn>` to
+   its own log line, so `no-watch t=<n>` alone would be the forbidden bare line.
 
 ## 3. Read-first list
 
-`plan.md` (leaf folder, D1-D10, criterion map), `skills/watch-issues/scripts/observe.ts`, `src/hc.ts` (hc/send/terminals/terminal/label/repoSpace/HcError), `src/transcript.ts` (transcriptFor, procStart), `src/config.ts` (readRepo/Repo), `tests/watch-timer.test.ts` + `tests/fixtures/watch-agent.sh` + `watch-hook.sh` (the contract you must satisfy), this skill folder's `ponytail.md` (at `/home/ivan/.pi/agent/skills/implement-issue/ponytail.md`).
+- `skills/watch-issues/scripts/tick.ts` — the file you change (only file you own).
+- `skills/watch-issues/scripts/hc.ts` — `getTerm`, `hcCall`, `isVerifiedTimer`, `Term`, `HcReply`
+  shapes you print kinds from.
+- `skills/watch-issues/scripts/repo.ts` — `watchTarget` error surface.
+- `tests/watch-timer.test.ts` (the case "stop kills the verified timer; stale and forged ticks
+  run nothing") — the red assertions you turn green; read, never edit.
+- `/home/ivan/.pi/agent/skills/implement-issue/ponytail.md` — read before editing.
 
-## 4. Change list / interfaces
+## 4. Change list and needed interfaces
 
-Owns: everything under `skills/watch-issues/scripts/` except `log-tail.ts`, `log-tail.test.ts`, `fixtures/`. New files: `timer.ts`, `start.ts`, `stop.ts`, `tick.ts`, `hc.ts`, `repo.ts`, `proc.ts`. Edit: `observe.ts` (import from `./repo.ts` only). Interfaces as in §2; `hc get --json` returns flat JSON with `argv`, `foreground.pid`, `parent`, `labels`, `name`, `state`, `status.state`, `turn` (see `tests/watch-timer.test.ts` `termSchema`); `hc run` errors come as `{"error":{"kind":"name_taken"}}` on stderr.
+- Owns: `skills/watch-issues/scripts/tick.ts` only.
+- Change: replace `noWatch()` with a reason-taking variant (e.g. `noWatch(reason: string)`) or
+  per-site `out('no-watch ' + reason, 1)`; route every refusal through it; the `catch` at the
+  bottom becomes `catch (e) { out('no-watch ' + (e instanceof Error ? e.message : String(e)), 1) }`
+  or equivalent.
+- `watchTarget` rejection: today `await watchTarget(root).catch(noWatch)` — capture the error and
+  print its message.
+- Creation commit: `061cd4320b061a8e1763fb7269093a1482d62cf5` (worker worktree cut at this head).
+- Lands first: nothing (wave 1). Consumed by: the free suite and both stand-in cells.
 
-## 5. Do-not
+## 5. Do-not, reasons and exceptions
 
-- No edits to `src/`, `tests/`, docs, or SKILL.md (U2 owns those); no edits to `log-tail.*`.
-- No new dependencies; zod is already there; keep one-purpose-per-script.
-- A planned test that is red or wrong once your code is correct is a mismatch return to A, never a test edit.
-- Never `git stash`; set work aside as a WIP commit, and before returning `git reset --soft <creation commit>` + one final commit so the cherry-pick carries everything.
-- No process kill by pattern; `akrogon stop-run <id>` only.
-- Restated: same-scope edits and interface changes return a mismatch with evidence; the exception is a revised brief from A.
+- Edit no test file and no other script — the planned tests are the contract; a planned test
+  that is wrong or stays red once your code is correct is a mismatch returned to A with the
+  failing output, not a test edit.
+- Do not change `accept`/`stopped` semantics, exit codes, the receipt-before-check order, or
+  the `stopped` kill+rm behavior — those are locked criteria 4-6.
+- Do not widen the check's scope (no new condition); only refusal *reporting* changes.
+- Standing exclusion: never run any `git stash` subcommand — all worktrees share one stash;
+  to inspect base behavior use a second worktree of the base instead. Set work aside only as a
+  WIP commit; before returning, `git reset --soft 061cd4320b061a8e1763fb7269093a1482d62cf5` and
+  make the unit's one commit again.
+- A refusal exit code or line a caller depends on changing (e.g. `stopped` → non-zero) is a
+  mismatch to return with evidence; the exception is a revised brief from A.
+- Restated: only tick.ts; reasons on every `no-watch`; `stale due=<n> receipt=<r>` verbatim;
+  no test edits; no stash; mismatch instead of scope change.
 
 ## 6. Ordered steps
 
-1. `proc.ts` (procStart via field 22, `isAncestor(pid, self)` ppid walk, `isDescendant(pid, root)` closure), `hc.ts` (spawn wrapper), `repo.ts` (factor resolveRepoKey+run; `observe.ts` import swap).
-2. `start.ts` → `stop.ts` → `tick.ts` (verification shared via a small local export, e.g. in `hc.ts` or `repo.ts`-adjacent helper — keep it inside your owned files).
-3. `timer.ts` (poll loop, dues, receipt wait, exit predicates).
-4. `bun test scripts` + `bun run typecheck` in `skills/watch-issues`; then `bun test --timeout=30000 tests/watch-timer.test.ts` from the worktree root — iterate until green (serial, ~2-3 min).
-5. Commit the unit as one commit.
+1. Read tick.ts, hc.ts (`HcReply.kind` values), repo.ts (watchTarget throw shape).
+2. Rewrite the refusals with reasons (acceptance 1-3).
+3. `bunx tsc --noEmit` must stay clean; then run the targeted test below and confirm the
+   previously-red assertions are green.
 
-Advisory size: ~8 files, under 60 turns.
+Advisory size: 1 file, ~6 turns.
 
 ## 7. Commands
 
-- `cd skills/watch-issues && bun test scripts && bun run typecheck`
-- `bun test --timeout=30000 tests/watch-timer.test.ts` (from worktree root; needs `hc` on PATH — it is)
-Keep output via `akrogon run-check --name <label> -- <cmd>` and cite the `check <label>: <exit> <path>` line.
+- `akrogon run-check --name watch-timer-u1 -- sh -c 'flock "$(git rev-parse --git-path akrogon-install.lock)" sh -c "bun install --frozen-lockfile --backend=copyfile" && bunx tsc --noEmit && bun test --timeout=30000 tests/watch-timer.test.ts'`
+  (the whole free file is the unit's targeted command; cite the printed `check watch-timer-u1: <exit> <path>` line)
 
-## 8. Done-when / report
+## 8. Done-when, evidence and report
 
-All §2 outcomes hold, the free suite is green, one commit on the detached HEAD. Report the four fill-ins:
+The free suite is green where it was red on `no-watch` bare lines; paste the `check
+watch-timer-u1: 0 <path>` line and any still-red case (a red that is not your change returns a
+mismatch). Commit once on top of the creation commit with message naming the change; the file is
+a frozen product path, so end the message with a trailer line:
+`Test-Change: skills/watch-issues/scripts/tick.ts issues/chart/watch-live-speed Corrections item 4 (criterion-14 refusal reasons)`.
 
 Changed files and reasons: <paths and why>
 Tests run: <commands and results>

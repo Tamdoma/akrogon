@@ -1,0 +1,8 @@
+
+akr-e2e-watch-claude-shell sp main ? ❯ env XDG_RUNTIME_DIR=/tmp/akr-e2e-live3/akr-e2e-watch-claude-shell-rt HOME=/home/ivan PATH=/tmp/akr-e2e-live3/akr-e2e-watch-claude-shell-logbin:/tmp/akr-e2e-live3/akr-e2e-watch-claude-shell-shimbin:/tmp/akr-e2e-live3/akr-e2e-watch-claude-shell-standinbin:/usr/bin:/home/ivan/.pi/agent/bin:/home/ivan/.local/bin:/home/ivan/.local/share/mise/command-wrappers/bin:/usr/share/omarchy/bin:/home/ivan/.local/share/mise/installs/npm-moonshot-ai-kimi-code/latest/node_modules/.bin:/home/ivan/.local/share/mise/installs/antigravity-cli/latest:/home/ivan/.local/share/mise/installs/claude/latest:/home/ivan/.local/share/mise/installs/codex/latest/bin:/home/ivan/.local/share/mise/installs/copilot/latest:/home/ivan/.local/share/mise/installs/gh/latest/gh_2.105.0_linux_amd64/bin:/home/ivan/.local/share/mise/installs/muse/latest:/home/ivan/.local/share/mise/installs/node/latest/bin:/home/ivan/.local/share/mise/installs/pi/latest/pi:/home/ivan/.local/share/mise/installs/playwright/latest/node_modules/.bin:/home/ivan/.local/share/mise/installs/uv/latest/.mise-bins:/home/ivan/.local/share/mise/shims:/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl WATCH_TICK_SECONDS=30 claude --model claude-haiku-5-5 --effort low --setting-sources project,local --permission-mode dontAsk --allowedTools Bash,Read,Grep,Glob
+
+
+Resume this session with:
+claude --resume 617d4760-bacd-432f-983a-b2fa898e6885
+
+akr-e2e-watch-claude-shell sp main ? ✗

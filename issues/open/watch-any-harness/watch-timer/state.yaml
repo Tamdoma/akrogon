@@ -1,42 +1,63 @@
 slug: watch-timer
-phase: implement
+phase: failed
 created: 2026-11-20
 repo: akrogon
 blocked-by: []
 sources: []
-busy_since:
-  A: 2026-11-20T17:25:22.708Z
+busy_since: {}
 busy_notified: {}
 blocked_notified: {}
 attempts:
-  A: 1
+  A: 0
   B: 0
 lost:
   A: 0
   B: 0
 done: []
-fix_rounds: 0
+fix_rounds: 1
 verdict: {}
 tab: ak97a87dd1e8f228c3d53cd247106328
 worktree: /home/ivan/.akrogon/worktrees/akrogon/watch-timer
 env_names: []
-env_generation: 0
+env_generation: 2
 pane: {}
 seat:
   A:
     session: infra
-    address: t2p5
-prompted:
-  A:
-    turn: 2
-    address: t2p5
+    address: t2sh
+  B:
+    session: infra
+    address: t2t9
+prompted: {}
 prompted_at: {}
 delivery_error: {}
+failure:
+  cause: blocked
+  phase: check.fix
+  slot: A
+  reason: "F2 remaining: locked design decision — no atomic send on watcher status done (hc guards only idle); plus operator action: grants[1] exhausted (>=24 prompted vs 12), paid re-proof on repaired inputs needs a fresh grant; see implementation/report.md and review-B.md"
+  delivery: shown
 frozen:
+  docs/pictures/watch-loop.svg: ca07e92b83fa975985888a4be19f211395d18fc2
+  docs/reference/skills.md: 96e066db0bbc2d307df4e92957de1fbdff596237
+  docs/use/watch-while-away.md: e5fad989689c6c3c4006399c7432bcbb605e4a8c
+  skills/AREA.md: 8545ceed3ab845e7593e5da338ec5f9e96d7e104
+  skills/watch-issues/SKILL.md: 5c912a01204da050abedc87899041bb4c25674ad
+  skills/watch-issues/scripts/hc.ts: 43f55a9ff8dc8cc09cb3cc672927b4b6fe8f6bd1
+  skills/watch-issues/scripts/observe.ts: 6abd7261a4b708b29e644c89c14ef90526fcf32f
+  skills/watch-issues/scripts/proc.ts: af29d454b9ba31f2d8085b39072b82269a735790
+  skills/watch-issues/scripts/repo.ts: b7fcf5c12d6629f31276509c08313c49762e8e6f
+  skills/watch-issues/scripts/start.ts: 69244d3660b01aa27aa8be33b969984e673f799d
+  skills/watch-issues/scripts/stop.ts: d683f2905db9670f16bd8f1889b5926757ac0245
+  skills/watch-issues/scripts/tick.ts: fead5f76f2984b6348f17491d0f8dae55372c2bf
+  skills/watch-issues/scripts/timer.ts: 75cbd95ffaf8c38b5629b235a1fbf627965b8b2f
+  tests/AREA.md: dfb393d20912e3bbb3f26e75765a8b51ccf68026
+  tests/e2e/tier.ts: f815c4e3ace3635c6ae9d19bcb47ee3f47cf4da1
   tests/e2e/watch-check.e2e.ts: null
-  tests/e2e/watch-live.e2e.ts: 9d90053ffe2df47ee2c7892fcb2f5258ed0aec6d
-  tests/e2e/watch-tier.ts: b66af31d427b423b4f42e58f8dc28ffa93ac6b86
-  tests/fixtures/watch-agent.sh: 1fdcd9cb8dd1e57d3b687b0b04d9c03613f42c23
-  tests/fixtures/watch-hook.sh: f8baa9ffcf6172abdc5dcf84583b3f369d6ea3a4
-  tests/watch-timer.test.ts: 457dff7d98ecc7c72391e0519482d5eb8c86a124
-frozen_cited: []
+  tests/e2e/watch-live.e2e.ts: 38e5af1517cd97dffeb8717e323a96f8f5e3fd9f
+  tests/e2e/watch-tier.ts: f274b13bd734c42f38b4bf5d3dde8a1007062f0d
+  tests/fixtures/watch-agent.sh: 8b439371d43100844e47f527e4248ea0b325eab1
+  tests/fixtures/watch-hook.sh: 3beedf2e9f58c83f46cae680e59343dbb56abc1a
+  tests/watch-timer.test.ts: 53bc0dd7a721b3ff19c004a13675976708b1b5f1
+frozen_cited:
+  - tests/AREA.md design leaf (names the rewritten watch tests and fixtures added under this leaf)

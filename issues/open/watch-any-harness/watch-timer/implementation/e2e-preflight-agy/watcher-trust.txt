@@ -1,0 +1,15 @@
+Accessing workspace:
+
+/var/tmp/akr-e2e-HlFhnC/akr-e2e-watch-agy-preflight
+
+Do you trust the contents of this project?
+
+Antigravity CLI requires permission to read, edit, and execute files here.
+
+> Yes, I trust this folder
+  No, exit
+
+  ↑/↓ Navigate · enter Confirm
+                                                                                                                                                                                  Gemini 3.8 Flash · low
+
+keys: enter

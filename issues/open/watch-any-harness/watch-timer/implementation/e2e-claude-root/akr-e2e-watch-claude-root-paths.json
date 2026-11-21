@@ -1,10 +1,11 @@
 [
-  "/tmp/akr-e2e/akr-e2e-watch-claude-root",
-  "/tmp/akr-e2e/akr-e2e-watch-claude-root-home",
-  "/tmp/akr-e2e/akr-e2e-watch-claude-root-scratch",
-  "/tmp/akr-e2e/akr-e2e-watch-claude-root-rt",
-  "/tmp/akr-e2e/akr-e2e-watch-claude-root-appbin",
-  "/tmp/akr-e2e/akr-e2e-watch-claude-root-shimbin",
-  "/tmp/akr-e2e/akr-e2e-watch-claude-root-standin",
-  "/tmp/akr-e2e/akr-e2e-watch-claude-root-standinbin"
+  "/var/tmp/akr-e2e-oWnlEq/akr-e2e-watch-claude-root",
+  "/var/tmp/akr-e2e-oWnlEq/akr-e2e-watch-claude-root-home",
+  "/var/tmp/akr-e2e-oWnlEq/akr-e2e-watch-claude-root-scratch",
+  "/var/tmp/akr-e2e-oWnlEq/akr-e2e-watch-claude-root-rt",
+  "/var/tmp/akr-e2e-oWnlEq/akr-e2e-watch-claude-root-appbin",
+  "/var/tmp/akr-e2e-oWnlEq/akr-e2e-watch-claude-root-shimbin",
+  "/var/tmp/akr-e2e-oWnlEq/akr-e2e-watch-claude-root-standin",
+  "/var/tmp/akr-e2e-oWnlEq/akr-e2e-watch-claude-root-standinbin",
+  "/var/tmp/akr-e2e-oWnlEq/akr-e2e-watch-claude-root-wtr"
 ]

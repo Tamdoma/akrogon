@@ -115,3 +115,9 @@ Stated limits added: a timer exit reason in a paid cell is not readable after `-
 Superseded in this design: `## Binding decisions` "What only a real harness shows" and `## Leaf architecture` "Live run shape" (the full per-harness matrix, live second start, restart, old cron tick, paused start and unpause, and `pi --skill` without `--no-skills`) are replaced by criterion 11 as corrected: the paused receipt order and paused checks are proven on the stand-in through the real tier, and the `akrogon next` act in the root cell's unpaused tick; the Standing design line "use only existing machinery" stands, and the tier fix of criterion 12 edits that existing machinery.
 
 Owned surfaces added: tests/e2e/watch-tier.ts (criterion 12), tests/e2e/watch-live.e2e.ts, tests/watch-timer.test.ts, skills/watch-issues/SKILL.md (criterion 15).
+
+## Corrections, 2026-11-21 (chart issues/chart/watch-live-speed)
+
+Binding, operator verbatim: "S4a, gamrsnt 8 stop", "Grant 8 stop", "s5a that's perfectly fine. Just do it" (forks/disposition.md S4, S5). Design item 4's stated limits add the two in brief.md Corrections 2026-11-21. The timer's send path stays as at def416a0: guarded with `--if idle` on `idle`, unguarded on `done`, with a re-read right before. No guard for a tick that joins a person's turn is built, and check.fix F2 is settled by these limits.
+
+Paid re-proof: grants[1] is spent and overrun (at least 24 prompted sessions against 12, implementation/report.md), and grants[0] is spent. The re-proof draws on grants[2]. Prior use under grants[2] is the number of `check_start` records in the registered root's issues/timings.jsonl with slug `watch-timer`, a name `watch-live-claude-*`, `watch-live-codex-*`, `watch-live-pi-*` or `watch-live-agy-*`, and `ts` after 2026-11-21T06:38:13Z. The seat reads it before every paid launch and writes it in the count line. A launch that would make it 9 is the stop.

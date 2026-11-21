@@ -1,10 +1,11 @@
 [
-  "/tmp/akr-e2e/akr-e2e-watch-pi-root",
-  "/tmp/akr-e2e/akr-e2e-watch-pi-root-home",
-  "/tmp/akr-e2e/akr-e2e-watch-pi-root-scratch",
-  "/tmp/akr-e2e/akr-e2e-watch-pi-root-rt",
-  "/tmp/akr-e2e/akr-e2e-watch-pi-root-appbin",
-  "/tmp/akr-e2e/akr-e2e-watch-pi-root-shimbin",
-  "/tmp/akr-e2e/akr-e2e-watch-pi-root-standin",
-  "/tmp/akr-e2e/akr-e2e-watch-pi-root-standinbin"
+  "/var/tmp/akr-e2e-QRkRoL/akr-e2e-watch-pi-root",
+  "/var/tmp/akr-e2e-QRkRoL/akr-e2e-watch-pi-root-home",
+  "/var/tmp/akr-e2e-QRkRoL/akr-e2e-watch-pi-root-scratch",
+  "/var/tmp/akr-e2e-QRkRoL/akr-e2e-watch-pi-root-rt",
+  "/var/tmp/akr-e2e-QRkRoL/akr-e2e-watch-pi-root-appbin",
+  "/var/tmp/akr-e2e-QRkRoL/akr-e2e-watch-pi-root-shimbin",
+  "/var/tmp/akr-e2e-QRkRoL/akr-e2e-watch-pi-root-standin",
+  "/var/tmp/akr-e2e-QRkRoL/akr-e2e-watch-pi-root-standinbin",
+  "/var/tmp/akr-e2e-QRkRoL/akr-e2e-watch-pi-root-wtr"
 ]

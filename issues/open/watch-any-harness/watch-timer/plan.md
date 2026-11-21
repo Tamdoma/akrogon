@@ -1,125 +1,303 @@
 # Plan: watch-timer
 
-Slot A synthesis, 2026-11-20. Sources: `brief.md`, `design.md` (locked items 1-10, corrections 1-4, exclusions), `readiness.yaml` grant (8 paid sessions, 10 min each), chart proofs P1-P13 (`issues/chart/watch-any-harness/forks/timer-design.md`), live surfaces listed below.
+Slot A re-plan synthesis, 2026-11-20, under `design.md` Corrections (issues/chart/watch-live-speed
+forks/disposition.md Taken 1-8, Probes P1-P3, Corrections 1-3) and `brief.md` Corrections (criteria
+4 restated, 11 replaced, 12-15 added). Sources: `brief.md`, `design.md` (items 1-10, corrections
+1-4, exclusions), `readiness.yaml` grants, chart proofs P1-P13
+(`issues/chart/watch-any-harness/forks/timer-design.md`) and P1-P3
+(`issues/chart/watch-live-speed/forks/disposition.md`), live surfaces below.
+
+This pass: the branch keeps the committed product code. The plan seat rewrites the tests so each
+defect test runs red against that code; product fixes land at implement. Open-for-the-plan items
+from the design are settled at D2, D3, D16.
 
 ## Read-first paths
 
-- `skills/watch-issues/SKILL.md` — current skill (invocations, Observe, Judge, Never, Reply); Observe, Judge, Never, Reply sections stay; Invocations and frontmatter are rewritten.
-- `skills/watch-issues/scripts/observe.ts` — existing script style, `resolveRepoKey` (akrogon config → repo name), `run` helper.
-- `src/hc.ts` — `hc`, `terminals`, `terminal`, `send`, `label`, `repoSpace`, `HcError`; note `hcEnv` strips `HC_TERMINAL_ID` (needed for untagged tick sends, wrong for `hc run` parent default).
-- `src/transcript.ts` — `transcriptFor` (pid/foreground transcript resolution, labels `akrogon.transcript`).
-- `src/config.ts` — `readRepo`, `Repo`.
-- `tests/hc-fixture.ts` — `hcFixture`, `hcCore`, real-core test surface, `tasks()`, `waitFor`.
-- `tests/stand-in.sh` — watcher/seat program (status OSC 7501, per-task hook at `$STANDIN_DIR/hook`).
-- `tests/e2e/watch-tier.ts`, `tests/e2e/tier.ts` — attended-tier setup, `startWatchTier`, `answerTrust`, `trustedWorkspaces`.
-- `tests/e2e/watch-check.e2e.ts` (deleted by this leaf, cron assertions false under signpost 1a), `tests/e2e/watch-stop.e2e.ts` (stays).
-- `tests/helpers.ts`, `tests/hc-listener.test.ts` (`akrogonShim` logging-shim pattern).
-- `docs/use/watch-while-away.md`, `docs/reference/skills.md`, `docs/pictures/watch-loop.svg`, `tests/AREA.md`, `skills/AREA.md` — human/agent docs naming the watch.
+- `skills/watch-issues/SKILL.md` — current skill; needs the criterion-15 fix (`akrogon status <root>`
+  → `akrogon status` at `<root>`); everything else stays.
+- `skills/watch-issues/scripts/` — committed scripts: `timer.ts` (due engine, reason printing),
+  `start.ts`, `stop.ts`, `tick.ts` (needs criterion-14 refusal reasons), `hc.ts`, `repo.ts`,
+  `proc.ts`, `observe.ts`, `log-tail.ts`.
+- `src/hc.ts` — `terminals`, `terminal`, `send`, `label`, `repoSpace`, `waitFor`, `HcError`;
+  `hcEnv` strips terminal vars (untagged sends from the timer; scripts/hc.ts keeps them for
+  `hc run` parenting and `hc get`).
+- `src/transcript.ts` — `transcriptFor` (resolution over seat pids; the timer's exit key).
+- `src/config.ts` — `readRepo`; `src/shell.ts` — `spawnCaptured`, `command`.
+- `tests/watch-timer.test.ts` — free mechanical suite on `hcFixture` cores (criteria 1-10, 14, 15).
+- `tests/fixtures/watch-agent.sh`, `tests/fixtures/watch-hook.sh`, `tests/stand-in.sh` — watcher
+  program and model-playing hook; the hook also plays the model for stand-in tier cells.
+- `tests/hc-fixture.ts`, `tests/helpers.ts`, `tests/isolation.ts` (suite TMPDIR/home isolation).
+- `tests/e2e/watch-tier.ts` — `startWatchTier`, `stopWatchTier`, `observeReady` (criterion-12
+  worktree folder already committed); `tests/e2e/tier.ts` — `answerTrust`, `realHome`,
+  `realRuntime`, `required`.
+- `tests/e2e/watch-live.e2e.ts` — the live file this plan rewrites (stand-in cells, preflight
+  cells, paid cells).
+- `docs/use/watch-while-away.md`, `docs/reference/skills.md`, `docs/pictures/watch-loop.svg`,
+  `tests/AREA.md`, `skills/AREA.md` — the doc set the docs gate reads.
+- Leaf folder: `implementation/report.md` (grant count lines and cell log), `readiness.yaml`
+  grants[1].
 
 ## Decisions
 
-- D1 — Script set: one script per step under `skills/watch-issues/scripts/`: `timer.ts` (the loop), `start.ts`, `stop.ts`, `tick.ts`, plus shared helpers `hc.ts` (hc spawn runner preserving the caller's terminal env), `repo.ts` (`resolveRepoKey`/`run` factored out of `observe.ts`, which imports them), `proc.ts` (proc start time + ancestor chain reads). `observe.ts` and `log-tail.ts` unchanged in behavior.
-- D2 — hc calls: `hc run` and `hc get --json` go through the scripts' own runner (scripts/hc.ts) which preserves `HC_TERMINAL_ID`/`HC_TERMINAL_SOCKET` so `hc run` default-parents to the watcher terminal (P4) and so `get` sees the caller terminal. `send`, `terminals` (label counting, terminal listing), `label`, `repoSpace` reuse `src/hc.ts` (`hcEnv` strips terminal vars → untagged send, P2-proven form). `src/hc.ts` is not extended: its `run` cannot express `--rm` and clears the parent identity by design (design "Not reusable unchanged").
-- D3 — Pin rule (design item 2 as corrected): `start.ts` reads the watcher terminal's `foreground.pid` from `hc get --json $HC_TERMINAL_ID`; it must appear in the start step's own `/proc` ancestor chain (ppid walk), else `refused` with no timer and no check. Start time is proc stat field 22 of that pid (same parse as `src/transcript.ts` `procStart` — reimplemented in `proc.ts`, not exported from src, since observe's gate is `src/hc.ts`-level). Transcript is resolved through `transcriptFor({session, address})` on the watcher address — seatPids covers both root and shell launch shapes; no `fromProcess` export needed.
-- D4 — Timer argv (passed by start.ts, timer never walks ancestry): `bun <scriptdir>/timer.ts --session <resolved session> --watcher <HC_TERMINAL_ID> --root <root> --repo <repoName> --pin-pid <pid> --pin-start <procStart> [--transcript <path>]`, preceded by `env WATCH_TICK_SECONDS=<v>` when the env override is set plus `XDG_RUNTIME_DIR`, `HOME`, `PATH` forwarded verbatim from the start step's env (the timer's `sessions()`/`transcriptFor` need the session socket dir and home paths). Timer address comes from `hc run --json` output; its own `HC_TERMINAL_ID` inside the timer equals that address.
-- D5 — Interval/poll: interval = `WATCH_TICK_SECONDS` else 1200 s. Poll tick cadence = min(1 s, interval/8) so every exit condition is re-checked continuously and again right before each send. Poll loop exits without sending (discarding pending dues) when: `/proc/<pin-pid>` is gone or its field-22 start differs from `--pin-start`; `hc get` on the watcher fails `not_found` or reports `state: finished`; the watcher's `foreground.pid` is neither `pinPid` nor a `/proc` descendant of `pinPid`; or `transcriptFor({session,watcher})` returns a non-null path different from the pinned/latched one. Transcript rule: pin at start (`--transcript` present = pinned value, absent = null); while pinned is null, the first non-null resolved path is latched as effective; a null resolution never exits (transient mid-rewrite/pi-unsaved), a non-null path different from effective exits. "Weaker" = latch only, never null-exit.
-- D6 — Due state machine (item 5 + corrections): dues numbered 1,2,… at each interval boundary (accumulate while not ready; start's immediate check is not a due). Readiness = ≥1 pending AND watcher `status.state` ∈ {idle,done} (absent status = silent, not ready). On ready: check exits, `send` `watch-issues tick timer=<timer> pid=<pinPid> due=<oldest n> <root>` via `src/hc.ts` `send` (untagged), record `turn0`/`started`. `started === true`: wait until watcher `turn > turn0` AND idle/done, deadline = one interval from send; then `hc get` own terminal: `labels["akrogon.watch-due"] == n` → delivered, pop. `started` false/null, turn-advance deadline hit, or receipt label missing/≠n → if first attempt, mark for one resend at next readiness; else drop, keep schedule. While awaiting a due's outcome, exit checks keep running; a terminal-exit during it ends the timer without sending.
-- D7 — Verified-timer test (item 6): given labelled terminals L (live, `akrogon.watch-timer=<repo>`): |L|=0 → none; |L|>1 → conflict listing every address; |L|=1 → verified iff `name === "<prefix>-watch"` AND `hc get --json` top-level argv joined contains `skills/watch-issues/scripts/timer.ts`. Separately, a live terminal named `<prefix>-watch` that is unlabelled or fails verification → conflict. `hc run` `name_taken` (kind `name_taken`, exit≠0) → re-read holder by name, re-verify: verified → report running; else conflict.
-- D8 — start.ts contract (stdout line + exit code, skill reads it): `refused <reason>` (no `HC_TERMINAL_ID`; watcher outside resolved session — terminal `hc get` fails or its session is not the repo's resolved session; foreground not an ancestor) exit 1; `conflict <details>` exit 2; `running <address>` (one verified timer or name_taken→verified) exit 0; `started <address>` exit 0. Order: refusals → label count → on zero, `hc run` (name, label `akrogon.watch-timer=<repo>`, `--rm`, argv from D4) then `started`; on one verified → `running`; conflicts → `conflict`. The skill runs `akrogon status <root>` only on `started`/`running` (item 6 correction 2/3: the one check still runs with a job present; creation on a paused repo is not an act on a leaf).
-- D9 — stop.ts contract: resolves repo session via `<root>` arg; counts labelled live terminals: 0 → `stopped` ("already stopped"); >1 → `conflict`; 1 → verify (D7); verified → `hc kill`+`hc rm` (via `src/hc.ts` `end`), `stopped <address>`; unverified → `conflict`. A `<prefix>-watch`-named unlabelled/unverified terminal → `conflict`, nothing touched. Works from any terminal: resolves session from the repo, not `HC_TERMINAL_ID`.
-- D10 — tick.ts contract (item 7 + corrections): argv is the tail after `tick`, root = remainder after `due=<n>` (spaces preserved). Steps: (a) parse `timer=`, `pid=`, `due=` — any missing/unparseable → `no-watch`, run nothing; (b) `hc get <timer>` must give a live verified timer (D7) with `parent === $HC_TERMINAL_ID`, else `no-watch`; (c) foreground-pid of own terminal must be ancestor of self AND equal `pid=` — mismatch → `hc kill`+`rm` the timer (item 6 stop), `stopped`; (d) `due` must exceed the timer's `akrogon.watch-due` label value (absent = 0), else `no-watch` (late copy of a resent due); (e) `hc label <timer> akrogon.watch-due=<n>` FIRST, then `accept` exit 0 → the skill runs its one check (`akrogon status` → observe/judge) before any first-prompt stop handling. First-prompt reset rule retained verbatim: a tick that is the first prompt of its conversation and a verified timer is live → stop steps instead of a check (item 7, "attempted, not guaranteed" for codex/pi `/new`).
-- D11 — Free-test harness: `tests/watch-timer.test.ts` on `hcFixture`-style real cores. Watcher program = `tests/fixtures/watch-agent.sh`: a small shell script whose argv runs `bun scripts/start.ts <root>` synchronously (making start.ts its descendant → ancestor rule satisfied), prints the outcome to its task log, then `exec`s `tests/stand-in.sh --model work` (same pid → stays the pinned foreground). Tick text arrives on stdin via `hc send`; the `$STANDIN_DIR/hook` (`tests/fixtures/watch-hook.sh`) plays the model: runs `bun scripts/tick.ts <line>` and, only on `accept`, runs `akrogon status` at the parsed root (a recording wrapper `akrogon` on the watcher's PATH writes `<argv> <epoch> <hc turn>` to a log). Watcher launched via `hc run -- env XDG_RUNTIME_DIR=… PATH=<wrapper>:<standin-bin>:<corePath> HOME=… STANDIN_DIR=… bun tests/fixtures/watch-agent.sh --model work <skilldir> <wrapperbin> <root>`.
-- D12 — Live-run shape (criterion 11, run order settled): one file `tests/e2e/watch-live.e2e.ts`, `AKROGON_E2E=watch-live`, `AKROGON_E2E_KIND=<claude|codex|pi|agy>`, `AKROGON_E2E_SHAPE=<root|shell>`; one `run-check` per run (its own tier, root and `AKROGON_E2E_OUT` folder), 8 sessions total = grant bound, sequential (tier refuses leftovers). Per kind: run A shape `root`; run B shape `shell` with the registered root's name containing a space via a new optional `rootName` param on `startWatchTier` (default = name; the space is inside the name segment so the `akr-e2e-watch-*` naming marker holds). Models: env `AKROGON_E2E_WATCHER_MODEL_<KIND>` defaulting to the repo's lowest-cost per kind (claude haiku-5.5, codex gpt-6.1-sol low, pi devin/swe-2-max low, agy gemini-3.8-flash-low); watcher launch lines follow `watch-check.e2e.ts`/`kinds.e2e.ts`; skill reach: claude `.claude/skills` link, codex/agy `.agents/skills` link, pi `--skill <checkout>/skills/watch-issues`. Trust answered via `answerTrust` (claude "Yes, I trust this folder", codex "Trust and continue", agy "Yes, I trust this folder"); run B shell launch via `hc keys` typing the command + enter (lesson: free text can't go through `hc keys`, so the launch line is typed per-character then enter — the lesson's rule is text via send, which is how ticks are delivered; the launch argv has no `_` or capitals so keys carries it).
-- D13 — Check accounting (standing design): the test writes a logging `akrogon` wrapper into `<leaf temp>/<name>-logbin`, placed ahead of the tier shim on the watcher's launch PATH: logs `argv`, epoch, and `hc get --json $HC_TERMINAL_ID` turn, then execs the real shim. Checks counted per delivered due: status calls after each tick = 1 per `akrogon.watch-due` receipt; `akrogon next <slug>` after each unpaused check on the seeded waiting stand-in leaf = evidence the check acted (Judge waiting rule). Receipt label and turns read via `hc get --json` product state.
-- D14 — Run A sequence (root shape): seed waiting stand-in leaf (phase `plan.synthesis`, slots a/b on `fake` harness) → `observeReady` → launch watcher as terminal program → send `watch-issues <root>` → assert: wrapper logged `status` at root once, live labelled `<prefix>-watch` with verified argv and parent=watcher, no cron tool (claude: no Cron* in transcript; others: no cron binary on PATH anyway — assert via transcript absence for claude and command log for all) → send start again → one more status call, still one timer → wait two interval ticks → each: send line, receipt `akrogon.watch-due=1,2`, one status call each, `next <slug>` logged each → busy: block watcher (FIFO wrapper delay on the next `status` call for ~1.6 intervals) → two dues accrue → each runs its own status call after the turn ends (two receipts, two status calls, none merged) → send old-style `watch-issues tick <root>` (no timer=) → no status call → `watch-issues stop <root>` → timer gone, reported → stop again → already stopped → `watch-issues <root>` again → new timer, new address → replay old tick text with old address → refused, no check → reset: claude/agy `/clear` via `hc keys`; codex/pi `/new` → wait ≥1 interval → claude/agy: timer exited, no tick text on screen; codex/pi: record the outcome (limit, no assertion of stop) → trust entries recorded for cleanup.
-- D15 — Run B sequence (shell shape, space in root): tier root `akr-e2e-watch-<kind>-sp ace` → `akrogon pause` at root → launch `bash` terminal → type watcher launch line via keys → answer trust → send `watch-issues <root>` → timer starts despite pause; immediate check logged `status` (paused → no `next`, receipt counts as check) → `akrogon unpause` → next due → status + `next` → `akrogon pause` again → next due → status call, no `next` (paused check) → kill the watcher agent process (`kill <foreground.pid>`) → wait 1.5 intervals → terminal screen holds no `watch-issues tick` text and shell resumes; timer exited (`hc get` not_found) and name freed → cleanup: stopWatchTier, remove trust entries for the space root, remove `trustedWorkspaces` entry if added (agy), record all in out folder.
-- D16 — Env/key accounting: `env_names: []`, `Missing:` none — no human-only blockers. Paid grant: 8 sessions max, 10 min each; plan-stage live launches: none (e2e tests red-fail before launching). Implement-stage count lines go to `implementation/report.md` beside each run-check name (`watch-live-<kind>-<shape>`), grant `readiness.yaml grants[0]` bound "at most 8 harness sessions … within 10 minutes".
-- D17 — Watcher-start refusals cover (criterion 9): free tests for unset `HC_TERMINAL_ID` (env-less spawn) and outside-session watcher (fixture core not holding the repo's space → `repoSpace` resolves another session); live runs assert `hc send` only in-session (no extra case needed — criterion 9's two refusals are the free cases).
-- D18 — One-time items with no criterion test: `WATCH_TICK_SECONDS` honored (free timer test runs dues at seconds scale — the env is the only way dues appear, so the free suite IS its proof); transcript-change exit covered by free test D5/T-trx below.
-- D19 — Deleted test: `tests/e2e/watch-check.e2e.ts` deleted at test-commit time (cron assertions false under signpost 1a; its other proofs carried by run A per standing design). `tests/e2e/watch-stop.e2e.ts` untouched (busy-rule stop keys unchanged).
-- D20 — Doc set for criterion 10: SKILL.md (invocations rewritten for plain-text `watch-issues [start|stop|tick]` across all four harnesses; slash forms kept as aliases for claude; Never gains the single carve-out "kill or remove an hc terminal: only the verified timer on stop and on a mismatched-pid tick"), docs/use/watch-while-away.md, docs/reference/skills.md, docs/pictures/watch-loop.svg (`cron every 20 min` → timer text), tests/AREA.md (line 15 names new files), skills/AREA.md (watch-issues line loses "cron"). Each states: limits of item 4 (held-draft tick, codex/pi `/new` reset limit), "a compaction summary before a tick is not a reset", no CronCreate/CronList/CronDelete/expiry words. Proof: grep assertions in a new `tests/watch-docs.test.ts` case inside `tests/docs-links.test.ts`-style free test — implemented as assertions in `tests/watch-timer.test.ts` docs section (no separate file).
+- D1 — Product diff at implement is small: `tick.ts` prints a reason on every refusal
+  (`no-watch <reason>`), `SKILL.md` drops `<root>` from the one `akrogon status` line. `timer.ts`,
+  `start.ts`, `stop.ts`, `hc.ts`, `repo.ts`, `proc.ts`, `observe.ts`, `tests/e2e/watch-tier.ts`
+  stay as committed (Corrections item-4 product fixes already landed at 6bc522ef, f74358cf).
+- D2 — Open-for-the-plan (design item 2, identification rule): settled by the design's own
+  Correction 1 — `start.ts` pins the watcher terminal's `foreground.pid`, required to be an
+  ancestor of the start step (committed; holds in root and shell shapes per P11/P12).
+- D3 — Open-for-the-plan (design leaf architecture, `hc run`/`hc get` route): settled as committed —
+  scripts/hc.ts keeps the caller's terminal env so `hc run` default-parents and `hc get` resolves;
+  `send`/`terminals`/`label`/`repoSpace` reuse `src/hc.ts` (untagged env). No src/ change.
+- D4 — tick.ts outcome lines (criterion 14): `accept`, `stopped` unchanged; every refusal prints
+  `no-watch <reason>` exit 1: missing/unparseable `timer=`/`pid=`/`due=`/root
+  (`bad fields`), `watchTarget` failure (the thrown message), timer dead/unverified/foreign or
+  parent ≠ caller (`timer <state|kind>`), own foreground unreadable (`watcher <kind>`),
+  `due <= receipt` (`stale due=<n> receipt=<r>`), receipt write failure (`label <kind>`). The
+  trailing `catch` binds `error.message` into the line so no catch-all hides it.
+- D5 — Timer exit reasons (criterion 14, timer part): committed timer prints each new failed-read,
+  skipped-send, failed-send and exit reason to its own output. Free tests launch timers without
+  `--rm` and read the screen for each reason; paid cells use `--rm` (stated limit: the reason is
+  not readable after removal).
+- D6 — Live file shape (criterion 11 as replaced): `tests/e2e/watch-live.e2e.ts`,
+  `AKROGON_E2E=watch-live`, `AKROGON_E2E_KIND=<claude|codex|pi|agy|standin>`,
+  `AKROGON_E2E_SHAPE=<root|shell>`; `AKROGON_E2E=watch-preflight` with `AKROGON_E2E_KIND` for the
+  no-prompt cells. Each cell is its own `run-check` with its own tier, registered root and
+  `AKROGON_E2E_OUT` folder; `AKROGON_E2E_ROOT` must resolve under `os.tmpdir()` (writes rule) and
+  the file refuses otherwise.
+- D7 — Skill loading per cell (criterion 13): claude → `<root>/.claude/skills/watch-issues`
+  symlink + `--setting-sources project,local`; codex and agy → `<root>/.agents/skills/watch-issues`
+  symlink, codex launched with `-c skills.config` disabling each user `watch-issues` SKILL.md
+  path that exists (`~/.codex/skills`, `~/.agents/skills`); pi → `--no-skills --skill <leaf>`
+  (P1). No home skill file is touched anywhere (writes rule; P1 proves agy's workspace copy
+  shadows the global one). The SKILL.md description marker `hc timer` identifies the leaf copy.
+- D8 — Stand-in cells (free, no prompt): `kind=standin` launches `fake --model work`
+  (`tests/stand-in.sh` via the tier's standinBin) as the watcher, root shape as the terminal's
+  program and shell shape typed into `bash` through a launch script. A copy of
+  `tests/fixtures/watch-hook.sh` at `$STANDIN_DIR/hook` plays the model: runs `tick.ts`/`start.ts`/
+  `stop.ts`, stamps the receipt before the check, then `akrogon status` and `akrogon next --all`
+  through the tier's logging wrapper (`call status`/`call next --all` with `t=<hc turn>`).
+  Root shape covers: start + check + timer verification, second start (one check, still one
+  timer), per-due tick with receipt and `next` for the waiting leaf, the held due, `stop`,
+  repeated stop, restart, the old-address tick refused, the old cron tick refused, forged pid
+  (timer stopped), stale due refused, `akrogon pause` + `unpause` (criterion 12: the socket keeps
+  answering and dues keep flowing), agent-as-program exit ending the timer. Shell shape covers:
+  the space root, paused start + paused check, `unpause` + acting check, the held due, agent exit
+  leaving no new tick text in the shell. `startWatchTier`'s disjointness is asserted once
+  (worktree folder outside root, runtime and helper folders — criterion 12).
+- D9 — Paid cells (criterion 11 verbatim, `WATCH_TICK_SECONDS=30`):
+  shape=root per kind: launch as the terminal's program → `watch-issues <root>` → one status call,
+  one verified labelled timer `aw-watch` parented to the watcher, argv running the leaf's
+  `timer.ts` by absolute path with the watcher's foreground pid → `waitDue(1)` → one status call
+  plus `next` for the waiting leaf → `hold-status=75` (2.5 intervals) → the next due falls behind
+  the busy check and runs once after it (`waitDue(2)`, exactly one `due=2 sent` line on the timer
+  screen, one more status call) → `watch-issues stop` → timer gone and no new `watch-issues tick`
+  text over a full interval → `watch-issues <root>` → new timer address → `hc keys` `/clear`
+  (claude, agy: timer exits) or `/new` (codex, pi: outcome recorded to `AKROGON_E2E_OUT`, not
+  asserted).
+  shape=shell per kind: `pause` nothing (pause moves to the stand-in cells) → `bash` in the space
+  root → launch script → trust → `watch-issues <root>` → timer + one status call → `waitDue(1)`
+  → `hold-status=75` → the held due runs once → SIGTERM the agent pid → timer exits → the shell's
+  screen gains no `watch-issues tick` lines over an interval+.
+  Second starts, repeated stops, the old tick, pause/unpause and every refusal are stand-in cell
+  proofs, per the corrected criterion's delegation.
+- D10 — Preflight cells (criterion 13, free, no prompt): real tier, real launch flags, then read
+  and stop before any paid turn: pi — the TUI screen shows no `watch-issues` collision warning;
+  codex — `codex debug prompt-input` run under the tier env with the cell's exact
+  `-c skills.config` prints a `skills` section listing `watch-issues` once with the `hc timer`
+  marker (the model-visible skill list; the TUI screen is also read for errors);
+  agy — `/skills` typed via `hc keys` (a client-side overlay, no prompt) lists `watch-issues` once
+  carrying the marker; claude — the `.claude/skills/watch-issues` symlink resolves into the leaf
+  and the screen shows no skill-load error. An empty or ambiguous list stops before any paid
+  cell (Corrections: preflights send no prompt and do not count against the bound).
+- D10a — agy wiring per the chart-door seat note
+  (issues/chart/watch-live-speed/slots/seat-note-agy-link.md): agy 1.5.13 does not list a
+  symlinked workspace skill (the first agy preflight showed only the global cron-era copy), so
+  the test copies the leaf skill folder into `<tier root>/.agents/skills/watch-issues` for agy;
+  every other harness keeps the symlink. `/skills` then lists exactly one `watch-issues`
+  carrying the marker — the workspace copy shadows the global one.
+- D11 — Run order (Corrections plan rules, binding): free preflight (typecheck, config parse,
+  tier start+teardown via the two stand-in cells, D10 skill checks) → stand-in root and shell
+  cells → one paid cell (claude-root) → the rest one at a time. After a paid red, no further
+  paid cell until a free reproduction of the cause passes after repair; a live-only diagnostic
+  launch names an observation no earlier run produced and a repeat of the known failure without
+  it ends paid launches (operator-blocker stop). A rerun repeats the failed cell and every cell
+  whose inputs a shared fix changed. Assertions are exact on observable effects per due (call
+  counts, receipts, timer screens) and never count model commands or match model wording.
+  A failed cell records the watcher screen and the timer's printed reason (or the failing
+  operation and error before any terminal exists) into `AKROGON_E2E_OUT`.
+- D12 — Grant accounting: `grants[0]` spent (>=26 prompted launches recorded in report.md,
+  disposition Findings); `grants[1]` binds at most 12 harness sessions that receive a prompt,
+  each ending within 10 minutes, stop_line = no 13th prompted session and no write outside leaf
+  temp / akr-e2e-watch / named trust entries / harness session records. Plan-stage launches: 0
+  paid (preflights and stand-in cells are free; count lines recorded below). Implement stage:
+  8 paid cells + up to 4 reruns = 12. Any 13th prompted session is the operator-blocker stop.
+  `env_names: []`, no `Missing:` lines — no credential blocker.
+- D13 — Commits and trailers: every commit touching a frozen path
+  (`tests/e2e/watch-check.e2e.ts`, `tests/e2e/watch-live.e2e.ts`, `tests/e2e/watch-tier.ts`,
+  `tests/fixtures/watch-agent.sh`, `tests/fixtures/watch-hook.sh`, `tests/watch-timer.test.ts`)
+  carries `Test-Change: <path> issues/chart/watch-live-speed Corrections …`; the dropped frozen
+  path `tests/e2e/watch-check.e2e.ts` already got its empty-commit citation range covered by
+  e2c7b47b's trailer on the deleting commit. Implement-stage commits fixing product files carry
+  `Test-Change:` for each touched product path citing Corrections item 4 (the next freeze covers
+  them). `tests/e2e/tier.ts` edits cite it too (test-matched file under the frozen-citation rule;
+  it is not in the frozen record but citations keep it unambiguous).
+- D14 — Writes: tests and scripts write only under `$TMPDIR` (`AKROGON_E2E_ROOT`, logbin, flags,
+  launch scripts, hook copies) and the leaf folder (`AKROGON_E2E_OUT`, report.md, run-check logs).
+  `dropTrust` removes only the run's own trust entries (grant-named). No `/tmp` literal path, no
+  home skill link changes; the e2e file refuses an `AKROGON_E2E_ROOT` outside `os.tmpdir()`.
+- D15 — Criterion-13 argv proof: every cell asserts the timer's `argv` contains the leaf's
+  `skills/watch-issues/scripts/timer.ts` as an absolute path (the watcher's PATH puts the leaf
+  checkout first; a foreign skill running a foreign script fails this line).
+- D16 — Open-for-the-plan (design leaf architecture, exit keys per harness): the shell-shape exit
+  is SIGTERM on the agent's foreground pid with a SIGKILL fallback; all harnesses take the same
+  key (a real user exit is indistinguishable at process level).
+- D17 — Reset keys (criterion 11 root cell): `hc keys` `/`,`c`,`l`,`e`,`a`,`r`,`enter` for claude
+  and agy; `/`,`n`,`e`,`w`,`enter` for codex and pi.
+- D18 — `tests/AREA.md` line 15 updated once: names `watch-timer.test.ts`, `watch-live.e2e.ts`
+  with its stand-in/preflight/live cells, the fixtures, and keeps `watch-stop.e2e.ts`
+  (`watch-check.e2e.ts` stays deleted). Doc set otherwise stands (criterion 10 already asserted).
+- D19 — What stays unproven: compaction continuation (skill-text rule), the held-draft window
+  (no hc surface), codex/pi `/new` (recorded), timer exit reasons in paid cells (`--rm` removes
+  the screen — stated limit), live transcript flip (free-tested only).
 
-## Waves (file checklist)
+## Waves
 
-Wave 1 — three units, disjoint paths, no shared test resource, no mutual deps:
+Wave 1 — two units, disjoint paths:
 
-- U1 `skills/watch-issues/scripts/`: new `timer.ts`, `start.ts`, `stop.ts`, `tick.ts`, `hc.ts`, `repo.ts`, `proc.ts`; `observe.ts` refactored to import `resolveRepoKey`/`run` from `repo.ts`; `package.json`/`tsconfig.json` unchanged (all new files land under `scripts/`). Owns the whole scripts dir except `log-tail.*` and fixtures/.
-- U2 `skills/watch-issues/SKILL.md` + docs: `docs/use/watch-while-away.md`, `docs/reference/skills.md`, `docs/pictures/watch-loop.svg`, `skills/AREA.md`, `tests/AREA.md`.
-- U3 e2e tier support: `tests/e2e/watch-tier.ts` (optional `rootName` param; no behavior change otherwise). Kept tiny so it can land ahead of the e2e file.
+- U1 `skills/watch-issues/scripts/tick.ts` — D4 refusal reasons (owns tick.ts only).
+- U2 `skills/watch-issues/SKILL.md` — D1/criterion-15 `akrogon status` fix (owns SKILL.md only;
+  docs gate assertions already cover the rest of the doc set).
 
-Wave 2 — one unit (needs U1's scripts to run against, U3's tier signature):
+Wave 2 — one unit (needs U1+U2 green to pass reds; owns the live proof):
 
-- U4 `tests/watch-timer.test.ts` + `tests/fixtures/watch-agent.sh` + `tests/fixtures/watch-hook.sh` + `tests/e2e/watch-live.e2e.ts` + delete `tests/e2e/watch-check.e2e.ts` (the delete itself is plan-stage). U4 is implement-stage: tests are committed red in the plan stage (see below), U4 makes them green and runs the live passes.
+- U3 verification — run the free suite, both stand-in cells, all four preflights, then the eight
+  paid cells in order with report.md count lines and failed-cell records (owns
+  `implementation/report.md` and `implementation/e2e-*` folders only).
 
-Not serial-solo: wave 1 holds 3 units → worker dispatch per implement-issue. (If waves change and every wave holds one unit, the run is serial-solo and A implements.)
+Not serial-solo: wave 1 holds 2 units → worker dispatch per implement-issue.
 
-Docs affected: SKILL.md, watch-while-away.md, reference/skills.md, watch-loop.svg, tests/AREA.md, skills/AREA.md — one line each above. No other doc names the watch (grep `cron|watch` over docs/ skills/ tests/ shows only these plus `docs/reference/checks.md`-adjacent nothing).
+Docs affected (one line each): `skills/watch-issues/SKILL.md` (U2), `tests/AREA.md` (this plan's
+test-commit edit). No other doc changes — the criterion-10 set is already written and asserted.
 
 ## Criterion → proof map
 
-Proof command semantics: `akrogon run-check --name <label> -- <cmd>`; test runner = repo's configured `bun test --timeout=30000`; e2e files run by name under env (established pattern from watch-check.e2e.ts header). Each criterion's observation = the mechanical behavior at its real boundary (hc core, terminals, labels, the watcher's stdin/task log, the wrapper's call log).
-
-| # | Observation (state before → after, product failure caught) | Command | Size | Rerun trigger |
+| # | Observation (boundary, before → after, failure caught) | Command | Size | Rerun trigger |
 |---|---|---|---|---|
-| 1 | `hcFixture` core, watcher agent runs start → one live `<prefix>-watch` labelled `akrogon.watch-timer=<repo>`, parent=watcher, argv runs timer.ts with watcher pid+start; one `akrogon status` logged. Catches: timer not started, wrong parent/label/argv, no immediate check, start when non-ancestor (negative case refuses). Paused repo: pause → start still creates timer + logs status. | `akrogon run-check --name crit-1 -- bun test --timeout=30000 tests/watch-timer.test.ts` | seconds | timer/start/pin code change |
-| 2 | Running timer → second start logs one more `status`, timer count stays 1. Two labelled terminals or unverified name-holder → `conflict`, zero status calls, timer untouched. | same command (cases in file) | seconds | verification/count logic |
-| 3 | Per due: stdin line `watch-issues tick timer=… pid=… due=n <root>` lands in the stand-in task log exactly once per interval while idle; receipt label set before the hook's `status` call (assert label value inside hook); root with a space parsed end-to-end (fixture root path variant). No leaves → watch keeps running (timers keep cycling). | same | seconds | tick.ts, timer send/receipt |
-| 4 | Two dues during a busy check: two sends, two receipts, two status calls, none merged; unreceipted due (hook skips receipt step via fixture flag) → one resend then drop, later dues continue. | same | seconds | due state machine D6 |
-| 5 | `stop` from watcher and from a second shell terminal → killed+removed, reported; repeated stop → already stopped; start after stop → new address; replayed old-address tick → refused, no check. | same | seconds | stop.ts, tick parent check |
-| 6 | Tick text without `timer=`, with a dead timer address, or after stop → `no-watch`, zero status calls; `due ≤` current receipt → refused; `pid` ≠ watcher foreground → timer killed, `stopped`, no check. | same | seconds | tick.ts verification |
-| 7 | Timer exits + `not_found` when: pinned pid killed; watcher foreground replaced (exec another program); watcher terminal killed (finished); `--pin-start` mismatched (deliberate wrong argv); resolved transcript changes (claude-named watcher stand-in + `CLAUDE_CONFIG_DIR` sessions record flip). | same | seconds | exit checks D5 |
-| 8 | `akrogon pause` → due delivered, status logged, hook reports paused (no `next` call logged); receipt set. | same | seconds | paused short-circuit placement |
-| 9 | start with env stripped of `HC_TERMINAL_ID` → `refused`, no status, no timer; watcher in a session not holding the space → refused. | same | seconds | refusal order |
-| 10 | Docs/skill text assertions (no cron/CronCreate/CronList/CronDelete/expiry wording in the six files; harness names + limits + compaction line present). | same (docs case in file) | seconds | doc edits |
-| 11 | Live: per kind×shape, wrapper log shows one `status` per delivered due + `next` per unpaused check; hc screens/gets show timer lifecycle, receipts, reset and exit outcomes; run B shows space-root working, paused start/check, no post-exit tick. Recorded outputs under `AKROGON_E2E_OUT`; run-check captures stdout/stderr. | `akrogon run-check --name watch-live-<kind>-<shape> -- env AKROGON_E2E=watch-live AKROGON_E2E_KIND=<kind> AKROGON_E2E_SHAPE=<shape> AKROGON_E2E_ROOT=<leaf temp> AKROGON_E2E_OUT=<leaf>/implementation/e2e-<kind>-<shape> WATCH_TICK_SECONDS=30 bun test --timeout=30000 ./tests/e2e/watch-live.e2e.ts` | minutes each, 8 runs | any product-code change; rerun = repeat the single run's command (restart boundary is the run) |
+| 1 | hcFixture core: watcher runs `start.ts` → one live `aw-watch`/`sp-watch`-named, labelled, parented timer whose argv runs timer.ts with the watcher foreground pid+start; one `call status` logged; paused start still starts. Catches: no timer, wrong parent/label/argv, missing check, ancestor refusal bypass. | `akrogon run-check --name watch-timer -- bun test --timeout=30000 tests/watch-timer.test.ts` | ~1 min | start.ts, timer.ts, verification |
+| 2 | second start: +1 status call, still one timer; 2 labelled → `conflict`, calls unchanged; squatter → `conflict`. | same file | ~1 min | counting/verification |
+| 3 | per-due `watch-issues tick timer=… due=n <root>` lands once per interval; `receipt=<n>` logged before `status`; space root end-to-end; no-leaf watch keeps running. | same | ~1 min | tick.ts parse, timer send |
+| 4 | two dues accrue behind a held `status` call; each runs its own check (`tickLines(due)` = 1 each, receipts = dues, status calls one per due); unreceipted due → sent once, resent once, dropped, later dues continue. | same | ~1 min | due engine |
+| 5 | stop from watcher and foreign terminal; repeat stop `stopped`; restart = new address; old-address tick → `no-watch`, no check. | same | ~1 min | stop.ts, parent check |
+| 6 | no `timer=` / dead timer / `due<=receipt` / wrong `pid=` → refused or `stopped`, no check. | same | ~1 min | tick verification |
+| 7 | pin death, pin-start mismatch, watcher finished, watcher not_found, foreground swap, transcript flip → timer exits with its printed reason; name freed. | same | ~1 min | exit predicates |
+| 8 | paused: due receipts, status logged, no `call next` at the check's own turn. | same | ~1 min | paused short-circuit |
+| 9 | unset `HC_TERMINAL_ID` and foreign-session watcher → `refused <reason>`, nothing changed. | same | ~1 min | refusal order |
+| 10 | six doc files: no `cron`/`CronCreate`/`CronList`/`CronDelete`/`expir`; SKILL has all four harness names + `/new`/`compaction`/`draft`. | same (docs case) | seconds | doc edits |
+| 11 | stand-in cells (free): the corrected criterion-11 stand-in sequence end to end on real hc through the tier incl. `akrogon unpause`. Paid cells: D9 sequences per kind×shape, observable effects only. | `akrogon run-check --name watch-live-<kind>-<shape> -- env AKROGON_E2E=watch-live AKROGON_E2E_KIND=<kind> AKROGON_E2E_SHAPE=<shape> AKROGON_E2E_ROOT=<tmp> AKROGON_E2E_OUT=<leaf>/implementation/e2e-<kind>-<shape> WATCH_TICK_SECONDS=<10|30> bun test --timeout=30000 ./tests/e2e/watch-live.e2e.ts` | stand-in ~3 min; paid ~6 min | any shared fix → all cells it touches |
+| 12 | tier worktree folder disjoint from root/runtime/helpers (asserted); `akrogon unpause` inside a stand-in cell leaves `hc ls` answering and dues flowing (F2's exact failure). | same file, `watch-live-standin-*` | ~3 min | watch-tier.ts |
+| 13 | preflight cells list exactly one `watch-issues` with the marker (pi: no collision; codex: debug prompt-input skills entry; agy: `/skills`; claude: link + screen); every paid cell's timer argv holds the leaf's absolute timer.ts. | `akrogon run-check --name watch-preflight-<kind> -- env AKROGON_E2E=watch-preflight AKROGON_E2E_KIND=<kind> AKROGON_E2E_ROOT=<tmp> AKROGON_E2E_OUT=<leaf>/implementation/e2e-preflight-<kind> bun test --timeout=30000 ./tests/e2e/watch-live.e2e.ts` + argv assertions in cells | ~1 min | skill wiring |
+| 14 | tick `no-watch` lines carry reasons; each timer exit reason is read from the timer's own screen (direct launches without `--rm`). | watch-timer.test.ts | ~1 min | reason printing |
+| 15 | SKILL.md check step reads `akrogon status` (no `<root>` operand; `status <root>` errors "Missing leaf"). | docs case in watch-timer.test.ts | seconds | SKILL.md |
 
-Model-choice readings: none of the criteria bind a model's output text; criterion 11 asserts harness-neutral records (wrapper log lines, hc product state) not transcript wording — per standing design's model-choice line the live runs' model-facing inputs are the watcher prompts (`watch-issues` texts), the recording is the wrapper log + hc get outputs + `tier.record` files, and replay consumers are the assertions in the e2e file. What stays unproven: compaction continuation (skill-text rule), held-draft limit.
+Model-choice readings: criteria keep their function checks; no test binds a model's wording.
+Criterion 11's live cells are read under the standing-design model-choice line: the model-facing
+inputs are the `watch-issues …` texts the test sends; the recording is the wrapper call log, hc
+`get` product state, timer/watcher screens and `tier.record` files under `AKROGON_E2E_OUT`; the
+replaying consumer is the reviewing seat. The one `next` floor (`>=1`) is a floor on checks
+acting, not on model judgment — a repeated `next` is the Judge's discretion, unasserted.
 
-## Breakable-condition cases (per done-criterion conditions)
+## Breakable-condition cases
 
-Traced per criterion; each case below runs in `tests/watch-timer.test.ts` where the decision's state lives (same hc session/process), or has a traced reason. Deliberate-break reds are the missing-implementation fails of these cases at plan stage (recorded below); implement-stage red evidence = the suite green. Deliberate-break mechanism note: a temporary bad argv (`--pin-start bogus`) is itself a criterion-7 case; other conditions are proven by asserting the refusing path in the negative cases — a temporary edit making each violation is discarded before the test commit, with red output recorded in `implementation/report.md` (the condition cases below are the criterion cases; an edit-injected red is also recorded at plan stage for the four marked *).
+Each done-criterion condition a decision can break gets a case in the same process/session where
+the decision's state lives; the deliberate-break red at plan stage is the missing product edit
+(`no-watch` bare, `status <root>`), recorded below.
 
-- C-1a (crit 1): `started` only when one live verified timer exists with parent=watcher — negative: `hc run` an unlabelled `<prefix>-watch` squatter → `conflict`, no timer of ours. 
-- C-1b* (crit 1): foreground not ancestor → spawn start.ts with `HC_TERMINAL_ID` pointing at an unrelated program terminal → `refused`.
-- C-2a (crit 2): |labelled|>1 → conflict, nothing touched (spawn second labelled timer argv).
-- C-3a* (crit 3): receipt before check — hook reads timer's `akrogon.watch-due` inside the task hook and asserts it equals the tick's due before calling `akrogon status`; violation = status called without receipt → case fails.
-- C-3b (crit 3): space root — fixture variant `f.root + " sp"` as registered root through start/tick/stop.
-- C-4a* (crit 4): dues during busy — FIFO-blocked status call; assert two separate receipts and two status calls.
-- C-4b* (crit 4): unreceipted → resent once then dropped: fixture flag makes hook skip label write on due 2 → count sends for due 2 = 2, due 3 still delivered.
-- C-5a (crit 5): stop from a foreign terminal in the session (plain `hc run` shell) → killed.
-- C-6a* (crit 6): stale `due=1` while receipt=1 → refused, no status.
-- C-6b* (crit 6): `pid=` = watcher pid+1 (or a killed-pinned then unrelated pid) → timer killed.
-- C-7a (crit 7): watcher foreground replaced — `hc keys`/`send` exec replacement in watcher's shell-mode variant... (root mode: kill watcher pid directly; replacement covered by shell-mode watch-agent variant that execs `sleep` after start → next poll exits). Traced: all four exit keys are one predicate family evaluated per poll.
-- C-8a (crit 8): paused — status logged, `next` absent from wrapper log, receipt set.
-- C-9a (crit 9): env-stripped spawn → refused before any hc write.
+- C14a (crit 14, D4): every refusal path of tick.ts asserts a non-empty reason — parse failure
+  (old cron tick `watch-issues tick <root>`), foreign/stale timer (`timer=<old>` after restart),
+  stale due (`due=1` after receipt 1), watchTarget failure (tick on an unregistered root),
+  label failure traced (unreachable without breaking hc — the schema'd reply only fails when hc
+  errors, covered by `timer <kind>` reason family). Red now: `no-watch` prints bare.
+- C14b (crit 14, D5): each timer exit reason read from the screen of a non-`--rm` timer:
+  `pinned process <pid> gone`, `replaced (start …)`, `watcher … finished`, `watcher … not_found`,
+  `foreground <pid> is not the pinned`, `transcript moved`, plus `dropped:` and `send … failed`
+  notes. Green at commit (the printing already landed); red evidence = the plan-stage run.
+- C15a (crit 15, D1): docs case asserts SKILL.md contains `akrogon status` and never
+  `akrogon status <root>` — red now (the committed text holds `<root>`).
+- C11a (crit 11, D9): the held due behind a busy check — `hold-status` makes a check span ≥2
+  interval boundaries; asserted: the accrued due is sent once after the check and runs one
+  status call (no merge: hc turn per due).
+- C13a (crit 13, D7/D15): agy cell repointing a home link is forbidden; the `.agents/skills`
+  route is asserted by the preflight listing and the argv absolute path.
+- C12a (crit 12, D8): worktree-folder disjointness asserted; the unpause-then-dues path is the
+  socket-survival proof (red at 17:51 when the socket was deleted).
+- C4a (crit 4 restated, committed fix): the free busy-dues case already proves dues send at first
+  readiness, not only at a boundary (boundary-only would show due n+1 delivered a full interval
+  late). Kept and run.
+- C-conditions unchanged from the prior plan (ancestor pin, conflict counting, receipt-first,
+  resend-once, stale due, pid stop, exits) stay proven by the existing free cases.
 
-Plan-stage red output for every new case: recorded beside each criterion's entry in `implementation/report.md` after the run-check below (this plan.md names the commands; the red excerpts land in plan.md's own appendix for the new files since report.md doesn't exist at plan stage — see "Plan-stage red evidence" appendix written after the runs).
+## Plan-stage run order (this pass)
 
-## Plan-stage test commit order
+1. Rewrite `tests/watch-timer.test.ts` (C14a/C14b/C15a assertions), rewrite
+   `tests/e2e/watch-live.e2e.ts` (D6-D11), minor `tests/fixtures/*` only if the stand-in hook
+   needs them for the tier (currently none expected).
+2. Run `watch-timer.test.ts` → record reds (C14a, C15a; also any C14b miss) beside the criteria.
+3. Typecheck the rewritten e2e file; run both stand-in cells and the four preflights free
+   (count lines below); record results.
+4. Commit tests with `Test-Change:` trailers; write reds into this plan; `akrogon phase
+   watch-timer implement --slot A`.
 
-1. This `plan.md`.
-2. New test files (committed red): `tests/watch-timer.test.ts`, `tests/fixtures/watch-agent.sh`, `tests/fixtures/watch-hook.sh`, `tests/e2e/watch-live.e2e.ts`, `tests/e2e/watch-tier.ts` (`rootName` param), delete `tests/e2e/watch-check.e2e.ts`. Trailer `Test-Change: tests/e2e/watch-tier.ts` on the commit touching it (existing test-matched file under the frozen-record rule).
-3. `akrogon phase watch-timer implement --slot A`.
+## Grant count lines (plan stage, grants[1])
 
-## Known limitations preserved
+| # | launch | prompts sent | bound units | outcome |
+|---|--------|--------------|-------------|---------|
+| 1 | pi preflight (`akrogon run-check --name watch-preflight-pi`) | 0 | 0 | pass |
+| 2 | claude preflight (`watch-preflight-claude`) | 0 | 0 | pass |
+| 3 | codex preflight (`watch-preflight-codex`) | 0 | 0 | pass |
+| 4 | agy preflight run A (`watch-preflight-agy`) | 0 | 0 | red: agy ignores a symlinked workspace skill |
+| 5 | agy preflight rerun after real-copy fix | 0 | 0 | pass |
+| 6 | stand-in root cell (`watch-live-standin-root`) | 0 | 0 | intended red (bare `no-watch`) |
+| 7 | stand-in shell cell (`watch-live-standin-shell`) | 0 | 0 | pass |
 
-- Compaction continuation is a skill-text rule, unproven (design cut).
-- Held-draft tick window (S2a/S3a) untested — no hc surface to produce it (P8).
-- Codex/pi `/new` continuation: recorded outcome in run A, asserted only for claude/agy.
-- Transcript-change exit has no live-run assertion (free test only; producing a real transcript flip inside a paid run is out of grant shape).
-
-## Slow-run restart boundaries
-
-Each e2e run is one run-check; a rerun starts at `startWatchTier` leftovers check (fails fast on leftovers) and re-uses nothing partial. Free suite: `tests/watch-timer.test.ts` reruns whole-file; individual cases hold no cross-case state (own `hcFixture` cores).
-
-## Grant accounting
-
-- readiness `grants[0]`: operations = launch claude/codex/pi/agy watcher sessions in akr-e2e-watch, hc send/keys/read/get/label/kill/rm, the checkout's akrogon through the tier shim; bound = at most 8 harness sessions, each ≤10 min; unit = one paid harness session.
-- Count so far before implement stage: **1** — `check watch-live-red` (see below) launched one claude watcher session for ~26 s inside `akrogon run-check`; prior use unknown beyond the leaf's artifacts (attempts A=0, no implementation/ folder before this run).
-- WARNING (repeat-count bound): criterion 11 needs 8 further sessions, so implement-stage launches will total 9 against the 8 bound. The count is recorded here and each launch writes its count line in `implementation/report.md`; the bound is a repeat count, not a stop line (no write outside the allowed paths, no other accounts).
-- Trust entries: the red run's claude trust entry (`/tmp/akr-e2e-plan/akr-e2e-watch-claude-root` in `~/.claude.json`) was removed after the run; `absence.json` reported no leftovers; `/tmp/akr-e2e-plan*` deleted by the tier cleanup. The e2e file's `dropTrust` performs the same cleanup per run.
+Prior use under grants[1]: 0 prompted sessions (grant created at 19:27; all earlier launches
+recorded under grants[0], now spent). This seat: 0 prompted sessions, 0 bound units. No 13th
+prompted session occurred; no home file was touched (the agy wiring copies the leaf skill into
+the tier root's `.agents/skills`; no home link was repointed — the chart-door restoration is
+untouched).
 
 ## Plan-stage red evidence
 
-- `check watch-timer: 1` — `akrogon run-check --name watch-timer -- bun test --timeout=30000 tests/watch-timer.test.ts`, log `implementation/check-watch-timer-1795184538860-1159219.log`: all 8 tests fail. Criteria 1-9 cases fail at `watcher start failed: start exit=1 error: Module not found "skills/watch-issues/scripts/start.ts"` (or the timer/counterpart script); criterion-10 docs case fails on `/cron/` still present in SKILL.md. These are the missing-implementation reds; the same commands go green under implement.
-- `check watch-live-red: 1` — `akrogon run-check --name watch-live-red -- env AKROGON_E2E=watch-live AKROGON_E2E_KIND=claude AKROGON_E2E_SHAPE=root AKROGON_E2E_ROOT=/tmp/akr-e2e-plan AKROGON_E2E_OUT=/tmp/akr-e2e-plan-out WATCH_TICK_SECONDS=30 bun test --timeout=30000 ./tests/e2e/watch-live.e2e.ts`, log `implementation/check-watch-live-red-1795184582805-1194735.log`: the real claude watcher started, answered trust, loaded the skill on `watch-issues <root>`, which refused per today's Claude-cron text; the test then failed at `expect(timers1).toHaveLength(1)` (no labelled timer — missing timer path, criterion 11's intended red). This launch counts (1 of 8).
+- C14a red, free suite: case "stop kills the verified timer; stale and forged ticks run
+  nothing" — the stop tick logs bare `no-watch` instead of `no-watch <reason>`:
+  check-watch-timer-1795207363302-181494.log.
+- C14a red, stand-in root cell: hook line `tick exit=1 no-watch t=8` for the stale forged tick:
+  capture-watch-live-standin-root-302d6437-fec6-41dd-949c-d6c9c66ee4-out.log.
+- C15a red, free suite: docs case — SKILL.md carries `akrogon status <root>`:
+  check-watch-timer-1795207390930-194171.log.
+- Stand-in root (pre-fix variant) also red at the same line; shell cell green end to end
+  including unpause socket survival and agent-exit (e2e-standin-shell,
+  check-watch-live-standin-shell-1795208327387-862203.log).
+- Preflights green: pi check-watch-preflight-pi-1795208477688-974431.log, claude
+  1795208484064-984884, codex 1795208492469-987168, agy 1795208578735-1015463.
+
+## Known limitations
+
+- Compaction continuation unproven (skill-text rule).
+- Held-draft window untested (no hc surface, P8).
+- Codex/pi `/new` recorded, not asserted.
+- Paid-cell timer exit reasons unreadable after `--rm` (stated limit).
+- Live transcript flip unproven (free-tested only).
+
+## Restart boundaries
+
+Each live cell is one run-check; a rerun starts at `startWatchTier`'s leftovers check. The free
+suite reruns whole-file; stand-in cells share nothing between shapes. A slow-run leaf boundary
+note: no cell continues from another's state; a killed cell leaves `absent()` clean or fails the
+next cell's leftovers check.
+
+## Implementation notes
+
+- 2026-11-20 B check.repair: Exercise the simultaneous timer claim before validating the winning holder, as design item 6 Corrections 3–4 require.
+- 2026-11-20 A check.fix: Every cell and preflight of `tests/e2e/watch-live.e2e.ts` runs with `--test-name-pattern` naming its own case (`preflight`, `standin`, `real harness`), because all three cases register unconditionally and assert their env selectors. Executable check: a cell's run log shows `1 pass, 2 filtered out`.
+- 2026-11-20 A check.fix: Post-receipt waits in live cells are attributed by watcher turn (`waitCallAfter`: a `call <name>` at a turn newer than every logged call), because the receipt lands before the check call and a bare count can be satisfied by an earlier call still in flight (review-B F3/F5). Executable check: `bunx tsc --noEmit` and the stand-in cells pass.

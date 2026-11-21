@@ -1,25 +1,25 @@
 
  ▐▛███▛█   Claude Code v2.1.329
 ▝▜██████▀  Haiku 5.5 with low effort · Claude Ultra
- ▝▝   ▝▝   /tmp/akr-e2e/akr-e2e-watch-claude-shell sp
+ ▝▝   ▝▝   /var/tmp/akr-e2e-jwx691/akr-e2e-watch-claude-shell sp
 
 
-❯ watch-issues /tmp/akr-e2e/akr-e2e-watch-claude-shell sp
+❯ watch-issues /var/tmp/akr-e2e-jwx691/akr-e2e-watch-claude-shell sp
 
 ● Skill(watch-issues)
   ⎿  Loaded skill
 
-  Ran 4 shell commands · 1 failed
+  Ran 4 shell commands
 
-● Watch started on this repo (timer t2), and the first check ran.
+● The watch is running on this repo, and this first check started the plan step for the one leaf, watch-live-leaf.
 
-  - The repo is paused (akre2e (paused)), so this check observed and acted on nothing.
-  - The only leaf is watch-live-leaf at plan.synthesis, with no action taken.
-  - My first status call used the repo path and failed with "Missing leaf". Running akrogon status from the root with no argument worked.
-  - Future ticks will re-check status; the watch runs until watch-issues stop.
+  - Start: started t2. The 20-minute timer is live.
+  - Check: the repo is not paused. The leaf is in plan.synthesis with no seat running yet.
+  - Action: akrogon next watch-live-leaf returned started, not confirmed t3. I haven't seen the seat come up yet, so the next tick should confirm it.
 
-✻ Cogitated for 11s · done 6:59 PM
+  Stop with watch-issues stop <root>.
 
+✻ Brewed for 21s · done 10:21 PM
 
 
 
