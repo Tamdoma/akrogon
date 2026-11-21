@@ -456,6 +456,23 @@ test('a landed-main run failing the unit between the pair breaks it; a non-ances
   }
 });
 
+test('a green same-tree retry consumes the red before a later rebased run', async (): Promise<void> => {
+  const f: Fixture = await fixture();
+  try {
+    const [red, rebased]: Step[] = pair('bun test', 'same-patch');
+    const retryEnd: string = '2026-10-14T01:30:00.000Z';
+    const retry: Step = { ...rebased, tree: red.tree, end: retryEnd };
+    const steps: Step[] = [red, retry, rebased];
+    for (const [index, step] of steps.entries()) seedRun(f, run(f, step, index));
+
+    const result: Result = await cli(f, ['flaky']);
+    expect(result.code).toBe(0);
+    expect(result.stdout.split(' ')).toEqual(['1', retryEnd, 'test', 'alpha']);
+  } finally {
+    f.clean();
+  }
+});
+
 test('same-tree pairs count as today, with or without the new field', async (): Promise<void> => {
   const f: Fixture = await fixture();
   try {
