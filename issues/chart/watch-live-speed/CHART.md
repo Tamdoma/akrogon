@@ -40,3 +40,5 @@ none
 
 Handed off 2026-11-20: issues/open/watch-live-speed (pi-exec-tail, paid-red-stop); watch-timer corrections pending N1. Leaf review: slots/leaf-review-{b,c,e}.md, all fixes applied.
 watch-timer Corrections written 2026-11-20 after N1 (brief.md, design.md, readiness.yaml grants[1] and proofs P1-P3).
+
+Closed 2026-11-21: watch-timer merged at 13:09:59Z (origin/main aef8d79f); pi-exec-tail and paid-red-stop merged 2026-11-20. No open leaf remains from this chart.
