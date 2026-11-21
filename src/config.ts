@@ -23,16 +23,25 @@ const indexSchema = z.strictObject({
 export const globalSchema = z
   .strictObject({
     max_active: z.number().int().positive().default(3),
-    slots: z.strictObject({ a: slotConfigSchema, b: slotConfigSchema }),
+    slots: z.strictObject({ a: slotConfigSchema, b: slotConfigSchema, consultant: slotConfigSchema.optional() }),
     harnesses: z.record(text, text),
     toolkits: z.record(text, text).default({}),
     repos: z.record(text, text).default({}),
     prefixes: z.record(text, z.string().regex(/^[a-z]{2}$/, 'prefix must be two lowercase letters')).optional(),
   })
   .superRefine((config, ctx) => {
-    for (const slot of [config.slots.a, config.slots.b]) {
-      if (!Object.hasOwn(config.harnesses, slot.harness))
-        ctx.addIssue({ code: 'custom', message: `Missing harness template: ${slot.harness}` });
+    const named: Record<string, SlotConfig | undefined> = {
+      a: config.slots.a,
+      b: config.slots.b,
+      consultant: config.slots.consultant,
+    };
+    for (const [key, slot] of Object.entries(named)) {
+      if (slot !== undefined && !Object.hasOwn(config.harnesses, slot.harness))
+        ctx.addIssue({
+          code: 'custom',
+          path: ['slots', key],
+          message: `Missing harness template: ${slot.harness}`,
+        });
     }
   });
 
@@ -463,7 +472,14 @@ export async function effectiveConfig(cwd: string): Promise<string> {
     {
       ...global,
       ...withSetup(repoConfig),
-      slots: resolved === null ? global.slots : { a: resolved.a, b: resolved.b },
+      slots:
+        resolved === null
+          ? global.slots
+          : {
+              ...(global.slots.consultant === undefined ? {} : { consultant: global.slots.consultant }),
+              a: resolved.a,
+              b: resolved.b,
+            },
       repo: repo === null ? 'none' : repo.name,
       ...(repo !== null ? { worktree_store: worktreeStore(repo) } : {}),
       ...(repo !== null && top !== repo.root ? { AKROGON_BASE: await base(repo, cwd) } : {}),
