@@ -391,7 +391,7 @@ fi
 });
 
 // Criteria 3, 4, 8: per-due delivery with receipt before the check, busy dues, paused repo.
-test.serial('each due runs one check with its receipt first; busy dues each run their own check', async () => {
+test.serial('each due runs one check with its receipt first; busy dues coalesce to the latest', async () => {
   const f: HcFixture = await hcFixture();
   try {
     leaf(f, 'watch-leaf', 'plan.synthesis');
@@ -408,20 +408,29 @@ test.serial('each due runs one check with its receipt first; busy dues each run 
     const seen: number[] = tickLines(rig).map((l) => Number(/due=(\d+)/.exec(l)?.[1]));
     const nextDue: number = Math.max(...seen) + 1;
 
-    // Busy: hold the next status call ~2.5 intervals; the dues that accrue each run a check.
+    // Busy: hold the next status call ~2.5 intervals. Brief C4: the dues that accrue while the
+    // watcher works collapse into one unsent due at the latest boundary; it is sent once the
+    // watcher is idle, tick.ts accepts it and its check runs.
     writeFileSync(resolve(rig.flags, 'hold-status'), '5');
     await waitTick(rig, nextDue);
-    await waitTick(rig, nextDue + 1, 25_000);
-    await waitLabel(rig, nextDue + 1, 25_000);
+    const later = (): number[] =>
+      tickLines(rig)
+        .map((l) => Number(/due=(\d+)/.exec(l)?.[1]))
+        .filter((n: number) => n > nextDue);
+    for (let n: number = 0; n < 125 && later().length === 0; n += 1) await Bun.sleep(200);
+    const coalesced: number = Math.min(...later());
+    expect(coalesced).toBeGreaterThanOrEqual(nextDue + 2);
     expect(tickLines(rig, nextDue)).toHaveLength(1);
-    expect(tickLines(rig, nextDue + 1)).toHaveLength(1);
-    // The receipt lands before the check call, and the accept line carries the due's own turn:
-    // wait for the (nextDue+1)-th accept — the receipt can become visible before the hook
-    // writes it — then wait for `call status` at exactly that turn.
-    const accepts = (): string[] => hooks(rig).filter((l) => /tick exit=0 accept/.test(l));
-    for (let n: number = 0; n < 80 && accepts().length < nextDue + 1; n += 1) await Bun.sleep(200);
-    const heldTurn: string | null = / t=(\d+)/.exec(accepts()[nextDue] ?? '')?.[1] ?? null;
-    expect(heldTurn).not.toBeNull();
+    expect(tickLines(rig, nextDue + 1)).toHaveLength(0);
+    expect(tickLines(rig, coalesced)).toHaveLength(1);
+    await waitLabel(rig, coalesced, 25_000);
+    // The hook writes the accept line, then the receipt it read: the coalesced due's accept
+    // carries its turn, and that turn's `call status` is the check it ran.
+    const receiptAt = (): number => hooks(rig).findIndex((l) => l === `receipt=${coalesced}`);
+    for (let n: number = 0; n < 80 && receiptAt() < 0; n += 1) await Bun.sleep(200);
+    const accepted: string = hooks(rig)[receiptAt() - 1] ?? '';
+    expect(accepted).toMatch(/^tick exit=0 accept t=\d+$/);
+    const heldTurn: string = z.string().parse(/ t=(\d+)$/.exec(accepted)?.[1]);
     for (
       let n: number = 0;
       n < 80 && !calls(rig).some((l) => l.startsWith('call status') && l.endsWith(`t=${heldTurn}`));
@@ -430,9 +439,9 @@ test.serial('each due runs one check with its receipt first; busy dues each run 
       await Bun.sleep(200);
     expect(
       calls(rig).some((l) => l.startsWith('call status') && l.endsWith(`t=${heldTurn}`)),
-      `status call at held due's turn ${heldTurn}`,
+      `status call at the coalesced due's turn ${heldTurn}`,
     ).toBe(true);
-    // one status call per delivered due: start + due1 + the two accrued dues
+    // one status call per delivered due: start + due1 + the held due + the coalesced due
     expect(statusCalls(rig)).toBeGreaterThanOrEqual(4);
 
     // Paused: a due still counts delivered (receipt set) but acts on nothing. The no-next proof
@@ -1079,11 +1088,13 @@ test.serial('stop closes the watch consultant after the timer, tolerating none',
   try {
     const rig: Rig = await watchUp(f);
     rig.timer = await started(rig);
-    // No consultant live: the timer stops and the line stays the single `stopped <timer>`.
+    // No consultant live: stop prints the single line `stopped <timer>` (the hook appends
+    // ` t=<turn>` to stop's last output line).
     await send(rig, `watch-issues stop ${f.root}`);
     await waitHooks(rig, /stop exit=0 stopped/);
-    const plain: string | undefined = hooks(rig).findLast((l) => l.startsWith('stop exit=0'));
-    expect(plain ?? '').not.toContain('stopped consultant');
+    const plainAt: number = hooks(rig).findLastIndex((l) => l.startsWith('stop exit=0'));
+    expect(hooks(rig)[plainAt]).toMatch(new RegExp(`^stop exit=0 stopped ${rig.timer} t=\\S+$`));
+    expect(hooks(rig).slice(plainAt + 1).some((l) => l.startsWith('stopped consultant'))).toBe(false);
     await waitGone(f.core, rig.timer);
 
     // Restart, then a verified consultant and a same-named foreign one share the session.
@@ -1098,11 +1109,11 @@ test.serial('stop closes the watch consultant after the timer, tolerating none',
       name: `${rig.f.prefix}-watch-consult-x`,
     });
     await send(rig, `watch-issues stop ${f.root}`);
-    await waitHooks(rig, /stop exit=0 .*stopped consultant/, 20_000);
-    const stopped: string | undefined = hooks(rig).findLast((l) => l.startsWith('stop exit=0'));
-    expect(stopped ?? '').toContain(`stopped consultant ${mine}`);
-    // `stopped <timer>` precedes the consultant line in the same run's output.
-    expect((stopped ?? '').indexOf('stopped ')).toBeLessThan((stopped ?? '').indexOf('stopped consultant'));
+    await waitHooks(rig, `stopped consultant ${mine}`, 20_000);
+    // Brief C5: `stopped <timer>` is the first line, `stopped consultant <address>` the second.
+    const at: number = hooks(rig).findLastIndex((l) => l.startsWith('stop exit=0'));
+    expect(hooks(rig)[at]).toBe(`stop exit=0 stopped ${rig.timer}`);
+    expect(hooks(rig)[at + 1]).toMatch(new RegExp(`^stopped consultant ${mine} t=\\S+$`));
     await waitGone(f.core, rig.timer);
     await waitGone(f.core, mine);
     expect((await get(f.core, foreign)).state).toBe('live');
