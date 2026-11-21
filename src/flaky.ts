@@ -151,7 +151,7 @@ export async function flips(repo: Repo, runs: VerifyRun[]): Promise<Flip[]> {
     for (const item of run.commands) {
       if (item.reused !== undefined || item.blocked !== undefined) continue;
       const entry: Pending = { item, run };
-      const key: string = `${run.leaf}\0${run.tree}\0${item.command}`;
+      const key: string = `${run.tree}\0${item.command}`;
       const mergeKey: string = `${run.leaf}\0${item.name}\0${item.command}`;
       if (item.exit !== 0) {
         red.set(key, entry);
