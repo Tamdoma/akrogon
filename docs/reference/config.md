@@ -41,6 +41,7 @@ slots:
 harnesses:
   claude: claude --model {model} <other flags>
   codex: codex --model {model} <other flags>
+  agy: agy --model {model} --effort {effort} --mode auto
 toolkits:
   <language>: <runner>
 repos:
