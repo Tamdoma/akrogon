@@ -182,6 +182,17 @@ test('match reports open, closed and clear for a current signature', async () =>
   expect(different.stdout).toBe('clear');
 });
 
+test('a case ended by an operator resume stays closed on the same signature', async () => {
+  const r: Rig = await rig();
+  await r.leaf('leaf-one', { head: true });
+  const flags: string[] = ['--anchor', 'leaf-one', '--cause', 'blocked', '--leaf', 'leaf-one'];
+  const { dir }: NewCase = await newCase(r, flags);
+  statusOf(dir, 'resumed');
+  const matched: SpawnResult = await r.run(['match', r.root, ...flags]);
+  expect(matched.code).toBe(0);
+  expect(matched.stdout).toBe(`closed ${dir}`);
+});
+
 test('a moved base or leaf HEAD is clear; an unknown anchor matches unknown', async () => {
   const r: Rig = await rig();
   await r.leaf('leaf-one', { head: true });
