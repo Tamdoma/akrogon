@@ -201,6 +201,10 @@ test.serial(
         `HOME=${realHome}`,
         `PATH=${tier.shimBin}:${dirname(process.execPath)}:${z.string().parse(process.env.PATH)}`,
         `DBUS_SESSION_BUS_ADDRESS=unix:path=${tier.runtime}/bus`,
+        // The watcher's own consults.ts calls globalHome() directly — the akrogon shim's
+        // AKROGON_HOME only covers akrogon processes; without it case folders land in the
+        // real ~/.akrogon.
+        `AKROGON_HOME=${z.string().parse(tier.akrogonEnv.AKROGON_HOME)}`,
         `WATCH_TICK_SECONDS=${intervalSec}`,
         `AKROGON_E2E_ROOT=${leafTemp}`,
       ];
