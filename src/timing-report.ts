@@ -23,7 +23,7 @@ const STALL_MS: number = 24 * 60 * 60000;
 type AttemptRecord = z.infer<typeof attemptRecordSchema>;
 type Move = LogRecord['record'];
 type WaitKind = 'repo_pause' | Exclude<WaitReason, 'none'>;
-const waitOrder: WaitKind[] = ['repo_pause', 'parked', 'prerequisite', 'merge_turn'];
+const waitOrder: WaitKind[] = ['repo_pause', 'parked', 'prerequisite', 'merge_turn', 'capacity'];
 
 type Visit = {
   phase: HistoricalPhase;

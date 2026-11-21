@@ -19,7 +19,7 @@ const checkCore = {
   attempt: attempt.optional(),
 };
 
-const waitReasonSchema = z.enum(['prerequisite', 'parked', 'merge_turn', 'none']);
+const waitReasonSchema = z.enum(['prerequisite', 'parked', 'merge_turn', 'capacity', 'none']);
 export type WaitReason = z.infer<typeof waitReasonSchema>;
 
 export const timingEventSchema = z.discriminatedUnion('kind', [

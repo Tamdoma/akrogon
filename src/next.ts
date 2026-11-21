@@ -369,7 +369,8 @@ export async function emitEnvFile(repo: Repo, worktree: string, names: string[])
 async function activeCount(global: GlobalConfig, invocation: Invocation): Promise<number> {
   const registered: ReturnType<typeof registeredRepos> = registeredRepos(global, invocation);
   let total: number = registered.unknown ? global.max_active : 0;
-  const unfinished = (leaf: Leaf): boolean => leaf.state.phase !== 'merged' && leaf.state.phase !== 'failed';
+  const unfinished = (leaf: Leaf): boolean =>
+    leaf.state.phase !== 'merged' && leaf.state.phase !== 'failed' && leaf.state.phase !== 'merge';
   const seated = (leaf: Leaf): boolean =>
     unfinished(leaf) && (leaf.state.tab !== undefined || leaf.state.worktree !== undefined);
   for (const repo of registered.repos) {
@@ -758,7 +759,7 @@ async function dispatchLeaf(
     await checkBase(repo, mustCreate);
     if ((await ownPlace()) === null) return 'skipped';
     const allocated: Allocation | null = await allocate(global, repo, { path: leaf.path, state }, invocation);
-    if (allocated === null) return end('none');
+    if (allocated === null) return end('capacity');
     for (const slot of requiredSlots(allocated.state.phase, allocated.state.fix_rounds)) {
       const delivery: string = `${repo.name}/${slug}/${allocated.state.phase}/${slot}`;
       if (invocation.dispatched.has(delivery)) continue;
@@ -1168,7 +1169,10 @@ export async function seatCommand(slug: string, slot: Slot, task: string | undef
   await withLock(resolve(globalHome(), '.lock'), async () => {
     const leaf: Leaf = findLeaf(repo, slug);
     const allocated: Allocation | null = await allocate(global, repo, leaf, invocation);
-    if (allocated === null) throw new Error(`No free seat capacity: max_active ${global.max_active} reached`);
+    if (allocated === null)
+      throw new Error(
+        `No free seat capacity: max_active ${global.max_active} reached (leaves waiting in merge are not counted)`,
+      );
     const started: Started = await startSeat(
       global,
       repo,
