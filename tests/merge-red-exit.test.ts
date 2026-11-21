@@ -49,6 +49,19 @@ async function idleAll(f: GreenFixture): Promise<void> {
   for (const seat of await f.core.terminals({ akrogon: '1' }, false))
     await f.core.waitFor(seat.address, (t) => t.state === 'finished' || t.status?.state === 'idle');
 }
+// Holds open each seat turn whose task starts with `skill` until the returned release runs.
+function holdTurns(f: GreenFixture, skill: string): () => void {
+  const gate: string = resolve(f.core.standin, 'gate');
+  Bun.spawnSync(['mkfifo', gate]);
+  writeFileSync(
+    resolve(f.core.standin, 'hook'),
+    `#!/bin/sh\ncase "$2" in ${skill}*) cat ${gate} >/dev/null ;; esac\n`,
+    { mode: 0o755 },
+  );
+  return () => {
+    Bun.spawnSync(['sh', '-c', `echo go > ${gate}`]);
+  };
+}
 function attemptRows(f: Fixture): { outcome: string; attempt: string }[] {
   const file: string = resolve(f.root, 'issues/merge-attempts.jsonl');
   return existsSync(file)
@@ -100,6 +113,10 @@ async function commitIn(path: string, name: string, content: string, message: st
 }
 function toMerge(path: string, stamp: string = '2026-10-19T00:00:00.000Z'): void {
   saveState(path, { ...readState(path), phase: 'merge', merge_stamp: stamp });
+}
+function configure(f: Fixture, extra: object): void {
+  const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
+  yaml(resolve(f.home, 'config.yaml'), { ...global, ...extra });
 }
 async function claimed(f: GreenFixture, path: string): Promise<{ attempt: string; top: string }> {
   await idleAll(f);
@@ -325,10 +342,13 @@ test('a dirty holder worktree exits to check.repair keeping the edit', async () 
   const f: GreenFixture = await greenFixture({ ok: 'true' });
   try {
     const aa: string = await allocated(f, 'aa', 'issue-aa');
+    const bb: string = await allocated(f, 'bb', 'issue-bb');
     await commitIn(aa, 'aa-file', 'aa\n');
+    await commitIn(bb, 'bb-file', 'bb\n');
     const worktree: string = z.string().parse(readState(aa).worktree);
     writeFileSync(resolve(worktree, 'forgotten'), 'never committed\n');
-    toMerge(aa);
+    toMerge(aa, '2026-10-19T00:00:00.000Z');
+    toMerge(bb, '2026-10-20T00:00:00.000Z');
     await idleAll(f);
     expect((await next(f)).code).toBe(0);
     const state: State = readState(aa);
@@ -336,8 +356,10 @@ test('a dirty holder worktree exits to check.repair keeping the edit', async () 
     expect(state.batch).toBeUndefined();
     expect(state.merge_exit?.reason).toBe('dirty');
     expect(readFileSync(resolve(worktree, 'forgotten'), 'utf8')).toBe('never committed\n');
-    expect(landLaunches(f)).toEqual([]);
+    expect(landLaunches(f).filter((line) => line.includes('land aa '))).toEqual([]);
     expect(attemptRows(f).map((row) => row.outcome)).toEqual(['red']);
+    // The same pass freed the line: bb's land unit launched.
+    expect(landLaunches(f).filter((line) => line.includes('land bb --attempt'))).toHaveLength(1);
   } finally {
     await f.clean();
   }
@@ -455,6 +477,54 @@ test('a dead B seat of the exited leaf does not stall the next holder', async ()
     expect(b).not.toBe(bAddress);
     expect(f.core.tasks(b).some((text) => text.startsWith('check-issue aa'))).toBe(true);
   } finally {
+    await f.clean();
+  }
+}, 60000);
+
+// Criterion 4c: with no live seat of its own the repair dispatch obeys
+// max_active — the dead B is restarted only when the cap has room.
+test('a dead B seat restarts only when capacity has room', async () => {
+  const f: GreenFixture = await greenFixture({ bad: 'false' });
+  // bb's plan.synthesis seat stays busy-live and fills the whole cap.
+  const release: () => void = holdTurns(f, 'plan-issue');
+  try {
+    const aa: string = await allocated(f, 'aa', 'issue-aa');
+    const bb: string = await allocated(f, 'bb', 'issue-bb');
+    // cc's plan.synthesis seat stays busy-live and fills the whole cap; a merge
+    // leaf never counts toward max_active.
+    await allocated(f, 'cc', 'issue-cc');
+    await commitIn(aa, 'aa-file', 'aa\n');
+    await commitIn(bb, 'bb-file', 'bb\n');
+    expect((await cli(f, ['seat', 'aa', 'B'], f.root, f.env)).code).toBe(0);
+    // Kill both of aa's seats: the leaf then holds no live seat, so capacity
+    // governs the repair restart.
+    const bAddress: string = z.string().parse(readState(aa).seat.B?.address);
+    const addresses: string[] = [aa]
+      .flatMap((path) => [readState(path).seat.A?.address, readState(path).seat.B?.address])
+      .filter((address): address is string => address !== undefined);
+    for (const address of addresses) {
+      await f.core.hc(['kill', address]);
+      expect((await f.core.hc(['rm', address])).code).toBe(0);
+    }
+    configure(f, { max_active: 1 });
+    toMerge(aa, '2026-10-19T00:00:00.000Z');
+    toMerge(bb, '2026-10-20T00:00:00.000Z');
+    expect((await next(f)).code).toBe(0);
+    const attempt: string = z.string().parse(readState(aa).batch?.attempt);
+    expect((await land(f, 'aa', attempt)).code).toBe(0);
+    expect(readState(aa).phase).toBe('check.repair');
+    // At capacity the repair dispatch starts no terminal and delivers no
+    // prompt; the next holder still claimed its turn.
+    expect(prompts(f, 'check-issue')).toEqual([]);
+    expect(landLaunches(f).filter((line) => line.includes('land bb --attempt'))).toHaveLength(1);
+    // With room the dead B restarts on a later pass.
+    configure(f, { max_active: 5 });
+    expect((await next(f)).code).toBe(0);
+    const b: string = z.string().parse(readState(aa).seat.B?.address);
+    expect(b).not.toBe(bAddress);
+    expect(f.core.tasks(b).some((text) => text.startsWith('check-issue aa'))).toBe(true);
+  } finally {
+    release();
     await f.clean();
   }
 }, 60000);

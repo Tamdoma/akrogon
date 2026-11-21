@@ -219,6 +219,79 @@ test('a red head covered by an unresolved red on main lands on its first run wit
   }
 }, 60000);
 
+// An older covered head run on the same tree covers only its own failures: a new uncovered
+// failure on that tree exits to check.repair with the new run's id, and no cover or previous
+// run grants it a base pass.
+test('an older covered run does not hide a new failure on the same tree', async () => {
+  const f: GreenFixture = await greenFixture({ ok: 'true' });
+  try {
+    const marker: string = resolve(f.home, 'fail-beta');
+    const runner: string = `${JSON.stringify(process.execPath)} test regression.test.ts`;
+    writeFileSync(
+      resolve(f.root, 'regression.test.ts'),
+      `import { test, expect } from 'bun:test';
+import { existsSync } from 'node:fs';
+test('alpha', () => expect(false).toBe(true));
+test('beta', () => expect(existsSync(${JSON.stringify(marker)})).toBe(false));
+`,
+    );
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      checks: { test: runner },
+      grounding: 'none',
+    });
+    await command(['git', 'add', 'regression.test.ts', 'issues/config.yaml'], f.root);
+    await command(['git', 'commit', '-m', 'failing test'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    const before: string = await remoteTip(f);
+    const path: string = await allocated(f, 'aa', 'issue-aa');
+    await commitIn(path, 'aa-file', 'aa\n');
+    toMerge(path);
+    const { attempt, top } = await claimed(f, path);
+    const holderHead: string = z.string().parse(readState(path).batch?.holder.head);
+    const base: string = await command(['git', 'merge-base', top, 'origin/main'], f.root);
+    // The older completed head run on the returning leaf's branch head: red on alpha only.
+    const previous = seedRun(f, {
+      sha: holderHead,
+      tree: await command(['git', 'rev-parse', `${holderHead}^{tree}`], f.root),
+      scope: 'merge',
+      commands: [
+        {
+          name: 'test',
+          command: runner,
+          exit: 1,
+          log: resolve(f.home, 'head-red.log'),
+          failures: ['alpha'],
+        },
+      ],
+    });
+    writeFileSync(previous.commands[0].log, '(fail) alpha\n');
+    // A completed base run at the merge-base red on alpha alone: alpha is covered.
+    const baseLog: string = resolve(f.home, 'base-red.log');
+    writeFileSync(baseLog, '(fail) alpha\n');
+    seedRun(f, {
+      sha: base,
+      tree: await command(['git', 'rev-parse', `${base}^{tree}`], f.root),
+      scope: 'merge',
+      compares: previous.run,
+      commands: [{ name: 'test', command: runner, exit: 1, log: baseLog, failures: ['alpha'] }],
+    });
+    // beta joins alpha on the land run's verify: the new uncovered failure.
+    writeFileSync(marker, '');
+    expect((await land(f, 'aa', attempt)).code).toBe(0);
+    expect(await remoteTip(f)).toBe(before);
+    const state: State = readState(path);
+    expect(state.phase).toBe('check.repair');
+    expect(state.batch).toBeUndefined();
+    const heads = verifyRuns(f).filter((run) => run.sha === top);
+    expect(heads.map((run) => run.commands[0].failures)).toEqual([['alpha'], ['alpha', 'beta']]);
+    expect(state.merge_exit).toMatchObject({ reason: 'red', run: heads[1].run, top });
+    // The covered repeat earned no base pass: no compares row links the new run.
+    expect(verifyRuns(f).filter((run) => run.compares === heads[1].run)).toEqual([]);
+  } finally {
+    await f.clean();
+  }
+}, 60000);
+
 test('a clean restack is verified and pushed again with no seat', async () => {
   const f: HcFixture = await hcFixture();
   const script: string = await advancer(f, 'adv-file', 'adv');
