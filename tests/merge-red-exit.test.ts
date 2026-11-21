@@ -521,6 +521,36 @@ test('a slot-run merged or check.fix on a merge leaf is refused and merged --che
 
 // Criterion 9: an unchanged returning leaf whose uncovered failing units repeat
 // gets one base verdict in the same land run.
+test('an unchanged red leaf gets a base pass when main and the merge top stay put', async () => {
+  const f: GreenFixture = await greenFixture({ test: 'bun test main-red.test.ts' });
+  try {
+    const file: string = 'main-red.test.ts';
+    writeFileSync(
+      resolve(f.root, file),
+      "import { test, expect } from 'bun:test'; test('existing red title', () => expect(1).toBe(2));\n",
+    );
+    await command(['git', 'add', file], f.root);
+    await command(['git', 'commit', '-m', 'introduce named regression on main'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    const aa: string = await allocated(f, 'aa', 'issue-aa');
+    await commitIn(aa, 'aa-file', 'independent leaf edit');
+    toMerge(aa);
+    const first = await claimed(f, aa);
+    expect((await land(f, 'aa', first.attempt)).code).toBe(0);
+    expect(readState(aa).phase).toBe('check.repair');
+    await idleAll(f);
+    expect((await cli(f, ['phase', 'aa', 'merge', '--slot', 'B'], f.root, f.env)).code).toBe(0);
+    const second = await claimed(f, aa);
+    expect(second.top).toBe(first.top);
+    expect((await land(f, 'aa', second.attempt)).code).toBe(0);
+    expect(verifyRuns(f).filter((run) => run.compares !== undefined)).toHaveLength(1);
+    expect(readState(moved(aa)).phase).toBe('merged');
+    expect(await remoteTip(f)).toBe(second.top);
+  } finally {
+    await f.clean();
+  }
+}, 60000);
+
 test('a green row at the merge-base skips the base pass and exits with its run as the verdict', async () => {
   const f: GreenFixture = await greenFixture({ ok: 'true' });
   try {
