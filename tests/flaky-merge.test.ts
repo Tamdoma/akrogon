@@ -194,7 +194,15 @@ test('changed own commits, a different leaf, a fieldless row and a non-consecuti
       { tree: 'B1', command: 'c1', exit: 0, end: '2026-10-14T02:00:00.000Z', patch_id: 'p2' },
       ...pair('c2', 'same'),
       // A different leaf's green never pairs: no flip on c3, while c4 controls.
-      { tree: 'A3', command: 'c3', exit: 1, end: '2026-10-14T01:00:00.000Z', leaf: 'leaf', failures: ['alpha'], patch_id: 'p' },
+      {
+        tree: 'A3',
+        command: 'c3',
+        exit: 1,
+        end: '2026-10-14T01:00:00.000Z',
+        leaf: 'leaf',
+        failures: ['alpha'],
+        patch_id: 'p',
+      },
       { tree: 'B3', command: 'c3', exit: 0, end: '2026-10-14T02:00:00.000Z', leaf: 'other', patch_id: 'p' },
       ...pair('c4', 'same'),
       // A red row written before this change cannot prove unchanged commits: no flip on c5.
@@ -368,15 +376,18 @@ test('same-tree pairs count as today, with or without the new field', async (): 
       { tree: 'A', command: 'bun test', exit: 1, end: '2026-10-14T01:00:00.000Z', failures: ['alpha'] },
       { tree: 'A', command: 'bun test', exit: 0, end: '2026-10-14T02:00:00.000Z' },
       // A same-tree pair ignores the field entirely, even a mismatch that cannot occur for real rows.
-      { tree: 'B', command: 'bun run all', exit: 1, end: '2026-10-14T01:00:00.000Z', failures: ['beta'], patch_id: 'p1' },
+      {
+        tree: 'B',
+        command: 'bun run all',
+        exit: 1,
+        end: '2026-10-14T01:00:00.000Z',
+        failures: ['beta'],
+        patch_id: 'p1',
+      },
       { tree: 'B', command: 'bun run all', exit: 0, end: '2026-10-14T02:00:00.000Z', patch_id: 'p2' },
     ];
     const runs: VerifyRun[] = steps.map((step, index) => run(f, step, index));
-    expect(
-      (
-        await flakyLines(repo, runs)
-      ).sort((a, b) => a.test.localeCompare(b.test)),
-    ).toEqual([
+    expect((await flakyLines(repo, runs)).sort((a, b) => a.test.localeCompare(b.test))).toEqual([
       { name: 'test', test: 'alpha', count: 1, last: '2026-10-14T02:00:00.000Z' },
       { name: 'test', test: 'beta', count: 1, last: '2026-10-14T02:00:00.000Z' },
     ]);

@@ -74,10 +74,7 @@ type Pending = { item: Red; run: VerifyRun };
 // Nameless names say nothing about which unit failed, so only real titles flip across trees.
 function nameless(test: string): boolean {
   return (
-    test === '(no test name)' ||
-    test === '(log gone)' ||
-    test.startsWith('(script) ') ||
-    test.startsWith('(unnamed)')
+    test === '(no test name)' || test === '(log gone)' || test.startsWith('(script) ') || test.startsWith('(unnamed)')
   );
 }
 
@@ -97,7 +94,11 @@ export async function flips(repo: Repo, runs: VerifyRun[]): Promise<Flip[]> {
       landed.set(
         sha,
         object.code === 0 &&
-          (await isAncestor(repo.root, sha, (tip ??= await command(['git', 'rev-parse', trackingRef(repo)], repo.root)))),
+          (await isAncestor(
+            repo.root,
+            sha,
+            (tip ??= await command(['git', 'rev-parse', trackingRef(repo)], repo.root)),
+          )),
       );
     }
     return landed.get(sha)!;
@@ -126,8 +127,7 @@ export async function flips(repo: Repo, runs: VerifyRun[]): Promise<Flip[]> {
     const item: Red = prior.item;
     const tests: string[] = item.failures ?? (await failedTests(repo, item.log));
     if (prior.run.tree === green.run.tree) {
-      for (const test of tests)
-        out.push({ name: item.name, command: item.command, test, end: green.run.end! });
+      for (const test of tests) out.push({ name: item.name, command: item.command, test, end: green.run.end! });
       return;
     }
     if (
