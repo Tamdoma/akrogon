@@ -217,3 +217,108 @@ watch-live-agy-shell are unproven on the repaired head**: the bound permits no 9
 - watch-live-standin-root: pass (check-watch-live-standin-root-1795244063571-34338.log)
 - watch-live-standin-shell: pass (check-watch-live-standin-shell-1795244153880-73644.log)
 - `akrogon verify`: green on 1303b37b (check-test-1795245786925-773503.log)
+
+## check.fix pass 3 (2026-11-21, seat A, grants[3])
+
+Operator granted 3 agy sessions (readiness.yaml grants[3], `check_start` records named
+`watch-live-agy-*` after 2026-11-21T07:38:17Z whose log shows the tier started). Rebased onto
+origin/main 31a1ce85; AKROGON_BASE now 31a1ce85. Prior head 1303b37b; handed-off base
+31a1ce85, head 84c5a8d7.
+
+### Grant count lines (grants[3], bound 3)
+
+| # | launch | outcome |
+|---|--------|---------|
+| a1 | watch-live-agy-root | pass 5m56s, check-watch-live-agy-root-1795247097474-1447995.log |
+| a2 | watch-live-agy-shell | pass 4m05s, check-watch-live-agy-shell-1795247345464-1558064.log |
+
+Used: 2 of 3. Both agy cells now proven on the repaired head; all eight paid cells are green
+(claude g2/g4, codex g5/g6, pi g7/g8, agy a1/a2). `akrogon verify` green on head 84c5a8d7
+(check-test-1795247490937-1617503.log). No open operator actions remain.
+
+## check.fix pass 4 (2026-11-21, seat A, fix round 2)
+
+Reviewed head `4b8c1bc9`; handed-off head `90224f88` (base `31a1ce85`, one test commit).
+
+### Repairs
+
+- **F5 (test correction).** The busy-dues wait now waits for the (nextDue+1)-th `accept`
+  line and `call status` at exactly its turn; the receipt can precede the hook's accept, so
+  the previous "last accept" could pick the prior due's turn. Wrong-turn proof:
+  `check-watch-f5-red-1795248592393` (waiting `t=<turn>9` times out red).
+- **F3 (test correction).** `waitCallAfter` ("any newer turn") rejected the right call:
+  `watchTarget`'s `akrogon config` runs on the tick's own send turn before the receipt
+  stamps. `sentTurn` reads `due=<n> sent (turn=<t>)` off the timer screen; `waitDueCall`/
+  `waitCallAtTurn` anchor each check call at exactly its due's turn, and the held-due wait
+  asserts its send turn is after the busy due's. Deliberate `t+1` substitution red:
+  `check-watch-live-standin-shell-1795248389705`; green restore:
+  `check-watch-live-standin-shell-1795248472789`. The post-unpause `next` wait reverted to
+  count form: a due in flight when unpause lands can legitimately check while paused
+  (standin-root log shows `call status t=6` with no `next`), and paused checks never call
+  `next`, so `beforeNext + 1` is the right assertion.
+- **F9 (test correction).** `noLaterTick` replaces `noNewTicks`: it compares the maximum
+  `due=<n>` on screen before/after the window. Dues are monotone, so a bounded screen can
+  shrink but a genuinely new tick always raises the maximum; baselines sit after the timer
+  is gone (exit or stop), covering the S5a allowance for a tick already racing a shell exit.
+- **F4 (records).** The two kept free reproductions are the runs above (watch-f5-red and
+  the stand-in `t+1` run), plus the earlier wrapper-order and agy-import repros recorded
+  below in this file (shell transcripts captured inline; not a run-check pair). Selection
+  equivalence: every cell's log shows `1 pass, 2 filtered out`.
+
+### Proofs on head 90224f88 (all free)
+
+- `bun test tests/watch-timer.test.ts`: 11/11 green, check-watch-timer-1795248563141-2160825.log
+- stand-in root: green, check-watch-live-standin-root-1795248321799-2131382.log
+- stand-in shell: green, check-watch-live-standin-shell-1795248472789-2155180.log
+- `akrogon verify`: green on 90224f88, check-test-1795248728258-2190817.log
+
+### Open item
+
+- **Paid re-proof.** All eight paid cells were proven on `84c5a8d7`/`def416a0`, but commits
+  `90224f88` (turn-anchored waits + `noLaterTick`) changed the shared e2e inputs, so those
+  greens are stale for every cell that calls them (all eight). grants[2] is at 8/8 and
+  grants[3] has one agy-only unit left. A fresh grant covering the eight
+  `watch-live-<kind>-<shape>` cells (plus headroom for red-cause retries) is the operator
+  action, as review-B's Operator actions names.
+
+## check.fix pass 5 (2026-11-21, seat A, fix round 2 continued)
+
+Operator Q4/O1: the eight paid passes stand; a cell reruns only when its launch or the
+product changed, or its records cannot answer the new assertions. Head `d951b8d5`.
+
+### F4 recording-reuse analysis (per cell, against the F3/F5/F9 assertions)
+
+New assertions need dues bound to watcher turns (F3: `call <x>` at the due's own send turn,
+from the timer's `due=<n> sent (turn=<t>)` line) and a delivered-tick identity for
+stop/exit (F9: max `due=` on the post-window screen).
+
+| cell | timer screen kept | calls log kept | reusable? |
+|------|-------------------|----------------|-----------|
+| claude-root | no | yes (appears to be the older Nov-20 run; log ends t=5) | no |
+| claude-shell | no | yes | no |
+| codex-root | yes (`timer-screen-t2.txt`, turns 2–7 for dues 1–6) | yes | partial: F3 answerable (due1 t=2, held due3 t=4 > busy t=3; due4 paused t=5); F9 post-stop dues 4–6 scrolled off `stop-screen.txt` (max due 3), so stray check unanswerable |
+| codex-shell | no | yes | no |
+| pi-root | no | yes | no |
+| pi-shell | no | yes | no |
+| agy-root | no | yes | no |
+| agy-shell | no | yes | no |
+
+Seven of eight cells keep no timer screen, so dues cannot bind to turns from records
+alone; codex-root binds dues but its post-stop dues scrolled off the kept stop screen.
+Fix forward: `d951b8d5` records `timer-screen.txt` at the held-due check, `pre-exit-screen.txt`
+before the exit window and `post-stop-screen.txt` after stop, on every cell, so future runs
+answer the assertions. Assertion-only change under Q4: no rerun owed for it.
+
+### Proof this pass
+
+- Free suite: 11/11 green, check-watch-timer-1795253831489-2658516.log
+- stand-in root: green, check-watch-live-standin-root-1795253903770-2693302.log
+- stand-in shell: green, check-watch-live-standin-shell-1795253984208-2752810.log
+- agy-shell rerun under grants[3] unit 3/3: green, check-watch-live-agy-shell-1795254205176-2857403.log (records now kept: timer-screen.txt, pre-exit-screen.txt)
+- `akrogon verify`: green on d951b8d5, check-test-1795254348654-2945065.log
+
+### Open item
+
+- Paid re-proof on the current tests: seven cells (claude-root/shell, codex-root/shell,
+  pi-root/shell, agy-root) whose records cannot answer F3/F9. grants[3] is exhausted.
+  Operator action: a grant naming those cells (agy-shell already re-proven).

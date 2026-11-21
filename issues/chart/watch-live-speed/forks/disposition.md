@@ -84,3 +84,5 @@ S5, operator 2026-11-21, verbatim: "s5a that's perfectly fine. Just do it". S5a 
 Q3, operator 2026-11-21, verbatim: "grant 3 stop". Written as watch-timer readiness.yaml grants[3] (agy only, 3 prompted sessions, written stop) at 2026-11-21T07:38:17Z.
 
 Q4, operator 2026-11-21, verbatim: "o1 o1 for both". Taken: O1, the eight paid passes on 84c5a8d7 stand; assertion-only changes are reviewed against kept records; written into watch-timer design.md.
+
+Q5, operator 2026-11-21, verbatim: "grant 8 stop". Written as watch-timer grants[4] (seven named cells plus one spare, written stop) at 2026-11-21T11:44:19Z.

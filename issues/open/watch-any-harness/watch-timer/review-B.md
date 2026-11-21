@@ -102,3 +102,48 @@ Repair tree `d90008c4`, unchanged by frozen-path citation commit `6a4906d6`. The
 - B3 root `check watch-live-standin-root: 0`, `check-watch-live-standin-root-1795213745418-745755.log`.
 - B4 shell `check watch-live-standin-shell: 0`, `check-watch-live-standin-shell-1795213824984-768319.log`.
 - Both existing stand-in cells passed on the repair tree. Their recorded `absence.json` files show an empty `left` list, and both trust cleanup reads say no trust entries. Zero prompted sessions and zero paid bound units for this pass.
+
+## 2026-11-21 check.review after check.fix
+
+Base reviewed: `31a1ce850aa23c10023c5b4b696b8fa980865f1e`.
+Head reviewed: `4b8c1bc9fd09f730a41589f89583d5655e55292b`.
+Verdict: `fix`.
+
+Computed `git range-diff ceb444fa..6a4906d6 31a1ce85..4b8c1bc9`. All 29 previously reviewed commits are patch-equivalent. The repair adds five commits, of which the last is citation-only; no main commits were reviewed as repair. The configured green verification receipt `1ca9b918-b3dd-421d-a101-0a34fdd216e7` on `84c5a8d7` has the reviewed tree `abd67eb07332ac81ec966ae1cbfbdcdec2f9b610`. Format, typecheck and test all exited 0. The kept suite log has 1,244 passes and 0 failures.
+
+### Repair verdict
+
+- **F1 resolved for the new runs.** The previous overrun remains reconciled in the report. Grants[2] has exactly eight counted starts before grants[3], including the pre-prompt leftovers refusal under the grant's count rule. Grants[3] has exactly two qualifying agy starts, both under 10 minutes. The eight latest paid logs each pass their selected test and the eight cells record empty fixture-absence results. Review launched no paid or covered operations.
+- **F2 closed by the authorized S4a/S5a Corrections.** The new skill, guide and reference describe the done-watcher interruption and the concurrent shell-exit limit. The earlier product patches for F6–F8 are patch-equivalent across the rebase. The finished-watcher and transcript-move tests now read their specific reasons, and the current suite passes them. F7's case coverage is present.
+- **F3 still open — the new per-turn assertions reject the requested turn and can pass on a later due.** In `tests/e2e/watch-live.e2e.ts:253–264` the bound is the latest turn of *any* logged call, sampled after receipt at :910–911 and :936–938. A real tick runs `akrogon config` via `watchTarget` before it stamps its receipt, so its own turn normally already appears in the log. For example the current Claude root call artifact `e2e-claude-root/akr-e2e-watch-claude-root-calls.log` has config, status and next on turn 1, then the same actions on turns 2 and 3. Awaiting status with a strictly newer turn rejects the correct status on turn 1. The following next wait then also rejects any next on the status turn it just observed. In the normal tracked sequence the root cell can arm its busy hold after due 3 has already begun, then credit any later status to due 3. The green passes therefore do not prove criterion 11's due-1 status and waiting-leaf action on the same turn or the held due's one check after the busy turn. Match the expected due to its own turn from the existing hc/timer and receipt evidence and exercise a deliberate wrong-turn case before requesting fresh paid proof.
+- **F4 still open — current, kept proof is missing.** The selection of one existing `preflight`, `standin` or `real harness` test per cell is equivalent across the matrix; kept logs show both successes and failures still surface. However g2 (Claude root) ended at 06:48:27 UTC, before `1303b37b` changed the shared `noNewTicks` assertion at 06:52:54 UTC, which that same root test calls at :953. There is no later Claude root run. The implementation report also labels the older Codex-wrapper and agy-import free reproductions “kept outputs” but gives no log paths or paired run-check results, and there are no such check-end entries in the repair ledger. Preserve and cite the reproducible free red/green outputs. Use current evidence for affected live cases after correcting F3 and F9. Stand-in and preflight selection alone cannot show those paid-cell behaviors.
+- **F5 still open — the new free wait can read a previous accept.** In `tests/watch-timer.test.ts:413–427` `waitLabel` sees the new receipt before `tests/fixtures/watch-hook.sh` has to log its accept line. The test then reads the most recent accept once and can pick the previous turn with a status line already logged. Its loop exits immediately, reviving the original three-versus-four sampling race from the configured red `check-test-1795212291805-3269230.log`. Wait for the target accept before matching the status by that turn and assert the match, since an aggregate minimum can also be reached by a later due.
+- **F9 — the repair weakens the no-stray-tick proof after a normal stop.** The real Claude shell failure `check-watch-live-claude-shell-1795243950255-4011524.log` shows the exit redraw dropped the visible count from four to zero. That rules out equality across a shell redraw, but `84c5a8d7` uses `count <= baseline` for all cases, including the root stop at `tests/e2e/watch-live.e2e.ts:947–953`. The bounded screen can lose old lines and gain a different due while its count shrinks or stays equal. The real transcript of Claude root also shows that the count includes the model repeating the command form. Replacing an old visible line with a new tick therefore passes. Criterion 11 still requires no stray tick on ordinary stop. Record the identity of the delivered ticks or an append-only delivery observation, and preserve the authorized S5a limit for sends already racing a shell exit.
+
+### Operator actions
+
+- **F4 live re-proof.** Review used the eight grants[2] starts and two grants[3] starts in the local timing ledger and read their output. There is no authorized Claude-root retry under those entries. One agy-only start is available, which cannot cover Claude or a full matrix after the proof changes. Once the free gates pass, record a fresh grant for the specific affected cases that the existing recordings cannot prove.
+
+### Test-Change trailers
+
+- `50bf2579` tests/watch-timer.test.ts cites F5 and criterion 14. The finished and moved transcript cases test the named reasons. The changed F5 wait has the race recorded above.
+- `cbc2e26a` tests/e2e/watch-live.e2e.ts cites F3, F5 and the exit observation. These sources require matching the exact due, which the new later-turn helper fails to do.
+- `84c5a8d7` tests/e2e/watch-live.e2e.ts cites the real Claude shell redraw. The source supports changing the shell assertion, and does not support treating a live root's visible tick count as monotonic. See F9.
+- `4b8c1bc9` supplies the three frozen documentation citations for `1dd24e96`, supported by the operator's S4a/S5a Corrections and criterion 10.
+
+I also recomputed the implementation report's original review range with `git range-diff ceb444fa..800000fb 31a1ce85..84c5a8d7`; it agrees with the split above. B reran the exact planned free command after configured setup: `akrogon run-check --name watch-timer -- bun test --timeout=30000 tests/watch-timer.test.ts`. `check watch-timer: 0`, `check-watch-timer-1795247737911-1991876.log`, read back with `akrogon log`. All 11 cases passed. That result verifies the current free cases and does not remove F5's reachable scheduling race.
+
+## 2026-11-21 check.repair, second round
+
+Repair input `4b8c1bc9fd09f730a41589f89583d5655e55292b` from the latest B review. Worktree and proof inputs are unchanged. F3, F5 and F9 are corrections to existing test expectations. F4 is missing kept proof through the existing runner. The B seat found no product or docs fix in this round, so there is no B commit or proof rerun. The old capture pairs each have a clearance record. Zero paid launches; the grants ledger remains 8/8 for grants[2] and 2/3 for agy-only grants[3].
+
+### Handed to A
+
+- **F3** — Existing test expectation, criterion 11. In `tests/e2e/watch-live.e2e.ts`, anchor each receipt and check to the exact due and hc turn. The timer already logs the due and send turn, and the wrapper records calls with their turn. Verify status and the waiting-leaf action share the due-1 turn and the held due starts after the identified busy turn. A deliberately substituted later turn should fail the free proof.
+- **F4** — Missing captures and a current recording, criteria 11–13 and plan D11. Use `akrogon run-check` to keep the free red/green evidence for the Codex wrapper's interrupted hold and agy workspace script import. Compare the actual live recording revisions with the corrected tests, including Claude root's shared assertion, and identify precisely which live outputs can be reused before asking for the rest.
+- **F5** — Existing test expectation, criterion 4. With the current stand-in task, hook and wrapper logs, wait for the target due's accept before using its turn, then assert that exact turn's status call. The receipt can become visible before the hook writes accept.
+- **F9** — Existing test expectation, criterion 11. For an ordinary stop, observe delivered tick identities through the existing hc recording tools. A bounded screen count can shrink while receiving a different tick. Keep the S5a allowance for a send already racing a shell exit.
+
+### Operator actions still open
+
+- **F4 live re-proof.** Grants[2] is exhausted and the spare grants[3] unit is agy-only. If the repaired test needs a fresh Claude-root or other out-of-grant live run, the operator must record a grant identifying the affected cells after the free cases and recording review. A owns the doable fixes and the stop if that authorization is still needed afterward.

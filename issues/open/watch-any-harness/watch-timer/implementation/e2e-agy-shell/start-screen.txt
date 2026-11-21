@@ -1,21 +1,22 @@
 
-akr-e2e-watch-agy-shell sp main ? ❯ sh '/var/tmp/akr-e2e-dhvEhu/launch-agy-shell.sh'
+akr-e2e-watch-agy-shell sp main ? ❯ sh '/var/tmp/akr-e2e-Pz0Eyk/launch-agy-shell.sh'
 
 
-      ▄▀▀▄        Antigravity CLI 1.5.13
+
+      ▄▀▀▄        Antigravity CLI 1.5.14
      ▀▀▀▀▀▀       authoritly@gmail.com (Google AI Ultra)
     ▀▀▀▀▀▀▀▀      Gemini 3.8 Flash (Low)
-   ▄▀▀    ▀▀▄     /var/tmp/akr-e2e-dhvEhu/akr-e2e-watch-agy-shell sp
+   ▄▀▀    ▀▀▄     /var/tmp/akr-e2e-Pz0Eyk/akr-e2e-watch-agy-shell sp
   ▄▀▀      ▀▀▄
 
 ────────────────────────────────────────────────────────────
-> watch-issues /var/tmp/akr-e2e-dhvEhu/akr-e2e-watch-agy-shell sp
+> watch-issues /var/tmp/akr-e2e-Pz0Eyk/akr-e2e-watch-agy-shell sp
 
 ● Explored 1 file (SKILL.md)
-● Ran 2 commands (+1 · cd "/var/tmp/akr-e2e-dhvEhu/akr-e2e-watch-agy-shell sp" && akrogon status) (ctrl+o to expand)
+● Ran 2 commands (+1 · akrogon status) (ctrl+o to expand)
 
   started t2
-  akre2e: watch-live-leaf at plan.synthesis
+  akrogon status: e2e/watch-live-leaf plan.synthesis
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 >

@@ -14,7 +14,7 @@ lost:
   A: 0
   B: 0
 done: []
-fix_rounds: 1
+fix_rounds: 2
 verdict: {}
 tab: ak97a87dd1e8f228c3d53cd247106328
 worktree: /home/ivan/.akrogon/worktrees/akrogon/watch-timer
@@ -35,7 +35,7 @@ failure:
   cause: blocked
   phase: check.fix
   slot: A
-  reason: "grants[2] exhausted at 8/8 check_start records; watch-live-agy-root and watch-live-agy-shell unproven on the repaired head — a fresh grant for the two agy cells is the operator action; see implementation/report.md check.fix pass 2"
+  reason: "grants[3] exhausted at 3/3; seven paid cells' kept records cannot answer the F3/F9 assertions (no timer screens kept pre-d951b8d5) — a grant naming claude-root/shell, codex-root/shell, pi-root/shell and agy-root is the operator action; agy-shell re-proven; see implementation/report.md check.fix pass 5"
   delivery: shown
 frozen:
   docs/pictures/watch-loop.svg: ca07e92b83fa975985888a4be19f211395d18fc2

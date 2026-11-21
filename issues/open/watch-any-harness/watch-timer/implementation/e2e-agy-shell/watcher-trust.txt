@@ -1,6 +1,6 @@
 Accessing workspace:
 
-/var/tmp/akr-e2e-dhvEhu/akr-e2e-watch-agy-shell sp
+/var/tmp/akr-e2e-Pz0Eyk/akr-e2e-watch-agy-shell sp
 
 Do you trust the contents of this project?
 
@@ -10,6 +10,6 @@ Antigravity CLI requires permission to read, edit, and execute files here.
   No, exit
 
   ↑/↓ Navigate · enter Confirm
-                                                                                                                                                                           auto · Gemini 3.8 Flash · low
+                                                                                                                                                                                  Gemini 3.8 Flash · low
 
 keys: enter

@@ -105,6 +105,32 @@ grants:
     effects: paid model usage on the operator's agy account; local files under the leaf temp, the trust entries above, and agy's own conversation records in the operator's home, kept like any session; no skill link or other home file changed; no push, GitHub or other outside write
     bounds: at most 3 agy sessions that receive a prompt, counted as check_start records in issues/timings.jsonl for slug watch-timer named watch-live-agy-* with ts after 2026-11-21T07:38:17Z whose log shows the tier started (a run that fails before any harness launches does not count); each session ends within 10 minutes of its launch
     stop_line: no 4th prompted agy session under this grant; no claude, codex or pi launch under this grant; no write outside the leaf temp, the akr-e2e-watch session, the trust entries the runs created and agy's own session records
+  - approved:
+      by: operator
+      date: '2026-11-21'
+      answer: '"grant 8 stop" (8 prompted sessions to re-run claude-root, claude-shell, codex-root, codex-shell, pi-root, pi-shell and agy-root, plus one spare, each ending within 10 minutes, a written stop at the bound; issues/chart/watch-live-speed/forks/disposition.md Q5)'
+    principal: the leaf's implementing seat running the live re-proof through akrogon run-check
+    account: operator's logged-in harness accounts on this host (claude, codex, pi devin, agy Google AI Ultra)
+    credential:
+      name: existing harness logins in the operator's home (no repo env key)
+      holder: operator home
+    targets: [claude CLI, codex CLI, pi CLI, agy CLI]
+    fixtures:
+      - account: local host
+        purpose: throwaway watch tier for the seven named cells
+        marker: hc session akr-e2e-watch; registered roots in the tier's own worktree folder under the leaf temp named akr-e2e-watch-<kind>-*
+        naming: akr-e2e-watch-<kind>-<run>
+        count: 8
+        cleanup:
+          - step: stopWatchTier kills and removes every terminal of akr-e2e-watch, stops its core, removes its state and every recorded folder
+            identity: the leaf's implementing seat
+          - step: remove the folder-trust entries the runs saved for their roots (codex ~/.codex/config.toml [projects."<root>"], agy ~/.gemini/antigravity-cli/settings.json trustedWorkspaces, claude ~/.claude.json projects entry)
+            identity: the leaf's implementing seat
+        absence_check: watch-tier absent() returns no paths (no hc call after stop, which would start a core); no trust entry names an akr-e2e root
+    operations: [launch claude, codex, pi and agy watcher sessions in akr-e2e-watch for the named cells, hc send, hc keys, hc read, hc get, hc label, hc kill, hc rm, the checkout's akrogon through the tier shim]
+    effects: paid model usage on the operator's accounts; local files under the leaf temp, the trust entries above, and the session records each harness writes in the operator's home on every launch, kept like any session; no skill link or other home file changed; no push, GitHub or other outside write
+    bounds: at most 8 harness sessions that receive a prompt, only for cells watch-live-claude-root, watch-live-claude-shell, watch-live-codex-root, watch-live-codex-shell, watch-live-pi-root, watch-live-pi-shell and watch-live-agy-root; counted as check_start records in issues/timings.jsonl for slug watch-timer with those names and ts after 2026-11-21T11:44:19Z whose log shows the tier started; each session ends within 10 minutes of its launch; every cell keeps its timer screen
+    stop_line: no 9th prompted session under this grant; no watch-live-agy-shell launch under this grant; no write outside the leaf temp, the akr-e2e-watch session, the trust entries the runs created and the harnesses' own session records; no session on another account or model provider than the logged-in ones
 retained: []
 proofs:
   - operation: hc run --bg child of the starting terminal; parent-exit rule
