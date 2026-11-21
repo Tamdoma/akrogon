@@ -123,7 +123,7 @@ Exact shapes are in [src/state.ts](../../src/state.ts).
 - `at` is when it failed.
 - An entry written before hc seats keeps its old shape (`command`, `code`, `message`, `pane`, `session`, `offset`) and still parses.
 
-`batch` (`batchSchema`) belongs to the leaf holding the merge turn. The merge turn creates it, and the reconcile step in `akrogon next` removes it once the push is settled:
+`batch` (`batchSchema`) belongs to the leaf holding the merge turn. The merge turn creates it, and the reconcile step in `akrogon next` removes it once the push is settled. A record with no `candidate` is dropped when the leaf leaves `failed`, so the merge turn rebuilds on the current base:
 
 - `attempt` is the id every `merged` and `check.fix` call must repeat with `--attempt`.
 - `started` and `pressure_start` are the start time and a CPU, memory and IO pressure reading.

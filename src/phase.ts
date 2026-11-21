@@ -210,10 +210,19 @@ export async function commitMove(
     leaf.path,
     to === 'merged' || leavingFailed ? await clearBusyNotices(repo, leaf.path, recorded) : recorded,
   );
+  // A batch with no candidate holds nothing pushed for reconcile to settle, so leaving failed
+  // drops it and the merge turn rebuilds on the current base; a batch holding a candidate keeps
+  // its landed/unlanded read in reconcileBatch.
+  const resumedBatch: Batch | undefined =
+    leavingFailed && recorded.batch !== undefined
+      ? recorded.batch.candidate === undefined
+        ? undefined
+        : { ...recorded.batch, notified: undefined }
+      : recorded.batch;
   const after: State = {
     ...cleared,
     phase: to,
-    batch: leavingFailed && recorded.batch !== undefined ? { ...recorded.batch, notified: undefined } : recorded.batch,
+    batch: resumedBatch,
     done: [],
     verdict: {},
     prompted: {},
