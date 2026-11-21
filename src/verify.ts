@@ -133,8 +133,17 @@ async function patchBase(repo: Repo, sha: string, tree: string): Promise<string 
   return (await treeOf(repo, base.stdout)) === tree ? undefined : base.stdout;
 }
 
+async function replayTree(cwd: string, base: string, onto: string, head: string): Promise<string | undefined> {
+  const argv: string[] = ['git', 'merge-tree', '--write-tree', '--no-messages', `--merge-base=${base}`, onto, head];
+  const replay: Result = await run(argv, cwd);
+  if (replay.code === 1) return undefined;
+  if (replay.code !== 0) throw new CommandError(argv, cwd, replay);
+  return replay.stdout;
+}
+
 // Replay the current change onto the previous merge base. The previous top may
-// have been evicted, so compare with its tree ID saved in the receipt.
+// have been evicted. Confirm both tree IDs so neither replay can lose a change
+// already present on the destination base.
 async function inheritedPatchId(repo: Repo, current: VerifyRun, runs: VerifyRun[]): Promise<string | undefined> {
   const base: string | undefined = current.patch_base;
   if (base === undefined || current.scope !== 'merge' || current.compares !== undefined || !completed(current))
@@ -152,19 +161,9 @@ async function inheritedPatchId(repo: Repo, current: VerifyRun, runs: VerifyRun[
   const anchor: Result = await run(priorBase, repo.root);
   if (anchor.code === 1) return undefined;
   if (anchor.code !== 0) throw new CommandError(priorBase, repo.root, anchor);
-  const argv: string[] = [
-    'git',
-    'merge-tree',
-    '--write-tree',
-    '--no-messages',
-    `--merge-base=${base}`,
-    anchor.stdout,
-    current.sha,
-  ];
-  const replay: Result = await run(argv, repo.root);
-  if (replay.code === 1) return undefined;
-  if (replay.code !== 0) throw new CommandError(argv, repo.root, replay);
-  return replay.stdout === previous.tree ? previous.patch_id : undefined;
+  const priorTree: string | undefined = await replayTree(repo.root, base, anchor.stdout, current.sha);
+  if (priorTree !== previous.tree) return undefined;
+  return (await replayTree(repo.root, anchor.stdout, base, priorTree)) === current.tree ? previous.patch_id : undefined;
 }
 
 function sameCommands(actual: readonly NamedCommand[], expected: readonly NamedCommand[]): boolean {
