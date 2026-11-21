@@ -267,12 +267,13 @@ test.serial(
       tier.record('watcher-screen.txt', await screen(tier, watcher, 200));
       tier.record('watcher-transcript.txt', (await transcriptFor({ session, address: watcher })) ?? 'none');
       expect(resumed).toContain(phase);
-      // The case close trails the resume: `akrogon next` and the record write finish first,
-      // then the watch closes the consultant on the same beat.
+      // The case close trails the resume by the whole `akrogon next` start proof (a codex
+      // seat's folder-trust dialog keeps it at the full wait) — give it the run's remaining
+      // time minus the record-and-teardown reserve.
       const closed: Term | null = await waitLabelled(
         tier,
         { 'akrogon.watch-consult': 'akre2e' },
-        Math.min(120_000, Math.max(15_000, deadline - Date.now() - 3 * 60_000)),
+        Math.min(240_000, Math.max(15_000, deadline - Date.now() - 90_000)),
       );
       expect(closed, `consultant still live after resume\n${await screen(tier, watcher, 60)}`).toBeNull();
 
@@ -304,6 +305,11 @@ test.serial(
           heads: z.record(z.string(), z.string()),
         })
         .parse(JSON.parse(readFileSync(resolve(caseDir, 'signature.json'), 'utf8')));
+      tier.record('case-signature.json', signature);
+      for (const turn of readdirSync(caseDir).filter((f) => f.startsWith('turn-')))
+        tier.record(`case-${turn}`, readFileSync(resolve(caseDir, turn), 'utf8'));
+      tier.record('case-brief.md', readFileSync(resolve(caseDir, 'brief.md'), 'utf8'));
+      tier.record('case-case.md', readFileSync(resolve(caseDir, 'case.md'), 'utf8'));
       expect(signature.anchor).toBe(SLUG);
       const turns: string[] = readdirSync(caseDir).filter((f) => /^turn-\d+-(watch|consultant)\.md$/.test(f));
       expect(turns.some((f) => f.includes('watch'))).toBe(true);
