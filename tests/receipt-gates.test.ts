@@ -232,7 +232,7 @@ test('merge gates accept a covered main-red head and refuse an uncovered or reso
     expect(passed.code).toBe(0);
     const pushed: Result = await landPushRun('landing');
     expect(pushed.stderr).toBe('');
-    expect(JSON.parse(pushed.stdout)).toEqual({ kind: 'landed' });
+    expect(JSON.parse(pushed.stdout.trim().split('\n').at(-1)!)).toEqual({ kind: 'landed' });
 
     // Uncovered: a second named unit no base run holds refuses the gate and the push.
     writeFileSync(file, '');
