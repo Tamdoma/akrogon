@@ -545,7 +545,10 @@ async function startCell(cell: Cell): Promise<Term> {
     await settleIdle(cell.tier, watcher, 60_000);
   }
   cell.tier.record('start-screen.txt', await screen(cell.tier, watcher));
-  return verifiedTimer(cell);
+  const timer: Term = await verifiedTimer(cell);
+  // Every cell keeps its timer's screen (grant bound), not only at the held-due check.
+  cell.tier.record('timer-screen.txt', await screen(cell.tier, timer.address));
+  return timer;
 }
 
 // One live labelled terminal named aw-watch whose argv runs the leaf's timer.ts by absolute
