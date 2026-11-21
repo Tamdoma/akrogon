@@ -1,14 +1,14 @@
-// watch-consults criteria 1-2, the paid attended run under readiness grants[0] (at most 6
-// harness sessions for the leaf, watchers and consultants each counted, each ending within 15
-// minutes): a real watcher in the akr-e2e-watch tier meets a staged notify-only failure
+// watch-consults criteria 1-2, the paid attended run under readiness grants[1] (at most 4
+// harness sessions from its approval, watchers and consultants each counted, each ending within
+// 15 minutes): a real watcher in the akr-e2e-watch tier meets a staged notify-only failure
 // (failed=blocked@check.review after two unproductive cycles, a base-red repo check), starts
 // its consultant with `akrogon seat --watch-consultant` from the machine slots.consultant
 // recipe, exchanges a turn file over hc send inside its own turn, lets the consultant fix the
 // base and push fast-forward, resumes the leaf with `akrogon phase` + `akrogon next`, writes
 // the case record and its signature, notices the push and the move non-attention, and closes
-// the consultant.
-// Sessions per run: watcher (pi), consultant (agy neon high, the N2 default recipe), the
-// resumed leaf's seat A (codex) — 3, leaving 3.
+// the consultant before the resume.
+// Sessions per run: watcher (pi), consultant (agy neon high, the N2 default recipe) — 2; the
+// resumed leaf's seat A is the tier stand-in (grants[1]: slots a/b use it), no paid session.
 // Run: akrogon run-check --name watch-consults -- env AKROGON_E2E=watch-consults
 //      AKROGON_E2E_ROOT=<leaf temp> AKROGON_E2E_OUT=<leaf>/implementation/watch-consults-e2e
 //      WATCH_TICK_SECONDS=15
@@ -20,7 +20,7 @@ import { z } from 'zod';
 import { waitFor, type Seen } from '../../src/hc';
 import { command, spawnCaptured, type SpawnResult } from '../../src/shell';
 import { transcriptFor } from '../../src/transcript';
-import { answerTrust, realHome, required } from './tier';
+import { realHome, required } from './tier';
 import { observeReady, session, startWatchTier, stopWatchTier, type WatchTier } from './watch-tier';
 
 const skill: string = resolve(import.meta.dir, '../../skills/watch-issues');
@@ -157,12 +157,12 @@ test.serial(
     const tier: WatchTier = await startWatchTier(
       name,
       {
-        a: { harness: 'codex', model: 'gpt-6.1-sol', effort: 'low' },
-        b: { harness: 'codex', model: 'gpt-6.1-sol', effort: 'low' },
+        a: { harness: 'fake', model: 'work', effort: 'low' },
+        b: { harness: 'fake', model: 'work', effort: 'low' },
         consultant: { harness: 'agy', model: 'neon', effort: 'high' },
       },
       {
-        codex: 'codex --no-daemon -m {model} -c model_reasoning_effort={effort} -a never -s danger-full-access',
+        fake: 'fake --model {model} --effort {effort}',
         agy: 'agy --model {model} --effort {effort} --mode auto',
         pi: 'pi --model {model} --thinking {effort} -a --exclude-tools request_user_input',
       },
@@ -262,17 +262,18 @@ test.serial(
       expect(consultant!.labels['akrogon.repo']).toBe('akre2e');
       tier.record('consultant.json', consultant);
 
-      // The fix lands: the leaf resumes out of failed and the consultant is closed.
+      // The fix lands: the leaf resumes out of failed, and the case end already closed the
+      // consultant (hc kill + rm) before the resume commands ran.
       const resumed: string[] = ['check.fix', 'check.review', 'check.repair'];
       while (!resumed.includes(statePhase(tier.root, SLUG)) && Date.now() < deadline) await Bun.sleep(5000);
       const phase: string = statePhase(tier.root, SLUG);
+      const closed: Term | null = await waitLabelled(tier, { 'akrogon.watch-consult': 'akre2e' }, 1000);
       tier.record('watcher-screen.txt', await screen(tier, watcher, 200));
       tier.record('watcher-transcript.txt', (await transcriptFor({ session, address: watcher })) ?? 'none');
       expect(resumed).toContain(phase);
+      expect(closed, `consultant still live after resume\n${await screen(tier, watcher, 60)}`).toBeNull();
 
-      // The leaf's seat A starts on the resumed phase (akrogon next dispatched it); answer its
-      // folder-trust dialog so the start proof — which the watcher's turn is inside — returns
-      // quickly instead of holding the proof window.
+      // The leaf's seat A (the tier stand-in) starts on the resumed phase: akrogon next dispatched it.
       const seat: Term | null = await waitLabelled(
         tier,
         { 'akrogon.leaf': SLUG, 'akrogon.seat': 'a' },
@@ -280,16 +281,6 @@ test.serial(
       );
       tier.record('seat.json', seat);
       expect(seat, `no leaf seat after resume to ${phase}`).not.toBeNull();
-      await answerTrust(tier, 'codex-seat', async () => seat!.address, 'Trust and continue', Bun.sleep(90_000));
-
-      // The case close trails the resume: the watcher's turn finishes `next`, then closes the
-      // consultant (hc kill + rm) on the same beat.
-      const closed: Term | null = await waitLabelled(
-        tier,
-        { 'akrogon.watch-consult': 'akre2e' },
-        Math.min(180_000, Math.max(15_000, deadline - Date.now() - 90_000)),
-      );
-      expect(closed, `consultant still live after resume\n${await screen(tier, watcher, 60)}`).toBeNull();
 
       // The case record: folder under <AKROGON_HOME>/watch/<repo>/consults/<case-id>/,
       // signature parses, the recorded turn files exist, the pushed base is fast-forward.
