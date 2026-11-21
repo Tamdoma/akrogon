@@ -38,7 +38,7 @@ test('solo cleanup command retires a union-resurrected lesson in a consumer repo
     const bin: string = resolve(f.home, 'bin');
     mkdirSync(bin);
     symlinkSync(entry, resolve(bin, 'akrogon'));
-    const invocation: string = readFileSync(resolve(import.meta.dir, '../skills/merge-issue/SKILL.md'), 'utf8')
+    const invocation: string = readFileSync(resolve(import.meta.dir, '../skills/check-issue/SKILL.md'), 'utf8')
       .split('\n')
       .find((line) => line.startsWith('bun -e '))!
       .replaceAll('<remote>/<default_branch>', 'origin/main');
