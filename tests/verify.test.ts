@@ -1027,7 +1027,12 @@ test('a landed run that drops the unit and fails only named tests resolves the m
     await commitIn(w2, 'b.ts');
     expect((await cli(f, ['verify', '--known-red'], w2, env)).code).toBe(0);
     expect(noticeFiles(core)).toHaveLength(2);
-    expect(first.run).not.toBe(baseRecord(f, records(f).at(-1)!).run);
+    const second: VerifyRun = baseRecord(
+      f,
+      records(f).findLast((run) => run.compares === undefined && run.sha !== base)!,
+    );
+    expect(second.run).not.toBe(first.run);
+    expect(second.notice).toBe('pending');
   } finally {
     await core.stop();
     f.clean();

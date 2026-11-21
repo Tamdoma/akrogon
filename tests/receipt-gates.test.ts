@@ -167,7 +167,9 @@ test('merge gates accept a covered main-red head and refuse an uncovered or reso
   try {
     const { worktree, head } = await branch(f, 'landing');
     const builtOn: string = await command(['git', 'rev-parse', 'origin/main'], f.root);
-    const path: string = leaf(f, 'landing', 'merge', { worktree, merge_stamp: '2026-10-05T00:00:00.000Z' });
+    // Each landing leaf gets its own container: a moved leaf leaves
+    // issues/closed/<container>, which twin-blocks later siblings in it.
+    const path: string = leaf(f, 'landing', 'merge', { worktree, merge_stamp: '2026-10-05T00:00:00.000Z' }, 'cov1');
     const record: Batch = {
       attempt: 'a1',
       built_on: builtOn,
@@ -184,7 +186,12 @@ test('merge gates accept a covered main-red head and refuse an uncovered or reso
     const repo: Repo = readRepo(f.repo, f.root);
     const cmds: { name: string; command: string }[] = verifyCommands(repo.config, 'merge');
     const entries = (exit: number, failures: string[]): VerifyRun['commands'] =>
-      cmds.map((item) => ({ ...item, exit, log: resolve(f.home, `gate-${exit}-${failures.join('-')}.log`), failures }));
+      cmds.map((item) => ({
+        ...item,
+        exit,
+        log: resolve(f.home, `gate-${exit}-${failures.join('-')}.log`),
+        ...(failures.length === 0 ? {} : { failures }),
+      }));
     const redHead = (failures: string[]): VerifyRun =>
       seedRun(f, { sha: head, tree, scope: 'merge', commands: entries(7, failures) });
     const redBase = (failures: string[]): VerifyRun =>
@@ -236,7 +243,7 @@ test('merge gates accept a covered main-red head and refuse an uncovered or reso
 
     // Uncovered: a second named unit no base run holds refuses the gate and the push.
     writeFileSync(file, '');
-    const path2: string = leaf(f, 'landing2', 'merge', { worktree, merge_stamp: '2026-10-05T00:00:00.000Z' });
+    const path2: string = leaf(f, 'landing2', 'merge', { worktree, merge_stamp: '2026-10-05T00:00:00.000Z' }, 'cov2');
     saveState(path2, { ...readState(path2), batch: record });
     redHead(['alpha', 'beta']);
     redBase(['alpha']);
@@ -250,14 +257,18 @@ test('merge gates accept a covered main-red head and refuse an uncovered or reso
     expect(refused.stderr).toContain(`No green merge verify receipt for ${head}`);
     expect(readState(path2).batch?.tested_top).toBeUndefined();
     expect((await guards()).code).not.toBe(0);
+    // batchPush's tested_top guard precedes the receipt read: stamp the top the
+    // way recordTested would have, so the push reaches the receipt check.
+    saveState(path2, { ...readState(path2), batch: { ...readState(path2).batch!, tested_top: head } });
     const pushRefused: Result = await landPushRun('landing2');
     expect(pushRefused.code).not.toBe(0);
     expect(pushRefused.stderr).toContain(`No green merge verify receipt for ${head}`);
+    saveState(path2, { ...readState(path2), phase: 'implement', batch: undefined });
 
     // Resolved on main: a later landed run passes the command, so the base red
     // no longer covers the head.
     writeFileSync(file, '');
-    const path3: string = leaf(f, 'landing3', 'merge', { worktree, merge_stamp: '2026-10-05T00:00:00.000Z' });
+    const path3: string = leaf(f, 'landing3', 'merge', { worktree, merge_stamp: '2026-10-05T00:00:00.000Z' }, 'cov3');
     saveState(path3, { ...readState(path3), batch: record });
     redHead(['alpha']);
     redBase(['alpha']);
