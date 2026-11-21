@@ -316,7 +316,10 @@ test.serial(
       tier.record('base-log.txt', baseLog.stdout);
       expect(baseLog.stdout).toContain('stage base red'); // the fix pushed fast-forward on top
 
-      // Notices: at least one non-attention notice (push/move), none attention.
+      // Notices: at least one non-attention notice (push/move), none attention. The case sends
+      // them last, after the resume and the status write, so wait for them.
+      const noticeBy: number = Date.now() + Math.min(90_000, Math.max(10_000, deadline - Date.now() - 30_000));
+      while (notices(scratch).length === 0 && Date.now() < noticeBy) await Bun.sleep(2000);
       const seen = notices(scratch);
       tier.record('notices.json', seen);
       expect(seen.length).toBeGreaterThanOrEqual(1);
