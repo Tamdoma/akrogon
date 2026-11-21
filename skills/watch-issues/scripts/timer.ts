@@ -7,8 +7,9 @@
 // pinned watcher foreground dies or is swapped, the watcher terminal goes away, or the resolved
 // transcript stays off the pinned one. Every refused read, skipped send, failed send and exit
 // reason prints to this terminal's own output.
-import { HcError, send, terminal, type Seen } from '../../../src/hc';
+import { hc, HcError, send, terminal, terminals, type Seen } from '../../../src/hc';
 import { transcriptFor } from '../../../src/transcript';
+import { isVerifiedConsultant } from './hc';
 import { isDescendant, procStart } from './proc';
 
 type Args = {
@@ -16,6 +17,7 @@ type Args = {
   watcher: string;
   root: string;
   repo: string;
+  prefix: string | null;
   pinPid: number;
   pinStart: string;
   transcript: string | null;
@@ -39,6 +41,9 @@ function parseArgs(): Args {
     watcher: raw.watcher,
     root: raw.root,
     repo: raw.repo,
+    // start.ts always launches with --prefix (plan D4); an older direct launch without it
+    // still runs — the exit sweep just has no consultant name to verify against.
+    prefix: raw.prefix ?? null,
     pinPid,
     pinStart: raw['pin-start'],
     transcript: raw.transcript ?? null,
@@ -59,7 +64,7 @@ function note(line: string): void {
   lastNote = line;
   console.log(`[watch-timer] ${line}`);
 }
-type Due = { n: number; attempts: number; sent: { at: number; turn: number } | null };
+type Due = { n: number; attempts: number; sent: { at: number; turn: number } | null; coalescing: boolean };
 
 const dues: Due[] = [];
 let dueCount: number = 0;
@@ -114,12 +119,6 @@ async function readWatcher(): Promise<Seen | 'exit' | 'stay'> {
 
 async function poll(): Promise<'exit' | 'stay'> {
   const now: number = Date.now();
-  while (nextBoundary <= now) {
-    dueCount += 1;
-    dues.push({ n: dueCount, attempts: 0, sent: null });
-    nextBoundary += intervalMs;
-  }
-
   const watcher = await readWatcher();
   if (typeof watcher === 'string') return watcher;
 
@@ -153,10 +152,28 @@ async function poll(): Promise<'exit' | 'stay'> {
     note(`receipt read failed: ${error.kind}`);
     return 'stay';
   }
+  const status: string | null = watcher.status?.state ?? null;
+  // Dues accrued while the watcher still works its first turn — the sent, receipted head due
+  // whose delivery opened it — coalesce to the latest boundary (plan D6): the first such due is
+  // marked `coalescing`, later crossed boundaries update its number instead of queueing. Dues
+  // accrued in any later shape keep their own entry and drain in order.
+  const backedUp: boolean =
+    status !== 'idle' &&
+    status !== 'done' &&
+    watcher.turn === 0 &&
+    dues[0] !== undefined &&
+    dues[0].sent !== null &&
+    Number(rcpt) >= dues[0].n;
+  const pending: Due | undefined = dues.find((due: Due) => due.coalescing && due.sent === null);
+  while (nextBoundary <= now) {
+    dueCount += 1;
+    if (pending !== undefined) pending.n = dueCount;
+    else dues.push({ n: dueCount, attempts: 0, sent: null, coalescing: backedUp });
+    nextBoundary += intervalMs;
+  }
+
   const oldest: Due | undefined = dues[0];
   if (oldest === undefined) return 'stay';
-
-  const status: string | null = watcher.status?.state ?? null;
   if (status !== 'idle' && status !== 'done') {
     note(`hold due=${oldest.n}: watcher ${status ?? 'has no reported status'}`);
     return 'stay';
@@ -231,4 +248,35 @@ for (;;) {
   if ((await poll()) === 'exit') break;
   await Bun.sleep(early-- > 0 ? Math.min(pollMs, 50) : pollMs);
 }
+
+// The exit sweep frees this watch's verified consultant however the loop ended (pinned death,
+// missing watcher, moved transcript): a missed consultant would outlive the watch paid. Only the
+// verified shape is touched — foreign-repo or unverified terminals stay; non-not_found errors are
+// noted and the exit still happens.
+async function sweepConsultant(): Promise<void> {
+  const prefix: string | null = args.prefix;
+  if (prefix === null) return;
+  let listed: Seen[];
+  try {
+    listed = await terminals(args.session, {});
+  } catch (error) {
+    console.log(
+      `[watch-timer] consultant sweep failed: ${error instanceof HcError ? error.kind : String(error)}`,
+    );
+    return;
+  }
+  for (const term of listed.filter((t: Seen) => isVerifiedConsultant(prefix, args.repo, args.watcher, t))) {
+    for (const verb of ['kill', 'rm']) {
+      try {
+        await hc(args.session, [verb, term.address]);
+      } catch (error) {
+        if (error instanceof HcError && error.kind === 'not_found') continue;
+        console.log(
+          `[watch-timer] consultant ${verb} ${term.address} failed: ${error instanceof HcError ? error.kind : String(error)}`,
+        );
+      }
+    }
+  }
+}
+await sweepConsultant();
 console.log(`[watch-timer] exited`);

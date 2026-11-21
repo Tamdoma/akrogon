@@ -142,6 +142,8 @@ async function main(): Promise<void> {
     root,
     '--repo',
     target.repo,
+    '--prefix',
+    target.prefix,
     '--pin-pid',
     String(pinPid),
     '--pin-start',

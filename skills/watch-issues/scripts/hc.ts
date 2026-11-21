@@ -3,6 +3,7 @@
 // that terminal. HC_SESSION is pinned per call; HC_TERMINAL_SOCKET is dropped because hc's
 // run-parent detection keys on HC_TERMINAL_ID only when the socket variable is absent — with it
 // present the spawned terminal gets parent:null (proven: hc run under an hc-injected env).
+import { watchConsultName } from '../../../src/hc';
 import { spawnCaptured, type SpawnResult } from '../../../src/shell';
 import { z } from 'zod';
 
@@ -61,5 +62,22 @@ export function isVerifiedTimer(prefix: string, term: Term): boolean {
   return (
     term.name === `${prefix}-watch` &&
     (term.argv ?? []).join(' ').includes('skills/watch-issues/scripts/timer.ts')
+  );
+}
+
+// Plan D5: the watch's own consultant is live, named for the prefix, labelled for the repo and
+// parented to the watcher address. The structural term type fits both Term and src/hc.ts Seen.
+export function isVerifiedConsultant(
+  prefix: string,
+  repo: string,
+  watcher: string,
+  term: { name: string | null; labels: Record<string, string>; parent: string | null; state: string },
+): boolean {
+  return (
+    term.state === 'live' &&
+    term.name === watchConsultName(prefix) &&
+    term.labels['akrogon.watch-consult'] === repo &&
+    term.labels['akrogon.repo'] === repo &&
+    term.parent === watcher
   );
 }
