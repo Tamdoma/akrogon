@@ -1,8 +1,10 @@
 // Repo resolution shared by the watch scripts: `run` and `resolveRepoKey` are factored out of
 // observe.ts (which imports them here) and extended so `akrogon config` answers the repo's prefix
 // alongside its name; watchTarget then turns a root into repo + prefix + hc session.
-import { readRepo, type Repo } from '../../../src/config';
+import { resolve } from 'node:path';
+import { globalHome, readRepo, type Repo } from '../../../src/config';
 import { repoSpace, type SpaceResolution } from '../../../src/hc';
+import { withLock } from '../../../src/state';
 
 export type RunResult = { code: number; stdout: string; stderr: string };
 
@@ -62,6 +64,10 @@ export async function resolveRepoKey(root: string, bin: string): Promise<RepoKey
 }
 
 export type WatchTarget = { repo: string; prefix: string; session: string };
+
+export function withConsultantLock<T>(target: WatchTarget, action: () => Promise<T>): Promise<T> {
+  return withLock(resolve(globalHome(), 'watch', target.repo, '.consultant.lock'), action);
+}
 
 // Everything a watch step needs from a root: the repo name (label value), its prefix (timer name)
 // and the live hc session the repo's space sits in.

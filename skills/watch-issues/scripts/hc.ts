@@ -65,6 +65,12 @@ export function isVerifiedTimer(prefix: string, term: Term): boolean {
   );
 }
 
+export function timerWatcher(term: Term): string | undefined {
+  const argv: string[] = term.argv ?? [];
+  const flag: number = argv.indexOf('--watcher');
+  return flag === -1 ? undefined : argv[flag + 1];
+}
+
 // Plan D5: the watch's own consultant is live, named for the prefix, labelled for the repo and
 // parented to the watcher address. The structural term type fits both Term and src/hc.ts Seen.
 export function isVerifiedConsultant(

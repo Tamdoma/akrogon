@@ -9,7 +9,8 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFi
 import { basename, resolve } from 'node:path';
 import { z } from 'zod';
 import { globalHome, within } from '../../../src/config';
-import { resolveRepoKey, run, type RunResult } from './repo';
+import { getTerm, isVerifiedTimer, timerWatcher } from './hc';
+import { resolveRepoKey, run, watchTarget, withConsultantLock, type RunResult, type WatchTarget } from './repo';
 
 const signatureSchema = z.strictObject({
   anchor: z.string(),
@@ -26,6 +27,7 @@ type Config = { repo: string; remote: string; branch: string };
 
 function usage(): never {
   console.error('Usage: consults.ts dir <root>');
+  console.error('       consults.ts start <root> <timer> <task>');
   console.error('       consults.ts new <root> --anchor <slug|unknown> --cause <cause|unknown> --phase <phase|unknown> --command <text|-> [--leaf <slug>]...');
   console.error('       consults.ts match <root> --anchor <slug|unknown> --cause <cause|unknown> --phase <phase|unknown> --command <text|-> [--leaf <slug>]...');
   process.exit(1);
@@ -207,10 +209,37 @@ function verbMatch(consults: string, current: Signature): void {
   }
 }
 
+async function startConsultant(root: string, address: string, task: string): Promise<void> {
+  const caller: string | undefined = process.env.HC_TERMINAL_ID;
+  if (!caller) throw new Error('consultant launch requires HC_TERMINAL_ID');
+  const target: WatchTarget = await watchTarget(root);
+  const result: RunResult = await withConsultantLock(target, async (): Promise<RunResult> => {
+    const timer: Awaited<ReturnType<typeof getTerm>> = await getTerm(target.session, address);
+    if (!timer.ok && timer.kind !== 'not_found') throw new Error(`timer ${address}: ${timer.kind}`);
+    if (!timer.ok || timer.term.state !== 'live') return { code: 0, stdout: `stopped ${address}`, stderr: '' };
+    if (
+      timer.term.labels['akrogon.watch-timer'] !== target.repo ||
+      !isVerifiedTimer(target.prefix, timer.term) ||
+      timerWatcher(timer.term) !== caller
+    )
+      throw new Error(`timer ${address} does not belong to watcher ${caller} for ${target.repo}`);
+    return run([process.env.WATCH_AKROGON ?? 'akrogon', 'seat', '--watch-consultant', '--task', task], root);
+  });
+  if (result.stdout !== '') console.log(result.stdout);
+  if (result.stderr !== '') console.error(result.stderr);
+  process.exitCode = result.code;
+}
+
 async function main(): Promise<void> {
   const verb: string | undefined = process.argv[2];
   const root: string | undefined = process.argv[3];
   if (verb === undefined || root === undefined) usage();
+  if (verb === 'start') {
+    const timer: string | undefined = process.argv[4];
+    const task: string | undefined = process.argv[5];
+    if (process.argv.length !== 6 || !timer || !task) usage();
+    return startConsultant(root, timer, task);
+  }
   if (verb === 'dir') {
     if (process.argv.length !== 4) usage();
     const { repo }: { repo: string; prefix: string | null } = await resolveRepoKey(
