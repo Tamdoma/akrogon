@@ -705,3 +705,31 @@ test('cohort member: parked waiting continues after the last phase move', async 
     f.clean();
   }
 });
+
+test('slug report: a capacity wait lists under its own kind beside the existing reasons', async () => {
+  const f: Fixture = await fixture();
+  try {
+    records(f, 'log', [
+      move(f, { slug: 'cap', from: 'failed', to: 'implement', ts: at(0) }),
+      move(f, { slug: 'cap', from: 'implement', to: 'check.review', ts: at(30) }),
+    ]);
+    records(f, 'timings', [
+      visitStart(f, 'cap', 'implement', 0, at(0)),
+      prompt(f, 'cap', 'A', 'implement', 0, at(5)),
+      event(f, { slug: 'cap', kind: 'wait', reason: 'parked', ts: at(10) }),
+      event(f, { slug: 'cap', kind: 'wait', reason: 'capacity', ts: at(15) }),
+      visitStart(f, 'cap', 'check.review', 0, at(30)),
+    ]);
+    const result = await timing(f, ['cap']);
+    expect(result.code).toBe(0);
+    const lines: string[] = result.stdout.split('\n');
+    expect(lines[0]).toBe('implement #0 30m');
+    expect(lines.at(-1)).toBe('check.review #0 open');
+    expect(lines).toContain('  wait parked 5m');
+    expect(lines).toContain('  wait capacity 15m');
+    expect(lines.some((line) => line.startsWith('  prompted'))).toBe(true);
+    expect(lines.some((line) => line.startsWith('  wait none'))).toBe(true);
+  } finally {
+    f.clean();
+  }
+});

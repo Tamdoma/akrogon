@@ -4656,3 +4656,60 @@ test('next --all, --resume and manual next record the registered or selected rep
     g.clean();
   }
 });
+
+test('a leaf waiting in merge does not count toward max_active while check.repair and implement do', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    const waiter: string = leaf(f, 'waiter', 'plan.synthesis');
+    const fresh: string = leaf(f, 'fresh', 'plan.synthesis');
+    configure(f, { max_active: 1 });
+    holdTurns(f);
+    expect((await next(f, ['waiter'])).code).toBe(0);
+    expect(await liveTabs(f)).toEqual(['waiter']);
+    saveState(waiter, { ...readState(waiter), phase: 'merge', ...holding(f) });
+    expect((await next(f, ['fresh'])).code).toBe(0);
+    expect(await liveTabs(f)).toEqual(['fresh', 'waiter']);
+    expect(readState(fresh).worktree).toBeDefined();
+    for (const [phase, slug] of [
+      ['check.repair', 'queued-repair'],
+      ['implement', 'queued-implement'],
+    ] as const) {
+      saveState(waiter, { ...readState(waiter), phase });
+      saveState(fresh, { ...readState(fresh), phase: 'merged' });
+      const queued: string = leaf(f, slug, 'plan.synthesis');
+      expect((await next(f, [slug])).code).toBe(0);
+      expect(readState(queued).worktree).toBeUndefined();
+      expect(readState(queued).seat.A).toBeUndefined();
+      expect(await liveTabs(f)).toEqual(['fresh', 'waiter']);
+      saveState(fresh, { ...readState(fresh), phase: 'plan.synthesis' });
+    }
+  } finally {
+    await f.clean();
+  }
+}, 30000);
+
+test('a leaf waiting in merge does not count toward max_active when its repo session is refused', async () => {
+  const f: HcFixture = await hcFixture();
+  const g: HcFixture = await otherRepo(f);
+  try {
+    configure(f, { max_active: 1, repos: { [f.repo]: f.root, [g.repo]: g.root } });
+    const waiter: string = leaf(g, 'waiter', 'merge', {
+      tab: 'akdeadwaiter',
+      worktree: resolve(g.home, 'dead-wt'),
+      repo: g.repo,
+    });
+    const fresh: string = leaf(f, 'fresh', 'plan.synthesis');
+    await g.core.stop();
+    expect((await next(f, ['fresh'])).code).toBe(0);
+    expect(await liveTabs(f)).toEqual(['fresh']);
+    saveState(fresh, { ...readState(fresh), phase: 'merged' });
+    saveState(waiter, { ...readState(waiter), phase: 'check.repair' });
+    const queued: string = leaf(f, 'queued', 'plan.synthesis');
+    expect((await next(f, ['queued'])).code).toBe(0);
+    expect(readState(queued).worktree).toBeUndefined();
+    expect(readState(queued).seat.A).toBeUndefined();
+  } finally {
+    await f.clean();
+    await g.clean();
+  }
+}, 30000);

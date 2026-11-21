@@ -358,3 +358,28 @@ test('repo pause event is persisted before its state lock is released', async ()
     await f.clean();
   }
 }, 30000);
+
+function maxActive(f: HcFixture, value: number): void {
+  const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
+  yaml(resolve(f.home, 'config.yaml'), { ...global, max_active: value });
+}
+
+test('capacity waits: a refused dispatch records one capacity wait that closes on dispatch', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    leaf(f, 'waiter', 'plan.synthesis');
+    leaf(f, 'queued', 'plan.synthesis');
+    maxActive(f, 1);
+    expect((await next(f, ['waiter'])).code).toBe(0);
+    expect((await next(f, ['queued'])).code).toBe(0);
+    expect((await next(f, ['queued'])).code).toBe(0);
+    expect(readState(resolve(f.root, 'issues/open/issue/queued')).worktree).toBeUndefined();
+    expect(ofKind(leafEvents(f, 'queued'), 'wait').map((event) => event.reason)).toEqual(['capacity']);
+    maxActive(f, 3);
+    expect((await next(f, ['queued'])).code).toBe(0);
+    expect(readState(resolve(f.root, 'issues/open/issue/queued')).worktree).toBeDefined();
+    expect(ofKind(leafEvents(f, 'queued'), 'wait').map((event) => event.reason)).toEqual(['capacity']);
+  } finally {
+    await f.clean();
+  }
+}, 30000);
