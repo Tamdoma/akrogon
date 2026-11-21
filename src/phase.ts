@@ -747,7 +747,7 @@ export function landClaim(repo: Repo, slug: string, attempt: string): { leaf: Le
 
 type BatchPending =
   | { kind: 'none' }
-  | { kind: 'refused'; record: Batch; candidate: string; stderr: string; end: PressureSnapshot | undefined }
+  | { kind: 'refused'; record: Batch; candidate: string; end: PressureSnapshot | undefined }
   | { kind: 'error'; record: Batch; candidate: string; result: Result; end: PressureSnapshot | undefined };
 
 type Move = (holderNow: Leaf, pushed: string, builtOn: string) => Promise<void>;
@@ -796,17 +796,17 @@ async function batchPush(
         tested_main: undefined,
       },
     });
-    return { kind: 'refused', record, candidate: head, stderr: pushed.stderr, end };
+    return { kind: 'refused', record, candidate: head, end };
   }
   saveState(leaf.path, { ...readState(leaf.path), batch: { ...record, candidate: undefined } });
   return { kind: 'error', record, candidate: head, result: pushed, end };
 }
 
-type Restacked = { kind: 'restacked'; top: string } | { kind: 'rebase'; base: string };
+export type Restacked = { kind: 'restacked'; top: string } | { kind: 'rebase'; base: string };
 
-async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<Restacked> {
+export async function restack(repo: Repo, slug: string, record: Batch): Promise<Restacked> {
   const builtOn: string = await command(['git', 'rev-parse', trackingRef(repo)], repo.root);
-  const holderHead: string = await command(['git', 'rev-parse', `refs/heads/${leaf.state.slug}`], repo.root);
+  const holderHead: string = await command(['git', 'rev-parse', `refs/heads/${slug}`], repo.root);
   const staged: Awaited<ReturnType<typeof buildStack>> = await buildStack(
     repo,
     builtOn,
@@ -814,7 +814,7 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<Restacked
     record.holder.head,
   );
   const top: string | undefined = await withLock(resolve(globalHome(), '.lock'), async () => {
-    const current: Leaf = findLeaf(repo, leaf.state.slug);
+    const current: Leaf = findLeaf(repo, slug);
     const batch: Batch | undefined = current.state.batch;
     if (batch?.attempt !== record.attempt || current.state.phase !== 'merge')
       throw new Error('Batch attempt superseded during restack; record left for the next pass');
@@ -836,13 +836,13 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<Restacked
   });
   console.log(
     top === undefined
-      ? `rerun rebase ${leaf.state.slug} onto ${builtOn}`
+      ? `rerun rebase ${slug} onto ${builtOn}`
       : `rerun tested=${record.tested_top ?? 'none'} pushed=${top}`,
   );
   return top === undefined ? { kind: 'rebase', base: builtOn } : { kind: 'restacked', top };
 }
 
-type Finished = { kind: 'landed' } | Restacked | { kind: 'error'; result: Result };
+type Finished = { kind: 'landed' } | { kind: 'refused'; record: Batch } | { kind: 'error'; result: Result };
 
 async function finishPush(
   repo: Repo,
@@ -873,14 +873,10 @@ async function finishPush(
     return { kind: 'landed' };
   }
   if (pending.kind === 'error') return { kind: 'error', result: pending.result };
-  return restack(repo, findLeaf(repo, slug), pending.record);
+  return { kind: 'refused', record: pending.record };
 }
 
-export type LandPush =
-  | { kind: 'landed' }
-  | { kind: 'restacked'; top: string; stderr: string }
-  | { kind: 'rebase'; base: string }
-  | { kind: 'error'; stderr: string };
+export type LandPush = Exclude<Finished, { kind: 'error' }> | { kind: 'error'; stderr: string };
 
 // The land run's push: the claim and the push hold the global lock, the refusal follow-up takes it itself.
 export async function landPush(
@@ -900,8 +896,6 @@ export async function landPush(
   if (pending.kind === 'none') return { kind: 'landed' };
   const finished: Finished = await finishPush(repo, slug, pending, move);
   if (finished.kind === 'error') return { kind: 'error', stderr: finished.result.stderr };
-  if (finished.kind === 'restacked')
-    return { kind: 'restacked', top: finished.top, stderr: pending.kind === 'refused' ? pending.stderr : '' };
   return finished;
 }
 
@@ -963,6 +957,7 @@ export async function phaseCommand(
     const finished: Finished = await finishPush(repo, slug, pending, seatMove);
     if (finished.kind === 'error')
       throw new Error(`Push failed: git push exited ${finished.result.code}: ${finished.result.stderr}`);
+    if (finished.kind === 'refused') await restack(repo, slug, finished.record);
   }
   return { repo, committed, to: committedTo };
 }

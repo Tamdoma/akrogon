@@ -2,7 +2,16 @@ import { resolve } from 'node:path';
 import { readGlobal, requireRepo, globalHome, toolRoot, type GlobalConfig, type Repo } from './config';
 import { allLeaves, readState, saveState, withLock, type Batch, type Leaf, type MergeExit } from './state';
 import { command, CommandError, spawnCaptured, type SpawnResult } from './shell';
-import { commitMove, landClaim, landGates, landPush, StaleLandError, type LandPush } from './phase';
+import {
+  commitMove,
+  landClaim,
+  landGates,
+  landPush,
+  restack,
+  StaleLandError,
+  type LandPush,
+  type Restacked,
+} from './phase';
 import { appendAttempt, readPressure, type PressureSnapshot } from './attempts';
 import { readVerifyRuns, uncoveredMainRedUnits, verify, type Unit, type VerifyRun } from './verify';
 import { leafSlice, sessionBusAddress } from './scope';
@@ -232,7 +241,11 @@ export async function land(
       return repairExit(global, repo, slug, attempt, { reason: 'gate', refusal, top }, endOf(record, pressureDir));
     const pushed: LandPush = await landPush(repo, slug, attempt, coverRun, pressureDir);
     if (pushed.kind === 'landed') return landedWake(global, repo, slug);
-    if (pushed.kind === 'rebase')
+    if (pushed.kind === 'error')
+      return commandFailed(global, repo, slug, attempt, pushed.stderr, endOf(record, pressureDir));
+    if (refusals > 0) return keepPlace(global, repo, slug, attempt, endOf(record, pressureDir));
+    const restacked: Restacked = await restack(repo, slug, pushed.record);
+    if (restacked.kind === 'rebase')
       return repairExit(
         global,
         repo,
@@ -240,15 +253,12 @@ export async function land(
         attempt,
         {
           reason: await dirtyOrConflict(repo, leaf.state.worktree),
-          base: pushed.base,
+          base: restacked.base,
           top,
         },
         endOf(record, pressureDir),
       );
-    if (pushed.kind === 'error')
-      return commandFailed(global, repo, slug, attempt, pushed.stderr, endOf(record, pressureDir));
     refusals += 1;
-    if (refusals > 1) return keepPlace(global, repo, slug, attempt, endOf(record, pressureDir));
   }
 }
 
