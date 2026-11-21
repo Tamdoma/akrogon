@@ -733,3 +733,23 @@ test('slug report: a capacity wait lists under its own kind beside the existing 
     f.clean();
   }
 });
+
+test('slug report: a capacity wait lists under its own kind until dispatch delivers a prompt', async () => {
+  const f: Fixture = await fixture();
+  try {
+    records(f, 'log', [move(f, { ts: at(12) })]);
+    records(f, 'timings', [
+      visitStart(f, 'x', 'plan.synthesis', 0, at(0)),
+      event(f, { kind: 'wait', reason: 'capacity', ts: at(2) }),
+      prompt(f, 'x', 'A', 'plan.synthesis', 0, at(5)),
+      visitStart(f, 'x', 'implement', 0, at(12)),
+    ]);
+    const result = await timing(f, ['x']);
+    expect(result.code).toBe(0);
+    const lines: string[] = result.stdout.split('\n');
+    expect(lines).toContain('  wait capacity 3m');
+    expect(lines).toContain('  prompted 7m');
+  } finally {
+    f.clean();
+  }
+});
