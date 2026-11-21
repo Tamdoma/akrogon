@@ -54,7 +54,7 @@ export async function startWatchTier(
   name: string,
   slots: object,
   harnesses: Record<string, string>,
-  opts: { rootName?: string } = {},
+  opts: { rootName?: string; startProofMs?: number; repoConfig?: Record<string, unknown> } = {},
 ): Promise<WatchTier> {
   const leafTemp: string = required('AKROGON_E2E_ROOT');
   const out: string = required('AKROGON_E2E_OUT');
@@ -95,7 +95,12 @@ export async function startWatchTier(
   writeFileSync(resolve(root, '.gitignore'), '.env\n.claude/\n');
   writeFileSync(
     resolve(root, 'issues/config.yaml'),
-    Bun.YAML.stringify({ checks: { test: 'true' }, grounding: 'none', worktree_root: worktrees }),
+    Bun.YAML.stringify({
+      checks: { test: 'true' },
+      grounding: 'none',
+      worktree_root: worktrees,
+      ...(opts.repoConfig ?? {}),
+    }),
   );
   await command(['git', 'add', '.'], root);
   await command(['git', 'commit', '-m', 'e2e'], root);
@@ -134,7 +139,7 @@ export async function startWatchTier(
     AKROGON_HOME: home,
     XDG_RUNTIME_DIR: runtime,
     FAKE_HERDR_APP: appPlan,
-    AKROGON_START_PROOF_MS: '3000',
+    AKROGON_START_PROOF_MS: String(opts.startProofMs ?? 3000),
     HC_SESSION: '',
     HC_TERMINAL_ID: '',
     HC_TERMINAL_SOCKET: '',

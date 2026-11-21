@@ -133,7 +133,7 @@ exec env -u HC_SESSION -u HC_TERMINAL_ID -u HC_TERMINAL_SOCKET -u HC_SCOPE ${env
 // Runs the watcher terminal; start's outcome line lands in the task log when the agent reports.
 async function watchUp(
   f: HcFixture,
-  opts: { root?: string; mode?: string; name?: string; claudeDir?: string; interval?: string } = {},
+  opts: { root?: string; mode?: string; name?: string; claudeDir?: string; interval?: string; keep?: boolean } = {},
 ): Promise<Rig> {
   const flags: string = resolve(f.home, `watch-flags-${opts.name ?? 'watcher'}`);
   mkdirSync(flags, { recursive: true });
@@ -158,6 +158,7 @@ async function watchUp(
     'run',
     '--bg',
     '--json',
+    ...(opts.keep === true ? ['--keep'] : []),
     '--name',
     opts.name ?? 'watcher',
     '--cwd',
@@ -1000,6 +1001,142 @@ test.serial('a root containing a space works through start, tick and stop', asyn
     await send(rig, `watch-issues stop ${sroot}`);
     await waitHooks(rig, /stop exit=0/);
     await waitGone(f.core, rig.timer);
+  } finally {
+    await f.clean();
+  }
+});
+
+// watch-consults criterion 4: while the watcher works through tick boundaries the timer
+// keeps any sent due plus at most one unsent due updated to the latest boundary; the idle
+// watcher receives that one latest due and tick.ts accepts it (a due above the receipt).
+test.serial('dues queued behind a busy watcher coalesce to the latest boundary', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    const rig: Rig = await watchUp(f);
+    rig.timer = await started(rig);
+    await waitTick(rig, 1);
+    // due 1's check call is held across three intervals: dues 2, 3 and 4 accrue while the
+    // watcher is busy. The timer must not queue them all.
+    writeFileSync(resolve(rig.flags, 'hold-status'), '6');
+    await waitLabel(rig, 1);
+    await Bun.sleep(7500);
+    // The check ends; the held dues collapse into one send carrying the newest due number.
+    const deadline: number = Date.now() + 30_000;
+    while (Date.now() < deadline && tickLines(rig, 4).length === 0) await Bun.sleep(200);
+    expect(tickLines(rig, 4)).toHaveLength(1);
+    expect(tickLines(rig, 2)).toHaveLength(0);
+    expect(tickLines(rig, 3)).toHaveLength(0);
+    // The coalesced due receipts and runs its own check, like any accepted due.
+    await waitLabel(rig, 4);
+    const screen: string = await screenOf(f.core, rig.timer);
+    expect(screen).toContain('due=4 sent');
+    expect(screen).not.toContain('due=2 sent');
+    expect(screen).not.toContain('due=3 sent');
+  } finally {
+    await f.clean();
+  }
+});
+
+// A consultant terminal for the consult tests: named <prefix>-watch-consult, labelled like
+// a startWatchConsult launch and parented to the watcher. `repo` labels a foreign repo's
+// consultant (a same-named terminal whose label does not name this repo).
+async function consultTerm(
+  rig: Rig,
+  opts: { repo?: string; parent?: string | null; name?: string; outlive?: boolean } = {},
+): Promise<string> {
+  const run: SpawnResult = await rig.core.hc([
+    'run',
+    '--bg',
+    '--json',
+    '--name',
+    opts.name ?? `${rig.f.prefix}-watch-consult`,
+    '--label',
+    'akrogon=1',
+    '--label',
+    `akrogon.repo=${rig.f.repo}`,
+    '--label',
+    `akrogon.watch-consult=${opts.repo ?? rig.f.repo}`,
+    ...(opts.parent === null
+      ? ['--no-parent']
+      : [
+          '--parent',
+          opts.parent ?? rig.watcher,
+          ...(opts.outlive === true ? ['--outlive-parent'] : []),
+        ]),
+    '--',
+    'cat',
+  ]);
+  expect(run.code, `hc run consultant: ${run.stderr}`).toBe(0);
+  return z.object({ address: z.string() }).parse(JSON.parse(run.stdout)).address;
+}
+
+// watch-consults criterion 5: `watch-issues stop` kills and removes the verified timer and
+// then this watch's verified consultant, printing `stopped <timer>` first and
+// `stopped consultant <address>` only when one was closed; an absent consultant counts as
+// closed and a foreign one is not the watch's.
+test.serial('stop closes the watch consultant after the timer, tolerating none', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    const rig: Rig = await watchUp(f);
+    rig.timer = await started(rig);
+    // No consultant live: the timer stops and the line stays the single `stopped <timer>`.
+    await send(rig, `watch-issues stop ${f.root}`);
+    await waitHooks(rig, /stop exit=0 stopped/);
+    const plain: string | undefined = hooks(rig).findLast((l) => l.startsWith('stop exit=0'));
+    expect(plain ?? '').not.toContain('stopped consultant');
+    await waitGone(f.core, rig.timer);
+
+    // Restart, then a verified consultant and a same-named foreign one share the session.
+    await send(rig, `watch-issues ${f.root}`);
+    await waitHooks(rig, /start exit=0 started/);
+    const timer: Term | undefined = (await labelled(f.core, f.repo))[0];
+    expect(timer).toBeDefined();
+    rig.timer = timer.address;
+    const mine: string = await consultTerm(rig);
+    const foreign: string = await consultTerm(rig, {
+      repo: 'other-repo',
+      name: `${rig.f.prefix}-watch-consult-x`,
+    });
+    await send(rig, `watch-issues stop ${f.root}`);
+    await waitHooks(rig, /stop exit=0 .*stopped consultant/, 20_000);
+    const stopped: string | undefined = hooks(rig).findLast((l) => l.startsWith('stop exit=0'));
+    expect(stopped ?? '').toContain(`stopped consultant ${mine}`);
+    // `stopped <timer>` precedes the consultant line in the same run's output.
+    expect((stopped ?? '').indexOf('stopped ')).toBeLessThan((stopped ?? '').indexOf('stopped consultant'));
+    await waitGone(f.core, rig.timer);
+    await waitGone(f.core, mine);
+    expect((await get(f.core, foreign)).state).toBe('live');
+    await f.core.hc(['kill', foreign]);
+    await f.core.hc(['rm', foreign]);
+  } finally {
+    await f.clean();
+  }
+});
+
+// watch-consults criterion 6: when the pinned watcher process dies and leaves the terminal,
+// the timer's own exit also kills and removes that watch's verified consultant; a
+// foreign-repo consultant is not the watch's and survives. The verified consultant is
+// outlive-parent so hc's parent-end handling cannot do the sweep for the timer.
+test.serial('a dying watcher makes the timer exit sweep its consultant', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    // --keep: the watcher terminal survives its pinned program, the shape criterion 6
+    // names — the timer's pin check fires and its exit path sweeps.
+    const rig: Rig = await watchUp(f, { keep: true });
+    rig.timer = await started(rig);
+    const mine: string = await consultTerm(rig, { outlive: true });
+    const foreign: string = await consultTerm(rig, {
+      repo: 'other-repo',
+      name: `${rig.f.prefix}-watch-consult-x`,
+    });
+    const w: Term = await get(f.core, rig.watcher);
+    const pinPid: number = z.number().parse(w.foreground?.pid);
+    process.kill(pinPid, 'SIGKILL');
+    await waitGone(f.core, rig.timer);
+    await waitGone(f.core, mine);
+    expect((await get(f.core, foreign)).state).toBe('live');
+    await f.core.hc(['kill', foreign]);
+    await f.core.hc(['rm', foreign]);
   } finally {
     await f.clean();
   }
