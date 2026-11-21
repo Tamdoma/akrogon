@@ -28,7 +28,7 @@ Source: [land.ts](../../src/land.ts), `commandMerged` in [phase.ts](../../src/ph
 
 ## When the land run exits
 
-Merge holds no seat, so nobody is prompted inside it. When the land run cannot land the leaf it writes `state.merge_exit` and moves the leaf to `check.repair`. Seat B's repair prompt then carries `merge-exit=<reason>` plus the exit's fields.
+Merge holds no seat. A red check, gate refusal, conflict or dirty worktree moves the leaf to `check.repair` and writes `state.merge_exit`. Seat B's repair prompt carries `merge-exit=<reason>` and the recorded fields.
 
 | Exit `merge-exit=` | What it means                                 | Fields carried                               |
 | ------------------ | --------------------------------------------- | -------------------------------------------- |
@@ -37,11 +37,11 @@ Merge holds no seat, so nobody is prompted inside it. When the land run cannot l
 | `conflict`         | The rebase or restack conflicted.             | `base=<sha>`, `top=<sha>` on a land exit     |
 | `dirty`            | The worktree held uncommitted work.           | `base=<sha>`, `top=<sha>` on a land exit     |
 
-`base_verdict` appears only when land ran the base pass itself and names that base run; a green verdict there means the head red is the leaf's own. The merge turn writes `conflict` and `dirty` itself when its own build step fails; a restack conflict mid-run writes them from the land run.
+When land checks an unchanged repeat against main, `base_verdict` names the base run or the existing whole-green receipt that let land skip that run. B reads the evidence for the failing unit. The merge turn records a conflict or dirty worktree at turn start, and land records one during a restack.
 
-Three push outcomes are not exits. A first fast-forward refusal restacks and pushes again inside the same run. A second clears the batch, prints `held <slug> attempt=<id>` and keeps the leaf in `merge` at its queue place. A push error that is not a refusal moves the leaf to `failed` with git's stderr as the reason. A `failed` leaf is recovered by the operator; `akrogon phase <slug> merged` also lands an applied batch directly.
+A first non-fast-forward refusal restacks and retries inside the same run. A second clears the batch, prints `held <slug> attempt=<id>` and keeps the leaf's queue place in `merge`. Other push errors move the leaf to `failed` with git's stderr for operator recovery. The operator can also land an applied batch with `akrogon phase <slug> merged`.
 
-The full procedure, including red-run judgment and `merge_exit`, is in [merge-issue](../../skills/merge-issue/SKILL.md). Phase rules are in [State and phases](../reference/state-and-phases.md).
+B follows [check-issue](../../skills/check-issue/SKILL.md#checkrepair) after a repair exit. The command's procedure is in [merge-issue](../../skills/merge-issue/SKILL.md), and phase rules are in [State and phases](../reference/state-and-phases.md).
 
 ## When an issue or epic completes
 

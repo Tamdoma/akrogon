@@ -11,7 +11,7 @@ A usual day takes a request, charts it into leaves, runs the leaves and ends wit
 3. The door hands off the leaves. It writes each leaf folder under `issues/open/` and marks the chart `Handed off`. It starts nothing. If the work is already clear, you can write the leaf files yourself instead. See [Write issues by hand](write-issues-by-hand.md).
 4. Run `akrogon next`. It starts the leaves that are ready. See [Run work](run-work.md).
 5. The seats work the leaf. Seat A plans it, A builds it, they review it, and B repairs what the review finds or hands it back to A. Akrogon prompts the next seat from the leaf's state, so you do not copy prompts between panes. See [plan-issue](../../skills/plan-issue/SKILL.md), [implement-issue](../../skills/implement-issue/SKILL.md) and [check-issue](../../skills/check-issue/SKILL.md).
-6. The command lands it. When a merge attempt is ready, `akrogon next` runs `akrogon land`, which checks the attempt, pushes it and moves the leaf to `merged`. If a check fails or a rebase is needed, seat B takes over with the [merge-issue](../../skills/merge-issue/SKILL.md) skill.
+6. The command lands it. When a merge attempt is ready, `akrogon next` runs `akrogon land`, which checks the attempt, pushes it and moves the leaf to `merged`. A red check, gate refusal, conflict or dirty worktree moves the leaf to `check.repair`, where B uses `check-issue`. A push error other than a non-fast-forward refusal moves the leaf to `failed` for operator recovery. See [Merge and announce](merge-and-announce.md).
 
 Run `watch-issues <root>` beside steps 4 to 6 to keep leaves moving while you step away. See [Watch while away](watch-while-away.md).
 

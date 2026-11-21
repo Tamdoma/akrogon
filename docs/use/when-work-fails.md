@@ -47,6 +47,6 @@ These are not failed leaves. A command refuses and tells you why. Fix the condit
 - **A phase move is refused.** Common causes are uncommitted work in the worktree, files under `issues/` changed on the leaf branch, an empty branch, a missing green `akrogon verify` receipt, or a changed test file with no `Test-Change:` trailer. See [Checks](../reference/checks.md).
 - **A leaf waits on a failed leaf.** A leaf whose `blocked-by` names a failed leaf gets no work until that leaf is recovered and merged. `akrogon next <slug>` refuses with `Leaf dependencies are not merged`.
 - **Sync refuses.** `akrogon sync` runs only in the registered checkout on its default branch, and refuses staged files outside issue records. Check with `git status --short` and `git diff --cached --name-only`, then decide what to do with those files. See [sync.ts](../../src/sync.ts).
-- **The merge cannot push.** The land run hands the attempt to seat B. See [Merge and announce](merge-and-announce.md).
+- **The remote refuses a fast-forward push.** Land restacks after the first non-fast-forward refusal. A second refusal keeps the leaf's place in `merge`. Other push errors move the leaf to `failed` with git's error. See [Merge and announce](merge-and-announce.md).
 
 Next: [Roll back a release](roll-back-a-release.md)
