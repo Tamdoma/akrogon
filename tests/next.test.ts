@@ -4680,7 +4680,8 @@ test('a leaf waiting in merge does not count toward max_active while check.repai
       expect((await next(f, [slug])).code).toBe(0);
       expect(readState(queued).worktree).toBeUndefined();
       expect(readState(queued).seat.A).toBeUndefined();
-      expect(await liveTabs(f)).toEqual(['fresh', 'waiter']);
+      // Reconcile closes a merged leaf's tab on the first pass, so only waiter's seats survive.
+      expect(await liveTabs(f)).toEqual(['waiter']);
       saveState(fresh, { ...readState(fresh), phase: 'plan.synthesis' });
     }
   } finally {
