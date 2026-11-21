@@ -173,8 +173,8 @@ function matchingCases(consults: string, current: Signature): Case[] {
     if (!existsSync(file)) continue;
     if (!identical(current, JSON.parse(readFileSync(file, 'utf8')))) continue;
     const statusFile: string = resolve(dir, 'status');
-    const closed: boolean = existsSync(statusFile) && readFileSync(statusFile, 'utf8').trim() === 'closed';
-    cases.push({ dir, closed });
+    const status: string = existsSync(statusFile) ? readFileSync(statusFile, 'utf8').trim() : 'open';
+    cases.push({ dir, closed: status === 'closed' || status === 'resumed' });
   }
   return cases;
 }
