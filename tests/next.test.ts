@@ -4704,11 +4704,16 @@ test('a leaf waiting in merge does not count toward max_active when its repo ses
     expect((await next(f, ['fresh'])).code).toBe(0);
     expect(await liveTabs(f)).toEqual(['fresh']);
     saveState(fresh, { ...readState(fresh), phase: 'merged' });
-    saveState(waiter, { ...readState(waiter), phase: 'check.repair' });
-    const queued: string = leaf(f, 'queued', 'plan.synthesis');
-    expect((await next(f, ['queued'])).code).toBe(0);
-    expect(readState(queued).worktree).toBeUndefined();
-    expect(readState(queued).seat.A).toBeUndefined();
+    for (const [phase, slug] of [
+      ['check.repair', 'queued-repair'],
+      ['implement', 'queued-implement'],
+    ] as const) {
+      saveState(waiter, { ...readState(waiter), phase });
+      const queued: string = leaf(f, slug, 'plan.synthesis');
+      expect((await next(f, [slug])).code).toBe(0);
+      expect(readState(queued).worktree).toBeUndefined();
+      expect(readState(queued).seat.A).toBeUndefined();
+    }
   } finally {
     await f.clean();
     await g.clean();
