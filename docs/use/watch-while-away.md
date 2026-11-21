@@ -12,7 +12,7 @@ watch-issues <root>
 
 (Claude also accepts `/watch-issues`.) It runs one check right away and starts a timer terminal named `<prefix>-watch` in the same session, which sends a `watch-issues tick` line to your agent every 20 minutes. If a watch is already running, it reports it and starts no second one.
 
-A tick that queues up while a check runs gets its own check afterwards. A prompt typed into the watcher terminal when a tick is due can receive the tick instead: claude and agy run the check inside that turn, and on codex the prompt's task is dropped and must be retyped.
+While the watcher is busy, the timer keeps the latest unsent tick. That tick runs one check when the watcher is idle. A prompt typed into the watcher terminal when a tick is due can receive the tick instead: claude and agy run the check inside that turn, and on codex the prompt's task is dropped and must be retyped.
 
 ## What each check does
 
