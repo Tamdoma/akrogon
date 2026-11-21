@@ -76,7 +76,7 @@ Each record file is one JSON object per line. `akrogon sync` commits them with t
 
 Each closed visit shows its total time, then splits it into:
 
-- `wait <reason>`: time spent waiting on `repo_pause`, `parked`, `prerequisite` or `merge_turn`.
+- `wait <reason>`: time spent waiting on `repo_pause`, `parked`, `prerequisite`, `merge_turn` or `capacity`.
 - `prompted`: time from the first delivered prompt to the phase exit, with each check run listed inside it.
 - `wait none`: time no record explains.
 - `incomplete <name>`: a record the visit should have but does not, such as a check with no end.
