@@ -1986,10 +1986,7 @@ test('merge turn refusal names the holder for merged and check.fix while failed 
     const holderPath: string = leaf(f, 'aa', 'merge', holding(f));
     const nonHolderPath: string = leaf(f, 'bb', 'merge', holding(f));
     // Unstamped merge leaves take turns in slug order, so aa holds the queue.
-    const refuses: Result[] = [
-      await cli(f, ['phase', 'bb', 'merged']),
-      await cli(f, ['phase', 'bb', 'check.fix']),
-    ];
+    const refuses: Result[] = [await cli(f, ['phase', 'bb', 'merged']), await cli(f, ['phase', 'bb', 'check.fix'])];
     for (const result of refuses) {
       expect(result.code).not.toBe(0);
       expect(result.stderr).toContain('aa');

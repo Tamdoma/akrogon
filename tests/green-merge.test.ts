@@ -347,9 +347,7 @@ test('stop --all stops a tabless command merge', async () => {
       PATH: `${resolve(f.home, 'bin')}:${process.env.PATH}`,
     });
     expect(stopped.code).toBe(0);
-    const calls: string[] = existsSync(systemctl.log)
-      ? readFileSync(systemctl.log, 'utf8').trim().split('\n')
-      : [];
+    const calls: string[] = existsSync(systemctl.log) ? readFileSync(systemctl.log, 'utf8').trim().split('\n') : [];
     expect(calls.some((line) => line === `--user stop ${slice}`)).toBe(true);
     expect(readFileSync(resolve(f.home, 'stopped.yaml'), 'utf8')).toContain(`${f.repo}/aa`);
   } finally {

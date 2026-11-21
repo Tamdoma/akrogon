@@ -8,12 +8,12 @@ This page explains how akrogon runs your checks, what proof a phase move asks fo
 
 You set four kinds of command in `issues/config.yaml`:
 
-| Setting        | When it runs                                                                                                                                                          | Does a failure block?                    |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| `checks`       | On every leaf, and again at merge.                                                                                                                                    | Yes.                                     |
+| Setting        | When it runs                                                                                                                                                        | Does a failure block?                    |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| `checks`       | On every leaf, and again at merge.                                                                                                                                  | Yes.                                     |
 | `merge_checks` | Only at merge, through the land run's `akrogon verify --attempt <id>`, its members all at once after the `checks` stage is green. `akrogon run-check` refuses them. | Yes.                                     |
-| `merge_covers` | Not a command. It names `checks` entries that a merge check already covers, so merge skips them.                                                                      | No.                                      |
-| `advisory`     | Seats run them next to the checks. `akrogon verify` does not run them.                                                                                                | No. Reviewers report a failure as a Nit. |
+| `merge_covers` | Not a command. It names `checks` entries that a merge check already covers, so merge skips them.                                                                    | No.                                      |
+| `advisory`     | Seats run them next to the checks. `akrogon verify` does not run them.                                                                                              | No. Reviewers report a failure as a Nit. |
 
 So a leaf runs every `checks` command. A merge runs every `checks` command not named in `merge_covers`, then, once they are green, the `merge_checks` members all at once. Inside `checks`, the non-`full` commands run first in config order and the `full` commands after them. When setup or a non-`full` check is red, each `full` check is recorded `blocked` with the blocker's exit and log and does not run; a red `full` check never blocks another `full` check. A red `checks` entry still leaves every `merge_checks` member recorded `blocked` without running it. A `blocked` receipt entry names an earlier red and did not run. Source: `verifyCommands` in [src/verify.ts](../../src/verify.ts).
 
@@ -70,10 +70,10 @@ A receipt is reused. When a green receipt already exists for the same tree and t
 
 These phase moves need a green receipt for the current commit:
 
-| Move                                                    | Scope   |
-| ------------------------------------------------------- | ------- |
-| Any move into `check.review`                            | `leaf`  |
-| `check.repair` to `merge`                               | `leaf`  |
+| Move                                                                 | Scope   |
+| -------------------------------------------------------------------- | ------- |
+| Any move into `check.review`                                         | `leaf`  |
+| `check.repair` to `merge`                                            | `leaf`  |
 | `merged`, including `akrogon land` and the operator's slot-less call | `merge` |
 
 The gate accepts a completed run on the same tree with every expected command green, or a qualifying [linked-base known-red receipt](#known-red). It uses the move's command list and never stitches together head entries across runs.

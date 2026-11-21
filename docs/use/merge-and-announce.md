@@ -30,12 +30,12 @@ Source: [land.ts](../../src/land.ts), `commandMerged` in [phase.ts](../../src/ph
 
 Merge holds no seat, so nobody is prompted inside it. When the land run cannot land the leaf it writes `state.merge_exit` and moves the leaf to `check.repair`. Seat B's repair prompt then carries `merge-exit=<reason>` plus the exit's fields.
 
-| Exit `merge-exit=` | What it means                                             | Fields carried                  |
-| ------------------ | --------------------------------------------------------- | ------------------------------- |
-| `red`              | The verify run went red and no cover applied.             | `run=<id>`, `top=<sha>`, `base_verdict=<id>` |
-| `gate`             | A land gate refused.                                      | `refusal=<text>`, `top=<sha>`   |
-| `conflict`         | The rebase or restack conflicted.                         | `base=<sha>`, `top=<sha>` on a land exit |
-| `dirty`            | The worktree held uncommitted work.                       | `base=<sha>`, `top=<sha>` on a land exit |
+| Exit `merge-exit=` | What it means                                 | Fields carried                               |
+| ------------------ | --------------------------------------------- | -------------------------------------------- |
+| `red`              | The verify run went red and no cover applied. | `run=<id>`, `top=<sha>`, `base_verdict=<id>` |
+| `gate`             | A land gate refused.                          | `refusal=<text>`, `top=<sha>`                |
+| `conflict`         | The rebase or restack conflicted.             | `base=<sha>`, `top=<sha>` on a land exit     |
+| `dirty`            | The worktree held uncommitted work.           | `base=<sha>`, `top=<sha>` on a land exit     |
 
 `base_verdict` appears only when land ran the base pass itself and names that base run; a green verdict there means the head red is the leaf's own. The merge turn writes `conflict` and `dirty` itself when its own build step fails; a restack conflict mid-run writes them from the land run.
 

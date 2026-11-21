@@ -1083,8 +1083,7 @@ async function mergeTurnExit(
   base: string,
   pressureDir: string,
 ): Promise<void> {
-  const end: PressureSnapshot | undefined =
-    record.pressure_start === undefined ? undefined : readPressure(pressureDir);
+  const end: PressureSnapshot | undefined = record.pressure_start === undefined ? undefined : readPressure(pressureDir);
   appendAttempt(repo, leaf.state.slug, record, 'red', end);
   await commitMove(repo, leaf, leaf.state, 'check.repair', null, undefined, undefined, {
     reason,

@@ -911,7 +911,6 @@ test('uncommitted work in a merge worktree exits to check.repair with the edit i
   }
 }, 15000);
 
-
 test('a worktree parked mid-rebase is still dispatched', async () => {
   const f: HcFixture = await hcFixture();
   try {
@@ -1774,7 +1773,6 @@ test('a blocked non-merge seat does not stall a merge leaf', async () => {
   }
 }, 15000);
 
-
 test('check.fix, check.repair and post-repair review dispatch to their swapped seats', async () => {
   const f: HcFixture = await hcFixture();
   try {
@@ -1807,7 +1805,6 @@ test('check.fix, check.repair and post-repair review dispatch to their swapped s
     await f.clean();
   }
 }, 15000);
-
 
 function tabCloses(f: HcFixture): string[][] {
   return f.core
@@ -3538,7 +3535,6 @@ test('only the earlier-stamped merge leaf holds the turn while the waiting leaf 
   }
 }, 15000);
 
-
 test('an ineligible merge leaf never holds the turn (blocked-by)', async () => {
   const f: HcFixture = await hcFixture();
   try {
@@ -3558,7 +3554,6 @@ test('an ineligible merge leaf never holds the turn (blocked-by)', async () => {
     await f.clean();
   }
 }, 15000);
-
 
 for (const exit of ['operator merged', 'operator failed'] as const) {
   test(`the ${exit} holder exit wakes the next merge leaf without a manual next`, async () => {
@@ -3626,7 +3621,6 @@ test('a leaf re-entering merge keeps its stamp and holds the turn over later-sta
     await f.clean();
   }
 }, 30000);
-
 
 test('a saved holder failure wakes the stamped queue when the log is a directory', async () => {
   const f: HcFixture = await hcFixture();

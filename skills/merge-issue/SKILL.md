@@ -37,12 +37,12 @@ When that misses and the previous red merge run sits on the same recorded holder
 
 An exit writes `state.merge_exit` and clears `batch`, then moves the leaf to `check.repair`, whose seat's prompt carries `merge-exit=<reason>` plus `run=<id>`, `refusal=<text>`, `base=<sha>`, `base_verdict=<id>` and `top=<sha>` as present:
 
-| Reason       | When                                                                | Fields                                  |
-| ------------ | ------------------------------------------------------------------- | --------------------------------------- |
+| Reason     | When                                                                      | Fields                        |
+| ---------- | ------------------------------------------------------------------------- | ----------------------------- |
 | `red`      | The verify run is red, with no cover on main and none from the base pass. | `run`, `top`, `base_verdict?` |
-| `gate`     | A land gate refused.                                                       | `refusal`, `top`              |
-| `conflict` | The rebase or restack conflicted, or the turn failed before apply.         | `base`, `top` on a land exit  |
-| `dirty`    | The holder worktree held uncommitted work at apply or restack.             | `base`, `top` on a land exit  |
+| `gate`     | A land gate refused.                                                      | `refusal`, `top`              |
+| `conflict` | The rebase or restack conflicted, or the turn failed before apply.        | `base`, `top` on a land exit  |
+| `dirty`    | The holder worktree held uncommitted work at apply or restack.            | `base`, `top` on a land exit  |
 
 Push outcomes are not exits: a first non-fast-forward refusal restacks onto the new remote tip inside the same run and pushes again; a second clears the batch, writes the attempt row `red`, prints `held <slug> attempt=<id>` and keeps the leaf in merge at its queue place for the next pass to rebuild; a push error that is not a refusal moves the leaf to `failed` with git's stderr in `failure.reason`.
 

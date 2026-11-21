@@ -308,4 +308,3 @@ export function holding(f: Fixture): { batch: Batch } {
     batch: { attempt: 'a1', built_on: main, holder: { base: main, head: main }, applied: true, top: main },
   };
 }
-

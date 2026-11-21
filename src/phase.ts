@@ -244,9 +244,8 @@ export async function commitMove(
     merge_stamp:
       to === 'merge'
         ? recorded.merge_stamp !== undefined &&
-          readLog(repo.root).filter(
-            (entry) => entry.record.slug === recorded.slug && entry.record.to === 'merge',
-          ).length <= 1
+          readLog(repo.root).filter((entry) => entry.record.slug === recorded.slug && entry.record.to === 'merge')
+            .length <= 1
           ? recorded.merge_stamp
           : new Date().toISOString()
         : recorded.merge_stamp,
@@ -939,10 +938,8 @@ export async function phaseCommand(
     if (leaf.state.phase === 'merged' && !check) await completeOwner(repo, leaf, false);
     const record: Batch | undefined = leaf.state.batch;
     if (leaf.state.phase === 'merge' && (requested === 'merged' || requested === 'check.fix')) {
-      if (slot !== undefined || attempt !== undefined)
-        throw new Error(`A seat cannot make merge calls: ${requested}`);
-      if (check)
-        throw new Error('--check is the seat protocol and merge holds no seat: run the move without --check');
+      if (slot !== undefined || attempt !== undefined) throw new Error(`A seat cannot make merge calls: ${requested}`);
+      if (check) throw new Error('--check is the seat protocol and merge holds no seat: run the move without --check');
       const holder: Leaf | undefined = mergeQueue(global, repo, allLeaves(repo), () => readLog(repo.root))[0]?.leaf;
       if (holder === undefined || holder.state.slug !== leaf.state.slug)
         throw new Error(

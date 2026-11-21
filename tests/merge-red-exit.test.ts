@@ -58,9 +58,7 @@ function attemptRows(f: Fixture): { outcome: string; attempt: string }[] {
         .map((line) => z.object({ outcome: z.string(), attempt: z.string() }).parse(JSON.parse(line)))
     : [];
 }
-function verifyRuns(
-  f: Fixture,
-): {
+function verifyRuns(f: Fixture): {
   run: string;
   sha: string;
   tree: string;
@@ -468,7 +466,6 @@ test('the first merge return keeps its stamp and heads the queue, the second min
   }
 }, 30000);
 
-
 // Criterion 7: a merge leaf holding a batch keeps its leaf slice when both
 // seats are gone.
 test('a merge leaf holding a batch keeps its slice with both seats gone', async () => {
@@ -562,9 +559,7 @@ test('a green row at the merge-base skips the base pass and exits with its run a
       tree: await command(['git', 'rev-parse', `${mergeBase}^{tree}`], f.root),
       scope: 'merge',
       compares: 'older-head',
-      commands: [
-        { name: 'test', command: 'sh check.sh', exit: 0, log: resolve(f.home, 'base-green.log') },
-      ],
+      commands: [{ name: 'test', command: 'sh check.sh', exit: 0, log: resolve(f.home, 'base-green.log') }],
     });
     writeFileSync(resolve(f.home, 'base-green.log'), '');
     expect((await land(f, 'aa', attempt)).code).toBe(0);

@@ -188,7 +188,9 @@ async function baseVerdictOf(repo: Repo, headId: string): Promise<string | undef
       run.end !== undefined &&
       run.setup !== 1 &&
       run.commands.length === expected.length &&
-      run.commands.every((item, index) => item.name === expected[index].name && item.command === expected[index].command) &&
+      run.commands.every(
+        (item, index) => item.name === expected[index].name && item.command === expected[index].command,
+      ) &&
       run.commands.every((item) => item.exit === 0),
   )?.run;
 }
@@ -229,7 +231,14 @@ export async function land(
             );
           }
         } else {
-          return repairExit(global, repo, slug, attempt, { reason: 'red', run: result.id, top }, endOf(record, pressureDir));
+          return repairExit(
+            global,
+            repo,
+            slug,
+            attempt,
+            { reason: 'red', run: result.id, top },
+            endOf(record, pressureDir),
+          );
         }
       } else {
         return repairExit(
@@ -273,7 +282,8 @@ export async function land(
         },
         endOf(record, pressureDir),
       );
-    if (pushed.kind === 'error') return commandFailed(global, repo, slug, attempt, pushed.stderr, endOf(record, pressureDir));
+    if (pushed.kind === 'error')
+      return commandFailed(global, repo, slug, attempt, pushed.stderr, endOf(record, pressureDir));
     refusals += 1;
     if (refusals > 1) return keepPlace(global, repo, slug, attempt, endOf(record, pressureDir));
   }

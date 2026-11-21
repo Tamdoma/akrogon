@@ -587,12 +587,7 @@ test.serial('a merged line without pressure_start keeps no pressure key even wit
     const { proc } = await batchFixture(f);
     const dir: string = pressureDir(f, { cpu: 'abc', memory: '90', io: '180' });
     await verified(f, 'hold', 'merge');
-    const merged: Result = await spawn(
-      f,
-      'merged',
-      landBody(f.repo, 'hold', 'a1', dir),
-      proc.env,
-    );
+    const merged: Result = await spawn(f, 'merged', landBody(f.repo, 'hold', 'a1', dir), proc.env);
     expect(merged.code).toBe(0);
     const lines: Attempt[] = attemptLines(f);
     expect(lines).toHaveLength(1);
@@ -610,12 +605,7 @@ test.serial('a merged line with an absent pressure dir keeps no pressure key', a
     saveBatch(holder.path, withStart(record, { cpu: 10, memory: 20, io: 30 }));
     const dir: string = resolve(f.home, 'psi/proc/pressure');
     await verified(f, 'hold', 'merge');
-    const merged: Result = await spawn(
-      f,
-      'merged',
-      landBody(f.repo, 'hold', 'a1', dir),
-      proc.env,
-    );
+    const merged: Result = await spawn(f, 'merged', landBody(f.repo, 'hold', 'a1', dir), proc.env);
     expect(merged.code).toBe(0);
     const lines: Attempt[] = attemptLines(f);
     expect(lines).toHaveLength(1);
@@ -633,12 +623,7 @@ test.serial('a merged line with a changed boot id keeps no pressure key', async 
     saveBatch(holder.path, withStart(record, { cpu: 10, memory: 20, io: 30 }, 'boot-old'));
     const dir: string = pressureDir(f, { cpu: '60', memory: '90', io: '180' }, 'boot-new');
     await verified(f, 'hold', 'merge');
-    const merged: Result = await spawn(
-      f,
-      'merged',
-      landBody(f.repo, 'hold', 'a1', dir),
-      proc.env,
-    );
+    const merged: Result = await spawn(f, 'merged', landBody(f.repo, 'hold', 'a1', dir), proc.env);
     expect(merged.code).toBe(0);
     const lines: Attempt[] = attemptLines(f);
     expect(lines).toHaveLength(1);
@@ -657,12 +642,7 @@ test.serial('a malformed pressure file stops the ending call before any push or 
     saveBatch(holder.path, batch);
     const dir: string = pressureDir(f, { cpu: 'abc', memory: '90', io: '180' });
     const tip: string = await remoteTip(f);
-    const merged: Result = await spawn(
-      f,
-      'merged',
-      landBody(f.repo, 'hold', 'a1', dir),
-      proc.env,
-    );
+    const merged: Result = await spawn(f, 'merged', landBody(f.repo, 'hold', 'a1', dir), proc.env);
     expect(merged.code).not.toBe(0);
     expect(merged.stderr).toContain(resolve(dir, 'cpu'));
     expect(merged.stderr).toContain('total=');
@@ -702,12 +682,7 @@ test.serial('a decimal pressure total stops the ending call before any push or s
     const dir: string = pressureDir(f, { cpu: '12.5', memory: '90', io: '180' });
     await verified(f, 'hold', 'merge');
     const tip: string = await remoteTip(f);
-    const merged: Result = await spawn(
-      f,
-      'merged',
-      landBody(f.repo, 'hold', 'a1', dir),
-      proc.env,
-    );
+    const merged: Result = await spawn(f, 'merged', landBody(f.repo, 'hold', 'a1', dir), proc.env);
     expect(merged.code).not.toBe(0);
     expect(merged.stderr).toContain(resolve(dir, 'cpu'));
     expect(merged.stderr).toContain('total=');

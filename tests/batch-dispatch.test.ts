@@ -134,7 +134,6 @@ test('the holder gets a batch record rebased onto the remote and nothing is prom
   }
 }, 15000);
 
-
 test('an interrupted build is discarded and rebuilt under a new attempt', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
@@ -165,7 +164,6 @@ test('an interrupted build is discarded and rebuilt under a new attempt', async 
     await f.clean();
   }
 }, 15000);
-
 
 test('the pass that releases a merged holder batch cleans up the holder in the same invocation', async () => {
   const f: DispatchFixture = await dispatchFixture({ window: 'open' });
@@ -328,7 +326,6 @@ test('a failed holder with no candidate is rebuilt on the new base, never rerun 
   }
 }, 25000);
 
-
 test('a fetch failure keeps the record, moves nothing and reports the error', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
@@ -426,49 +423,44 @@ test('a dirty holder worktree exits to check.repair and keeps its branch and edi
   }
 }, 15000);
 
-
 test('a refused check.fix keeps the holder-seat commit on the branch', async () => {
-    const f: DispatchFixture = await dispatchFixture();
-    try {
-      const holder: { path: string } = await allocatedLeaf(f, 'holder');
-      await commitFile(f, holder.path, 'original', 'original');
-      toMerge(holder.path, '2026-09-11T00:00:00Z');
-      await idleAll(f);
-      expect((await next(f, ['--all'])).code).toBe(0);
-      await commitFile(f, holder.path, 'seat-fix', 'committed holder repair');
-      const repaired: string = await head(f, 'holder');
-      const args: string[] = ['phase', 'holder', 'check.fix'];
-      expect((await cli(f, args, f.root, f.env)).code).not.toBe(0);
-      expect(readState(holder.path).phase).toBe('merge');
-      expect(await head(f, 'holder')).toBe(repaired);
-      expect(readFileSync(resolve(readState(holder.path).worktree!, 'seat-fix'), 'utf8')).toBe(
-        'committed holder repair',
-      );
-    } finally {
-      await f.clean();
-    }
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const holder: { path: string } = await allocatedLeaf(f, 'holder');
+    await commitFile(f, holder.path, 'original', 'original');
+    toMerge(holder.path, '2026-09-11T00:00:00Z');
+    await idleAll(f);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    await commitFile(f, holder.path, 'seat-fix', 'committed holder repair');
+    const repaired: string = await head(f, 'holder');
+    const args: string[] = ['phase', 'holder', 'check.fix'];
+    expect((await cli(f, args, f.root, f.env)).code).not.toBe(0);
+    expect(readState(holder.path).phase).toBe('merge');
+    expect(await head(f, 'holder')).toBe(repaired);
+    expect(readFileSync(resolve(readState(holder.path).worktree!, 'seat-fix'), 'utf8')).toBe('committed holder repair');
+  } finally {
+    await f.clean();
+  }
 });
 
 test('a failed move keeps the holder-seat commit on the branch', async () => {
-    const f: DispatchFixture = await dispatchFixture();
-    try {
-      const holder: { path: string } = await allocatedLeaf(f, 'holder');
-      await commitFile(f, holder.path, 'original', 'original');
-      toMerge(holder.path, '2026-09-11T00:00:00Z');
-      await idleAll(f);
-      expect((await next(f, ['--all'])).code).toBe(0);
-      await commitFile(f, holder.path, 'seat-fix', 'committed holder repair');
-      const repaired: string = await head(f, 'holder');
-      const args: string[] = ['phase', 'holder', 'failed', '--reason', 'stop'];
-      expect((await cli(f, args, f.root, f.env)).code).toBe(0);
-      expect(readState(holder.path).phase).toBe('failed');
-      expect(await head(f, 'holder')).toBe(repaired);
-      expect(readFileSync(resolve(readState(holder.path).worktree!, 'seat-fix'), 'utf8')).toBe(
-        'committed holder repair',
-      );
-    } finally {
-      await f.clean();
-    }
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const holder: { path: string } = await allocatedLeaf(f, 'holder');
+    await commitFile(f, holder.path, 'original', 'original');
+    toMerge(holder.path, '2026-09-11T00:00:00Z');
+    await idleAll(f);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    await commitFile(f, holder.path, 'seat-fix', 'committed holder repair');
+    const repaired: string = await head(f, 'holder');
+    const args: string[] = ['phase', 'holder', 'failed', '--reason', 'stop'];
+    expect((await cli(f, args, f.root, f.env)).code).toBe(0);
+    expect(readState(holder.path).phase).toBe('failed');
+    expect(await head(f, 'holder')).toBe(repaired);
+    expect(readFileSync(resolve(readState(holder.path).worktree!, 'seat-fix'), 'utf8')).toBe('committed holder repair');
+  } finally {
+    await f.clean();
+  }
 });
 
 test('late holder dirt during initial apply is isolated and survives cleanup', async () => {
@@ -543,7 +535,6 @@ test('an applied holder retains its integration head when a check.fix is refused
   }
 });
 
-
 test('a waiting leaf stays out of the holder turn and lands in its own turn', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
@@ -590,15 +581,16 @@ test('a waiting leaf stays out of the holder turn and lands in its own turn', as
   }
 }, 30000);
 
-
 test('a red verify with another leaf waiting exits the holder to check.repair', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
     const aa: { path: string } = await allocatedLeaf(f, 'aa', 'issue-aa');
     const bb: { path: string } = await allocatedLeaf(f, 'bb', 'issue-bb');
     // A failing test on the holder's branch turns its land run red.
-    writeFileSync(resolve(z.string().parse(readState(aa.path).worktree), 'fail.test.ts'),
-      "import { test, expect } from 'bun:test';\ntest('red', () => expect(false).toBe(true));\n");
+    writeFileSync(
+      resolve(z.string().parse(readState(aa.path).worktree), 'fail.test.ts'),
+      "import { test, expect } from 'bun:test';\ntest('red', () => expect(false).toBe(true));\n",
+    );
     await command(['git', 'add', 'fail.test.ts'], z.string().parse(readState(aa.path).worktree));
     await command(['git', 'commit', '-m', 'failing test'], z.string().parse(readState(aa.path).worktree));
     await commitFile(f, bb.path, 'bb-file', 'bb\n');
@@ -626,7 +618,6 @@ test('a red verify with another leaf waiting exits the holder to check.repair', 
     await f.clean();
   }
 }, 30000);
-
 
 test('a refused push restacks only the holder while another leaf waits', async () => {
   const f: DispatchFixture = await dispatchFixture();
@@ -671,7 +662,6 @@ test('a refused push restacks only the holder while another leaf waits', async (
     await f.clean();
   }
 }, 30000);
-
 
 test('a push reported lost but landed moves only the holder to merged once', async () => {
   const f: DispatchFixture = await dispatchFixture();
