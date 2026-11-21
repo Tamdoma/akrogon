@@ -577,19 +577,16 @@ async function exitAgent(cell: Cell): Promise<number> {
   return agentPid;
 }
 
-// `watch-issues tick ... due=<n>` identities only grow: dues are monotone, and after the
-// timer is gone no resend or later due can exist. A bounded screen can drop old lines, but
-// a new tick always carries the highest due, so the maximum `due=` on screen is the delivery
-// identity. The baseline sits after the timer is gone (exit or stop proven), so the S5a
-// allowance for a tick already racing a shell exit is covered: it landed before the baseline.
-async function noLaterTick(cell: Cell, ms: number): Promise<void> {
-  const maxDue = async (): Promise<number> =>
-    ((await screen(cell.tier, cell.watcher)).match(/due=\d+/g) ?? [])
-      .map((m: string) => Number(m.slice(4)))
-      .reduce((a: number, b: number) => Math.max(a, b), 0);
-  const baseline: number = await maxDue();
+// After the timer is gone (exit or stop proven), the calls log is the append-only count of
+// delivered ticks: dues are not unique (a resend repeats one) and a bounded screen drops
+// lines, but every delivered tick makes the wrapper log `call config` first, so the window's
+// end must show the same count. The S5a allowance is covered by placement: a tick already
+// racing the shell exit logged its call before the baseline.
+async function noDeliveredTick(cell: Cell, ms: number): Promise<void> {
+  const baseline: number = calls(cell.callLog).length;
   await Bun.sleep(ms);
-  expect(await maxDue()).toBeLessThanOrEqual(baseline);
+  cell.tier.record('quiet-end-screen.txt', await screen(cell.tier, cell.watcher));
+  expect(calls(cell.callLog).length).toBe(baseline);
 }
 
 // A probe tick that must run no check: wait for the hook's `tick exit=` boundary, then read the
@@ -792,7 +789,7 @@ test.serial(
         await exitAgent(cell);
         await waitGone(tier, timer.address, 60_000);
         tier.record('pre-exit-screen.txt', await screen(tier, cell.watcher));
-        await noLaterTick(cell, intervalSec * 1000 + 15_000);
+        await noDeliveredTick(cell, intervalSec * 1000 + 15_000);
         await teardownCell(cell);
         return;
       }
@@ -960,7 +957,7 @@ test.serial(
         await exitAgent(cell);
         await waitGone(tier, timer.address, 90_000);
         tier.record('pre-exit-screen.txt', await screen(tier, cell.watcher));
-        await noLaterTick(cell, intervalSec * 1000 + 15_000);
+        await noDeliveredTick(cell, intervalSec * 1000 + 15_000);
         await teardownCell(cell);
         return;
       }
@@ -989,7 +986,7 @@ test.serial(
       await settleIdle(tier, cell.watcher, 60_000);
       expect(await labelled(tier)).toHaveLength(0);
       tier.record('post-stop-screen.txt', await screen(tier, cell.watcher));
-      await noLaterTick(cell, intervalSec * 1000 + 10_000);
+      await noDeliveredTick(cell, intervalSec * 1000 + 10_000);
       // A second start, then the reset: /clear ends claude's and agy's watch; codex and pi record
       // their /new outcome as the stated limit (7).
       const turnRe: number = await send(tier, cell.watcher, `watch-issues ${tier.root}`);
