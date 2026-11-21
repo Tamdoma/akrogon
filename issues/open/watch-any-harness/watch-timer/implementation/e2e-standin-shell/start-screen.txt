@@ -1,4 +1,4 @@
 
-akr-e2e-watch-standin-shell sp main ? ❯ sh '/var/tmp/akr-e2e-llu00g/launch-standin-shell.sh'
+akr-e2e-watch-standin-shell sp main ? ❯ sh '/var/tmp/akr-e2e-qQVVek/launch-standin-shell.sh'
 
-watch-issues /var/tmp/akr-e2e-llu00g/akr-e2e-watch-standin-shell sp
+watch-issues /var/tmp/akr-e2e-qQVVek/akr-e2e-watch-standin-shell sp

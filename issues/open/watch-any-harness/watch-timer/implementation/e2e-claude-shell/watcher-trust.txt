@@ -1,11 +1,11 @@
 
-akr-e2e-watch-claude-shell sp main ? ❯ sh '/var/tmp/akr-e2e-jwx691/launch-claude-shell.sh'
+akr-e2e-watch-claude-shell sp main ? ❯ sh '/var/tmp/akr-e2e-0yLqk1/launch-claude-shell.sh'
 
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  Accessing workspace:
 
- /var/tmp/akr-e2e-jwx691/akr-e2e-watch-claude-shell sp
+ /var/tmp/akr-e2e-0yLqk1/akr-e2e-watch-claude-shell sp
 
  Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source project, or work from your team). If not, take a moment to review what's in this
  folder first.

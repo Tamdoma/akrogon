@@ -1,10 +1,10 @@
 
   >_ OpenAI Codex (v0.171.0)
-     /var/tmp/akr-e2e-WFGIA4/akr-e2e-watch-codex-shell sp
+     /var/tmp/akr-e2e-q8g4Ou/akr-e2e-watch-codex-shell sp
   permissions: YOLO mode
 
 
-› watch-issues /var/tmp/akr-e2e-WFGIA4/akr-e2e-watch-codex-shell sp
+› watch-issues /var/tmp/akr-e2e-q8g4Ou/akr-e2e-watch-codex-shell sp
 
 
 • I’m using the watch-issues skill to start watching this repository.
@@ -19,7 +19,7 @@
       execute outside hc.
     + 341 lines (^t to expand)
 
-• Ran bun '.agents/skills/watch-issues/scripts/start.ts' '/var/tmp/akr-e2e-WFGIA4/akr-e2e-watch-codex-shell sp'
+• Ran bun '/var/tmp/akr-e2e-q8g4Ou/akr-e2e-watch-codex-shell sp/.agents/skills/watch-issues/scripts/start.ts' '/var/tmp/akr-e2e-q8g4Ou/akr-e2e-watch-codex-shell sp'
   └ started t2
 
 • Ran timeout 30s akrogon status
@@ -28,7 +28,7 @@
          watch-live-leaf  plan.synthesis  -
     + 2 lines (^t to expand)
 
-• Ran timeout 30s bun '.agents/skills/watch-issues/scripts/observe.ts' '/var/tmp/akr-e2e-WFGIA4/akr-e2e-watch-codex-shell sp'
+• Ran timeout 30s bun '/var/tmp/akr-e2e-q8g4Ou/akr-e2e-watch-codex-shell sp/.agents/skills/watch-issues/scripts/observe.ts' '/var/tmp/akr-e2e-q8g4Ou/akr-e2e-watch-codex-shell sp'
   └ session=akr-e2e-watch
     slug=watch-live-leaf phase=plan.synthesis attempts=A0,B0 blocked= A=-/- B=-/- notified=
 
@@ -37,10 +37,10 @@
 
 
 
-• Watch started on t2, checking every 20 minutes.
-  watch-live-leaf was waiting for planning. Ran akrogon next: started t3, not confirmed.
+• Started watch timer t2 with checks every 20 minutes.
+  watch-live-leaf had no planning seat. Ran akrogon next: started t3, not confirmed.
 
-  Worked for 26s • 22:35
+  Worked for 26s • 08:06
 
 
 

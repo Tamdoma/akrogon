@@ -175,3 +175,45 @@ No prompted sessions in this pass; the bound stands at 24/12 audited.
   decision, not test work; A cannot edit the locked design.
 - **Operator action (review-B):** fresh grant needed for the paid-cell re-proof on the
   repaired inputs.
+
+## check.fix pass 2 (2026-11-21, seat A, grants[2])
+
+Operator answered S4a/S5a and granted 8 prompted sessions (readiness.yaml grants[2],
+counted as `check_start` records named `watch-live-<claude|codex|pi|agy>-*` after
+2026-11-21T06:38:13Z). Rebased onto origin/main 63efc2d7 (2 commits); AKROGON_BASE now
+63efc2d7. Prior base ceb444fa, prior head def416a0; handed-off base 63efc2d7, head 1303b37b.
+
+### Repairs this pass
+
+- **S4a/S5a limits** (commit 4454567e): SKILL.md, docs/use/watch-while-away.md and
+  docs/reference/skills.md name the `done`-watcher turn limit (a prompt typed when a tick
+  is due can receive it; claude/agy check inside that turn, codex drops the prompt's task)
+  and widen the shell-exit limit to "with or without a held draft". F2-remaining closed by
+  the Corrections; no code change.
+- **Paid-cell test correction** (commit 1303b37b): the pre-kill `noNewTicks` baseline broke
+  on claude's exit redraw (screen shrank 4→0). Baseline now after `exitAgent`; invariant `<=`
+  (a dead screen only loses text, a new tick can only raise it). Cites real output
+  e2e-claude-shell/after-exit-screen.txt.
+
+### Grant count lines (grants[2], bound 8)
+
+| # | launch | outcome |
+|---|--------|---------|
+| g1 | watch-live-claude-root (first try) | launch record; RED at leftovers check before any prompt (0 bound-intended, still a `check_start` record) |
+| g2 | watch-live-claude-root | pass 5m50s, check-watch-live-claude-root-1795243707690-3871674.log |
+| g3 | watch-live-claude-shell (first try) | RED: noNewTicks equality on post-exit screen shrink; test corrected at 1303b37b |
+| g4 | watch-live-claude-shell rerun | pass 3m52s, check-watch-live-claude-shell-1795244409505-134920.log |
+| g5 | watch-live-codex-root | pass 5m31s, check-watch-live-codex-root-1795244743480-190165.log |
+| g6 | watch-live-codex-shell | pass 3m23s, check-watch-live-codex-shell-1795244949476-414072.log |
+| g7 | watch-live-pi-root | pass 5m54s, check-watch-live-pi-root-1795245306067-528096.log |
+| g8 | watch-live-pi-shell | pass 3m53s, check-watch-live-pi-shell-1795245541453-625510.log |
+
+Used: 8 of 8 `check_start` records under grants[2]. **watch-live-agy-root and
+watch-live-agy-shell are unproven on the repaired head**: the bound permits no 9th launch
+(g1 and g3 consumed two). A fresh grant for the two agy cells is the operator action.
+
+### Free proofs on head 1303b37b
+
+- watch-live-standin-root: pass (check-watch-live-standin-root-1795244063571-34338.log)
+- watch-live-standin-shell: pass (check-watch-live-standin-shell-1795244153880-73644.log)
+- `akrogon verify`: green on 1303b37b (check-test-1795245786925-773503.log)

@@ -1,17 +1,23 @@
 
   >_ OpenAI Codex (v0.171.0)
-     /var/tmp/akr-e2e-iYwLgZ/akr-e2e-watch-codex-root
+     /var/tmp/akr-e2e-0YjZav/akr-e2e-watch-codex-root
   permissions: YOLO mode
 
 
-› watch-issues /var/tmp/akr-e2e-iYwLgZ/akr-e2e-watch-codex-root
+› watch-issues /var/tmp/akr-e2e-0YjZav/akr-e2e-watch-codex-root
 
 
-• I’m using the watch-issues skill to start watching this repository.
+• I’ll read the watch-issues instructions and start watching this repository.
 
 • Explored
   └ Read SKILL.md
     + Show details
+
+• Ran printenv HC_TERMINAL_ID; cat /home/ivan/.codex/skills/herdr/SKILL.md
+  └ - Agents and terminals (starting, messaging, reading, waiting, `<hc>` messages): run `hc --skill` and follow it.
+    - The window the person sees: run `herdr-app --skill`.
+    - Layouts, keys and mods: read `${HERDR_APP_HOME:-$HOME/.config/herdr-app}/AGENTS.md` and run `herdr-app commands`.
+    + 8 lines (^t to expand)
 
 • Ran hc --skill
   └   3 not_found, 7 needs_target, 9 blocked, 10 status_mismatch, 11 finished.
@@ -19,7 +25,7 @@
       execute outside hc.
     + 341 lines (^t to expand)
 
-• Ran bun .agents/skills/watch-issues/scripts/start.ts /var/tmp/akr-e2e-iYwLgZ/akr-e2e-watch-codex-root
+• Ran bun .agents/skills/watch-issues/scripts/start.ts /var/tmp/akr-e2e-0YjZav/akr-e2e-watch-codex-root
   └ started t2
 
 • Ran timeout 30s akrogon status
@@ -28,7 +34,7 @@
          watch-live-leaf  plan.synthesis  -
     + 2 lines (^t to expand)
 
-• Ran timeout 30s bun .agents/skills/watch-issues/scripts/observe.ts /var/tmp/akr-e2e-iYwLgZ/akr-e2e-watch-codex-root
+• Ran timeout 30s bun .agents/skills/watch-issues/scripts/observe.ts /var/tmp/akr-e2e-0YjZav/akr-e2e-watch-codex-root
   └ session=akr-e2e-watch
     slug=watch-live-leaf phase=plan.synthesis attempts=A0,B0 blocked= A=-/- B=-/- notified=
 
@@ -37,16 +43,10 @@
 
 
 
-• Started watch timer t2, checking every 20 minutes.
-  watch-live-leaf was waiting for seat A. Ran akrogon next watch-live-leaf: started t3, not confirmed.
+• started t2. Watching every 20 minutes.
+  watch-live-leaf was waiting in plan.synthesis. Ran akrogon next watch-live-leaf: started t3, not confirmed.
 
-  Worked for 23s • 22:30
-
-
-
-
-
-
+  Worked for 31s • 08:00
 
 
 

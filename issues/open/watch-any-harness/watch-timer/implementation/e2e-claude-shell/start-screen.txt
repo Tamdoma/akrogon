@@ -1,25 +1,25 @@
 
- ▐▛███▛█   Claude Code v2.1.329
+ ▐▛███▛█   Claude Code v2.1.330
 ▝▜██████▀  Haiku 5.5 with low effort · Claude Ultra
- ▝▝   ▝▝   /var/tmp/akr-e2e-jwx691/akr-e2e-watch-claude-shell sp
+ ▝▝   ▝▝   /var/tmp/akr-e2e-0yLqk1/akr-e2e-watch-claude-shell sp
 
 
-❯ watch-issues /var/tmp/akr-e2e-jwx691/akr-e2e-watch-claude-shell sp
+❯ watch-issues /var/tmp/akr-e2e-0yLqk1/akr-e2e-watch-claude-shell sp
 
 ● Skill(watch-issues)
   ⎿  Loaded skill
 
-  Ran 4 shell commands
+  Ran 5 shell commands
 
-● The watch is running on this repo, and this first check started the plan step for the one leaf, watch-live-leaf.
+● The watch is running on issues/open and I've advanced the one leaf in it.
 
   - Start: started t2. The 20-minute timer is live.
-  - Check: the repo is not paused. The leaf is in plan.synthesis with no seat running yet.
-  - Action: akrogon next watch-live-leaf returned started, not confirmed t3. I haven't seen the seat come up yet, so the next tick should confirm it.
+  - Check: the repo is not paused, and the leaf watch-live-leaf is in plan.synthesis with no seat yet.
+  - Action: akrogon next watch-live-leaf reported started, not confirmed. A re-observe now shows seat A at t3, idle, so the plan step has started.
 
-  Stop with watch-issues stop <root>.
+  Next tick is in about 20 minutes. Stop with watch-issues stop <root>.
 
-✻ Brewed for 21s · done 10:21 PM
+✻ Baked for 17s · done 7:56 AM
 
 
 
@@ -117,4 +117,4 @@
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 ❯
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-  ⏵⏵ don't ask on (shift+tab to cycle) · ← 1 agent
+  ⏵⏵ don't ask on (shift+tab to cycle) · ← 2 agents

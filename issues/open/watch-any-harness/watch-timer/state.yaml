@@ -35,7 +35,7 @@ failure:
   cause: blocked
   phase: check.fix
   slot: A
-  reason: "F2 remaining: locked design decision — no atomic send on watcher status done (hc guards only idle); plus operator action: grants[1] exhausted (>=24 prompted vs 12), paid re-proof on repaired inputs needs a fresh grant; see implementation/report.md and review-B.md"
+  reason: "grants[2] exhausted at 8/8 check_start records; watch-live-agy-root and watch-live-agy-shell unproven on the repaired head — a fresh grant for the two agy cells is the operator action; see implementation/report.md check.fix pass 2"
   delivery: shown
 frozen:
   docs/pictures/watch-loop.svg: ca07e92b83fa975985888a4be19f211395d18fc2
