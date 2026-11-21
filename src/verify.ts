@@ -273,6 +273,109 @@ async function knownRedReceipt(repo: Repo, sha: string, scope: VerifyScope): Pro
   return false;
 }
 
+// Identity is command name and string + failing test name; sha is evidence, not identity.
+type Unit = { name: string; command: string; test: string };
+
+// A unit name that is a real test title: none of Bun's nameless forms.
+function named(name: string): boolean {
+  return (
+    !name.startsWith('(unnamed)') && !name.startsWith('(script)') && name !== '(no test name)' && name !== '(log gone)'
+  );
+}
+
+// One git-ancestry cache per caller: `onMain` tests membership on the tracked
+// default branch, `before` tests sha ordering. Both read `isAncestor`.
+async function mainAncestors(repo: Repo): Promise<{
+  onMain: (sha: string) => Promise<boolean>;
+  before: (a: string, b: string) => Promise<boolean>;
+}> {
+  const tip: string = await command(['git', 'rev-parse', trackingRef(repo)], repo.root);
+  const cache: Map<string, boolean> = new Map();
+  const before = async (a: string, b: string): Promise<boolean> => {
+    const key: string = `${a}\0${b}`;
+    if (!cache.has(key)) cache.set(key, await isAncestor(repo.root, a, b));
+    return cache.get(key)!;
+  };
+  return { onMain: (sha: string) => before(sha, tip), before };
+}
+
+function matching(run: VerifyRun, unit: Unit): VerifyRun['commands'][number] | undefined {
+  return run.commands.find(
+    (item) => item.name === unit.name && item.command === unit.command && item.blocked === undefined,
+  );
+}
+
+// A red observation `red` of `unit` resolves when a later completed run whose sha
+// sits on landed main at or after red's sha shows the same command green, or red
+// while naming only other real test titles. A nameless landed failure resolves
+// nothing, and a run that ended no later than the observation is not later.
+async function resolvedOnMain(
+  repo: Repo,
+  runs: VerifyRun[],
+  red: VerifyRun,
+  unit: Unit,
+  onMain: (sha: string) => Promise<boolean>,
+  before: (a: string, b: string) => Promise<boolean>,
+): Promise<boolean> {
+  for (const landed of runs) {
+    if (!completed(landed)) continue;
+    if (landed.end! <= red.end!) continue;
+    const hit = matching(landed, unit);
+    if (hit === undefined || hit.reused !== undefined) continue;
+    if (!(await onMain(landed.sha))) continue;
+    if (!(await before(red.sha, landed.sha))) continue;
+    if (hit.exit === 0) return true;
+    const names: string[] = hit.failures ?? (await failedTests(repo, hit.log));
+    if (names.every((name) => named(name) && name !== unit.test)) return true;
+  }
+  return false;
+}
+
+// A completed merge run on the head tree is covered when it holds at least one
+// red unit and every red unit is a named title a completed base run at or
+// before the head's merge-base already fails, still unresolved on landed main.
+// Unit names read stored `failures` first and the log second, as newRedUnits does.
+export async function mainRedCover(repo: Repo, sha: string): Promise<boolean> {
+  const runs: VerifyRun[] = readVerifyRuns(repo);
+  const tree: string = await treeOf(repo, sha);
+  const heads: VerifyRun[] = runs.filter(
+    (run) => run.tree === tree && completed(run) && sameCommands(run.commands, verifyCommands(repo.config, 'merge')),
+  );
+  if (heads.length === 0) return false;
+  const mergeBase: string = await command(['git', 'merge-base', sha, trackingRef(repo)], repo.root);
+  const { onMain, before } = await mainAncestors(repo);
+  const covered = async (unit: Unit): Promise<boolean> => {
+    if (!named(unit.test)) return false;
+    for (const red of runs) {
+      if (red.compares === undefined || !completed(red)) continue;
+      const item = matching(red, unit);
+      if (item === undefined || item.exit === 0 || item.reused !== undefined) continue;
+      if (!(item.failures ?? (await failedTests(repo, item.log))).includes(unit.test)) continue;
+      if (!(await before(red.sha, mergeBase))) continue;
+      if (await resolvedOnMain(repo, runs, red, unit, onMain, before)) continue;
+      return true;
+    }
+    return false;
+  };
+  for (const head of heads) {
+    const units: Unit[] = [];
+    for (const item of head.commands) {
+      if (item.exit === 0 || item.blocked !== undefined) continue;
+      for (const test of item.failures ?? (await failedTests(repo, item.log)))
+        units.push({ name: item.name, command: item.command, test });
+    }
+    if (units.length === 0) continue;
+    let all: boolean = true;
+    for (const unit of units)
+      if (!(await covered(unit))) {
+        all = false;
+        break;
+      }
+    if (all) return true;
+  }
+  return false;
+}
+
 // A pending notice covers only while its file waits in the folder; `error` never covers, `shown` and
 // older herdr reason strings always do.
 function noticeCovers(value: string | undefined, folder: string | null, id: string): boolean {
@@ -325,30 +428,10 @@ function recordNotice(target: NoticeTarget, id: string, notice: Notice): 'pendin
   }
 }
 
-// Identity is command name and string + failing test name; sha is evidence, not identity.
-type Unit = { name: string; command: string; test: string };
-
-function matching(run: VerifyRun, unit: Unit): VerifyRun['commands'][number] | undefined {
-  return run.commands.find(
-    (item) => item.name === unit.name && item.command === unit.command && item.blocked === undefined,
-  );
-}
-
 // A green observation is a completed record with the unit's command green whose sha sits on landed
 // main; a red observation R resolves when a green observation lands at or after R's sha.
 async function newRedUnits(repo: Repo, me: VerifyRun, runs: VerifyRun[], folder: string | null): Promise<string[]> {
-  const tip: string = await command(['git', 'rev-parse', trackingRef(repo)], repo.root);
-  const landed: Map<string, boolean> = new Map();
-  const onMain = async (sha: string): Promise<boolean> => {
-    if (!landed.has(sha)) landed.set(sha, await isAncestor(repo.root, sha, tip));
-    return landed.get(sha)!;
-  };
-  const covers: Map<string, boolean> = new Map();
-  const redOrGreen = async (red: string, green: string): Promise<boolean> => {
-    const key: string = `${red}\0${green}`;
-    if (!covers.has(key)) covers.set(key, await isAncestor(repo.root, red, green));
-    return covers.get(key)!;
-  };
+  const { onMain, before } = await mainAncestors(repo);
   const units: Unit[] = [];
   for (const item of me.commands) {
     if (item.exit === 0 || item.reused !== undefined || item.blocked !== undefined) continue;
@@ -366,17 +449,7 @@ async function newRedUnits(repo: Repo, me: VerifyRun, runs: VerifyRun[], folder:
       if (item.exit === 0) continue;
       if (run.compares === undefined) continue;
       if (!(item.failures ?? (await failedTests(repo, item.log))).includes(unit.test)) continue;
-      const resolved: boolean = await (async () => {
-        for (const green of runs) {
-          if (!completed(green)) continue;
-          if (green.end! <= run.end!) continue;
-          const hit = matching(green, unit);
-          if (hit === undefined || hit.exit !== 0 || hit.reused !== undefined) continue;
-          if (!(await onMain(green.sha))) continue;
-          if (await redOrGreen(run.sha, green.sha)) return true;
-        }
-        return false;
-      })();
+      const resolved: boolean = await resolvedOnMain(repo, runs, run, unit, onMain, before);
       if (!resolved && noticeCovers(run.notice, folder, noticeId(repo.name, 'main-red', run.run))) {
         covered = true;
         break;
@@ -471,7 +544,11 @@ function decideSlow(runs: VerifyRun[], index: number, folder: string | null): Sl
 export async function requireGreenReceipt(repo: Repo, sha: string, scope: VerifyScope): Promise<void> {
   const tree: string = await treeOf(repo, sha);
   const green: VerifyRun | undefined = greenRun(repo, tree, verifyCommands(repo.config, scope));
-  if (green === undefined && !(await knownRedReceipt(repo, sha, scope)))
+  if (
+    green === undefined &&
+    !(await knownRedReceipt(repo, sha, scope)) &&
+    !(scope === 'merge' && (await mainRedCover(repo, sha)))
+  )
     throw new Error(
       `No green ${scope} verify receipt for ${sha} under the current config; run akrogon verify on this commit`,
     );

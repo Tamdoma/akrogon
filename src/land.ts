@@ -3,7 +3,7 @@ import { readGlobal, requireRepo, globalHome, toolRoot, type GlobalConfig, type 
 import { readState, saveState, withLock, type Batch } from './state';
 import { command, CommandError, spawnCaptured, type SpawnResult } from './shell';
 import { landClaim, landGates, landPush, StaleLandError, type LandPush } from './phase';
-import { readVerifyRuns, verify, type VerifyRun } from './verify';
+import { mainRedCover, readVerifyRuns, verify, type VerifyRun } from './verify';
 import { leafSlice, sessionBusAddress } from './scope';
 import { landedWake, mergeWake } from './next';
 
@@ -83,7 +83,12 @@ async function land(global: GlobalConfig, repo: Repo, slug: string, attempt: str
   const lock: string = resolve(globalHome(), '.lock');
   for (let refusals: number = 0; ;) {
     const { leaf } = await withLock(lock, async () => landClaim(repo, slug, attempt));
-    if ((await verify(repo.root, undefined, attempt, undefined, false)) !== 0)
+    // A red head lands without a rerun or a base run when every failing unit is
+    // already an unresolved named red on main; any other red hands off as before.
+    if (
+      (await verify(repo.root, undefined, attempt, undefined, false)) !== 0 &&
+      !(await mainRedCover(repo, await command(['git', 'rev-parse', 'HEAD'], leaf.state.worktree ?? repo.root)))
+    )
       return handOff(global, repo, slug, attempt, {
         wake: 'red',
         red: await redRun(repo, leaf.state.worktree ?? repo.root),
