@@ -551,6 +551,41 @@ test('an unchanged red leaf gets a base pass when main and the merge top stay pu
   }
 }, 60000);
 
+test('a covered repeat and a new uncovered failure do not trigger a base pass', async () => {
+  const f: GreenFixture = await greenFixture({ test: 'sh check.sh' });
+  try {
+    await failingCheck(f, 'alpha');
+    const aa: string = await allocated(f, 'aa', 'issue-aa');
+    await commitIn(aa, 'aa-file', 'independent leaf edit');
+    toMerge(aa);
+    const first = await claimed(f, aa);
+    expect((await land(f, 'aa', first.attempt)).code).toBe(0);
+    expect(readState(aa).phase).toBe('check.repair');
+
+    const direct: string = resolve(f.home, 'direct');
+    mkdirSync(direct);
+    expect((await cli(f, ['verify', '--holder', direct, '--known-red'], f.root, f.env)).code).toBe(0);
+    expect(verifyRuns(f).filter((run) => run.compares !== undefined)).toHaveLength(1);
+    writeFileSync(resolve(f.root, 'check.sh'), 'echo "(fail) alpha"; echo "(fail) beta"; exit 7\n');
+    await command(['git', 'add', 'check.sh'], f.root);
+    await command(['git', 'commit', '-m', 'introduce beta failure on main'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+
+    await idleAll(f);
+    expect((await cli(f, ['phase', 'aa', 'merge', '--slot', 'B'], f.root, f.env)).code).toBe(0);
+    const second = await claimed(f, aa);
+    expect(second.top).not.toBe(first.top);
+    expect((await land(f, 'aa', second.attempt)).code).toBe(0);
+    const runs = verifyRuns(f);
+    expect(runs.find((run) => run.sha === second.top)?.commands[0].failures).toEqual(['alpha', 'beta']);
+    expect(runs.filter((run) => run.compares !== undefined)).toHaveLength(1);
+    expect(readState(aa).merge_exit).toMatchObject({ reason: 'red', top: second.top });
+    expect(readState(aa).merge_exit?.base_verdict).toBeUndefined();
+  } finally {
+    await f.clean();
+  }
+}, 60000);
+
 test('a green row at the merge-base skips the base pass and exits with its run as the verdict', async () => {
   const f: GreenFixture = await greenFixture({ ok: 'true' });
   try {
