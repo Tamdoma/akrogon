@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { cli, fakeAkrogon, procFixture, fixture, leaf, seedRun, storeDir, yaml, type Fixture } from './helpers';
-import { command, type Result } from '../src/shell';
+import { command, quote, type Result } from '../src/shell';
 import { readRepo } from '../src/config';
 import { requireGreenReceipt, verifyRunSchema, type VerifyRun } from '../src/verify';
 import { blockNotices, hcCore, noticeFiles, noticeFolder, type HcCore, type NoticeFile } from './hc-fixture';
@@ -101,7 +101,7 @@ async function bump(direct: string, file: string): Promise<string> {
 // The pass appends its receipt before checkout and rewrites it at the end,
 // keeping `start`: backdating that start mid-pass gives the run a real wall
 // time of about `ms` without waiting. Returns the appended run's id.
-async function backdate(f: Fixture, ms: number): Promise<string> {
+async function backdate(f: Fixture, ms: number, sha?: string): Promise<string> {
   const file: string = resolve(f.root, LEDGER);
   const deadline: number = Date.now() + 15000;
   while (Date.now() < deadline) {
@@ -111,8 +111,8 @@ async function backdate(f: Fixture, ms: number): Promise<string> {
           .filter((line) => line.trim() !== '')
       : [];
     const index: number = lines.findIndex((line) => {
-      const row = JSON.parse(line) as { scope?: string; end?: string };
-      return row.scope === 'merge' && row.end === undefined;
+      const row: { scope: string; end?: string; sha: string } = JSON.parse(line);
+      return row.scope === 'merge' && row.end === undefined && (sha === undefined || row.sha === sha);
     });
     if (index !== -1) {
       const row = JSON.parse(lines[index]) as { run: string; start: string };
@@ -769,6 +769,57 @@ test('an intervening leaf verify does not cause a delivered accepted notice to b
     expect(noticeFiles(core)).toHaveLength(0);
     expect(records(f).find((run) => run.run === closingId)?.slow?.accepted_notice).toBe('shown');
   } finally {
+    await core.stop();
+    f.clean();
+  }
+}, 30000);
+
+test('an overlapping merge verify uses the median from the accepted close', async () => {
+  const f: Fixture = await fixture();
+  const core: HcCore = await hcCore(f);
+  const releaseClose: string = resolve(f.home, 'release-close');
+  const releaseLate: string = resolve(f.home, 'release-late');
+  const pending: Promise<Result>[] = [];
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      setup: 'mkdir -p node_modules',
+      checks: {
+        unit: `gate=${quote(releaseClose)}; if test -f overlap-late.ts; then gate=${quote(releaseLate)}; fi; while ! test -f "$gate"; do sleep 0.02; done`,
+      },
+      grounding: 'none',
+    });
+    const env: NodeJS.ProcessEnv = coreEnv(f, core);
+    const { direct, holder } = await mergeCaller(f);
+    const lateTree: string = resolve(storeDir(f), 'overlap-late');
+    await command(['git', 'worktree', 'add', lateTree, '-b', 'overlap-late'], f.root);
+    const lateSha: string = await bump(lateTree, 'overlap-late.ts');
+    const closeSha: string = await bump(direct, 'overlap-close.ts');
+    const episode: string = seedEpisode(f, 0, { end: new Date(Date.now() - 15 * DAYS).toISOString() });
+    for (let i = 0; i < 10; i++) seedInEpisode(f, episode, 600000);
+    for (let i = 0; i < 8; i++) seedInEpisode(f, episode, 850000);
+
+    const late: Promise<Result> = cli(f, ['verify', '--holder', holder], lateTree, env);
+    pending.push(late);
+    const lateId: string = await backdate(f, 850000, lateSha);
+    const closing: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
+    pending.push(closing);
+    const closingId: string = await backdate(f, 850000, closeSha);
+    writeFileSync(releaseClose, '');
+    expect((await closing).code).toBe(0);
+    expect(noticeFiles(core)[0].body).toContain('10m');
+    writeFileSync(releaseLate, '');
+    expect((await late).code).toBe(0);
+
+    const nextSha: string = await bump(direct, 'overlap-next.ts');
+    expect((await cli(f, ['verify', '--holder', holder], direct, env)).code).toBe(0);
+    const runs: VerifyRun[] = records(f);
+    expect(runs.find((run) => run.sha === nextSha)?.slow?.normal_ms).toBe(600000);
+    expect(runs.find((run) => run.run === lateId)?.slow?.normal_ms).toBe(600000);
+    expect(runs.filter((run) => run.slow?.close === 'accepted').map((run) => run.run)).toEqual([closingId]);
+  } finally {
+    writeFileSync(releaseClose, '');
+    writeFileSync(releaseLate, '');
+    await Promise.allSettled(pending);
     await core.stop();
     f.clean();
   }
