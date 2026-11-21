@@ -1,4 +1,5 @@
 import { test, expect } from 'bun:test';
+import { ok as assert } from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { command, type Result } from '../src/shell';
@@ -188,6 +189,7 @@ test('alpha', () => expect(existsSync(${JSON.stringify(marker)})).toBe(true));
 
     const [red, green]: VerifyRun[] = records(f);
     expect(green.tree).not.toBe(red.tree);
+    assert(green.end !== undefined);
     const result: Result = await cli(f, ['flaky']);
     expect(result.code).toBe(0);
     expect(result.stdout.split(' ')).toEqual(['1', green.end, 'test', 'alpha']);
