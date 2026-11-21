@@ -473,6 +473,21 @@ test('a green same-tree retry consumes the red before a later rebased run', asyn
   }
 });
 
+test('fieldless same-tree receipts still count across leaf names', async (): Promise<void> => {
+  const f: Fixture = await fixture();
+  try {
+    const [red, green]: Step[] = pair('bun test', undefined);
+    seedRun(f, run(f, red, 0));
+    seedRun(f, run(f, { ...green, tree: red.tree, leaf: 'other-leaf' }, 1));
+
+    const result: Result = await cli(f, ['flaky']);
+    expect(result.code).toBe(0);
+    expect(result.stdout.split(' ')).toEqual(['1', green.end, 'test', 'alpha']);
+  } finally {
+    f.clean();
+  }
+});
+
 test('same-tree pairs count as today, with or without the new field', async (): Promise<void> => {
   const f: Fixture = await fixture();
   try {
