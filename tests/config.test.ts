@@ -12,6 +12,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { z } from 'zod';
 import { fixture, cli, leaf, yaml, printedChecks, type Fixture } from './helpers';
 import { command, quote, run, spawnCaptured, type Result } from '../src/shell';
 import {
@@ -301,6 +302,115 @@ test.each(refusedStores)(
     }
   },
 );
+
+test('config loads and prints a machine slots.consultant recipe', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const file: string = resolve(f.home, 'config.yaml');
+    const global = z.record(z.string(), z.unknown()).parse(Bun.YAML.parse(readFileSync(file, 'utf8')));
+    yaml(file, {
+      ...global,
+      slots: {
+        ...global.slots,
+        consultant: { harness: 'fake', model: 'recipe-m', effort: 'low' },
+      },
+    });
+    const recipe: object = { consultant: { harness: 'fake', model: 'recipe-m', effort: 'low' } };
+    const inside: Result = await cli(f, ['config']);
+    expect(inside.code).toBe(0);
+    expect(Bun.YAML.parse(inside.stdout)).toMatchObject({ slots: recipe });
+    const outside: Result = await cli(f, ['config'], f.home);
+    expect(outside.code).toBe(0);
+    expect(Bun.YAML.parse(outside.stdout)).toMatchObject({ slots: recipe });
+  } finally {
+    f.clean();
+  }
+});
+
+test('config refuses a machine slots.consultant whose harness is not in harnesses, naming the key', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const file: string = resolve(f.home, 'config.yaml');
+    const global = z.record(z.string(), z.unknown()).parse(Bun.YAML.parse(readFileSync(file, 'utf8')));
+    yaml(file, {
+      ...global,
+      slots: { ...global.slots, consultant: { harness: 'absent', model: 'm', effort: 'low' } },
+    });
+    const refused: Result = await cli(f, ['config']);
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain('consultant');
+    expect(refused.stderr).toContain('absent');
+  } finally {
+    f.clean();
+  }
+});
+
+test.each([
+  { name: 'a missing model', recipe: { harness: 'fake', effort: 'low' }, field: 'model' },
+  { name: 'a missing effort', recipe: { harness: 'fake', model: 'm' }, field: 'effort' },
+  { name: 'a blank model', recipe: { harness: 'fake', model: '   ', effort: 'low' }, field: 'model' },
+  { name: 'a blank effort', recipe: { harness: 'fake', model: 'm', effort: '' }, field: 'effort' },
+])('config refuses a machine slots.consultant with $name, naming the key', async ({ recipe, field }) => {
+  const f: Fixture = await fixture();
+  try {
+    const file: string = resolve(f.home, 'config.yaml');
+    const global = z.record(z.string(), z.unknown()).parse(Bun.YAML.parse(readFileSync(file, 'utf8')));
+    yaml(file, { ...global, slots: { ...global.slots, consultant: recipe } });
+    const refused: Result = await cli(f, ['config']);
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain('consultant');
+    expect(refused.stderr).toContain(field);
+  } finally {
+    f.clean();
+  }
+});
+
+test('config refuses slots.consultant in the repo issues/config.yaml', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      grounding: 'none',
+      slots: { consultant: { harness: 'fake', model: 'm', effort: 'e' } },
+    });
+    const refused: Result = await cli(f, ['config']);
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain('consultant');
+  } finally {
+    f.clean();
+  }
+});
+
+test('seats refuses slots.consultant in ISSUE.md front matter naming the file and key', async () => {
+  const f: Fixture = await fixture();
+  const previous: string | undefined = process.env.AKROGON_HOME;
+  process.env.AKROGON_HOME = f.home;
+  try {
+    const root: string = realpathSync(f.root);
+    yaml(resolve(root, 'issues/config.yaml'), { grounding: 'none' });
+    const global: GlobalConfig = readGlobal();
+    const repo: Repo = readRepo(f.repo, root);
+    const owner: string = resolve(root, 'issues/open/issue');
+    const leafPath: string = resolve(owner, 'leaf');
+    mkdirSync(leafPath, { recursive: true });
+    const file: string = resolve(owner, 'ISSUE.md');
+    writeFileSync(
+      file,
+      '---\nslots:\n  consultant:\n    harness: fake\n    model: m\n    effort: low\n---\n# t\n',
+    );
+    try {
+      seats(global, repo, leafPath);
+      throw new Error('seats did not throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(SeatIndexError);
+      expect((error as SeatIndexError).file).toBe(file);
+      expect((error as Error).message).toContain('consultant');
+    }
+  } finally {
+    if (previous === undefined) delete process.env.AKROGON_HOME;
+    else process.env.AKROGON_HOME = previous;
+    f.clean();
+  }
+});
 
 test('config prints per-repo merged slots with two overrides', async () => {
   const f: Fixture = await fixture();

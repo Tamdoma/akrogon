@@ -38,7 +38,7 @@ const contracts: Record<string, string> = {
   rollback: '',
   notice: '--title <text> --body <text> [--attention]',
   listen: '',
-  seat: '<slug> <A|B> [--task <text>] | --slot <letter> --harness <name> --model <model> --effort <effort> [--task <text>]',
+  seat: '<slug> <A|B> [--task <text>] | --slot <letter> --harness <name> --model <model> --effort <effort> [--task <text>] | --watch-consultant [--task <text>]',
 };
 
 function commandRows(markdown: string): CommandRow[] {
