@@ -413,10 +413,12 @@ test.serial('each due runs one check with its receipt first; busy dues each run 
     await waitLabel(rig, nextDue + 1, 25_000);
     expect(tickLines(rig, nextDue)).toHaveLength(1);
     expect(tickLines(rig, nextDue + 1)).toHaveLength(1);
-    // The receipt lands before the check call, so the count is provable only by the due's own
-    // turn: the last accept line carries t=<turn>, and its status call shares it.
-    const heldTurn: string | null =
-      / t=(\d+)/.exec(hooks(rig)[hooks(rig).findLastIndex((l) => /tick exit=0 accept/.test(l))] ?? '')?.[1] ?? null;
+    // The receipt lands before the check call, and the accept line carries the due's own turn:
+    // wait for the (nextDue+1)-th accept — the receipt can become visible before the hook
+    // writes it — then wait for `call status` at exactly that turn.
+    const accepts = (): string[] => hooks(rig).filter((l) => /tick exit=0 accept/.test(l));
+    for (let n: number = 0; n < 80 && accepts().length < nextDue + 1; n += 1) await Bun.sleep(200);
+    const heldTurn: string | null = / t=(\d+)/.exec(accepts()[nextDue] ?? '')?.[1] ?? null;
     expect(heldTurn).not.toBeNull();
     for (
       let n: number = 0;
@@ -424,6 +426,10 @@ test.serial('each due runs one check with its receipt first; busy dues each run 
       n += 1
     )
       await Bun.sleep(200);
+    expect(
+      calls(rig).some((l) => l.startsWith('call status') && l.endsWith(`t=${heldTurn}`)),
+      `status call at held due's turn ${heldTurn}`,
+    ).toBe(true);
     // one status call per delivered due: start + due1 + the two accrued dues
     expect(statusCalls(rig)).toBeGreaterThanOrEqual(4);
 
