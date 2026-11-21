@@ -27,9 +27,9 @@ A tick that queues up while a check runs gets its own check afterwards. A prompt
 
 ## What stays yours
 
-The watch never recovers a leaf that failed on a credential, a permission, a decision or an outside step. It notifies you instead. Fix the cause, then move the leaf yourself as shown in [Limits](../reference/limits.md).
+The watch now consults and recovers on its own: a failure it cannot retry starts a consultant, a peer agent the watch exchanges case files with, and a verified fix resumes the leaf without you. What it stops for and brings to you is the stop list: a credential, login, grant or permission; spend past a recorded grant; a change to a decision or lock you made; host tooling installs or downgrades; a force push or history rewrite; and a fix that would change what was decided. Stopping the watch itself is yours too.
 
-The watch never kills an agent, kills or removes a terminal, answers a seat, or edits `state.yaml`, worktrees or `issues/`.
+The watch still never kills an agent, kills or removes a terminal other than the timer and its own consultant, answers a leaf seat, or edits `state.yaml`, worktrees or `issues/`.
 
 ## Stop the watch
 
