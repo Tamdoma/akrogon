@@ -786,6 +786,254 @@ test('a linked pair fails to satisfy requireGreenReceipt with unnamed or unlinke
   }
 });
 
+// The merge gate's main-red cover: a completed red run on the head tree whose
+// every failing unit is a named title that an unresolved red on main already
+// holds, observed in a completed base run at or before the head's merge-base.
+test('requireGreenReceipt accepts a covered merge head and refuses uncovered and resolved ones', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const older: string = await command(['git', 'rev-parse', 'origin/main'], f.root);
+    await commitIn(f.root, 'main2.ts');
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    const { worktree } = await callerWorktree(f);
+    const head: string = await commitIn(worktree, 'code.ts');
+    const tree: string = await command(['git', 'rev-parse', 'HEAD^{tree}'], worktree);
+    const mergeBase: string = await command(['git', 'merge-base', 'HEAD', 'origin/main'], worktree);
+    const baseTree: string = await command(['git', 'rev-parse', `${mergeBase}^{tree}`], f.root);
+    const repo: Repo = readRepo(f.repo, f.root);
+    const cmds: { name: string; command: string }[] = verifyCommands(repo.config, 'merge');
+    const file: string = resolve(f.root, 'issues/verify-runs.jsonl');
+    const later: string = '2999-01-01T00:00:00.000Z';
+    const reset = (): void => writeFileSync(file, '');
+    const headRun = (failures: string[], extra: Partial<VerifyRun> = {}): VerifyRun =>
+      seedRun(f, {
+        sha: head,
+        tree,
+        scope: 'merge',
+        commands: cmds.map((item) => ({ ...item, exit: 7, log: resolve(f.home, 'head.log'), failures })),
+        ...extra,
+      });
+    const baseRun = (failures: string[], extra: Partial<VerifyRun> = {}): VerifyRun =>
+      seedRun(f, {
+        sha: mergeBase,
+        tree: baseTree,
+        scope: 'merge',
+        compares: 'older-head',
+        commands: cmds.map((item) => ({ ...item, exit: 7, log: resolve(f.home, 'base.log'), failures })),
+        ...extra,
+      });
+    const refuse = async (): Promise<void> => {
+      await expect(requireGreenReceipt(repo, head, 'merge')).rejects.toThrow(
+        `No green merge verify receipt for ${head}`,
+      );
+    };
+
+    // Named unit, stored failures on both sides, base at the merge-base.
+    headRun(['alpha']);
+    baseRun(['alpha']);
+    await requireGreenReceipt(repo, head, 'merge');
+
+    // The same cover reads red names from the log when failures are not stored.
+    reset();
+    writeFileSync(resolve(f.home, 'head.log'), '(fail) alpha\n');
+    seedRun(f, {
+      sha: head,
+      tree,
+      scope: 'merge',
+      commands: cmds.map((item) => ({ ...item, exit: 7, log: resolve(f.home, 'head.log') })),
+    });
+    writeFileSync(resolve(f.home, 'base.log'), '(fail) alpha\n');
+    seedRun(f, {
+      sha: mergeBase,
+      tree: baseTree,
+      scope: 'merge',
+      compares: 'older-head',
+      commands: cmds.map((item) => ({ ...item, exit: 7, log: resolve(f.home, 'base.log') })),
+    });
+    await requireGreenReceipt(repo, head, 'merge');
+
+    // An older completed base run also covers.
+    reset();
+    headRun(['alpha']);
+    baseRun(['alpha'], { sha: older, tree: await command(['git', 'rev-parse', `${older}^{tree}`], f.root) });
+    await requireGreenReceipt(repo, head, 'merge');
+
+    // A nameless unit is never covered.
+    for (const nameless of ['(unnamed) check.sh', '(script) check.sh', '(no test name)']) {
+      reset();
+      headRun([nameless]);
+      baseRun([nameless]);
+      await refuse();
+    }
+
+    // A base run after the merge-base is not main-red evidence for this head.
+    const after: string = await commitIn(f.root, 'later.ts');
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    reset();
+    headRun(['alpha']);
+    baseRun(['alpha'], { sha: after, tree: await command(['git', 'rev-parse', `${after}^{tree}`], f.root) });
+    await refuse();
+
+    // A base run whose names differ leaves the unit uncovered.
+    reset();
+    headRun(['alpha']);
+    baseRun(['beta']);
+    await refuse();
+
+    // One uncovered unit among covered ones uncovers the run.
+    reset();
+    seedRun(f, {
+      sha: head,
+      tree,
+      scope: 'merge',
+      commands: cmds.map((item) => ({
+        ...item,
+        exit: 7,
+        log: resolve(f.home, 'head.log'),
+        failures: ['alpha', 'beta'],
+      })),
+    });
+    baseRun(['alpha']);
+    await refuse();
+
+    // An incomplete or setup-failed base run never covers.
+    reset();
+    headRun(['alpha']);
+    baseRun(['alpha'], { end: undefined });
+    await refuse();
+    reset();
+    headRun(['alpha']);
+    baseRun(['alpha'], { setup: 9 });
+    await refuse();
+
+    // Leaf scope has no ledger cover.
+    reset();
+    seedRun(f, {
+      sha: head,
+      tree,
+      scope: 'leaf',
+      commands: verifyCommands(repo.config, 'leaf').map((item) => ({
+        ...item,
+        exit: 7,
+        log: resolve(f.home, 'head.log'),
+        failures: ['alpha'],
+      })),
+    });
+    baseRun(['alpha']);
+    await expect(requireGreenReceipt(repo, head, 'leaf')).rejects.toThrow('No green leaf verify receipt');
+
+    // A landed run that ends after the base run and passes the command resolves
+    // the red: the head is no longer covered.
+    const afterTree: string = await command(['git', 'rev-parse', `${after}^{tree}`], f.root);
+    const landed = (entry: { exit: number; failures?: string[] }, extra: Partial<VerifyRun> = {}): VerifyRun =>
+      seedRun(f, {
+        sha: after,
+        tree: afterTree,
+        scope: 'merge',
+        start: later,
+        end: later,
+        commands: cmds.map((item) => ({
+          ...item,
+          exit: entry.exit,
+          log: resolve(f.home, 'landed.log'),
+          ...(entry.failures === undefined ? {} : { failures: entry.failures }),
+        })),
+        ...extra,
+      });
+    for (const entry of [{ exit: 0 }, { exit: 1, failures: ['beta'] }]) {
+      reset();
+      headRun(['alpha']);
+      baseRun(['alpha']);
+      landed(entry);
+      await refuse();
+    }
+
+    // A landed run still red on the unit, one red only on a nameless unit, one
+    // ending before the base run and one whose sha is not on landed main each
+    // resolve nothing: the cover still stands.
+    for (const extra of [
+      { exit: 1, failures: ['alpha', 'beta'] },
+      { exit: 1, failures: ['(script) check.sh'] },
+    ]) {
+      reset();
+      headRun(['alpha']);
+      baseRun(['alpha']);
+      landed(extra);
+      await requireGreenReceipt(repo, head, 'merge');
+    }
+    reset();
+    headRun(['alpha']);
+    baseRun(['alpha'], { end: later });
+    landed({ exit: 0 }, { start: '2000-01-01T00:00:00.000Z', end: '2000-01-01T00:00:00.000Z' });
+    await requireGreenReceipt(repo, head, 'merge');
+    reset();
+    headRun(['alpha']);
+    baseRun(['alpha']);
+    // A green run whose sha never landed resolves nothing; a different command
+    // string also keeps it out of the green-run shortcut.
+    seedRun(f, {
+      sha: head,
+      tree,
+      scope: 'merge',
+      start: later,
+      end: later,
+      commands: cmds.map((item) => ({
+        name: item.name,
+        command: 'other',
+        exit: 0,
+        log: resolve(f.home, 'landed.log'),
+      })),
+    });
+    await requireGreenReceipt(repo, head, 'merge');
+  } finally {
+    f.clean();
+  }
+});
+
+test('a landed run that drops the unit and fails only named tests resolves the main-red incident', async () => {
+  const f: Fixture = await fixture();
+  const core: HcCore = await hcCore(f);
+  try {
+    await failureScript(f, 'alpha');
+    const env: NodeJS.ProcessEnv = core.env;
+    const repo: Repo = readRepo(f.repo, f.root);
+    const cmds: { name: string; command: string }[] = verifyCommands(repo.config, 'merge');
+    const base: string = await command(['git', 'rev-parse', 'origin/main'], f.root);
+    const baseTree: string = await command(['git', 'rev-parse', `${base}^{tree}`], f.root);
+    // The first incident: alpha red on main, noticed.
+    const { worktree: w1 } = await callerWorktree(f, 'one');
+    await commitIn(w1, 'a.ts');
+    expect((await cli(f, ['verify', '--known-red'], w1, env)).code).toBe(0);
+    expect(noticeFiles(core)).toHaveLength(1);
+    const first: VerifyRun = baseRecord(
+      f,
+      records(f).find((run) => run.sha !== base)!,
+    );
+    // A later landed run that fails only a different named unit resolves it.
+    seedRun(f, {
+      sha: base,
+      tree: baseTree,
+      scope: 'merge',
+      start: '2999-01-01T00:00:00.000Z',
+      end: '2999-01-01T00:00:00.000Z',
+      commands: cmds.map((item) => ({
+        ...item,
+        exit: 7,
+        log: resolve(f.home, 'landed.log'),
+        failures: ['beta'],
+      })),
+    });
+    const { worktree: w2 } = await callerWorktree(f, 'two');
+    await commitIn(w2, 'b.ts');
+    expect((await cli(f, ['verify', '--known-red'], w2, env)).code).toBe(0);
+    expect(noticeFiles(core)).toHaveLength(2);
+    expect(first.run).not.toBe(baseRecord(f, records(f).at(-1)!).run);
+  } finally {
+    await core.stop();
+    f.clean();
+  }
+});
+
 test('plain verify on a red head writes only its own run', async () => {
   const f: Fixture = await fixture();
   try {

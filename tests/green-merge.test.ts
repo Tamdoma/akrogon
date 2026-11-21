@@ -2,7 +2,7 @@ import { test, expect } from 'bun:test';
 import { appendFileSync, chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { cli, fakeSystemctl, fixture, leaf, yaml, type Fixture, type SystemctlFixture } from './helpers';
+import { cli, fakeSystemctl, fixture, leaf, seedRun, yaml, type Fixture, type SystemctlFixture } from './helpers';
 import { hcFixture, type HcFixture } from './hc-fixture';
 import { readState, saveState, type State } from '../src/state';
 import { command, run, type Result } from '../src/shell';
@@ -66,7 +66,7 @@ function attempts(f: Fixture): string[] {
         .map((line) => z.object({ outcome: z.string() }).parse(JSON.parse(line)).outcome)
     : [];
 }
-function verifyRuns(f: Fixture): { run: string; sha: string; commands: { exit: number }[] }[] {
+function verifyRuns(f: Fixture): { run: string; sha: string; compares?: string; commands: { exit: number }[] }[] {
   const file: string = resolve(f.root, 'issues/verify-runs.jsonl');
   return existsSync(file)
     ? readFileSync(file, 'utf8')
@@ -196,6 +196,73 @@ test('a red verify is never pushed and wakes B once', async () => {
     expect(prompts(f, 'merge-issue')).toHaveLength(1);
     expect(landLaunches(f)).toHaveLength(1);
     expect(verifyRuns(f)).toHaveLength(runs);
+  } finally {
+    await f.clean();
+  }
+}, 60000);
+
+// A check whose log names the failing test, plus a completed base run holding
+// that same named unit red at the leaf's merge-base, is the covered main-red
+// head the land run lands without a rerun or a base run.
+async function failingCheck(f: GreenFixture, name: string): Promise<void> {
+  writeFileSync(resolve(f.root, 'check.sh'), `echo "(fail) ${name}"; exit 7\n`);
+  yaml(resolve(f.root, 'issues/config.yaml'), { checks: { test: 'sh check.sh' }, grounding: 'none' });
+  await command(['git', 'add', 'check.sh', 'issues/config.yaml'], f.root);
+  await command(['git', 'commit', '-m', 'failing check'], f.root);
+  await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+}
+
+test('a red head covered by an unresolved red on main lands on its first run with one verify', async () => {
+  const f: GreenFixture = await greenFixture({ ok: 'true' });
+  try {
+    await failingCheck(f, 'alpha');
+    const path: string = await allocated(f, 'aa', 'issue-aa');
+    await commitIn(path, 'aa-file', 'aa\n');
+    toMerge(path);
+    const { attempt, top } = await claimed(f, path);
+    const base: string = await command(['git', 'merge-base', top, 'origin/main'], f.root);
+    const seeded = seedRun(f, {
+      sha: base,
+      tree: await command(['git', 'rev-parse', `${base}^{tree}`], f.root),
+      scope: 'merge',
+      compares: 'older-head',
+      commands: [
+        { name: 'test', command: 'sh check.sh', exit: 7, log: resolve(f.home, 'base-red.log'), failures: ['alpha'] },
+      ],
+    });
+    writeFileSync(seeded.commands[0].log, '(fail) alpha\n');
+    expect((await land(f, 'aa', attempt)).code).toBe(0);
+    expect(await remoteTip(f)).toBe(top);
+    expect(readState(moved(path)).phase).toBe('merged');
+    const runs: { run: string; sha: string; compares?: string; commands: { exit: number }[] }[] = verifyRuns(f);
+    expect(runs.filter((run) => run.run !== seeded.run)).toHaveLength(1);
+    const head = runs.find((run) => run.run !== seeded.run)!;
+    expect(head.sha).toBe(top);
+    expect(head.compares).toBeUndefined();
+    expect(head.commands.every((item) => item.exit !== 0)).toBe(true);
+    expect(attempts(f)).toEqual(['merged']);
+    expect(prompts(f, 'merge-issue')).toEqual([]);
+    expect(landLaunches(f)).toHaveLength(1);
+  } finally {
+    await f.clean();
+  }
+}, 60000);
+
+test('a named red unit that is not an unresolved red on main hands off to the seat', async () => {
+  const f: GreenFixture = await greenFixture({ ok: 'true' });
+  try {
+    await failingCheck(f, 'beta');
+    const path: string = await allocated(f, 'aa', 'issue-aa');
+    await commitIn(path, 'aa-file', 'aa\n');
+    toMerge(path);
+    const before: string = await remoteTip(f);
+    const { attempt } = await claimed(f, path);
+    expect((await land(f, 'aa', attempt)).code).toBe(0);
+    expect(await remoteTip(f)).toBe(before);
+    const state: State = readState(path);
+    expect(state.batch).toMatchObject({ owner: 'seat', wake: 'red' });
+    expect(prompts(f, 'merge-issue')).toHaveLength(1);
+    expect(prompts(f, 'merge-issue')[0]).toContain(`wake=red red=${z.string().parse(state.batch?.red)}`);
   } finally {
     await f.clean();
   }
