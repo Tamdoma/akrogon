@@ -577,16 +577,29 @@ async function exitAgent(cell: Cell): Promise<number> {
   return agentPid;
 }
 
-// After the timer is gone (exit or stop proven), the calls log is the append-only count of
-// delivered ticks: dues are not unique (a resend repeats one) and a bounded screen drops
-// lines, but every delivered tick makes the wrapper log `call config` first, so the window's
-// end must show the same count. The S5a allowance is covered by placement: a tick already
-// racing the shell exit logged its call before the baseline.
+// After the timer is gone (exit or stop proven), delivery itself is the boundary, not any
+// script the tick may run: a tick can arrive at a bash shell and run no akrogon call at all
+// (agy-shell's exit race showed one). hc's `turn` counts each delivered input while an app is
+// detected; on a bash shell `turn` stays 0 but the pasted line echoes into the screen
+// history, so the `watch-issues tick` occurrence count over `hc read` covers it. Both are
+// asserted unchanged: dues are not unique, and a repeat of the same literal tick still adds
+// one turn or one echoed line. Nothing but a delivery adds a tick line in this window, so a
+// bounded history that loses old lines is safe. The S5a allowance is covered by placement: a
+// tick already racing the shell exit landed — and counted — before the baseline.
+const tickLines = (text: string): number => (text.match(/watch-issues tick/g) ?? []).length;
 async function noDeliveredTick(cell: Cell, ms: number): Promise<void> {
-  const baseline: number = calls(cell.callLog).length;
+  const baseline: { turn: number; ticks: number } = {
+    turn: (await get(cell.tier, cell.watcher)).turn,
+    ticks: tickLines(await screen(cell.tier, cell.watcher, 400)),
+  };
   await Bun.sleep(ms);
-  cell.tier.record('quiet-end-screen.txt', await screen(cell.tier, cell.watcher));
-  expect(calls(cell.callLog).length).toBe(baseline);
+  const end: string = await screen(cell.tier, cell.watcher, 400);
+  cell.tier.record('quiet-end-screen.txt', end);
+  const after: { turn: number; ticks: number } = {
+    turn: (await get(cell.tier, cell.watcher)).turn,
+    ticks: tickLines(end),
+  };
+  expect(after).toEqual(baseline);
 }
 
 // A probe tick that must run no check: wait for the hook's `tick exit=` boundary, then read the
