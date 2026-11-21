@@ -188,10 +188,10 @@ test.serial(
       await command(['git', 'commit', '-m', 'stage base red'], tier.root);
       await command(['git', 'push', 'origin', 'HEAD:main'], tier.root);
       await stageLeaf(tier, worktrees);
-      tier.record(
-        'staged.txt',
-        `base=${(await spawnCaptured(['git', 'rev-parse', 'origin/main'], { cwd: tier.root })).stdout.trim()}\n`,
-      );
+      const staged: string = (
+        await spawnCaptured(['git', 'rev-parse', 'origin/main'], { cwd: tier.root })
+      ).stdout.trim();
+      tier.record('staged.txt', `base=${staged}\n`);
 
       // The watcher session (pi, low): the leaf's skill copy plus its scripts on PATH, then
       // `watch-issues <root>` starts the timer.
@@ -263,15 +263,15 @@ test.serial(
       tier.record('consultant.json', consultant);
 
       // The fix lands: the leaf resumes out of failed, and the case end already closed the
-      // consultant (hc kill + rm) before the resume commands ran.
+      // consultant (hc kill + rm) before the resume commands ran: its terminal is gone.
       const resumed: string[] = ['check.fix', 'check.review', 'check.repair'];
       while (!resumed.includes(statePhase(tier.root, SLUG)) && Date.now() < deadline) await Bun.sleep(5000);
       const phase: string = statePhase(tier.root, SLUG);
-      const closed: Term | null = await waitLabelled(tier, { 'akrogon.watch-consult': 'akre2e' }, 1000);
+      const removed: boolean = await gone(tier, consultant!.address);
       tier.record('watcher-screen.txt', await screen(tier, watcher, 200));
       tier.record('watcher-transcript.txt', (await transcriptFor({ session, address: watcher })) ?? 'none');
       expect(resumed).toContain(phase);
-      expect(closed, `consultant still live after resume\n${await screen(tier, watcher, 60)}`).toBeNull();
+      expect(removed, `consultant ${consultant!.address} not removed\n${await screen(tier, watcher, 60)}`).toBe(true);
 
       // The leaf's seat A (the tier stand-in) starts on the resumed phase: akrogon next dispatched it.
       const seat: Term | null = await waitLabelled(
@@ -282,12 +282,21 @@ test.serial(
       tier.record('seat.json', seat);
       expect(seat, `no leaf seat after resume to ${phase}`).not.toBeNull();
 
-      // The case record: folder under <AKROGON_HOME>/watch/<repo>/consults/<case-id>/,
-      // signature parses, the recorded turn files exist, the pushed base is fast-forward.
+      // The case record: folder under <AKROGON_HOME>/watch/<repo>/consults/<case-id>/. The case
+      // ends after the resume (status written, then the push and move notices), so the record
+      // is read once its status has ended and both notices landed.
       const consults: string = resolve(leafTemp, `${name}-home`, 'watch/akre2e/consults');
       const cases: string[] = readdirSync(consults);
       expect(cases.length).toBe(1);
       const caseDir: string = resolve(consults, cases[0]);
+      const status = (): string =>
+        existsSync(resolve(caseDir, 'status')) ? readFileSync(resolve(caseDir, 'status'), 'utf8').trim() : 'missing';
+      const ended: string[] = ['closed', 'resumed'];
+      const settleBy: number = Date.now() + Math.min(90_000, Math.max(10_000, deadline - Date.now() - 30_000));
+      while ((notices(scratch).length < 2 || !ended.includes(status())) && Date.now() < settleBy) await Bun.sleep(2000);
+      const seen = notices(scratch);
+      tier.record('notices.json', seen);
+      tier.record('case-status.txt', status());
       tier.record('case-listing.txt', readdirSync(caseDir).join('\n'));
       for (const file of ['brief.md', 'signature.json', 'case.md'])
         expect(existsSync(resolve(caseDir, file)), `missing ${file}`).toBe(true);
@@ -307,23 +316,38 @@ test.serial(
       tier.record('case-brief.md', readFileSync(resolve(caseDir, 'brief.md'), 'utf8'));
       tier.record('case-case.md', readFileSync(resolve(caseDir, 'case.md'), 'utf8'));
       expect(signature.anchor).toBe(SLUG);
-      const turns: string[] = readdirSync(caseDir).filter((f) => /^turn-\d+-(watch|consultant)\.md$/.test(f));
-      expect(turns.some((f) => f.includes('watch'))).toBe(true);
-      expect(turns.some((f) => f.includes('consultant'))).toBe(true);
-      const baseLog: SpawnResult = await spawnCaptured(['git', 'log', '--oneline', '-5', 'origin/main'], {
+      expect(ended).toContain(status());
+      // Notices: one for the push and one for the move, none attention.
+      expect(seen.length).toBeGreaterThanOrEqual(2);
+      expect(seen.every((n) => n.attention === false)).toBe(true);
+
+      // Every turn file named in a send exists, with a send each way: the consultant's sends land
+      // on the watcher's screen inside `<hc from="<consultant> ...">`, the watcher's go out as
+      // `hc send` commands.
+      const full: string = await screen(tier, watcher, 2000);
+      tier.record('watcher-screen-full.txt', full);
+      const named = (l: string): string[] => [...l.matchAll(/turn-\d+-(?:watch|consultant)\.md/g)].map((m) => m[0]);
+      const lines: string[] = full.split('\n');
+      const inbound: string[] = lines.filter((l) => l.includes(`<hc from="${consultant!.address} `)).flatMap(named);
+      const outbound: string[] = lines.filter((l) => /\bhc send\b/.test(l)).flatMap(named);
+      tier.record('sent-turn-files.json', { inbound, outbound });
+      expect(inbound.some((f) => f.endsWith('-consultant.md'))).toBe(true);
+      expect(outbound.some((f) => f.endsWith('-watch.md'))).toBe(true);
+      for (const file of [...inbound, ...outbound])
+        expect(existsSync(resolve(caseDir, file)), `sent ${file} missing from the case`).toBe(true);
+
+      // The base fix advanced the remote default branch fast-forward from the staged base.
+      await command(['git', 'fetch', '-q', 'origin'], tier.root);
+      const tip: string = (await spawnCaptured(['git', 'rev-parse', 'origin/main'], { cwd: tier.root })).stdout.trim();
+      const forward: SpawnResult = await spawnCaptured(['git', 'merge-base', '--is-ancestor', staged, tip], {
         cwd: tier.root,
       });
-      tier.record('base-log.txt', baseLog.stdout);
-      expect(baseLog.stdout).toContain('stage base red'); // the fix pushed fast-forward on top
-
-      // Notices: at least one non-attention notice (push/move), none attention. The case sends
-      // them last, after the resume and the status write, so wait for them.
-      const noticeBy: number = Date.now() + Math.min(90_000, Math.max(10_000, deadline - Date.now() - 30_000));
-      while (notices(scratch).length === 0 && Date.now() < noticeBy) await Bun.sleep(2000);
-      const seen = notices(scratch);
-      tier.record('notices.json', seen);
-      expect(seen.length).toBeGreaterThanOrEqual(1);
-      expect(seen.every((n) => n.attention === false)).toBe(true);
+      tier.record(
+        'base-log.txt',
+        (await spawnCaptured(['git', 'log', '--oneline', '-5', 'origin/main'], { cwd: tier.root })).stdout,
+      );
+      expect(tip).not.toBe(staged);
+      expect(forward.code).toBe(0);
 
       const left: string[] = await stopWatchTier(tier, [leafTemp]);
       tier.record('absence.json', { left });
