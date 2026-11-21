@@ -2,7 +2,7 @@ import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { cli, fakeAkrogon, procFixture, fixture, seedRun, storeDir, yaml, type Fixture } from './helpers';
+import { cli, fakeAkrogon, procFixture, fixture, leaf, seedRun, storeDir, yaml, type Fixture } from './helpers';
 import { command, type Result } from '../src/shell';
 import { readRepo } from '../src/config';
 import { requireGreenReceipt, verifyRunSchema, type VerifyRun } from '../src/verify';
@@ -730,6 +730,44 @@ test('a failed accepted notice is retried by the next checked run', async () => 
     // The in-place retry never reopens the episode in status.
     const status: Result = await cli(f, ['status'], f.home, env);
     expect(status.stdout).not.toContain('Slow merge:');
+  } finally {
+    await core.stop();
+    f.clean();
+  }
+}, 30000);
+
+test('an intervening leaf verify does not cause a delivered accepted notice to be resent', async () => {
+  const f: Fixture = await fixture();
+  const core: HcCore = await hcCore(f);
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      setup: 'mkdir -p node_modules',
+      checks: { unit: 'echo unit' },
+      grounding: 'none',
+    });
+    const env: NodeJS.ProcessEnv = coreEnv(f, core);
+    const { direct, holder } = await mergeCaller(f);
+    const episode: string = seedEpisode(f, 0, { end: new Date(Date.now() - 15 * DAYS).toISOString() });
+    for (let i = 0; i < 18; i++) seedInEpisode(f, episode, 500000);
+    const closing: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
+    const closingId: string = await backdate(f, 500000);
+    expect((await closing).code).toBe(0);
+    expect(records(f).find((run) => run.run === closingId)?.slow?.accepted_notice).toBe('pending');
+    const files: NoticeFile[] = noticeFiles(core);
+    expect(files).toHaveLength(1);
+    rmSync(files[0].path);
+
+    const worktree: string = resolve(storeDir(f), 'unrelated-leaf');
+    await command(['git', 'worktree', 'add', worktree, '-b', 'unrelated-leaf'], f.root);
+    leaf(f, 'unrelated-leaf', 'implement', { worktree });
+    const sha: string = await bump(worktree, 'leaf.ts');
+    expect((await cli(f, ['verify'], worktree, env)).code).toBe(0);
+    expect(records(f).find((run) => run.sha === sha)?.scope).toBe('leaf');
+
+    await bump(direct, 'next.ts');
+    expect((await cli(f, ['verify', '--holder', holder], direct, env)).code).toBe(0);
+    expect(noticeFiles(core)).toHaveLength(0);
+    expect(records(f).find((run) => run.run === closingId)?.slow?.accepted_notice).toBe('shown');
   } finally {
     await core.stop();
     f.clean();
