@@ -17,6 +17,7 @@ import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
+import { waitFor, type Seen } from '../../src/hc';
 import { command, spawnCaptured, type SpawnResult } from '../../src/shell';
 import { transcriptFor } from '../../src/transcript';
 import { realHome, required } from './tier';
@@ -229,6 +230,15 @@ test.serial(
       expect(run.code).toBe(0);
       const watcher: string = z.object({ address: z.string() }).parse(JSON.parse(run.stdout)).address;
       tier.record('cwds.json', [tier.root, leafTemp]);
+      // pi must be listening before the task lands: a send before its idle state sits
+      // unsubmitted in the input line (plan-red run and the first lane run both lost it).
+      const ready: Seen | null = await waitFor(
+        session,
+        watcher,
+        (t: Seen) => t.status?.state === 'idle' || t.status?.state === 'done',
+        120_000,
+      );
+      expect(ready, `watcher never idle; screen:\n${await screen(tier, watcher)}`).not.toBeNull();
       await send(tier, watcher, `watch-issues ${tier.root}`);
 
       // The consult: the consultant terminal appears under the verified name and labels.
