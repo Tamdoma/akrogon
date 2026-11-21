@@ -301,6 +301,50 @@ test('a failed holder with a landed candidate is told to move back, then reconci
   }
 }, 20000);
 
+test('a failed holder with no candidate is rebuilt on the new base, never dispatched on its stale attempt', async () => {
+  const f: DispatchFixture = await dispatchFixture();
+  try {
+    const aa: { path: string } = await allocatedLeaf(f, 'aa');
+    await commitFile(f, aa.path, 'aa-file', 'aa\n');
+    toMerge(aa.path, '2026-09-11T00:00:00.000Z');
+    expect((await next(f, ['--all'])).code).toBe(0);
+    const staleAttempt: string = z.string().parse(readState(aa.path).batch?.attempt);
+    const staleTop: string = z.string().parse(readState(aa.path).batch?.top);
+    // The leaf fails in merge before any push: the applied batch holds no candidate.
+    saveState(aa.path, {
+      ...readState(aa.path),
+      phase: 'failed',
+      batch: { ...readState(aa.path).batch!, owner: 'seat' },
+      failure: { cause: 'blocked', phase: 'merge', slot: 'B', reason: 'merge blocked' },
+    });
+    await pushMain(f, 'main-advance');
+    const newTip: string = await remoteTip(f);
+    resetPrompts(f);
+    // The consultant's base fix landed; the watch resumes the leaf as the criterion states.
+    expect((await cli(f, ['phase', 'aa', 'merge'], f.root, f.env)).code).toBe(0);
+    expect((await next(f, ['aa'])).code).toBe(0);
+    const state: State = readState(aa.path);
+    expect(state.phase).toBe('merge');
+    expect(state.batch?.attempt).not.toBe(staleAttempt);
+    expect(state.batch?.built_on).toBe(newTip);
+    expect(await head(f, 'aa')).toBe(z.string().parse(state.batch?.top));
+    expect(
+      (await run(['git', 'merge-base', '--is-ancestor', newTip, z.string().parse(state.batch?.top)], f.root)).code,
+    ).toBe(0);
+    expect(prompts(f).filter((prompt) => prompt.includes(staleAttempt) || prompt.includes(staleTop))).toEqual([]);
+    const ledgerPath: string = resolve(f.root, 'issues/merge-attempts.jsonl');
+    const ledger: string = existsSync(ledgerPath) ? readFileSync(ledgerPath, 'utf8') : '';
+    expect(ledger).not.toContain(staleAttempt);
+    expect(ledger).not.toContain(staleTop);
+    // The fresh attempt dispatches normally once the land run hands it over.
+    seatOwned(aa.path);
+    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(mergePrompts(f)).toEqual([expectedPrompt(aa.path)]);
+  } finally {
+    await f.clean();
+  }
+}, 25000);
+
 test('a landed candidate moves the holder once, clears the record, and the next pass wakes dependents', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
