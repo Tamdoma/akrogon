@@ -51,7 +51,7 @@ A pass visits merged leaves first. Then it visits leaves that more unmerged leav
 
 `max_active` in your machine config limits how many leaves run at once across all registered repositories. At the limit no new leaf starts, but leaves that already have a tab keep working. Leaves waiting in the merge phase do not count toward the limit. Each leaf has two seats, so this is not a count of agent processes. See [config.md](../reference/config.md).
 
-Leaves in the `merge` phase take turns. Each repository has one merge turn. Only the leaf holding it is prompted. The rest wait until it frees.
+Leaves in the `merge` phase take turns. Each repository has one merge turn. The leaf holding it is rebased, verified and pushed by the command's land run; a red verify or a refused gate exits it to `check.repair`. The rest wait until the turn frees.
 
 ## When picked work cannot start
 

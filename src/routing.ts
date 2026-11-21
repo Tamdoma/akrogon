@@ -37,7 +37,7 @@ export const routing: Record<Phase, Route> = {
   'check.review': { skill: 'check-issue', slots: ['A', 'B'], next: ['merge', 'check.repair', 'failed'] },
   'check.repair': { skill: 'check-issue', slots: ['B'], next: ['merge', 'check.fix', 'failed'] },
   'check.fix': { skill: 'implement-issue', slots: ['A'], next: ['check.review', 'failed'] },
-  merge: { skill: 'merge-issue', slots: ['B'], next: ['merged', 'check.fix', 'failed'] },
+  merge: { skill: null, slots: [], next: ['merged', 'check.repair', 'failed'] },
   merged: { skill: null, slots: [], next: [] },
   failed: {
     skill: null,

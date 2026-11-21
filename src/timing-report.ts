@@ -70,7 +70,7 @@ function visitsOf(slug: string, timings: TimingEvent[], log: LogRecord[]): Visit
         failed: close !== undefined && close.to === 'failed',
         rounds: entry?.fix_rounds ?? 0,
         // A command-run merge closes with no slot: no seat was prompted.
-        seatless: close !== undefined && close.to === 'merged' && close.slot === null,
+        seatless: close !== undefined && close.slot === null && (close.to === 'merged' || event.phase === 'merge'),
       };
     });
 }

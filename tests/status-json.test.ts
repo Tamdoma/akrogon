@@ -206,7 +206,7 @@ test('envelope carries row and section facts', async () => {
       broadcast: { kind: 'issue', name: 'broad', destination: 'discord', pushed: 'now', sources: [] },
     });
     leaf(f, 'landing', 'merge', {
-      batch: { attempt: 'xyz123', built_on: 'main', holder: { base: 'a', head: 'b' }, applied: true, owner: 'command' },
+      batch: { attempt: 'xyz123', built_on: 'main', holder: { base: 'a', head: 'b' }, applied: true },
     });
     mkdirSync(resolve(f.home, 'reconcile'), { recursive: true });
     writeFileSync(
@@ -289,13 +289,11 @@ test('a stopped command-owned land job is an attention fact only while unrecorde
       built_on: 'main',
       holder: { base: 'a', head: 'b' },
       applied: true,
-      owner: 'command',
       ...extra,
     });
     leaf(f, 'land-dead', 'merge', { batch: batch('deadjob') });
     leaf(f, 'land-live', 'merge', { batch: batch('livejob') });
     leaf(f, 'land-pushed', 'merge', { batch: batch('pushedjob', { recorded: true }) });
-    leaf(f, 'land-seat', 'merge', { batch: batch('seatjob', { owner: 'seat' }) });
     writeFileSync(systemctl.db, JSON.stringify({ units: [{ unit: 'akrogon-land-livejob.service', sub: 'running' }] }));
     const env: Envelope = envelope(
       await cli(f, ['status', '--json'], f.root, {
@@ -303,9 +301,11 @@ test('a stopped command-owned land job is an attention fact only while unrecorde
         PATH: `${resolve(f.home, 'bin')}:${process.env.PATH}`,
       }),
     );
-    expect(
-      ['land-dead', 'land-live', 'land-pushed', 'land-seat'].map((slug) => leafOf(env, f.repo, slug).attention),
-    ).toEqual([['merge job stopped'], [], [], []]);
+    expect(['land-dead', 'land-live', 'land-pushed'].map((slug) => leafOf(env, f.repo, slug).attention)).toEqual([
+      ['merge job stopped'],
+      [],
+      [],
+    ]);
     expect(leafOf(env, f.repo, 'land-dead').red).toBe(true);
     expect(env.red).toBe(1);
   } finally {

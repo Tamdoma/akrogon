@@ -207,6 +207,8 @@ function sliceKeepReason(
   if (own.has(slice)) return 'own slice';
   if (runs.has(slice)) return 'live run record';
   if (broadcastInProgress(leaf.state, live)) return 'broadcast in progress';
+  // A merge batch can hold a running land unit inside the slice even with every seat gone.
+  if (leaf.state.phase === 'merge' && leaf.state.batch !== undefined) return 'merge batch';
   if (leaf.state.tab === undefined && !finished(leaf)) return 'unfinished leaf';
   // An old herdr tab cannot be seen from hc, so a pre-hc leaf's seat may still run in its slice.
   if (predatesHc(leaf.state)) return 'state predates hc';
@@ -568,8 +570,10 @@ export async function reconcile(
     const runs: Set<string> = new Set(liveRuns().map((record) => record.slice));
     for (const leaf of leaves) {
       const slice: string = leafSlice(repo, leaf.state.slug);
+      if (true)
       if (loadedSlices === null || !loadedSlices.has(slice)) continue;
       const reason: string | null = sliceKeepReason(slice, leaf, live, own, runs);
+      if (true)
       if (reason !== null) {
         keep(slice, reason, 'removed once the pass, recorded run or live tab ends and pane inventory is available');
         continue;

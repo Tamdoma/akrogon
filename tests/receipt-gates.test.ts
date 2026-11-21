@@ -18,6 +18,26 @@ async function branch(f: Fixture, slug: string): Promise<{ worktree: string; hea
   return { worktree, head: await command(['git', 'rev-parse', 'HEAD'], worktree) };
 }
 
+// Runs the land run's gates for the leaf's batch in a child process: the same
+// refusal `merged --check` used to carry, now reached by `akrogon land`.
+async function gateRun(f: Fixture, slug: string): Promise<Result> {
+  const script: string = resolve(f.home, 'gates.ts');
+  writeFileSync(
+    script,
+    'import { landGates } from ' +
+      JSON.stringify(resolve(import.meta.dir, '../src/phase.ts')) +
+      ';\nimport { findLeaf } from ' +
+      JSON.stringify(resolve(import.meta.dir, '../src/state.ts')) +
+      ';\nimport { readRepo } from ' +
+      JSON.stringify(resolve(import.meta.dir, '../src/config.ts')) +
+      ';\nconst repo = readRepo(process.argv[2], process.cwd());\nconst leaf = findLeaf(repo, process.argv[3]);\nawait landGates(repo, leaf, leaf.state.batch);\nconsole.log("gates ok");\n',
+  );
+  return spawnCaptured([process.execPath, script, f.repo, slug], {
+    cwd: f.root,
+    env: { ...process.env, AKROGON_HOME: f.home, HOME: f.home },
+  });
+}
+
 test('a move into check.review needs a green leaf receipt for HEAD under the current command set', async () => {
   const f: Fixture = await fixture();
   try {
@@ -63,7 +83,7 @@ test('a repair move into merge needs a green leaf receipt for HEAD while check.f
   }
 });
 
-test('merged --check stamps tested_top only with a green merge receipt for HEAD under the current command set', async () => {
+test('the land gates stamp tested_top only with a green merge receipt for HEAD under the current command set', async () => {
   const f: Fixture = await fixture();
   try {
     const { worktree, head } = await branch(f, 'landing');
@@ -76,17 +96,15 @@ test('merged --check stamps tested_top only with a green merge receipt for HEAD 
       applied: true,
     };
     saveState(path, { ...readState(path), batch: record });
-    const proc: { env: NodeJS.ProcessEnv } = procFixture(f);
-    const check: string[] = ['phase', 'landing', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'];
-    const missing: Result = await cli(f, check, f.root, proc.env);
+    const missing: Result = await gateRun(f, 'landing');
     expect(missing.code).not.toBe(0);
     expect(missing.stderr).toContain(`No green merge verify receipt for ${head}`);
     greenReceipt(f, head, 'merge', stale);
-    const mismatched: Result = await cli(f, check, f.root, proc.env);
+    const mismatched: Result = await gateRun(f, 'landing');
     expect(mismatched.code).not.toBe(0);
     expect(readState(path).batch?.tested_top).toBeUndefined();
     greenReceipt(f, head, 'merge');
-    expect((await cli(f, check, f.root, proc.env)).code).toBe(0);
+    expect((await gateRun(f, 'landing')).code).toBe(0);
     expect(readState(path).batch?.tested_top).toBe(head);
   } finally {
     f.clean();
@@ -106,8 +124,6 @@ test('a qualifying linked pair satisfies the merge gates and a non-qualifying pa
       applied: true,
     };
     saveState(path, { ...readState(path), batch: record });
-    const proc: { env: NodeJS.ProcessEnv } = procFixture(f);
-    const check: string[] = ['phase', 'landing', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'];
     const tree: string = await command(['git', 'rev-parse', `${head}^{tree}`], f.root);
     const baseTree: string = await command(['git', 'rev-parse', `${builtOn}^{tree}`], f.root);
     const cmds: { name: string; command: string }[] = verifyCommands(readRepo(f.repo, f.root).config, 'merge');
@@ -143,13 +159,15 @@ test('a qualifying linked pair satisfies the merge gates and a non-qualifying pa
     const headOnly: string = resolve(path, 'implementation/check-test-base.log');
     writeFileSync(headOnly, '(fail) beta\n');
     pair(headOnly);
-    expect((await cli(f, check, f.root, proc.env)).stderr).toContain(`No green merge verify receipt for ${head}`);
+    const refused1: Result = await gateRun(f, 'landing');
+    expect(refused1.code).not.toBe(0);
+    expect(refused1.stderr).toContain(`No green merge verify receipt for ${head}`);
     expect(readState(path).batch?.tested_top).toBeUndefined();
     expect((await guards()).code).not.toBe(0);
     const same: string = resolve(path, 'implementation/check-test-base-same.log');
     writeFileSync(same, '(fail) alpha\n');
     pair(same);
-    expect((await cli(f, check, f.root, proc.env)).code).toBe(0);
+    expect((await gateRun(f, 'landing')).code).toBe(0);
     expect(readState(path).batch?.tested_top).toBe(head);
     const passed: Result = await guards();
     expect(passed.stderr).toBe('');
@@ -175,12 +193,9 @@ test('merge gates accept a covered main-red head and refuse an uncovered or reso
       built_on: builtOn,
       holder: { base: builtOn, head },
       applied: true,
-      owner: 'command',
       top: head,
     };
     saveState(path, { ...readState(path), batch: record });
-    const proc: { env: NodeJS.ProcessEnv } = procFixture(f);
-    const check: string[] = ['phase', 'landing', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'];
     const tree: string = await command(['git', 'rev-parse', `${head}^{tree}`], f.root);
     const baseTree: string = await command(['git', 'rev-parse', `${builtOn}^{tree}`], f.root);
     const repo: Repo = readRepo(f.repo, f.root);
@@ -232,7 +247,7 @@ test('merge gates accept a covered main-red head and refuse an uncovered or reso
     // Covered: named unit red in a completed base run at the merge-base.
     redHead(['alpha']);
     redBase(['alpha']);
-    expect((await cli(f, check, f.root, proc.env)).code).toBe(0);
+    expect((await gateRun(f, 'landing')).code).toBe(0);
     expect(readState(path).batch?.tested_top).toBe(head);
     const passed: Result = await guards();
     expect(passed.stderr).toBe('');
@@ -247,12 +262,7 @@ test('merge gates accept a covered main-red head and refuse an uncovered or reso
     saveState(path2, { ...readState(path2), batch: record });
     redHead(['alpha', 'beta']);
     redBase(['alpha']);
-    const refused: Result = await cli(
-      f,
-      ['phase', 'landing2', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
-      f.root,
-      proc.env,
-    );
+    const refused: Result = await gateRun(f, 'landing2');
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain(`No green merge verify receipt for ${head}`);
     expect(readState(path2).batch?.tested_top).toBeUndefined();
@@ -280,12 +290,7 @@ test('merge gates accept a covered main-red head and refuse an uncovered or reso
       end: '2999-01-01T00:00:00.000Z',
       commands: entries(0, []),
     });
-    const resolved: Result = await cli(
-      f,
-      ['phase', 'landing3', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
-      f.root,
-      proc.env,
-    );
+    const resolved: Result = await gateRun(f, 'landing3');
     expect(resolved.code).not.toBe(0);
     expect(resolved.stderr).toContain(`No green merge verify receipt for ${head}`);
   } finally {

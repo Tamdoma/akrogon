@@ -309,8 +309,3 @@ export function holding(f: Fixture): { batch: Batch } {
   };
 }
 
-// The command claims every applied top. Cases about B's merge prompt hand the attempt to the seat, as a land run's handoff does.
-export function seatOwned(path: string): void {
-  const state = readState(path);
-  saveState(path, { ...state, batch: { ...state.batch!, owner: 'seat' } });
-}

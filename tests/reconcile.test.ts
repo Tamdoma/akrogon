@@ -418,7 +418,6 @@ for (const refusal of ['dirty', 'mid-rebase', 'live tab', 'live cwd', 'batch'] a
                 built_on: 'x',
                 holder: { base: 'x', head: 'x' },
                 applied: false,
-                owner: 'command',
               },
             }
           : { worktree: old };

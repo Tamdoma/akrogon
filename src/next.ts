@@ -420,13 +420,23 @@ async function allocate(
   return { state, place, seats: found };
 }
 
-function promptFor(state: State, slot: Slot, path: string, mergeContext?: string): string {
+function mergeExitContext(state: State): string {
+  const exit = state.merge_exit;
+  if (state.phase !== 'check.repair' || exit === undefined) return '';
+  return (
+    ` merge-exit=${exit.reason}` +
+    (exit.run === undefined ? '' : ` run=${exit.run}`) +
+    (exit.refusal === undefined ? '' : ` refusal=${exit.refusal}`) +
+    (exit.base === undefined ? '' : ` base=${exit.base}`) +
+    (exit.base_verdict === undefined ? '' : ` base_verdict=${exit.base_verdict}`) +
+    (exit.top === undefined ? '' : ` top=${exit.top}`)
+  );
+}
+
+function promptFor(state: State, slot: Slot, path: string): string {
   const skill: string | null = routing[state.phase].skill;
   if (skill === null) throw new Error(`Leaf ${state.slug} is ${state.phase}: no phase task`);
-  return (
-    `${skill} ${state.slug} slot=${slot} phase=${state.phase} leaf=${path}` +
-    (mergeContext === undefined ? '' : ` ${mergeContext}`)
-  );
+  return `${skill} ${state.slug} slot=${slot} phase=${state.phase} leaf=${path}${mergeExitContext(state)}`;
 }
 
 // Delivery to one seat (plan D13): start a missing or finished seat with the task; prompt a live idle
@@ -437,7 +447,6 @@ async function dispatchSlot(
   leaf: Leaf,
   slot: Slot,
   prompt: string,
-  attempt: string | undefined,
   allocation: { place: Place; seats: Seats },
 ): Promise<void> {
   const place: Place = allocation.place;
@@ -453,7 +462,6 @@ async function dispatchSlot(
       visit: currentVisit(readLog(repo.root), now.slug, now.phase),
       session: await transcriptFor({ session: place.session, address }),
       outcome,
-      ...(attempt === undefined ? {} : { attempt }),
     });
   };
   const prepare = async (): Promise<void> => {
@@ -638,9 +646,7 @@ async function dispatchLeaf(
   identity: Leaf,
   picked: boolean,
   invocation: Invocation,
-  mergeContext: string | undefined,
   isAutomatic: boolean,
-  attempt?: string,
 ): Promise<DispatchOutcome> {
   const slug: string = identity.state.slug;
   const end = (reason: WaitReason, blocking?: string): DispatchOutcome => {
@@ -751,7 +757,7 @@ async function dispatchLeaf(
     }
     const turn: QueueEntry | undefined =
       state.phase === 'merge' ? mergeQueue(global, repo, inventory.leaves, () => readLog(repo.root))[0] : undefined;
-    if (state.phase === 'merge' && (turn?.leaf.state.slug !== slug || mergeContext === undefined))
+    if (state.phase === 'merge')
       return end('merge_turn', turn === undefined || turn.leaf.state.slug === slug ? undefined : turn.leaf.state.slug);
     seats(global, repo, leaf.path);
     // Mirrors ensureWorktree's path: a missing worktree needs remote proof, an existing one only local.
@@ -769,8 +775,7 @@ async function dispatchLeaf(
         repo,
         { path: leaf.path, state: allocated.state },
         slot,
-        promptFor(allocated.state, slot, leaf.path, mergeContext),
-        attempt,
+        promptFor(allocated.state, slot, leaf.path),
         allocated,
       );
     }
@@ -830,7 +835,7 @@ async function sweep(
         (counts.get(b.state.slug) ?? 0) - (counts.get(a.state.slug) ?? 0),
     );
   for (const leaf of ordered) {
-    const outcome: DispatchOutcome = await dispatchLeaf(global, repo, leaf, picked, invocation, undefined, isAutomatic);
+    const outcome: DispatchOutcome = await dispatchLeaf(global, repo, leaf, picked, invocation, isAutomatic);
     if (outcome === 'completed') await dispatchDependents(global, repo, leaf.state.slug, invocation, isAutomatic);
   }
 }
@@ -894,7 +899,7 @@ async function reconcileBatch(
       (fresh.state.phase === 'merge' && !(batch.applied === true && batch.candidate !== undefined))
     )
       return;
-    if (batch.owner === 'command' && (await landAlive(batch.attempt))) return;
+    if (await landAlive(batch.attempt)) return;
     const end: PressureSnapshot | undefined =
       batch.pressure_start === undefined ? undefined : readPressure(pressureDir);
     const landed: boolean =
@@ -944,20 +949,42 @@ async function mergeTurn(
   if (holder === undefined) return;
   if (isStopped(repo.name, holder.state.slug)) return;
   const recorded: Batch | undefined = holder.state.batch;
-  if (recorded?.owner === 'command' && (await landAlive(recorded.attempt))) {
-    recordWait(repo, holder.state.slug, 'merge_turn');
+  if (recorded !== undefined && recorded.applied === true && recorded.top !== undefined) {
+    if (await landAlive(recorded.attempt)) {
+      recordWait(repo, holder.state.slug, 'merge_turn');
+      return;
+    }
+    await withLock(resolve(globalHome(), '.lock'), async () => {
+      const batch: Batch | undefined = readState(holder.path).batch;
+      if (batch?.attempt !== recorded.attempt || batch.applied !== true || batch.top === undefined) return;
+      if (await landAlive(batch.attempt)) return;
+      await launchLand(repo, holder.state.slug, batch.attempt);
+    });
     return;
   }
+  // A legacy applied record with no top was the solo handoff: the exit it would
+  // have written runs now, in this pass.
   if (recorded !== undefined && recorded.applied === true) {
-    if (recorded.top === undefined || recorded.owner !== 'command')
-      await dispatchMergeLeaf(global, repo, holder, invocation, mergeContext(recorded), isAutomatic, recorded.attempt);
-    else
-      await withLock(resolve(globalHome(), '.lock'), async () => {
-        const batch: Batch | undefined = readState(holder.path).batch;
-        if (batch?.attempt !== recorded.attempt || batch.owner !== 'command' || (await landAlive(batch.attempt)))
-          return;
-        await launchLand(repo, holder.state.slug, batch.attempt);
+    const attempt: string = recorded.attempt;
+    const base: string = recorded.built_on;
+    const end: PressureSnapshot | undefined =
+      recorded.pressure_start === undefined ? undefined : readPressure(pressureDir);
+    await withLock(resolve(globalHome(), '.lock'), async () => {
+      const fresh: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === holder.state.slug);
+      if (
+        fresh?.state.phase !== 'merge' ||
+        fresh.state.batch?.attempt !== attempt ||
+        fresh.state.batch.applied !== true ||
+        fresh.state.batch.top !== undefined
+      )
+        return;
+      appendAttempt(repo, holder.state.slug, fresh.state.batch, 'red', end);
+      await commitMove(repo, fresh, fresh.state, 'check.repair', null, undefined, undefined, {
+        reason: 'conflict',
+        base,
       });
+    });
+    await phaseWake(global, repo, holder.state.slug);
     return;
   }
   const fetched: Result = await run(['git', 'fetch', repo.config.remote], repo.root);
@@ -983,7 +1010,8 @@ async function mergeTurn(
       fresh.state.batch?.applied === true
     )
       return;
-    if (fresh.state.batch?.owner === 'command' && (await landAlive(fresh.state.batch.attempt))) return;
+    // An unapplied batch with a live land run is in flight mid-restack: it keeps its attempt.
+    if (fresh.state.batch !== undefined && (await landAlive(fresh.state.batch.attempt))) return;
     if (mergeQueue(global, repo, leaves, () => readLog(repo.root))[0]?.leaf.state.slug !== holder.state.slug) return;
     const start: PressureSnapshot | undefined = readPressure(pressureDir);
     const builtOn: string = await localBase(repo);
@@ -1012,43 +1040,56 @@ async function mergeTurn(
   const current: Batch = batch;
   if (isAutomatic && isPaused(repo.name)) return;
   const staged: Awaited<ReturnType<typeof buildStack>> = await buildStack(repo, current.built_on, current.holder.head);
-  const outcome: Batch | undefined = await withLock(
+  const outcome: 'launched' | 'exited' | undefined = await withLock(
     resolve(globalHome(), '.lock'),
-    async (): Promise<Batch | undefined> => {
+    async (): Promise<'launched' | 'exited' | undefined> => {
       if (isAutomatic && isPaused(repo.name)) return undefined;
       const fresh: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === holder.state.slug);
       if (fresh === undefined || fresh.state.phase !== 'merge' || fresh.state.batch === undefined) return undefined;
       if (fresh.state.batch.applied === true || fresh.state.batch.attempt !== current.attempt) {
+        // A live land run owns its in-flight record: the push it drives may have
+        // cleared applied for a restack it is about to write itself.
+        if (await landAlive(fresh.state.batch.attempt)) return undefined;
         saveState(fresh.path, { ...fresh.state, batch: undefined });
         return undefined;
       }
-      const applied: Batch =
-        staged.ok && (await applyTop(repo, fresh, staged.top, current.holder.head))
-          ? { ...fresh.state.batch, applied: true, top: staged.top, owner: 'command' }
-          : { ...fresh.state.batch, applied: true };
+      if (!staged.ok) {
+        await mergeTurnExit(repo, fresh, current, 'conflict', current.built_on, pressureDir);
+        return 'exited';
+      }
+      if (!(await applyTop(repo, fresh, staged.top, current.holder.head))) {
+        const dirty: boolean =
+          fresh.state.worktree !== undefined &&
+          (await command(['git', 'status', '--porcelain'], fresh.state.worktree)) !== '';
+        await mergeTurnExit(repo, fresh, current, dirty ? 'dirty' : 'conflict', current.built_on, pressureDir);
+        return 'exited';
+      }
+      const applied: Batch = { ...fresh.state.batch, applied: true, top: staged.top };
       saveState(fresh.path, { ...readState(fresh.path), batch: applied });
-      if (applied.owner === 'command') await launchLand(repo, holder.state.slug, applied.attempt);
-      return applied;
+      await launchLand(repo, holder.state.slug, applied.attempt);
+      return 'launched';
     },
   );
-  if (outcome !== undefined && outcome.owner !== 'command')
-    await dispatchMergeLeaf(
-      global,
-      repo,
-      { path: holder.path, state: readState(holder.path) },
-      invocation,
-      mergeContext(outcome),
-      isAutomatic,
-      outcome.attempt,
-    );
+  if (outcome === 'exited') await phaseWake(global, repo, holder.state.slug);
 }
 
-function mergeContext(record: Batch): string {
-  return record.top === undefined
-    ? `attempt=${record.attempt} solo`
-    : `attempt=${record.attempt} top=${record.top}` +
-        (record.wake === undefined ? '' : ` wake=${record.wake}`) +
-        (record.red === undefined ? '' : ` red=${record.red}`);
+// The merge turn's own repair exit (no land run exists to write it): the red
+// attempt row, the move with its exit record, and the repair seat's wake.
+async function mergeTurnExit(
+  repo: Repo,
+  leaf: Leaf,
+  record: Batch,
+  reason: 'conflict' | 'dirty',
+  base: string,
+  pressureDir: string,
+): Promise<void> {
+  const end: PressureSnapshot | undefined =
+    record.pressure_start === undefined ? undefined : readPressure(pressureDir);
+  appendAttempt(repo, leaf.state.slug, record, 'red', end);
+  await commitMove(repo, leaf, leaf.state, 'check.repair', null, undefined, undefined, {
+    reason,
+    base,
+  });
 }
 
 // A command-run merge leaves the completing owner's broadcast to a broadcast-only B seat; prompted.B is its ack.
@@ -1070,7 +1111,6 @@ async function broadcastPass(global: GlobalConfig, repo: Repo, invocation: Invoc
           { path: fresh.path, state: allocated.state },
           'B',
           `broadcast-issue ${fresh.state.slug} slot=B owner=${handoff.kind}:${handoff.name} closed=${handoff.destination} sha=${handoff.pushed} sources=${sources} leaf=${fresh.path}`,
-          undefined,
           allocated,
         );
       });
@@ -1079,27 +1119,6 @@ async function broadcastPass(global: GlobalConfig, repo: Repo, invocation: Invoc
       report(invocation, repo.name, pending.path, error, pending.state.slug);
     }
   }
-}
-
-async function dispatchMergeLeaf(
-  global: GlobalConfig,
-  repo: Repo,
-  leaf: Leaf,
-  invocation: Invocation,
-  mergeContext: string,
-  isAutomatic: boolean,
-  attempt: string,
-): Promise<void> {
-  if (!isAutomatic) {
-    await withLock(resolve(globalHome(), '.lock'), async () => {
-      await dispatchLeaf(global, repo, leaf, false, invocation, mergeContext, false, attempt);
-    });
-    return;
-  }
-  await withLock(resolve(globalHome(), '.lock'), async () => {
-    if (isPaused(repo.name)) return;
-    await dispatchLeaf(global, repo, leaf, false, invocation, mergeContext, true, attempt);
-  });
 }
 
 export async function mergePass(
@@ -1151,7 +1170,7 @@ export async function phaseWake(global: GlobalConfig, repo: Repo, slug: string):
     await withLock(resolve(globalHome(), '.lock'), async () => {
       const leaf: Leaf | undefined = discover(repo, invocation).leaves.find((item) => item.state.slug === slug);
       if (leaf === undefined) return;
-      const outcome: DispatchOutcome = await dispatchLeaf(global, repo, leaf, false, invocation, undefined, true);
+      const outcome: DispatchOutcome = await dispatchLeaf(global, repo, leaf, false, invocation, true);
       if (outcome === 'completed') await dispatchDependents(global, repo, slug, invocation, true);
     });
   } catch (error) {
@@ -1405,7 +1424,6 @@ export async function nextCommand(input: string | undefined, pressureDir: string
             selection.leaves[0],
             true,
             invocation,
-            undefined,
             false,
           );
           if (outcome === 'completed')

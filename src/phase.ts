@@ -14,6 +14,7 @@ import {
   predatesHc,
   type Batch,
   type Failure,
+  type MergeExit,
   type State,
   type Leaf,
   type Inventory,
@@ -193,6 +194,7 @@ export async function commitMove(
   slot: Slot | null,
   failure?: Failure,
   onCommitted?: () => void,
+  merge_exit?: MergeExit,
 ): Promise<State> {
   const leavingFailed: boolean = recorded.phase === 'failed' && to !== 'failed';
   const stale: string[] = [
@@ -222,7 +224,6 @@ export async function commitMove(
   const after: State = {
     ...cleared,
     phase: to,
-    batch: resumedBatch,
     done: [],
     verdict: {},
     prompted: {},
@@ -232,11 +233,23 @@ export async function commitMove(
     lost: { A: 0, B: 0 },
     failure: to === 'failed' ? failure : undefined,
     busy_since: to === 'failed' || to === 'merged' ? {} : recorded.busy_since,
+    batch: to === 'check.repair' ? undefined : resumedBatch,
+    merge_exit: to === 'check.repair' ? merge_exit : undefined,
     fix_rounds:
       to === 'check.fix' && (recorded.phase === 'check.repair' || recorded.phase === 'merge')
         ? recorded.fix_rounds + 1
         : recorded.fix_rounds,
-    merge_stamp: to === 'merge' ? new Date().toISOString() : recorded.merge_stamp,
+    // The first return to merge keeps the stamp it entered with, counted from
+    // the move log; a second return mints a new queue place.
+    merge_stamp:
+      to === 'merge'
+        ? recorded.merge_stamp !== undefined &&
+          readLog(repo.root).filter(
+            (entry) => entry.record.slug === recorded.slug && entry.record.to === 'merge',
+          ).length <= 1
+          ? recorded.merge_stamp
+          : new Date().toISOString()
+        : recorded.merge_stamp,
   };
   // After the candidate record: a refusal here keeps after.batch so recovery
   // sees the candidate already pushed or recorded by land/finishPush.
@@ -424,7 +437,9 @@ export async function transition(
   if (requested !== 'failed' && reason !== undefined) throw new Error('--reason is only valid for failed');
   const required: readonly Slot[] = requiredSlots(state.phase, state.fix_rounds);
   const slot: Slot | undefined = explicitSlot ?? (required.length === 1 ? required[0] : undefined);
-  if (state.phase !== 'failed' && (slot === undefined || !required.includes(slot)))
+  if (state.phase !== 'failed' && required.length === 0 && explicitSlot !== undefined)
+    throw new Error(`A seat cannot make ${state.phase} calls: ${requested} --slot ${explicitSlot}`);
+  if (state.phase !== 'failed' && required.length > 0 && (slot === undefined || !required.includes(slot)))
     throw new Error('A required --slot is missing or invalid');
   if (slot !== undefined && state.done.includes(slot)) throw new Error(`Slot already recorded: ${slot}`);
   if (requested === 'failed') {
@@ -449,8 +464,12 @@ export async function transition(
     await requireNonEmpty(repo, state.worktree);
     await requireGreenReceipt(repo, await command(['git', 'rev-parse', 'HEAD'], state.worktree), 'leaf');
   }
-  if (state.phase === 'check.repair' && requested === 'merge' && state.worktree !== undefined)
-    await requireGreenReceipt(repo, await command(['git', 'rev-parse', 'HEAD'], state.worktree), 'leaf');
+  if (state.phase === 'check.repair' && requested === 'merge' && state.worktree !== undefined) {
+    const head: string = await command(['git', 'rev-parse', 'HEAD'], state.worktree);
+    // A red-exited leaf returning unedited already holds its merge-scope proof.
+    if (!(state.merge_exit?.reason === 'red' && state.merge_exit.top === head))
+      await requireGreenReceipt(repo, head, 'leaf');
+  }
   if ((state.phase === 'check.review') !== (verdict !== undefined))
     throw new Error('Review requires --verdict; other phases forbid it');
   if (checkOnly) {
@@ -707,20 +726,6 @@ async function recordTested(repo: Repo, leaf: Leaf, record: Batch, head: string,
   });
 }
 
-async function batchCheck(
-  repo: Repo,
-  leaf: Leaf,
-  requested: Phase,
-  slot: Slot | undefined,
-  verdict: Verdict | undefined,
-  reason: string | undefined,
-  record: Batch,
-): Promise<void> {
-  const head: string = await batchGuards(repo, leaf, record);
-  await transition(repo, leaf, requested, slot, verdict, reason, true);
-  await recordTested(repo, leaf, record, head);
-}
-
 // The land run's gates: everything a seat's `merged --check` and its move would refuse. A throw is the refusal.
 export async function landGates(repo: Repo, leaf: Leaf, record: Batch, coverRun?: string): Promise<void> {
   const head: string = await batchGuards(repo, leaf, record);
@@ -734,9 +739,9 @@ export class StaleLandError extends Error {}
 export function landClaim(repo: Repo, slug: string, attempt: string): { leaf: Leaf; record: Batch } {
   const leaf: Leaf = findLeaf(repo, slug);
   const record: Batch | undefined = leaf.state.batch;
-  if (leaf.state.phase !== 'merge' || record === undefined || record.attempt !== attempt || record.owner !== 'command')
+  if (leaf.state.phase !== 'merge' || record === undefined || record.attempt !== attempt)
     throw new StaleLandError(
-      `Stale land run ${slug} attempt ${attempt}: phase ${leaf.state.phase}, attempt ${record?.attempt ?? 'none'}, owner ${record?.owner ?? 'seat'}`,
+      `Stale land run ${slug} attempt ${attempt}: phase ${leaf.state.phase}, attempt ${record?.attempt ?? 'none'}`,
     );
   return { leaf, record };
 }
@@ -790,7 +795,6 @@ async function batchPush(
         applied: false,
         tested_top: undefined,
         tested_main: undefined,
-        decision: undefined,
       },
     });
     return { kind: 'refused', record, candidate: head, stderr: pushed.stderr, end };
@@ -828,7 +832,6 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<Restacked
         candidate: undefined,
         tested_top: undefined,
         tested_main: undefined,
-        decision: 'rerun',
       },
     });
     return applied;
@@ -882,12 +885,18 @@ export type LandPush =
   | { kind: 'error'; stderr: string };
 
 // The land run's push: the claim and the push hold the global lock, the refusal follow-up takes it itself.
-export async function landPush(repo: Repo, slug: string, attempt: string, coverRun?: string): Promise<LandPush> {
+export async function landPush(
+  repo: Repo,
+  slug: string,
+  attempt: string,
+  coverRun?: string,
+  pressureDir: string = '/proc/pressure',
+): Promise<LandPush> {
   const move: Move = (holderNow, pushed) => commandMerged(repo, holderNow, pushed);
   const pending: BatchPending = await withLock(resolve(globalHome(), '.lock'), async () => {
     const { leaf, record } = landClaim(repo, slug, attempt);
     const end: PressureSnapshot | undefined =
-      record.pressure_start === undefined ? undefined : readPressure('/proc/pressure');
+      record.pressure_start === undefined ? undefined : readPressure(pressureDir);
     return batchPush(repo, leaf, record, true, move, end, coverRun);
   });
   if (pending.kind === 'none') return { kind: 'landed' };
@@ -928,7 +937,12 @@ export async function phaseCommand(
   await withLock(resolve(globalHome(), '.lock'), async () => {
     const leaf: Leaf = findLeaf(repo, slug);
     if (leaf.state.phase === 'merged' && !check) await completeOwner(repo, leaf, false);
+    const record: Batch | undefined = leaf.state.batch;
     if (leaf.state.phase === 'merge' && (requested === 'merged' || requested === 'check.fix')) {
+      if (slot !== undefined || attempt !== undefined)
+        throw new Error(`A seat cannot make merge calls: ${requested}`);
+      if (check)
+        throw new Error('--check is the seat protocol and merge holds no seat: run the move without --check');
       const holder: Leaf | undefined = mergeQueue(global, repo, allLeaves(repo), () => readLog(repo.root))[0]?.leaf;
       if (holder === undefined || holder.state.slug !== leaf.state.slug)
         throw new Error(
@@ -937,26 +951,15 @@ export async function phaseCommand(
             : `Merge turn refused for ${slug}: holder is ${holder.state.slug}`,
         );
     }
-    const record: Batch | undefined = leaf.state.batch;
     if (leaf.state.phase === 'merge' && requested === 'merged' && record === undefined)
       throw new Error(`Merged refused: ${slug} holds no batch record, so nothing was pushed`);
-    if (leaf.state.phase === 'merge' && record !== undefined && (requested === 'merged' || requested === 'check.fix')) {
-      if (slot !== undefined && attempt !== record.attempt)
-        throw new Error(
-          `Stale attempt ${attempt === undefined ? 'missing' : JSON.stringify(attempt)}: current batch attempt is ${record.attempt}`,
-        );
-      if (check) await batchCheck(repo, leaf, requested, slot, verdict, reason, record);
-      else {
-        const end: PressureSnapshot | undefined =
-          record.pressure_start === undefined ? undefined : readPressure(pressureDir);
-        if (requested === 'merged') pending = await batchPush(repo, leaf, record, slot !== undefined, seatMove, end);
-        else
-          await transition(repo, leaf, requested, slot, verdict, reason, check, () => {
-            appendAttempt(repo, leaf.state.slug, record, 'red', end);
-            onCommitted();
-          });
-      }
-    } else {
+    if (leaf.state.phase === 'merge' && record !== undefined && requested === 'merged') {
+      const end: PressureSnapshot | undefined =
+        record.pressure_start === undefined ? undefined : readPressure(pressureDir);
+      pending = await batchPush(repo, leaf, record, false, seatMove, end);
+    } else if (leaf.state.phase === 'merge' && requested === 'check.fix')
+      throw new Error('Merge moves to check.repair itself; a second red takes check.fix from check.repair');
+    else {
       await transition(repo, leaf, requested, slot, verdict, reason, check, onCommitted);
     }
   });

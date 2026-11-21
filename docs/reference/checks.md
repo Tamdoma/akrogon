@@ -11,7 +11,7 @@ You set four kinds of command in `issues/config.yaml`:
 | Setting        | When it runs                                                                                                                                                          | Does a failure block?                    |
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | `checks`       | On every leaf, and again at merge.                                                                                                                                    | Yes.                                     |
-| `merge_checks` | Only at merge, through the merge turn's `akrogon verify --attempt <id>`, its members all at once after the `checks` stage is green. `akrogon run-check` refuses them. | Yes.                                     |
+| `merge_checks` | Only at merge, through the land run's `akrogon verify --attempt <id>`, its members all at once after the `checks` stage is green. `akrogon run-check` refuses them. | Yes.                                     |
 | `merge_covers` | Not a command. It names `checks` entries that a merge check already covers, so merge skips them.                                                                      | No.                                      |
 | `advisory`     | Seats run them next to the checks. `akrogon verify` does not run them.                                                                                                | No. Reviewers report a failure as a Nit. |
 
@@ -53,7 +53,7 @@ A leaf- or worker-scoped run is refused while the leaf's phase is `failed`. The 
 
 run-check refuses a configured `merge_checks` command, given as its words, as `sh -c '<command>'`, or in the `sh -c` form `setup` would add: it exits non-zero, starts no process and saves no log, printing `akrogon verify --attempt <id>` as the merge suite's only runner and that a red merge check is reproduced with a narrower command, never the whole suite.
 
-When to keep output this way, and which commands are exempt, is a seat rule. See [lifecycle-rules.md](../../skills/lifecycle-rules.md), with seat-own parts in [implement-issue](../../skills/implement-issue/SKILL.md), [check-issue](../../skills/check-issue/SKILL.md) and [merge-issue](../../skills/merge-issue/SKILL.md).
+When to keep output this way, and which commands are exempt, is a seat rule. See [lifecycle-rules.md](../../skills/lifecycle-rules.md), with seat-own parts in [implement-issue](../../skills/implement-issue/SKILL.md) and [check-issue](../../skills/check-issue/SKILL.md).
 
 ## Prove a commit with akrogon verify
 
@@ -74,7 +74,7 @@ These phase moves need a green receipt for the current commit:
 | ------------------------------------------------------- | ------- |
 | Any move into `check.review`                            | `leaf`  |
 | `check.repair` to `merge`                               | `leaf`  |
-| `merged`, including `akrogon land` and `merged --check` | `merge` |
+| `merged`, including `akrogon land` and the operator's slot-less call | `merge` |
 
 The gate accepts a completed run on the same tree with every expected command green, or a qualifying [linked-base known-red receipt](#known-red). It uses the move's command list and never stitches together head entries across runs.
 
@@ -96,7 +96,7 @@ A cover is judged per head receipt: one completed run on the head tree matching 
 
 A pass counts as a receipt for the phase moves above.
 
-When a seat should retry a red command, and when it should run known-red, is a seat rule. See the retry and known-red rules in [lifecycle-rules.md](../../skills/lifecycle-rules.md), with seat command forms in [implement-issue](../../skills/implement-issue/SKILL.md), [check-issue](../../skills/check-issue/SKILL.md) and [merge-issue](../../skills/merge-issue/SKILL.md). Who may replace a wrong proof command is in [plan-issue](../../skills/plan-issue/SKILL.md) and [implement-issue](../../skills/implement-issue/SKILL.md).
+When a seat should retry a red command, and when it should run known-red, is a seat rule. See the retry and known-red rules in [lifecycle-rules.md](../../skills/lifecycle-rules.md), with seat command forms in [implement-issue](../../skills/implement-issue/SKILL.md) and [check-issue](../../skills/check-issue/SKILL.md). Who may replace a wrong proof command is in [plan-issue](../../skills/plan-issue/SKILL.md) and [implement-issue](../../skills/implement-issue/SKILL.md).
 
 ## Test-change refusals
 
@@ -121,7 +121,7 @@ git commit --allow-empty -m "<message>" -m "Test-Change: <path> <source and reas
 
 The refusal starts with `Changed test files need a citation:` and lists one ready `Test-Change:` line per missing path. Source: `requireTestChangeCitations` and `requireFrozenCitations` in [src/phase.ts](../../src/phase.ts).
 
-Whether a test may change at all is a seat rule, not a trailer question. See [check-issue](../../skills/check-issue/SKILL.md) and [merge-issue](../../skills/merge-issue/SKILL.md).
+Whether a test may change at all is a seat rule, not a trailer question. See [check-issue](../../skills/check-issue/SKILL.md).
 
 ## akrogon guard
 

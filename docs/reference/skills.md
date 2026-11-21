@@ -41,9 +41,9 @@ Chart consultants are different from seats A and B. A consultant is an hc termin
 
 ## merge-issue
 
-- **Result:** a merge attempt the command could not finish alone, checked or repaired by seat B: the applied rebase checked, a red check or refused push looked into, or a solo leaf rebased by hand. The command then pushes and moves the leaf. Seat B never pushes itself.
-- **When to use:** a leaf is in `merge` and the command hands the attempt over. An attempt that passes the command's own land run lands with no seat at all.
-- **Who starts it:** the command, dispatching seat B.
+- **Result:** the reference for the command-owned merge phase: the merge turn's batch and rebase, the `akrogon land` run that verifies, gates and pushes, each `merge_exit` into `check.repair` or `failed`, and the operator's slot-less `akrogon phase <slug> merged`. Merge holds no seat, so no prompt names this skill.
+- **When to use:** to understand or intervene in a leaf's merge: a held batch, a merge exit the repair seat reported, or a `failed` merge leaf's recovery.
+- **Who starts it:** nobody — it documents what the command runs.
 - **Source:** [`skills/merge-issue/SKILL.md`](../../skills/merge-issue/SKILL.md)
 
 ## seed-issue

@@ -1,92 +1,61 @@
 ---
 name: merge-issue
-description: Check the applied rebase or rebase a solo leaf in its worktree, run checks, let the command push and move the leaf, gather the completion owner's briefs, and run one broadcast per `issue complete` or `epic complete` line.
+description: The command-owned merge turn and land run — the batch record, the verify, gates and push, each exit into check.repair or failed, and how the operator lands a held leaf or intervenes. Merge holds no seat: no prompt names merge-issue and no phase call takes a slot.
 ---
-
-At every phase prompt, re-read this file, its references and the leaf's `brief.md` and `design.md` from disk before acting, even when read earlier in this thread.
 
 # Merge issue
 
-The prompt is `merge-issue <slug> slot=B phase=merge leaf=<folder> attempt=<id> top=<sha>` for a rebase the command already applied, optionally followed by `wake=red red=<run>`, `wake=gate` or `wake=push` when the command's own land run handed the attempt over, or `... attempt=<id> solo` when B rebases its own leaf; B works in the existing leaf worktree and never runs `git push`.
+Merge holds no seat. Its route carries no skill and no slots, and its legal moves are `merged`, `check.repair` and `failed`. This file documents the turn the command runs, the batch record in the leaf's `state.yaml`, every exit and what the operator can do. The repair seat that receives an exited leaf reads the check-issue skill's `check.repair` section.
 
-## Shared context
+## The merge turn
 
-Read `akrogon config` once, locate the unique leaf under the registered repo's authoritative `issues/open/`, and read its plan, `implementation/report.md` and reviews, using configured `remote` and `default_branch` (defaults `origin` and `main`).
+Each registered repo holds one merge turn, and each leaf in `merge` takes its own turn in merge-queue order; a waiting leaf is never touched by another leaf's turn. First return to merge keeps the `merge_stamp` it entered with; a second return mints a new one.
 
-Pass artifacts are written under the `leaf=` folder while code is read and edited only in the worktree, and a manual prompt naming a slug without `leaf=` falls back to locating the slug under the registered repo's `issues/open/`.
+A merge pass (`akrogon next`, an unpause, a wake) works in this order:
 
-Temp files and logs go under `$TMPDIR`, never a fixed `/tmp/<name>`; the full check set runs only through `akrogon verify`; anything needed later goes in the leaf folder.
+1. Reconcile every recorded batch: a live `akrogon-land-<id>` unit keeps its batch, even one left `applied: false` mid-restack; a dead unit with an applied, pushed `candidate` reconciles the leaf to `merged`; one whose push never landed writes the attempt row `red` and clears the batch.
+2. A holder whose applied batch lost its land run relaunches `akrogon land <slug> --attempt <id>` under the same attempt.
+3. Otherwise the command records a new batch — `attempt`, `started`, `pressure_start`, `built_on` (the fetched `<remote>/<default_branch>`), `holder` (the branch's merge-base and head before the rebase) and `tools`, with `applied: false` — rebases the holder's branch onto the base in disposable state, removes resurrected retired lesson lines as a fixup commit on the top, moves the holder's live branch to the top, stamps the batch `applied` with the rebased `top`, and launches the land run.
 
-The rules the merge seat shares with the other lifecycle seats — grant reuse and count lines, `.env` handling, kept command output and the red-check judgment — live in [lifecycle-rules.md](lifecycle-rules.md). The merge seat's record file is `review-B.md`, its `.env` exception is that configured merge checks may read the committed non-secret template `.env.example`, its red-check rerun is `akrogon verify --attempt <id>` and its known-red form `akrogon verify --attempt <id> --known-red`, and its operator-blocker stop is the `failed` stop the Shared context seat-stop rule states. At most a short excerpt of kept output is pasted into Markdown. Proof fixtures are cleaned up on success and failure with the cleanup identities in `grants[].fixtures[].cleanup`; absence is proven by `absence_check`, an authenticated read-back, never by a delete reply; leftovers are a blocker recorded with IDs, error, owner and next step; resources in `retained[]` are labelled apart from still-to-delete ones.
+A build conflict or a dirty holder worktree never reaches land: the turn exits the leaf to `check.repair` with `merge_exit` {reason: `conflict` | `dirty`, base}.
 
-Ground in docs first.
-Challenge fuzzy terms.
-Verify with a concrete scenario.
-Check the live surface.
+## The land run
 
-The command owns state, repair counts, dispatch and the push; a resumed merge inspects the existing rebase, diff and remote ancestry to complete remaining work.
+`akrogon land <slug> --attempt <id>` runs as the user unit `akrogon-land-<id>` — no prompt, no seat, no seat identity. It claims the leaf only while the leaf is in merge on its attempt:
 
-The merge seat completes the pass from its own reads and commands, requesting nothing and stalling for nothing. When a step physically requires the operator (a permission B cannot grant, an env value B cannot obtain), B writes the blocker into `review-B.md` with its name or ID, the attempted operation, the identity it used, the observed error, the owner and the exact operator action, never a value, under the `leaf=` folder, runs `akrogon phase <slug> failed --reason "<blocker; see review-B.md>" --slot B`, and ends the pass. A review finding whose fix needs operator access follows the operator-only rule in check-issue Shared context. This stop covers only blockers only the operator can clear; rebase conflicts, red checks, and push handling below are unchanged.
+1. `akrogon verify --attempt <id>` on the candidate worktree head: every `checks` command not named in `merge_covers`, then every `merge_checks` command at once. It is the only runner of `merge_checks`; `akrogon run-check` refuses them.
+2. The land gates — everything a refused non-failed move enforces, plus the merge ones: clean worktree, no `issues/` files on the branch, `Test-Change:` trailers over the pushed range, no retired-lesson line resurrected in the range, HEAD descending from the recorded `top`, and a green merge receipt for HEAD. Passing stamps `batch.tested_top` and `batch.tested_main`.
+3. One fast-forward push. A landed push moves the leaf to `merged` with no seat.
 
-## merge
+### Red verify judgment inside land
 
-Each registered repo holds one merge turn, and each leaf in `merge` takes its own turn in merge-queue order; a waiting leaf is never touched by another leaf's turn. At the turn's start the command records a batch on the holder, rebases the holder's branch onto the fetched `<remote>/<default_branch>` in disposable state, removes resurrected retired lesson lines as a fixup commit on the top, moves the holder's live branch to the top, and lands a green top itself: it launches `akrogon land <slug> --attempt <id>` as the user unit `akrogon-land-<id>`, which runs `akrogon verify --attempt <id>`, the `merged --check` gates and the push, and moves the holder with no seat. B gets the merge prompt only when that run hands the attempt over: a red verify, a gate refusal, a push it cannot finish, or a rebase. A holder that cannot be rebased mechanically (a conflict or a dirty worktree) takes a solo turn. A `merged`, `merged --check` or `check.fix` call on a leaf whose turn is not held is refused (naming the current holder when one holds it), ending that pass; `failed` is never refused.
+A red merge-scope verify first takes the covered-main check: when every failing unit is a named test still unresolved on main, the head lands with the run as its own receipt.
 
-The prompt ends `attempt=<id> top=<sha>` for an applied rebase, or `attempt=<id> solo` when the branch cannot be rebased mechanically (a conflict or a dirty worktree) and B rebases it by hand. Every `merged`, `merged --check` and `check.fix` call carries `--attempt <id>`; a stale or missing id is refused and changes nothing, ending the pass.
+When that misses and the previous red merge run sits on the same recorded holder head — every failing unit of the current run a real test title, at least one failing unit the cover misses repeating in that previous run — land runs the base pass itself, with `--known-red` semantics, skipping it when a green row already exists at the merge-base tree. A green base row or a green base pass exits `check.repair` with `base_verdict` naming the base run; a base red on every failing unit covers the head, which lands. A nameless failure — `(script)`, `(unnamed)`, `(no test name)`, `(log gone)` — or a holder head that changed since the record never triggers the base pass.
 
-### attempt top: the worktree is the rebased top
+### Exits
 
-B does not fetch or rebase, and commits nothing except the repair below.
+An exit writes `state.merge_exit` and clears `batch`, then moves the leaf to `check.repair`, whose seat's prompt carries `merge-exit=<reason>` plus `run=<id>`, `refusal=<text>`, `base=<sha>`, `base_verdict=<id>` and `top=<sha>` as present:
 
-A `wake=` suffix names where the command's land run stopped; the batch record in the leaf's `state.yaml` holds its text. `wake=red red=<run>`: the command's verify of this top is red; B reads that run's logs with `akrogon log <path>` and judges it under Shared endings before any repair, rerunning `akrogon verify --attempt <id>` as below. `wake=gate`: `merged --check` refused, with the message in `batch.refusal`; B fixes it as a trailer refusal is fixed below and reruns `merged --check`. `wake=push`: the push failed or was refused twice, with git's stderr in `batch.refusal`; B reruns `akrogon verify --attempt <id>`, `--check` and `merged`, and reports any other push error rather than retrying. B runs `akrogon verify --attempt <id>` in the worktree, which checks `HEAD` out fresh, runs every `checks` command not named in `merge_covers`, then every `merge_checks` command, and writes the receipt `merged --check` requires, then records its output in `review-B.md` under the `leaf=` folder with advisory failures as Nits; verify keeps its own logs under the Shared context exemption.
+| Reason       | When                                                                | Fields                                  |
+| ------------ | ------------------------------------------------------------------- | --------------------------------------- |
+| `red`      | The verify run is red, with no cover on main and none from the base pass. | `run`, `top`, `base_verdict?` |
+| `gate`     | A land gate refused.                                                       | `refusal`, `top`              |
+| `conflict` | The rebase or restack conflicted, or the turn failed before apply.         | `base`, `top` on a land exit  |
+| `dirty`    | The holder worktree held uncommitted work at apply or restack.             | `base`, `top` on a land exit  |
 
-On a green verify run `akrogon phase <slug> merged --slot B --check --attempt <id>`, which requires a green merge receipt for HEAD under the current config, HEAD to descend from the recorded top, checks the `Test-Change:` trailers over the pushed range, and records the tested top. A refusal names each uncited file, fixed as the solo form fixes it; red runs take the endings under Shared endings.
+Push outcomes are not exits: a first non-fast-forward refusal restacks onto the new remote tip inside the same run and pushes again; a second clears the batch, writes the attempt row `red`, prints `held <slug> attempt=<id>` and keeps the leaf in merge at its queue place for the next pass to rebuild; a push error that is not a refusal moves the leaf to `failed` with git's stderr in `failure.reason`.
 
-B may fix a mechanical red in place before `merged --check`: generator output, lint, a schema or version bump, or re-recording. The check-issue repair exceptions apply: no test expectation correction, no locked brief or design change, no new or widened live action, and no proof-command correction — a needed one is not a B repair and goes to A through `check.fix` under the `plan-issue` `plan.synthesis` proof-command rule. B commits the repair in the worktree under the solo trailer rule, so a re-record or any repair touching a test file carries its `Test-Change:` trailers, and a trailer refusal on this top is fixed as the solo form fixes it, then `--check` reruns. B then reruns `akrogon verify --attempt <id>` green on the repaired head and records it in `review-B.md`. A second red on the same command or unit ends with `akrogon phase <slug> check.fix --slot B --attempt <id>`.
+`merge_exit` clears when the leaf leaves `check.repair`. A `check.repair → merge` move skips the leaf green-receipt requirement exactly when `merge_exit.reason` is `red` and `merge_exit.top` equals the worktree HEAD — the unedited returning leaf already holds its merge-scope proof; anything else still needs the receipt.
 
-Gather the holder's completion owner's briefs (its issue's, or every leaf brief under its epic), then run `akrogon phase <slug> merged --slot B --attempt <id>`. The command pushes the tested head fast-forward once, prints `issue complete <issue>` or `epic complete <epic>` when the owner finishes, and moves the holder.
+## Phase calls on a merge leaf
 
-A non-fast-forward refusal rebases only the holder onto the new remote tip and prints exactly one line. `rerun tested=<T1-sha|none> pushed=<T2-sha>` means the worktree already sits at `<T2-sha>`, and the push needs a green receipt for that tree (`none` when no `--check` ran before the refusal): rerun `akrogon verify --attempt <id>`, which reuses a receipt only for an identical tree, `--check`, briefs and `merged` under the same `--attempt <id>`. `rerun rebase <slug> onto <sha>` means the branch no longer fits the new base or its worktree is dirty: fetch, rebase onto `<remote>/<default_branch>` resolving conflicts as in the solo form, then rerun `akrogon verify --attempt <id>`, `--check` and `merged`. Any other push error fails the call with its cause; report it rather than retrying.
+A call on a merge leaf carrying `--slot` or `--attempt` is refused: `A seat cannot make merge calls: <requested>`. `merged --check` is refused: `--check is the seat protocol and merge holds no seat: run the move without --check`. `merged` or `check.fix` on a leaf that does not hold the turn is refused, naming the holder when one holds it. `check.fix` is always refused on a merge leaf: `Merge moves to check.repair itself; a second red takes check.fix from check.repair`.
 
-### attempt solo: B rebases its own leaf
+The one legal move call is the operator's slot-less `akrogon phase <slug> merged`, which lands the leaf's applied batch: it pushes the tested head fast-forward, restacks once on a non-fast-forward refusal and pushes again, completes the owner and moves the leaf — or fails the call when nothing was pushed. Any seat or the operator can still stop the leaf with `akrogon phase <slug> failed --reason "<text>"`, and a failed leaf's operator recovery back into `merge` re-enters the queue.
 
-Commit scoped outstanding changes (each scoped commit that changes an existing file matched by the path rule in `src/test-files.ts` ends its message with a `Test-Change: <exact path> <source and reason>` trailer in the final trailer block, one per changed old test file, and a commit adding a case to an existing test file names what was added and that no existing expectation changed, citing no source, and a path recorded at the `plan.synthesis` to `implement` move that changed or vanished since, or an added `src/test-files.ts`-matched path outside that record, needs the same trailer in the last commit touching it or a later commit, and when no branch commit touches the path, a later trailer-only commit must carry it on a commit new since the record, a replayed planning-era trailer does not count), fetch the configured remote, rebase onto `<remote>/<default_branch>`, and run `akrogon verify --attempt <id>` in the worktree, recording its output in `review-B.md` under the `leaf=` folder and advisory failures as Nits.
+## Operator surface
 
-On a rebase conflict, resolve it in the worktree keeping both true sides, complete the rebase, and record in `review-B.md` under the `leaf=` folder the rebase target, the prior reviewed head, the resolved head and `git range-diff <old-base>..<prior-head> <target>..<resolved-head>` before running the checks, where old-base is the `AKROGON_BASE` value before the post-rebase refresh.
+The retired hold verbs exit with an error pointing at the check-issue skill's `check.repair` section; a merge exit goes to `check.repair`, never to a seat inside merge.
 
-Same-line index conflicts retain both true entries and recheck pointers. An existing assertion, fixture or recorded output changes or is deleted only with a cited brief outcome or real source (a real build, user action or content, integration or attacker-reachable input) that the old expectation contradicts. A test added after planning cites its source in a `Test-Change` trailer. B corrects no test expectation at merge. A wrong expectation exposed by the rebase goes to A through the `check.fix` ending under Shared endings.
-
-After the rebase resolves, B runs the re-removal one-liner, resolving the helper beside the installed akrogon entry point while operating in the target worktree, and commits the removal as its own scoped commit when the output lists removed histories; `merged --check` refuses a pushed range still holding a retired line.
-
-```
-bun -e "const {mergeBase, removeRetiredLessons}=await import(process.argv[1]); const b=await mergeBase(process.cwd(),'<remote>/<default_branch>','HEAD'); const ob=await mergeBase(process.cwd(),'<remote>/<default_branch>','ORIG_HEAD'); const r=await removeRetiredLessons(process.cwd(),b,'HEAD',[{base:ob,head:'ORIG_HEAD'}]); console.log(r.length?r.join('\n'):'none')" "$(dirname "$(readlink -f "$(command -v akrogon)")")/lessons.ts"
-```
-
-When the output lists removed histories (`none` means no removal): `git add learnings/LESSONS.md && git commit -m "lessons: retire applied lines"`.
-
-On green checks run `akrogon phase <slug> merged --slot B --check --attempt <id>`; on a trailer refusal B adds a commit carrying the missing trailer when the change has a real source, a trailer-only empty commit when the change sits inside a rebased commit, or reverts the change, then reruns `akrogon verify --attempt <id>` and `--check`.
-
-Then gather the completion owner's briefs (the issue's, or every leaf brief under the epic when the leaf has one) and run `akrogon phase <slug> merged --slot B --attempt <id>`; the command pushes the tested head fast-forward and moves the leaf. `rerun` and `rerun rebase` lines mean the same as in the applied form.
-
-### Shared endings
-
-Every run and rerun is `akrogon verify --attempt <id>`, whose receipt lists each command with its exit and log — read a listed log with `akrogon log <path>`.
-
-On a red verify, judge the cause: a red run with no cause in the leaf's diff takes the retry and known-red judgment in [lifecycle-rules.md](lifecycle-rules.md), the rerun being `akrogon verify --attempt <id>` on the unchanged head, the known-red run `akrogon verify --attempt <id> --known-red` on that same head, the record `review-B.md`, a green rerun `inconsistent` and on to `merged --check`, a pass the judgment agrees with on to `merged --check`, and a failing exit or disagreeing judgment taking the ending below with `review-B.md` recording the runs and the judged cause first. A red run appends each failing command exactly as invoked (command and arguments), its failing output, the rebase target commit and the tested head to `review-B.md` under the `leaf=` folder, then calls `akrogon phase <slug> check.fix --slot B --attempt <id>`, which moves the leaf to `check.fix` so A corrects it — A reproduces the red on run-check, which refuses a configured `merge_checks` command, with the narrowest failing command, never the whole merge suite —, including a wrong expectation in its own done-criteria and any needed proof-command correction under the `plan-issue` `plan.synthesis` proof-command rule, and finishes with the actual result and repair footer.
-
-A local default branch is unnecessary; the command's fast-forward push serializes competing merges. An unchanged successful check run is reused only when neither code nor integration changed.
-
-When the command's land run merges the leaf, B makes no merge call; the command later prompts B with `broadcast-issue` for the completed owner. Each `issue complete` or `epic complete` line B's own `merged` call prints gets one broadcast-issue run by the merge seat itself in this session with that context and repo worktree — one run per completed standalone issue or whole epic — sent by the merge slot, never by a subagent or another agent, because the tab closes as soon as this pane goes idle after `merged`.
-
-A failed broadcast is visible but leaves the merge complete, while GitHub closure and completed-folder moves belong to the command.
-
-Finish by printing the footer as the last act; the command closes this tab once this pane goes idle or exits after `merged`, a manual sweep or startup cleanup closes any tab a merge left open, and only those sweeps remove the worktree and branch once the issue folder has moved.
-
-## Printed footer
-
-```text
-Last operation: <push/check evidence and observed phase result>
-Next: <skill> <slug> slot=<A|B> phase=<phase> leaf=<folder>
-```
-
-A repair move names `implement-issue <slug> slot=A phase=check.fix leaf=<folder>`; completion uses `Next: none merged`, failure uses `Next: none failed`, and another unresolved error names its actual reason without inventing a state move.
+`akrogon status` shows `land` on any merge-phase leaf holding a batch, with the unit name and liveness under the leaf's detail. A merge leaf holding a batch keeps its systemd slice in cleanup under the `merge batch` reason, and `stop --all` stops a tab-less merge leaf holding a batch. `akrogon timing` counts a seatless close into `merged` or `check.repair` as a seatless visit.

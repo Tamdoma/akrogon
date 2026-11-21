@@ -12,7 +12,7 @@ const text = z.string().min(1);
 export const failureSchema = z.strictObject({
   cause: z.enum(['blocked', 'attempts']),
   phase: historicalPhaseSchema,
-  slot: slotSchema,
+  slot: slotSchema.optional(),
   reason: z.string().trim().min(1),
   delivery: z.string().optional(),
 });
@@ -99,6 +99,19 @@ export const batchSchema = z.strictObject({
 
 export type Batch = z.infer<typeof batchSchema>;
 
+// Written on the check.repair leaf a command-run merge evicted: why the land run or
+// the merge turn moved it, the evicted top, and the evidence a repair seat needs.
+export const mergeExitSchema = z.strictObject({
+  reason: z.enum(['red', 'gate', 'conflict', 'dirty']),
+  top: z.string().optional(),
+  run: z.string().optional(),
+  refusal: z.string().optional(),
+  base: z.string().optional(),
+  base_verdict: z.string().optional(),
+});
+
+export type MergeExit = z.infer<typeof mergeExitSchema>;
+
 export const broadcastSchema = z.strictObject({
   kind: z.enum(['issue', 'epic']),
   name: text,
@@ -136,6 +149,7 @@ export const stateSchema = z
     delivery_error: z.object({ A: deliveryErrorSchema.optional(), B: deliveryErrorSchema.optional() }).default({}),
     failure: failureSchema.optional(),
     merge_stamp: z.string().optional(),
+    merge_exit: mergeExitSchema.optional(),
     batch: batchSchema.optional(),
     broadcast: broadcastSchema.optional(),
     frozen: z.record(z.string(), z.string().nullable()).optional(),

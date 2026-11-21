@@ -188,7 +188,7 @@ function note(state: State, now: number, seatSources: { a: string; b: string }):
     .map((file) => basename(file))
     .filter((name) => name === 'ISSUE.md' || name === 'EPIC.md')
     .filter((name, index, all) => all.indexOf(name) === index);
-  const land: string[] = state.phase === 'merge' && state.batch?.owner === 'command' ? ['land'] : [];
+  const land: string[] = state.phase === 'merge' && state.batch !== undefined ? ['land'] : [];
   const broadcast: string[] = broadcastPending(state) ? ['broadcast pending'] : [];
   return [
     ...failed,
@@ -211,7 +211,7 @@ function phaseEntry(log: LogRecord[], state: State): LogRecord | undefined {
 
 // The command-owned land attempt when the leaf is in one.
 function landAttempt(state: State): string | undefined {
-  return state.phase === 'merge' && state.batch?.owner === 'command' ? state.batch.attempt : undefined;
+  return state.phase === 'merge' && state.batch !== undefined ? state.batch.attempt : undefined;
 }
 
 function cells(

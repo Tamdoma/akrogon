@@ -80,7 +80,7 @@ export async function stopCommand(target: string | undefined, all: boolean, cwd:
     inv !== null
       ? inv.leaves.filter(
           (leaf: Leaf) =>
-            (leaf.state.tab !== undefined || leaf.state.batch?.owner === 'command') && leaf.state.phase !== 'merged',
+            (leaf.state.tab !== undefined || leaf.state.batch !== undefined) && leaf.state.phase !== 'merged',
         )
       : [findLeaf(repo, z.string().parse(target))];
   await withLock(resolve(globalHome(), '.lock'), async () => {

@@ -18,7 +18,7 @@ When a leaf gets the turn, the command:
 The land run then does the rest on its own:
 
 1. Runs `akrogon verify --attempt <id>` on a fresh checkout. A merge runs every `checks` command not named in `merge_covers`, then, once those are green, the `merge_checks` members all at once. See [Checks](../reference/checks.md).
-2. Runs the `merged --check` gates, such as the `Test-Change:` trailer rule.
+2. Runs the land gates, such as the `Test-Change:` trailer rule.
 3. Pushes the tested head fast-forward.
 4. Moves the leaf to `merged`.
 
@@ -26,22 +26,22 @@ No seat is prompted. While the land run works, `akrogon status <slug>` shows `la
 
 Source: [land.ts](../../src/land.ts), `commandMerged` in [phase.ts](../../src/phase.ts), the merge turn in [next.ts](../../src/next.ts).
 
-## When seat B takes over
+## When the land run exits
 
-The land run hands the attempt to seat B in these cases:
+Merge holds no seat, so nobody is prompted inside it. When the land run cannot land the leaf it writes `state.merge_exit` and moves the leaf to `check.repair`. Seat B's repair prompt then carries `merge-exit=<reason>` plus the exit's fields.
 
-| Case                                   | What B sees in its prompt | What B does                                                  |
-| -------------------------------------- | ------------------------- | ------------------------------------------------------------ |
-| The verify run is red                  | `wake=red red=<run>`      | Reads the logs and judges the cause.                         |
-| A gate refused the move                | `wake=gate`               | Fixes the refusal, such as a missing trailer.                |
-| The push errored, or was refused twice | `wake=push`               | Reruns verify, `--check` and `merged`, or reports the error. |
-| The push needs a hand rebase           | `attempt=<id> solo`       | Rebases by hand and reruns the checks.                       |
+| Exit `merge-exit=` | What it means                                             | Fields carried                  |
+| ------------------ | --------------------------------------------------------- | ------------------------------- |
+| `red`              | The verify run went red and no cover applied.             | `run=<id>`, `top=<sha>`, `base_verdict=<id>` |
+| `gate`             | A land gate refused.                                      | `refusal=<text>`, `top=<sha>`   |
+| `conflict`         | The rebase or restack conflicted.                         | `base=<sha>`, `top=<sha>` on a land exit |
+| `dirty`            | The worktree held uncommitted work.                       | `base=<sha>`, `top=<sha>` on a land exit |
 
-A branch that cannot rebase mechanically never reaches the land run. A conflict or a dirty worktree gives B a solo turn, with `attempt=<id> solo` in its prompt. B rebases by hand, runs `akrogon verify --attempt <id>`, then calls `akrogon phase <slug> merged --slot B --attempt <id>`.
+`base_verdict` appears only when land ran the base pass itself and names that base run; a green verdict there means the head red is the leaf's own. The merge turn writes `conflict` and `dirty` itself when its own build step fails; a restack conflict mid-run writes them from the land run.
 
-B never runs `git push`. When B calls `merged`, the command does the push and moves the leaf. A red result B cannot fix in place sends the leaf to `check.fix` so seat A repairs it.
+Three push outcomes are not exits. A first fast-forward refusal restacks and pushes again inside the same run. A second clears the batch, prints `held <slug> attempt=<id>` and keeps the leaf in `merge` at its queue place. A push error that is not a refusal moves the leaf to `failed` with git's stderr as the reason. A `failed` leaf is recovered by the operator; `akrogon phase <slug> merged` also lands an applied batch directly.
 
-The full procedure, including red-run judgment and `rerun` lines, is in [merge-issue](../../skills/merge-issue/SKILL.md). Phase rules are in [State and phases](../reference/state-and-phases.md).
+The full procedure, including red-run judgment and `merge_exit`, is in [merge-issue](../../skills/merge-issue/SKILL.md). Phase rules are in [State and phases](../reference/state-and-phases.md).
 
 ## When an issue or epic completes
 
@@ -60,8 +60,8 @@ Each completion gets one update sent to Discord by the [broadcast-issue](../../s
 
 Who sends it depends on who merged:
 
-- When B called `merged`, B runs broadcast-issue itself, in the same session.
-- When the land run merged with no seat, `akrogon status` shows `broadcast pending`. `akrogon next` then prompts B with a broadcast-only `broadcast-issue` turn.
+- When the command's land run merged, `akrogon status` shows `broadcast pending`. `akrogon next` then prompts B with a broadcast-only `broadcast-issue` turn.
+- When you land a leaf yourself with `akrogon phase <slug> merged`, run broadcast-issue yourself for the printed completion line.
 
 The message has a one-line summary and two short lists: what was wrong or missing before, and what is better now. It is written for the whole team, not only developers.
 

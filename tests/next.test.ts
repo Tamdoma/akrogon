@@ -31,7 +31,6 @@ import {
   type Fixture,
   verified,
   holding,
-  seatOwned,
 } from './helpers';
 import { readState, saveState, type Batch, type State } from '../src/state';
 import { seatName } from '../src/hc';
@@ -841,31 +840,12 @@ test('next recovers only merge-phase work by ancestry against a non-default remo
     saveState(path, { ...readState(path), phase: 'merge', sources: ['team/project#8'] });
     const prompted: Result = await next(f, ['landed']);
     expect(prompted.code).toBe(0);
-    seatOwned(path);
-    expect((await next(f, ['landed'])).code).toBe(0);
     expect(readState(path).phase).toBe('merge');
+    expect(readState(path).batch?.top).toBeTruthy();
     const merges = (await delivered(f, 'landed')).filter((task) => task.seat === 'b');
-    expect(merges.map((task) => task.text)).toEqual([mergeText(path)]);
-    expect(merges[0].address).toBe(z.string().parse(readState(path).seat.B?.address));
-    expect(merges[0].text.split(' leaf=')[1]?.split(' ')[0]).toBe(`${f.root}/issues/open/landing/landed`);
-    const landedAttempt: string = z.string().parse(readState(path).batch?.attempt);
+    expect(merges).toEqual([]);
     await verified(f, 'landed', 'merge');
-    expect(
-      (
-        await cli(
-          f,
-          ['phase', 'landed', 'merged', '--slot', 'B', '--check', '--attempt', landedAttempt],
-          worktree,
-          f.env,
-        )
-      ).code,
-    ).toBe(0);
-    const completed: Result = await cli(
-      f,
-      ['phase', 'landed', 'merged', '--slot', 'B', '--attempt', landedAttempt],
-      worktree,
-      f.env,
-    );
+    const completed: Result = await cli(f, ['phase', 'landed', 'merged'], worktree, f.env);
     expect(completed.code).toBe(0);
     expect(completed.stdout).toContain('issue complete landing');
     expect(JSON.parse(readFileSync(gh.db, 'utf8'))).toEqual([]);
@@ -911,7 +891,7 @@ test('a finished seat restarts with its task and the surviving slot keeps its te
   }
 }, 15000);
 
-test('uncommitted work in a merge worktree is left to the merge seat', async () => {
+test('uncommitted work in a merge worktree exits to check.repair with the edit intact', async () => {
   const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'dirty', 'plan.synthesis');
@@ -922,15 +902,15 @@ test('uncommitted work in a merge worktree is left to the merge seat', async () 
     saveState(path, { ...readState(path), phase: 'merge', prompted: {} });
     const result: Result = await next(f, ['dirty']);
     expect(result.code).toBe(0);
-    expect(readState(path).phase).toBe('merge');
-    const merges = (await delivered(f, 'dirty')).filter((task) => task.seat === 'b');
-    expect(merges.map((task) => task.text)).toEqual([mergeText(path)]);
-    expect(merges[0].address).toBe(z.string().parse(readState(path).seat.B?.address));
+    const exited: State = readState(path);
+    expect(exited.phase).toBe('check.repair');
+    expect(exited.merge_exit?.reason).toBe('dirty');
     expect(existsSync(resolve(worktree, 'forgotten'))).toBe(true);
   } finally {
     await f.clean();
   }
 }, 15000);
+
 
 test('a worktree parked mid-rebase is still dispatched', async () => {
   const f: HcFixture = await hcFixture();
@@ -983,24 +963,8 @@ test('a live merge retains its completion call after pushing, including a peer r
     expect(readState(path).busy_since.B).toBeDefined();
     expect(readState(path).busy_notified.B).toBeDefined();
     expect(noticeFiles(f.core).at(-1)!.title).toContain('seat B');
-    const mergeAttempt: string = z.string().parse(readState(path).batch?.attempt);
     await verified(f, 'active-merge', 'merge');
-    expect(
-      (
-        await cli(
-          f,
-          ['phase', 'active-merge', 'merged', '--slot', 'B', '--check', '--attempt', mergeAttempt],
-          worktree,
-          f.env,
-        )
-      ).code,
-    ).toBe(0);
-    const completed: Result = await cli(
-      f,
-      ['phase', 'active-merge', 'merged', '--slot', 'B', '--attempt', mergeAttempt],
-      worktree,
-      f.env,
-    );
+    const completed: Result = await cli(f, ['phase', 'active-merge', 'merged'], worktree, f.env);
     expect(completed.code).toBe(0);
     expect(completed.stdout).toContain('issue complete issue');
     expect(await liveTabs(f)).toEqual(['active-merge']);
@@ -1735,17 +1699,21 @@ test('blocked merge seat B prevents fetch and clean checks in a dirty worktree',
     const tasksBefore = await allTasks(f);
     const result: Result = await next(f, ['blocked-merge'], { REAL_GIT: realGit, GIT_CALL_LOG: gitLog });
     const gitCalls: string[] = readFileSync(gitLog, 'utf8').trim().split('\n');
-    expect(gitCalls).not.toContain('status --porcelain');
+    // The dirty check reads the worktree once; the blocked seat is never touched.
+    expect(gitCalls.filter((line) => line === 'status --porcelain').length).toBeGreaterThanOrEqual(1);
     expect(result.code).toBe(0);
     const after: State = readState(path);
     // A blocked seat sets no busy clock: the pass records its blocked notice, nothing else.
     expect(before.busy_since.B).toBeUndefined();
     expect(after.busy_since.B).toBeUndefined();
     expect(after.blocked_notified.B).toBe('pending');
-    // The batch pass built and applied a member-less record without touching the seat.
-    expect(after.batch?.applied).toBe(true);
-    const { batch, ...rest }: State = after;
-    expect(rest).toEqual({ ...before, blocked_notified: { B: 'pending' }, busy_notified: {} });
+    // The dirty holder worktree exits to check.repair and keeps the edit.
+    expect(after.phase).toBe('check.repair');
+    expect(after.batch).toBeUndefined();
+    expect(after.merge_exit?.reason).toBe('dirty');
+    expect(after.seat.B).toBeDefined();
+    expect(after.busy_since).toEqual({});
+    expect(after.done).toEqual([]);
     expect(await allTasks(f)).toEqual(tasksBefore);
     expect(await seatTerminals(f, 'blocked-merge', true)).toHaveLength(2);
     expect(readFileSync(resolve(state.worktree!, 'unfinished'), 'utf8')).toBe('dirty merge work\n');
@@ -1794,10 +1762,10 @@ test('a blocked non-merge seat does not stall a merge leaf', async () => {
     saveState(path, { ...state, phase: 'merge' });
     const result: Result = await next(f, ['blocked-merge']);
     expect(result.code).toBe(0);
-    expect(readState(path).phase).toBe('merge');
-    const merges = (await delivered(f, 'blocked-merge')).filter((task) => task.seat === 'b');
-    expect(merges.map((task) => task.text)).toEqual([mergeText(path)]);
-    expect(merges[0].address).toBe(z.string().parse(readState(path).seat.B?.address));
+    const exited: State = readState(path);
+    expect(exited.phase).toBe('check.repair');
+    expect(exited.batch).toBeUndefined();
+    expect(exited.merge_exit?.reason).toBe('dirty');
     expect(readState(path).busy_since.A).toBeUndefined();
     expect(readState(path).blocked_notified.A).toBe('pending');
     expect(readFileSync(resolve(state.worktree!, 'unfinished'), 'utf8')).toBe('dirty merge work\n');
@@ -1806,44 +1774,40 @@ test('a blocked non-merge seat does not stall a merge leaf', async () => {
   }
 }, 15000);
 
-test('merge, check.fix, check.repair and post-repair review dispatch to their swapped seats', async () => {
+
+test('check.fix, check.repair and post-repair review dispatch to their swapped seats', async () => {
   const f: HcFixture = await hcFixture();
   try {
     const path: string = leaf(f, 'post-repair', 'plan.synthesis');
     expect((await next(f, ['post-repair'])).code).toBe(0);
     const state: State = readState(path);
     const a: string = z.string().parse(state.seat.A?.address);
-    const worktree: string = z.string().parse(state.worktree);
-    writeFileSync(resolve(worktree, 'change'), 'fix\n');
-    await command(['git', 'add', 'change'], worktree);
-    await command(['git', 'commit', '-m', 'change'], worktree);
-    await quiet(f, a);
-    saveState(path, { ...state, phase: 'merge', prompted: {} });
-    expect((await next(f, ['post-repair'])).code).toBe(0);
-    seatOwned(path);
-    expect((await next(f, ['post-repair'])).code).toBe(0);
-    const b: string = z.string().parse(readState(path).seat.B?.address);
-    expect(f.core.tasks(b)).toEqual([mergeText(path)]);
-    const move = async (phase: State['phase'], extra: object = {}): Promise<void> => {
+    const quietA = async (): Promise<void> => {
       await quiet(f, a);
-      await quiet(f, b);
+    };
+    const move = async (phase: State['phase'], extra: object = {}): Promise<void> => {
+      await quietA();
+      const b: string | undefined = readState(path).seat.B?.address;
+      if (b !== undefined) await quiet(f, b);
       saveState(path, { ...readState(path), phase, ...extra, prompted: {} });
       expect((await next(f, ['post-repair'])).code).toBe(0);
     };
     await move('check.fix');
     expect(f.core.tasks(a).at(-1)).toBe(`implement-issue post-repair slot=A phase=check.fix leaf=${path}`);
     await move('check.review', { fix_rounds: 1 });
+    const b: string = z.string().parse(readState(path).seat.B?.address);
     expect(f.core.tasks(b).at(-1)).toBe(`check-issue post-repair slot=B phase=check.review leaf=${path}`);
     await move('check.repair');
     expect(f.core.tasks(b).at(-1)).toBe(`check-issue post-repair slot=B phase=check.repair leaf=${path}`);
     expect(f.core.tasks(a)).toHaveLength(2);
-    expect(f.core.tasks(b)).toHaveLength(3);
+    expect(f.core.tasks(b)).toHaveLength(2);
     expect(readState(path).seat.A?.address).toBe(a);
     expect(readState(path).seat.B?.address).toBe(b);
   } finally {
     await f.clean();
   }
 }, 15000);
+
 
 function tabCloses(f: HcFixture): string[][] {
   return f.core
@@ -2150,33 +2114,6 @@ for (const owner of ['issue', 'epic/issue']) {
     }
   });
 }
-
-test('merge leaf with landed branch re-prompts its idle seat instead of auto-recovering', async () => {
-  const f: HcFixture = await hcFixture();
-  try {
-    const path: string = leaf(f, 'landed-merge', 'check.review');
-    expect((await next(f, ['landed-merge'])).code).toBe(0);
-    const worktree: string = readState(path).worktree!;
-    writeFileSync(resolve(worktree, 'landed'), 'real change\n');
-    await command(['git', 'add', 'landed'], worktree);
-    await command(['git', 'commit', '-m', 'landed change'], worktree);
-    await command(['git', 'push', 'origin', 'HEAD:main'], worktree);
-    const b: string = z.string().parse(readState(path).seat.B?.address);
-    await quiet(f, z.string().parse(readState(path).seat.A?.address));
-    await quiet(f, b);
-    saveState(path, { ...readState(path), phase: 'merge', prompted: {} });
-    const tasksBefore: number = f.core.tasks(b).length;
-    expect((await next(f, ['landed-merge'])).code).toBe(0);
-    seatOwned(path);
-    expect((await next(f, ['landed-merge'])).code).toBe(0);
-    expect(f.core.tasks(b)).toHaveLength(tasksBefore + 1);
-    expect(f.core.tasks(b).at(-1)).toBe(mergeText(path));
-    expect(readState(path).seat.B?.address).toBe(b);
-    expect(readState(path).phase).toBe('merge');
-  } finally {
-    await f.clean();
-  }
-}, 15000);
 
 test('spaced repo root dispatches leaf= with the complete spaced authoritative folder', async () => {
   const f: HcFixture = await hcFixture();
@@ -3582,16 +3519,7 @@ function testedTurn(f: HcFixture): { batch: Batch } {
   return { batch: { ...batch, tested_top: batch.top } };
 }
 
-function mergeText(path: string): string {
-  const state: State = readState(path);
-  const batch = state.batch;
-  expect(batch).toBeDefined();
-  const context: string =
-    batch!.top === undefined ? `attempt=${batch!.attempt} solo` : `attempt=${batch!.attempt} top=${batch!.top}`;
-  return `merge-issue ${state.slug} slot=B phase=merge leaf=${path} ${context}`;
-}
-
-test('only the earlier-stamped merge leaf is prompted while the waiting leaf keeps its tab and seats', async () => {
+test('only the earlier-stamped merge leaf holds the turn while the waiting leaf keeps its tab and seats', async () => {
   const f: HcFixture = await hcFixture();
   try {
     const aa: { path: string } = await allocatedLeaf(f, 'aa');
@@ -3599,10 +3527,9 @@ test('only the earlier-stamped merge leaf is prompted while the waiting leaf kee
     toMerge(aa.path, '2026-09-11T00:00:00.000Z');
     const before: State = toMerge(bb.path, '2026-09-12T00:00:00.000Z');
     expect((await next(f, [])).code).toBe(0);
-    seatOwned(aa.path);
-    expect((await next(f, [])).code).toBe(0);
-    expect(await mergePrompts(f)).toEqual([{ seat: 'aa/b', text: mergeText(aa.path) }]);
+    expect(readState(aa.path).batch?.applied).toBe(true);
     expect(readState(bb.path)).toEqual(before);
+    expect(await mergePrompts(f)).toEqual([]);
     expect(await liveTabs(f)).toEqual(['aa', 'bb']);
     for (const seat of Object.values(before.seat))
       expect((await f.core.get(z.string().parse(seat?.address))).state).toBe('live');
@@ -3610,6 +3537,7 @@ test('only the earlier-stamped merge leaf is prompted while the waiting leaf kee
     await f.clean();
   }
 }, 15000);
+
 
 test('an ineligible merge leaf never holds the turn (blocked-by)', async () => {
   const f: HcFixture = await hcFixture();
@@ -3621,44 +3549,32 @@ test('an ineligible merge leaf never holds the turn (blocked-by)', async () => {
     leaf(f, 'cc', 'failed');
     const baseline: number = (await allTasks(f)).length;
     expect((await next(f, ['--all'])).code).toBe(1);
-    seatOwned(aa.path);
-    expect((await next(f, ['--all'])).code).toBe(1);
-    expect(await mergePrompts(f)).toEqual([{ seat: 'aa/b', text: mergeText(aa.path) }]);
-    expect(await allTasks(f)).toHaveLength(baseline + 1);
+    expect(readState(aa.path).batch?.applied).toBe(true);
+    expect(await mergePrompts(f)).toEqual([]);
+    expect(await allTasks(f)).toHaveLength(baseline);
     expect(readState(bb.path).prompted.B).toBeUndefined();
+    expect(readState(bb.path).batch).toBeUndefined();
   } finally {
     await f.clean();
   }
 }, 15000);
 
-for (const exit of ['seat merged', 'seat check.fix', 'seat failed', 'operator merged'] as const) {
+
+for (const exit of ['operator merged', 'operator failed'] as const) {
   test(`the ${exit} holder exit wakes the next merge leaf without a manual next`, async () => {
     const f: HcFixture = await hcFixture();
     try {
       const [aa, bb]: { path: string }[] = await allocatedLeaves(f, ['aa', 'bb']);
-      toMerge(aa.path, '2026-09-11T00:00:00.000Z', exit.endsWith('merged') ? testedTurn(f) : {});
+      toMerge(aa.path, '2026-09-11T00:00:00.000Z', exit === 'operator merged' ? testedTurn(f) : {});
       toMerge(bb.path, '2026-09-12T00:00:00.000Z');
       const args: string[] =
-        exit === 'seat merged'
-          ? ['phase', 'aa', 'merged', '--slot', 'B', '--attempt', 'a1']
-          : exit === 'seat check.fix'
-            ? ['phase', 'aa', 'check.fix', '--slot', 'B']
-            : exit === 'seat failed'
-              ? ['phase', 'aa', 'failed', '--reason', 'stop', '--slot', 'B']
-              : ['phase', 'aa', 'merged'];
+        exit === 'operator merged' ? ['phase', 'aa', 'merged'] : ['phase', 'aa', 'failed', '--reason', 'stop'];
       expect((await cli(f, args, f.root, f.env)).code).toBe(0);
-      expect(readState(aa.path).phase).toBe(
-        exit === 'seat check.fix' ? 'check.fix' : exit === 'seat failed' ? 'failed' : 'merged',
-      );
+      expect(readState(aa.path).phase).toBe(exit === 'operator merged' ? 'merged' : 'failed');
       expect(await mergePrompts(f)).toEqual([]);
-      expect(readState(bb.path).batch?.owner).toBe('command');
-      seatOwned(bb.path);
-      // B works on its merge task through the later pass, as a merge seat would.
-      holdTurns(f);
-      expect((await next(f, ['--all'])).code).toBe(exit === 'seat failed' ? 1 : 0);
-      expect(await mergePrompts(f)).toEqual([{ seat: 'bb/b', text: mergeText(bb.path) }]);
-      expect((await next(f, ['--all'])).code).toBe(exit === 'seat failed' ? 1 : 0);
-      expect((await mergePrompts(f)).filter((prompt) => prompt.seat === 'bb/b')).toHaveLength(1);
+      expect(readState(bb.path).batch?.applied).toBe(true);
+      expect((await next(f, ['--all'])).code).toBe(exit === 'operator failed' ? 1 : 0);
+      expect(await mergePrompts(f)).toEqual([]);
     } finally {
       await f.clean();
     }
@@ -3675,79 +3591,42 @@ test('a committed merge whose log append fails still wakes the next leaf', async
     const log: string = resolve(f.root, 'issues/log.jsonl');
     writeFileSync(log, '');
     chmodSync(log, 0o444);
-    const result: Result = await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--attempt', 'a1'], f.root, f.env);
+    const result: Result = await cli(f, ['phase', 'aa', 'merged'], f.root, f.env);
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain('committed');
     expect(result.stderr).toContain('log append failed');
     chmodSync(log, 0o644);
     expect(readState(aa.path).phase).toBe('merged');
-    expect(readState(bb.path).batch?.owner).toBe('command');
+    expect(readState(bb.path).batch?.applied).toBe(true);
     expect(await mergePrompts(f)).toEqual([]);
   } finally {
     await f.clean();
   }
 }, 15000);
 
-test('a leaf re-entering merge queues behind the two leaves stamped earlier', async () => {
+test('a leaf re-entering merge keeps its stamp and holds the turn over later-stamped leaves', async () => {
   const f: HcFixture = await hcFixture();
   try {
     const [aa, bb, cc]: { path: string }[] = await allocatedLeaves(f, ['aa', 'bb', 'cc']);
     toMerge(aa.path, '2026-09-11T00:00:00.000Z');
     toMerge(bb.path, '2026-09-12T00:00:00.000Z');
     toMerge(cc.path, '2026-09-13T00:00:00.000Z');
-    // Every merge seat works on its task until this case lets it finish.
-    holdTurns(f);
-    const seats = async (): Promise<string[]> => (await mergePrompts(f)).map((prompt) => prompt.seat);
     expect((await next(f, ['--all'])).code).toBe(0);
-    seatOwned(aa.path);
-    expect((await next(f, ['--all'])).code).toBe(0);
-    expect(await seats()).toEqual(['aa/b']);
-    expect((await cli(f, ['phase', 'aa', 'failed', '--reason', 'stop', '--slot', 'B'], f.root, f.env)).code).toBe(0);
-    seatOwned(bb.path);
-    expect((await next(f, ['bb'])).code).toBe(0);
-    expect(await seats()).toEqual(['aa/b', 'bb/b']);
+    expect(readState(aa.path).batch?.applied).toBe(true);
+    expect((await cli(f, ['phase', 'aa', 'failed', '--reason', 'stop'], f.root, f.env)).code).toBe(0);
     expect((await cli(f, ['phase', 'aa', 'merge'], f.root, f.env)).code).toBe(0);
-    expect(await seats()).toEqual(['aa/b', 'bb/b']);
-    // aa's merge seat finishes its turn, so it is idle for its next merge prompt.
-    const aaB: string = z.string().parse(readState(aa.path).seat.B?.address);
-    freeTurns(f, aaB);
-    await seatIdle(f, aaB, 1);
-    const bbAttempt: string = z.string().parse(readState(bb.path).batch?.attempt);
-    await verified(f, 'bb', 'merge');
-    expect(
-      (await cli(f, ['phase', 'bb', 'merged', '--slot', 'B', '--check', '--attempt', bbAttempt], f.root, f.env)).code,
-    ).toBe(0);
-    expect((await cli(f, ['phase', 'bb', 'merged', '--slot', 'B', '--attempt', bbAttempt], f.root, f.env)).code).toBe(
-      0,
-    );
-    seatOwned(cc.path);
-    expect((await next(f, ['cc'])).code).toBe(0);
-    expect(await seats()).toEqual(['aa/b', 'bb/b', 'cc/b']);
-    const ccAttempt: string = z.string().parse(readState(cc.path).batch?.attempt);
-    await verified(f, 'cc', 'merge');
-    expect(
-      (await cli(f, ['phase', 'cc', 'merged', '--slot', 'B', '--check', '--attempt', ccAttempt], f.root, f.env)).code,
-    ).toBe(0);
-    expect((await cli(f, ['phase', 'cc', 'merged', '--slot', 'B', '--attempt', ccAttempt], f.root, f.env)).code).toBe(
-      0,
-    );
-    seatOwned(aa.path);
-    expect((await next(f, ['aa'])).code).toBe(0);
-    expect(await seats()).toEqual(['aa/b', 'aa/b', 'bb/b', 'cc/b']);
-    const aaAttempt: string = z.string().parse(readState(aa.path).batch?.attempt);
-    await verified(f, 'aa', 'merge');
-    expect(
-      (await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--check', '--attempt', aaAttempt], f.root, f.env)).code,
-    ).toBe(0);
-    expect((await cli(f, ['phase', 'aa', 'merged', '--slot', 'B', '--attempt', aaAttempt], f.root, f.env)).code).toBe(
-      0,
-    );
-    expect(readState(resolve(f.root, 'issues/closed/issue/aa')).phase).toBe('merged');
-    expect(await seats()).toEqual(['aa/b', 'aa/b', 'bb/b', 'cc/b']);
+    expect(readState(aa.path).merge_stamp).toBe('2026-09-11T00:00:00.000Z');
+    expect((await next(f, ['--all'])).code).toBe(0);
+    // The in-flight batched holder outranks the re-queued aa until its turn resolves.
+    expect(readState(bb.path).batch?.applied).toBe(true);
+    expect(readState(aa.path).batch).toBeUndefined();
+    expect(readState(cc.path).batch).toBeUndefined();
+    expect(await mergePrompts(f)).toEqual([]);
   } finally {
     await f.clean();
   }
 }, 30000);
+
 
 test('a saved holder failure wakes the stamped queue when the log is a directory', async () => {
   const f: HcFixture = await hcFixture();
@@ -3757,11 +3636,11 @@ test('a saved holder failure wakes the stamped queue when the log is a directory
     toMerge(aa.path, '2026-09-11T00:00:00.000Z');
     toMerge(bb.path, '2026-09-12T00:00:00.000Z');
     mkdirSync(resolve(f.root, 'issues/log.jsonl'));
-    const result: Result = await cli(f, ['phase', 'aa', 'failed', '--reason', 'stop', '--slot', 'B'], f.root, f.env);
+    const result: Result = await cli(f, ['phase', 'aa', 'failed', '--reason', 'stop'], f.root, f.env);
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain('log append failed');
     expect(readState(aa.path).phase).toBe('failed');
-    expect(readState(bb.path).batch?.owner).toBe('command');
+    expect(readState(bb.path).batch?.applied).toBe(true);
     expect(await mergePrompts(f)).toEqual([]);
   } finally {
     await f.clean();
@@ -3797,9 +3676,9 @@ test('unstamped merge dispatch uses log order and refuses unreadable history', a
     );
     writeFileSync(log, records.join('\n') + '\n');
     expect((await next(f, ['--all'])).code).toBe(0);
-    seatOwned(bb.path);
-    expect((await next(f, ['--all'])).code).toBe(0);
-    expect(await mergePrompts(f)).toEqual([{ seat: 'bb/b', text: mergeText(bb.path) }]);
+    expect(readState(bb.path).batch?.applied).toBe(true);
+    expect(readState(aa.path).batch).toBeUndefined();
+    expect(await mergePrompts(f)).toEqual([]);
   } finally {
     await f.clean();
   }
@@ -4101,7 +3980,7 @@ test('blocked-report no line for merge turn waits', async () => {
     const result: Result = await next(f, ['--all']);
     expect(result.code).toBe(0);
     expect(result.stderr).toBe('');
-    expect(readState(aa.path).batch?.owner).toBe('command');
+    expect(readState(aa.path).batch?.applied).toBe(true);
     expect(await mergePrompts(f)).toEqual([]);
   } finally {
     await f.clean();
@@ -4412,11 +4291,9 @@ test('a twin merge leaf never heads the merge queue', async () => {
     const result: Result = await next(f, ['--all']);
     expect(result.code).toBe(1);
     expect(result.stderr).toContain('issues/open/old');
-    expect(await dispatchedSlugs(f)).toEqual(['m2']);
-    const merges: { seat: string; text: string }[] = await mergePrompts(f);
-    expect(merges.map((prompt) => prompt.seat)).toEqual(['m2/b']);
-    expect(merges[0].text).toContain(`merge-issue m2 slot=B phase=merge leaf=`);
-    expect(merges[0].text).toContain(`attempt=${batch.attempt} top=${batch.top}`);
+    const m2: State = readState(resolve(f.root, 'issues/open/other/m2'));
+    expect(m2.phase === 'merged' || m2.batch?.attempt === batch.attempt).toBe(true);
+    expect(await mergePrompts(f)).toEqual([]);
   } finally {
     await f.clean();
   }

@@ -68,14 +68,12 @@ test.serial('restack preserves a holder retirement the union merge resurrects', 
     saveState(holderPath, { ...readState(holderPath), batch: record });
     expect(await applyTop(repo, { path: holderPath, state: readState(holderPath) }, built.top, held.head)).toBe(true);
     const proc: ProcFixture = procFixture(f);
-    const args: string[] = ['phase', 'holder', 'merged', '--slot', 'B', '--attempt', 'a1'];
     await verified(f, 'holder', 'merge');
-    expect((await cli(f, [...args, '--check'], f.root, proc.env)).code).toBe(0);
     writeFileSync(resolve(f.root, 'learnings/LESSONS.md'), alpha + gamma + delta + recurrence + beta);
     await command(['git', 'add', '.'], f.root);
     await command(['git', 'commit', '-m', 'main adds delta'], f.root);
     await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
-    expect((await cli(f, args, f.root, proc.env)).code).toBe(0);
+    expect((await cli(f, ['phase', 'holder', 'merged'], f.root, proc.env)).code).toBe(0);
     const restacked: Batch = readState(holderPath).batch!;
     const expected: string = gamma + delta + recurrence + beta;
     expect(readFileSync(resolve(held.worktree, 'learnings/LESSONS.md'), 'utf8')).toBe(expected);
@@ -85,14 +83,18 @@ test.serial('restack preserves a holder retirement the union merge resurrects', 
     await command(['git', 'commit', '-m', 'resurrect retired line'], held.worktree);
     const resurrected: string = await command(['git', 'rev-parse', 'HEAD'], held.worktree);
     saveState(holderPath, { ...readState(holderPath), batch: { ...restacked, top: resurrected } });
-    const refused: Result = await cli(f, [...args, '--check'], f.root, proc.env);
-    expect(refused.code).not.toBe(0);
-    expect(refused.stderr).toContain('history/alpha');
-    await command(['git', 'reset', '--hard', restacked.top!], held.worktree);
-    saveState(holderPath, { ...readState(holderPath), batch: restacked });
+    // The land run's gates refuse a push whose range resurrects a retired line.
     await verified(f, 'holder', 'merge');
-    expect((await cli(f, [...args, '--check'], f.root, proc.env)).code).toBe(0);
-    expect((await cli(f, args, f.root, proc.env)).code).toBe(0);
+    const refused: Result = await cli(f, ['land', 'holder', '--attempt', 'a1'], f.root, proc.env);
+    expect(refused.code).toBe(0);
+    const exited: State = readState(holderPath);
+    expect(exited.phase).toBe('check.repair');
+    expect(exited.merge_exit?.reason).toBe('gate');
+    expect(exited.merge_exit?.refusal).toContain('history/alpha');
+    await command(['git', 'reset', '--hard', restacked.top!], held.worktree);
+    saveState(holderPath, { ...readState(holderPath), phase: 'merge', batch: restacked });
+    await verified(f, 'holder', 'merge');
+    expect((await cli(f, ['land', 'holder', '--attempt', 'a1'], f.root, proc.env)).code).toBe(0);
     expect(await command(['git', 'show', 'origin/main:learnings/LESSONS.md'], f.root)).toBe(expected.trim());
   } finally {
     f.clean();
@@ -197,31 +199,15 @@ async function advanceRemote(f: Fixture, files: Record<string, string>): Promise
   }
 }
 
-test.serial('a green holder checks once, pushes once, moves the holder and closes the issue', async () => {
+test.serial('a green holder pushes once, moves the holder and closes the issue', async () => {
   const f: Fixture = await fixture();
   try {
-    const { record, holder, proc } = await batchFixture(f);
-    const countFile: string = resolve(f.home, 'count');
-    yaml(resolve(f.root, 'issues/config.yaml'), {
-      grounding: 'none',
-      checks: { count: 'sh -c "echo x >> ' + countFile + '"' },
-    });
+    const { record, proc } = await batchFixture(f);
     await verified(f, 'hold', 'merge');
-    const checked: Result = await cli(
-      f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
-      f.root,
-      proc.env,
-    );
-    expect(checked.code).toBe(0);
-    expect(checked.stdout).toBe('ok');
-    expect(readState(holder.path).batch?.tested_top).toBe(record.top);
-    const checkRun: Result = await run(['sh', '-c', 'echo x >> ' + countFile]);
-    expect(checkRun.code).toBe(0);
     const oldHead: string = await command(['git', 'rev-parse', 'HEAD'], f.root);
     const merged: Result = await cli(
       f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
+      ['phase', 'hold', 'merged'],
       f.root,
       proc.env,
     );
@@ -232,13 +218,12 @@ test.serial('a green holder checks once, pushes once, moves the holder and close
     expect(await remoteTip(f)).toBe(record.top!);
     expect(await remoteSubjects(f, 1)).toEqual(['hold']);
     expect(readState(resolve(f.root, 'issues/closed/issue/hold')).phase).toBe('merged');
-    expect(readFileSync(countFile, 'utf8').trim().split('\n')).toHaveLength(1);
   } finally {
     f.clean();
   }
 });
 
-test.serial('a stale or missing attempt is refused, changes nothing, and the current attempt still lands', async () => {
+test.serial('a slot-run merged or check.fix on a merge leaf is refused and changes nothing', async () => {
   const f: Fixture = await fixture();
   try {
     const { holder, record, proc } = await batchFixture(f);
@@ -246,27 +231,21 @@ test.serial('a stale or missing attempt is refused, changes nothing, and the cur
     const before: string = stateBytes(holder.path);
     await verified(f, 'hold', 'merge');
     const refusals: Result[] = [
-      await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'old-attempt'], f.root, proc.env),
+      await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'], f.root, proc.env),
       await cli(f, ['phase', 'hold', 'merged', '--slot', 'B'], f.root, proc.env),
-      await cli(f, ['phase', 'hold', 'check.fix', '--slot', 'B', '--attempt', 'old-attempt'], f.root, proc.env),
-      await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'old-attempt', '--check'], f.root, proc.env),
+      await cli(f, ['phase', 'hold', 'check.fix', '--slot', 'B', '--attempt', 'a1'], f.root, proc.env),
+      await cli(f, ['phase', 'hold', 'merged', '--check'], f.root, proc.env),
     ];
     for (const result of refusals) {
       expect(result.code).not.toBe(0);
-      expect(result.stderr).toContain('Stale attempt');
+      expect(result.stderr.toLowerCase()).toContain('seat');
     }
-    expect(refusals[0].stderr).toContain('old-attempt');
     expect(stateBytes(holder.path)).toBe(before);
     expect(await remoteTip(f)).toBe(remoteBefore);
     await verified(f, 'hold', 'merge');
-    expect(
-      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, proc.env)).code,
-    ).toBe(0);
-    expect((await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'], f.root, proc.env)).code).toBe(
-      0,
-    );
+    expect((await cli(f, ['phase', 'hold', 'merged'], f.root, proc.env)).code).toBe(0);
     expect(await remoteTip(f)).toBe(record.top!);
-    const late: Result = await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'], f.root, proc.env);
+    const late: Result = await cli(f, ['phase', 'hold', 'merged'], f.root, proc.env);
     expect(late.code).not.toBe(0);
     expect(await remoteTip(f)).toBe(record.top!);
   } finally {
@@ -279,9 +258,6 @@ test.serial('a refused push restacks onto the new remote, prints rerun and the r
   try {
     const { holder, record, proc } = await batchFixture(f);
     await verified(f, 'hold', 'merge');
-    expect(
-      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, proc.env)).code,
-    ).toBe(0);
     const advance: string = resolve(f.home, 'advance');
     await command(['git', 'worktree', 'add', '--detach', advance, 'origin/main'], f.root);
     writeFileSync(resolve(advance, 'adv-file'), 'adv\n');
@@ -292,12 +268,12 @@ test.serial('a refused push restacks onto the new remote, prints rerun and the r
     await command(['git', 'worktree', 'remove', '--force', advance], f.root);
     const merged: Result = await cli(
       f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
+      ['phase', 'hold', 'merged'],
       f.root,
       proc.env,
     );
     expect(merged.code).toBe(0);
-    expect(merged.stdout).toMatch(/^rerun tested=[0-9a-f]{40} pushed=[0-9a-f]{40}$/);
+    expect(merged.stdout).toMatch(/^rerun tested=none pushed=[0-9a-f]{40}$/);
     const newTop: string = merged.stdout.split('pushed=')[1];
     const after: State = readState(holder.path);
     expect(after.phase).toBe('merge');
@@ -309,15 +285,11 @@ test.serial('a refused push restacks onto the new remote, prints rerun and the r
     expect(batch.built_on).toBe(advSha);
     expect(batch.tested_top).toBeUndefined();
     expect(batch.tested_main).toBeUndefined();
-    expect(batch.decision).toBe('rerun');
     expect(batch.candidate).toBeUndefined();
     expect(await remoteTip(f)).toBe(advSha);
     expect(await command(['git', 'rev-parse', 'refs/heads/hold'], f.root)).toBe(newTop);
     await verified(f, 'hold', 'merge');
-    expect(
-      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, proc.env)).code,
-    ).toBe(0);
-    expect((await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'], f.root, proc.env)).code).toBe(
+    expect((await cli(f, ['phase', 'hold', 'merged'], f.root, proc.env)).code).toBe(
       0,
     );
     expect(await remoteTip(f)).toBe(newTop);
@@ -333,18 +305,9 @@ test.serial('a solo record checks and pushes the worktree HEAD', async () => {
     const { holder, proc } = await soloFixture(f);
     const head: string = await command(['git', 'rev-parse', 'refs/heads/hold'], f.root);
     await verified(f, 'hold', 'merge');
-    const checked: Result = await cli(
-      f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
-      f.root,
-      proc.env,
-    );
-    expect(checked.code).toBe(0);
-    expect(checked.stdout).toBe('ok');
-    expect(readState(holder.path).batch?.tested_top).toBe(head);
     const merged: Result = await cli(
       f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
+      ['phase', 'hold', 'merged'],
       f.root,
       proc.env,
     );
@@ -379,23 +342,16 @@ test.serial(
   },
 );
 
-test.serial('a config command change after merged --check refuses the push', async () => {
+test.serial('a config command change after the verify refuses the push', async () => {
   const f: Fixture = await fixture();
   try {
     const { proc } = await soloFixture(f);
     const head: string = await command(['git', 'rev-parse', 'refs/heads/hold'], f.root);
     await verified(f, 'hold', 'merge');
-    const checked: Result = await cli(
-      f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
-      f.root,
-      proc.env,
-    );
-    expect(checked.code).toBe(0);
     yaml(resolve(f.root, 'issues/config.yaml'), { checks: { test: 'bun test --bail' }, grounding: 'none' });
     const merged: Result = await cli(
       f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
+      ['phase', 'hold', 'merged'],
       f.root,
       proc.env,
     );
@@ -407,19 +363,13 @@ test.serial('a config command change after merged --check refuses the push', asy
   }
 });
 
-test.serial('check.fix on a record moves the holder to check.fix', async () => {
+test.serial('check.fix on a merge leaf is refused', async () => {
   const f: Fixture = await fixture();
   try {
     const { holder, proc } = await soloFixture(f);
-    const moved: Result = await cli(
-      f,
-      ['phase', 'hold', 'check.fix', '--slot', 'B', '--attempt', 'a1'],
-      f.root,
-      proc.env,
-    );
-    expect(moved.code).toBe(0);
-    expect(moved.stdout).toBe('moved check.fix');
-    expect(readState(holder.path).phase).toBe('check.fix');
+    const moved: Result = await cli(f, ['phase', 'hold', 'check.fix'], f.root, proc.env);
+    expect(moved.code).not.toBe(0);
+    expect(readState(holder.path).phase).toBe('merge');
   } finally {
     f.clean();
   }
@@ -439,15 +389,7 @@ test.serial('a stack checks and pushes a B repair commit past the top', async ()
     const repaired: string = await repairCommit(holder);
     expect(repaired).not.toBe(record.top);
     await verified(f, 'hold', 'merge');
-    const checked: Result = await cli(
-      f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
-      f.root,
-      proc.env,
-    );
-    expect(checked.code).toBe(0);
-    expect(readState(holder.path).batch?.tested_top).toBe(repaired);
-    expect((await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'], f.root, proc.env)).code).toBe(
+    expect((await cli(f, ['phase', 'hold', 'merged'], f.root, proc.env)).code).toBe(
       0,
     );
     expect(await remoteTip(f)).toBe(repaired);
@@ -462,23 +404,17 @@ test.serial('a restack keeps the B repair commit', async () => {
     const { holder, proc } = await batchFixture(f);
     await repairCommit(holder);
     await verified(f, 'hold', 'merge');
-    expect(
-      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, proc.env)).code,
-    ).toBe(0);
     await advanceRemote(f, { 'adv-file': 'adv\n' });
     const merged: Result = await cli(
       f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
+      ['phase', 'hold', 'merged'],
       f.root,
       proc.env,
     );
     expect(merged.code).toBe(0);
-    expect(merged.stdout).toMatch(/^rerun tested=[0-9a-f]{40} pushed=[0-9a-f]{40}$/);
+    expect(merged.stdout).toMatch(/^rerun tested=none pushed=[0-9a-f]{40}$/);
     await verified(f, 'hold', 'merge');
-    expect(
-      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, proc.env)).code,
-    ).toBe(0);
-    expect((await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'], f.root, proc.env)).code).toBe(
+    expect((await cli(f, ['phase', 'hold', 'merged'], f.root, proc.env)).code).toBe(
       0,
     );
     expect(await remoteSubjects(f, 3)).toEqual(['repair', 'hold', 'adv']);
@@ -492,12 +428,9 @@ test.serial('check.fix keeps the B repair commit on the branch', async () => {
   try {
     const { holder, proc } = await batchFixture(f);
     const repaired: string = await repairCommit(holder);
-    const moved: Result = await cli(
-      f,
-      ['phase', 'hold', 'check.fix', '--slot', 'B', '--attempt', 'a1'],
-      f.root,
-      proc.env,
-    );
+    // A merge leaf exits to check.repair itself; the repair seat takes check.fix from there.
+    expect((await cli(f, ['phase', 'hold', 'check.repair'], f.root, proc.env)).code).toBe(0);
+    const moved: Result = await cli(f, ['phase', 'hold', 'check.fix', '--slot', 'B'], f.root, proc.env);
     expect(moved.code).toBe(0);
     expect(readState(holder.path).phase).toBe('check.fix');
     expect(await command(['git', 'rev-parse', 'refs/heads/hold'], f.root)).toBe(repaired);
@@ -506,22 +439,16 @@ test.serial('check.fix keeps the B repair commit on the branch', async () => {
   }
 });
 
-test.serial('a stack refuses a HEAD that does not descend from the top at --check', async () => {
+test.serial('a stack refuses a HEAD that does not descend from the top', async () => {
   const f: Fixture = await fixture();
   try {
     const { holder, record, proc } = await batchFixture(f);
     await command(['git', 'reset', '--hard', record.built_on], holder.state.worktree!);
     await repairCommit(holder);
     await verified(f, 'hold', 'merge');
-    const checked: Result = await cli(
-      f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
-      f.root,
-      proc.env,
-    );
+    const checked: Result = await cli(f, ['phase', 'hold', 'merged'], f.root, proc.env);
     expect(checked.code).not.toBe(0);
     expect(checked.stderr).toContain('HEAD must descend from the recorded batch top ' + record.top);
-    expect(readState(holder.path).batch?.tested_top).toBeUndefined();
   } finally {
     f.clean();
   }
@@ -569,16 +496,13 @@ test.serial('a solo restack conflict preserves commits made during the solo pass
     await command(['git', 'commit', '-m', 'solo repair'], holder.state.worktree!);
     const repaired: string = await command(['git', 'rev-parse', 'hold'], f.root);
     await verified(f, 'hold', 'merge');
-    expect(
-      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--check', '--attempt', 'a1'], f.root, proc.env)).code,
-    ).toBe(0);
     writeFileSync(resolve(f.root, 'file-hold'), 'main conflict');
     await command(['git', 'add', 'file-hold'], f.root);
     await command(['git', 'commit', '-m', 'advance'], f.root);
     await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
     const result: Result = await cli(
       f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
+      ['phase', 'hold', 'merged'],
       f.root,
       proc.env,
     );
@@ -596,9 +520,6 @@ test.serial('late holder dirt during restack is isolated', async () => {
   try {
     const { holder, proc } = await batchFixture(f);
     await verified(f, 'hold', 'merge');
-    expect(
-      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--check', '--attempt', 'a1'], f.root, proc.env)).code,
-    ).toBe(0);
     writeFileSync(resolve(f.root, 'advance'), 'advance');
     await command(['git', 'add', 'advance'], f.root);
     await command(['git', 'commit', '-m', 'advance'], f.root);
@@ -606,7 +527,7 @@ test.serial('late holder dirt during restack is isolated', async () => {
     const created: string = await editOnSecondStatus(f, holder.state.worktree!);
     const result: Result = await cli(
       f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
+      ['phase', 'hold', 'merged'],
       f.root,
       proc.env,
     );
@@ -623,7 +544,6 @@ test.serial('a records-only advance refuses the push until the pushed tree has i
   const f: Fixture = await fixture();
   try {
     const { holder, record, proc } = await batchFixture(f);
-    const t1: string = record.top!;
     const m1: string = record.built_on;
     yaml(resolve(f.root, 'issues/config.yaml'), {
       setup: 'mkdir -p node_modules',
@@ -631,26 +551,22 @@ test.serial('a records-only advance refuses the push until the pushed tree has i
       checks: { absent: 'test ! -e learnings/history/red.md' },
     });
     expect((await cli(f, ['verify', '--attempt', 'a1'], f.root, proc.env)).code).toBe(0);
-    expect(
-      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, proc.env)).code,
-    ).toBe(0);
     const m2: string = await advanceRemote(f, { 'learnings/history/red.md': 'red\n' });
     const merged: Result = await cli(
       f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
+      ['phase', 'hold', 'merged'],
       f.root,
       proc.env,
     );
     expect(merged.code).toBe(0);
     const t2: string = merged.stdout.split('pushed=')[1];
-    expect(merged.stdout).toBe(`rerun tested=${t1} pushed=${t2}`);
+    expect(merged.stdout).toBe(`rerun tested=none pushed=${t2}`);
     const batch: Batch = readState(holder.path).batch!;
-    expect(batch.decision).toBe('rerun');
     expect(batch.tested_top).toBeUndefined();
     expect(batch.top).toBe(t2);
     const refused: Result = await cli(
       f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
+      ['phase', 'hold', 'merged'],
       f.root,
       proc.env,
     );
@@ -658,20 +574,16 @@ test.serial('a records-only advance refuses the push until the pushed tree has i
     expect(await remoteTip(f)).toBe(m2);
     expect(m1).not.toBe(m2);
     expect((await cli(f, ['verify', '--attempt', 'a1'], f.root, proc.env)).code).toBe(1);
-    expect(
-      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, proc.env)).code,
-    ).not.toBe(0);
     expect(await remoteTip(f)).toBe(m2);
   } finally {
     f.clean();
   }
 });
 
-test.serial('a code advance forces a rerun: the seat rechecks and the restacked top lands', async () => {
+test.serial('a code advance forces a rerun and the restacked top lands', async () => {
   const f: Fixture = await fixture();
   try {
     const { holder, record, proc } = await batchFixture(f);
-    const t1: string = record.top!;
     const countFile: string = resolve(f.home, 'check-count');
     yaml(resolve(f.root, 'issues/config.yaml'), {
       grounding: 'none',
@@ -679,21 +591,17 @@ test.serial('a code advance forces a rerun: the seat rechecks and the restacked 
     });
     await command(['sh', '-c', 'echo x >> ' + countFile]);
     await verified(f, 'hold', 'merge');
-    expect(
-      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, proc.env)).code,
-    ).toBe(0);
     const m2: string = await advanceRemote(f, { file: 'advanced\n' });
     const merged: Result = await cli(
       f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
+      ['phase', 'hold', 'merged'],
       f.root,
       proc.env,
     );
     expect(merged.code).toBe(0);
     const t2: string = merged.stdout.split('pushed=')[1];
-    expect(merged.stdout).toBe(`rerun tested=${t1} pushed=${t2}`);
+    expect(merged.stdout).toBe(`rerun tested=none pushed=${t2}`);
     const rerunBatch: Batch = readState(holder.path).batch!;
-    expect(rerunBatch.decision).toBe('rerun');
     expect(rerunBatch.tested_top).toBeUndefined();
     expect(rerunBatch.tested_main).toBeUndefined();
     expect(rerunBatch.built_on).toBe(m2);
@@ -701,10 +609,7 @@ test.serial('a code advance forces a rerun: the seat rechecks and the restacked 
     expect(await remoteTip(f)).toBe(m2);
     await command(['sh', '-c', 'echo x >> ' + countFile]);
     await verified(f, 'hold', 'merge');
-    expect(
-      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, proc.env)).code,
-    ).toBe(0);
-    expect((await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'], f.root, proc.env)).code).toBe(
+    expect((await cli(f, ['phase', 'hold', 'merged'], f.root, proc.env)).code).toBe(
       0,
     );
     expect(await remoteTip(f)).toBe(t2);
@@ -718,23 +623,18 @@ test.serial('a change to issues/config.yaml on main forces a rerun', async () =>
   const f: Fixture = await fixture();
   try {
     const { holder, record, proc } = await batchFixture(f);
-    const t1: string = record.top!;
     await verified(f, 'hold', 'merge');
-    expect(
-      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, proc.env)).code,
-    ).toBe(0);
     await advanceRemote(f, { 'issues/config.yaml': 'checks: {}\n' });
     const merged: Result = await cli(
       f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
+      ['phase', 'hold', 'merged'],
       f.root,
       proc.env,
     );
     expect(merged.code).toBe(0);
     const t2: string = merged.stdout.split('pushed=')[1];
-    expect(merged.stdout).toBe(`rerun tested=${t1} pushed=${t2}`);
+    expect(merged.stdout).toBe(`rerun tested=none pushed=${t2}`);
     const batch: Batch = readState(holder.path).batch!;
-    expect(batch.decision).toBe('rerun');
     expect(batch.tested_top).toBeUndefined();
     expect(batch.tested_main).toBeUndefined();
   } finally {
@@ -747,22 +647,18 @@ test.serial('a dirty holder during restack records rerun and preserves the opera
   try {
     const { holder, proc } = await batchFixture(f);
     await verified(f, 'hold', 'merge');
-    expect(
-      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, proc.env)).code,
-    ).toBe(0);
     const main: string = await advanceRemote(f, { 'issues/open/x/state.yaml': 'x\n' });
     const edit: string = resolve(holder.state.worktree!, 'operator-edit');
     writeFileSync(edit, 'edit\n');
     const merged: Result = await cli(
       f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
+      ['phase', 'hold', 'merged'],
       f.root,
       proc.env,
     );
     expect(merged.code).toBe(0);
     expect(merged.stdout).toBe(`rerun rebase hold onto ${main}`);
     const batch: Batch = readState(holder.path).batch!;
-    expect(batch.decision).toBe('rerun');
     expect(batch.tested_top).toBeUndefined();
     expect(batch.tested_main).toBeUndefined();
     expect(batch.top).toBeUndefined();

@@ -177,6 +177,7 @@ const appliedBatch: object = {
   built_on: 'base',
   holder: { base: 'base', head: 'head' },
   applied: true,
+  top: 'top',
 };
 
 test('phase move in a paused repo commits while its merge wake prompts nothing', async () => {
@@ -265,7 +266,7 @@ test('manual next target completes a leaf and dispatches its dependent while pau
   }
 });
 
-test('manual next target prompts the waiting merge holder while paused', async () => {
+test('manual next target dispatches the selected leaf while paused and never prompts the merge holder', async () => {
   const f: DispatchFixture = await hcFixture();
   try {
     leaf(f, 'build', 'plan.synthesis', {}, 'build-issue');
@@ -273,7 +274,8 @@ test('manual next target prompts the waiting merge holder while paused', async (
     expect((await cli(f, ['pause'])).code).toBe(0);
     const run: Result = await next(f, ['build']);
     expect(run.code).toBe(0);
-    expect((await delivered(f, 'holder')).some((prompt) => prompt.seat === 'b')).toBe(true);
+    expect((await delivered(f, 'holder')).some((prompt) => prompt.seat === 'b')).toBe(false);
+    expect(readState(resolve(f.root, 'issues/open/merge-issue/holder')).batch).toMatchObject(appliedBatch);
     expect(Bun.YAML.parse(readFileSync(resolve(f.home, 'paused.yaml'), 'utf8'))).toEqual({ [f.repo]: true });
   } finally {
     await f.clean();
@@ -470,7 +472,8 @@ test('race A: pause recorded before the locked merge section suppresses the laun
     const controlPath: string = leaf(control, 'holder', 'merge');
     const run: Result = await next(control, ['--resume']);
     expect(run.code).toBe(0);
-    expect(readState(controlPath).batch?.owner).toBe('command');
+    // The applied record is the in-flight land run.
+    expect(readState(controlPath).batch?.applied).toBe(true);
   } finally {
     await control.clean();
   }
@@ -505,7 +508,7 @@ test('race A: pause recorded before the locked merge section suppresses the laun
     expect({ stdout, stderr, code }).toMatchObject({ code: 0 });
     expect(mutating(f)).toEqual([]);
     expect(prompts(f)).toEqual([]);
-    expect(readState(holderPath).batch?.owner).toBeUndefined();
+    expect(readState(holderPath).batch).toBeUndefined();
   } finally {
     if (child.current !== undefined) killTree(child.current);
     await f.clean();

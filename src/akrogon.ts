@@ -31,7 +31,7 @@ import type { SpaceResolution } from './hc';
 import type { Started } from './seat';
 
 const RETIRED_MERGE_HOLD: string =
-  'Merge hold commands are retired; a red merge run follows the red-run endings in skills/merge-issue/SKILL.md';
+  'Merge hold commands are retired; a merge exit goes to check.repair, whose red-run endings are in skills/check-issue/SKILL.md';
 
 const verb: string | undefined = process.argv[2];
 if (verb === 'unhold' || verb === 'hold-fix') throw new Error(RETIRED_MERGE_HOLD);

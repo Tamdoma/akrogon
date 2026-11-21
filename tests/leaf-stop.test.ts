@@ -155,7 +155,7 @@ test('the merge path builds no stack and starts no merge seat for a stopped leaf
     const holder: State = readState(bb);
     expect(holder.batch).toBeDefined();
     expect((await prompts(f)).filter((text) => text.startsWith('merge-issue aa'))).toEqual([]);
-    expect(holder.batch?.owner).toBe('command');
+    expect(holder.batch?.applied).toBe(true);
   } finally {
     await f.clean();
   }

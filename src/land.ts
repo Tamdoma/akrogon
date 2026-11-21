@@ -1,13 +1,13 @@
 import { resolve } from 'node:path';
 import { readGlobal, requireRepo, globalHome, toolRoot, type GlobalConfig, type Repo } from './config';
-import { readState, saveState, withLock, type Batch } from './state';
+import { trackingRef } from './preflight';
+import { allLeaves, readState, saveState, withLock, type Batch, type Leaf, type MergeExit } from './state';
 import { command, CommandError, spawnCaptured, type SpawnResult } from './shell';
-import { landClaim, landGates, landPush, StaleLandError, type LandPush } from './phase';
-import { mainRedCover, readVerifyRuns, verify, type VerifyRun } from './verify';
+import { commitMove, landClaim, landGates, landPush, StaleLandError, type LandPush } from './phase';
+import { appendAttempt, readPressure, type PressureSnapshot } from './attempts';
+import { mainRedCover, readVerifyRuns, verify, verifyCommands, type VerifyRun } from './verify';
 import { leafSlice, sessionBusAddress } from './scope';
-import { landedWake, mergeWake } from './next';
-
-type Handoff = Pick<Batch, 'wake' | 'red' | 'refusal'>;
+import { landedWake, mergeWake, phaseWake } from './next';
 
 export function landUnit(attempt: string): string {
   return `akrogon-land-${attempt}`;
@@ -54,7 +54,9 @@ export async function landAlive(attempt: string): Promise<boolean> {
   return result.code === 0;
 }
 
-async function redRun(repo: Repo, worktree: string): Promise<string> {
+// The newest completed merge run on the worktree's tree, for the exit record's run field when the
+// red verify surfaced no id (code 2).
+async function redRunId(repo: Repo, worktree: string): Promise<string> {
   const tree: string = await command(['git', 'rev-parse', 'HEAD^{tree}'], worktree);
   const runs: VerifyRun[] = readVerifyRuns(repo).filter(
     (run) => run.tree === tree && run.scope === 'merge' && run.end !== undefined,
@@ -64,32 +66,186 @@ async function redRun(repo: Repo, worktree: string): Promise<string> {
   return newest.run;
 }
 
-async function handOff(
+// The commit and the wakes of one repair exit: claim again under the lock so a state that moved on
+// while the run worked is left alone, then free the merge line and prompt the repair seat.
+export async function repairExit(
   global: GlobalConfig,
   repo: Repo,
   slug: string,
   attempt: string,
-  fields: Handoff,
+  exit: MergeExit,
+  end?: PressureSnapshot,
 ): Promise<void> {
   await withLock(resolve(globalHome(), '.lock'), async () => {
     const { leaf, record } = landClaim(repo, slug, attempt);
-    saveState(leaf.path, { ...readState(leaf.path), batch: { ...record, owner: 'seat', ...fields } });
+    appendAttempt(repo, slug, record, 'red', end);
+    await commitMove(repo, leaf, leaf.state, 'check.repair', null, undefined, undefined, exit);
   });
-  console.log(`handoff ${slug} attempt=${attempt}${fields.wake === undefined ? '' : ` wake=${fields.wake}`}`);
+  console.log(`repair ${slug} attempt=${attempt} reason=${exit.reason}`);
+  await mergeWake(global, repo);
+  await phaseWake(global, repo, slug);
+}
+
+// A second non-fast-forward refusal: the attempt is spent but the leaf keeps its queue place and
+// the next pass rebuilds the batch on the fetched base.
+async function keepPlace(
+  global: GlobalConfig,
+  repo: Repo,
+  slug: string,
+  attempt: string,
+  end?: PressureSnapshot,
+): Promise<void> {
+  await withLock(resolve(globalHome(), '.lock'), async () => {
+    const { leaf, record } = landClaim(repo, slug, attempt);
+    appendAttempt(repo, slug, record, 'red', end);
+    saveState(leaf.path, { ...readState(leaf.path), batch: undefined });
+  });
+  console.log(`held ${slug} attempt=${attempt}`);
   await mergeWake(global, repo);
 }
 
-async function land(global: GlobalConfig, repo: Repo, slug: string, attempt: string): Promise<void> {
+// A push error that is not a refusal: the leaf fails with git's stderr and frees the line.
+async function commandFailed(
+  global: GlobalConfig,
+  repo: Repo,
+  slug: string,
+  attempt: string,
+  stderr: string,
+  end?: PressureSnapshot,
+): Promise<void> {
+  await withLock(resolve(globalHome(), '.lock'), async () => {
+    const { leaf, record } = landClaim(repo, slug, attempt);
+    appendAttempt(repo, slug, record, 'red', end);
+    await commitMove(repo, leaf, leaf.state, 'failed', null, {
+      cause: 'blocked',
+      phase: 'merge',
+      reason: stderr,
+    });
+    // The attempt row is written: no candidate survives for reconcile to row a second time.
+    saveState(leaf.path, { ...readState(leaf.path), batch: undefined });
+  });
+  await mergeWake(global, repo);
+}
+
+function nameless(test: string): boolean {
+  return (
+    test === '(no test name)' || test === '(log gone)' || test.startsWith('(script) ') || test.startsWith('(unnamed)')
+  );
+}
+
+// Taken-8: the returning leaf's last red merge run sits on exactly the recorded holder head (no
+// edit between exits), every failing unit names a real title, and at least one failing unit the
+// main-red cover misses repeats in that previous run.
+async function taken8Trigger(repo: Repo, record: Batch, sha: string, runId: string): Promise<boolean> {
+  const runs: VerifyRun[] = readVerifyRuns(repo);
+  const previous: VerifyRun | undefined = runs
+    .filter(
+      (run) =>
+        run.scope === 'merge' &&
+        run.compares === undefined &&
+        run.end !== undefined &&
+        run.setup === 0 &&
+        run.sha === record.holder.head &&
+        run.sha !== sha &&
+        run.commands.some((item) => item.exit !== 0),
+    )
+    .sort((a, b) => b.end!.localeCompare(a.end!))[0];
+  if (previous === undefined) return false;
+  const current: VerifyRun | undefined = runs.find((run) => run.run === runId);
+  if (current === undefined) return false;
+  const { failedTests } = await import('./flaky');
+  let overlap: boolean = false;
+  for (const item of current.commands) {
+    if (item.exit === 0 || item.blocked !== undefined) continue;
+    const names: string[] = item.failures ?? (await failedTests(repo, item.log));
+    for (const test of names) {
+      if (nameless(test)) return false;
+      const prev = previous.commands.find((entry) => entry.name === item.name && entry.command === item.command);
+      if (prev === undefined || prev.exit === 0 || prev.blocked !== undefined) continue;
+      if ((prev.failures ?? (await failedTests(repo, prev.log))).includes(test)) overlap = true;
+    }
+  }
+  return overlap;
+}
+
+// The base evidence a red exit names: the compares run just written, or the standing whole-green
+// row at the merge-base the verdict pass reused instead of running again.
+async function baseVerdictOf(repo: Repo, headId: string): Promise<string | undefined> {
+  const runs: VerifyRun[] = readVerifyRuns(repo);
+  const compared: VerifyRun | undefined = runs
+    .filter((run) => run.compares === headId && run.end !== undefined)
+    .sort((a, b) => b.end!.localeCompare(a.end!))[0];
+  if (compared !== undefined) return compared.run;
+  const head: VerifyRun | undefined = runs.find((run) => run.run === headId);
+  if (head === undefined) return undefined;
+  const baseSha: string = await command(['git', 'merge-base', head.sha, trackingRef(repo)], repo.root);
+  const baseTree: string = await command(['git', 'rev-parse', `${baseSha}^{tree}`], repo.root);
+  const expected = verifyCommands(repo.config, 'merge');
+  return runs.find(
+    (run) =>
+      run.tree === baseTree &&
+      run.scope === 'merge' &&
+      run.end !== undefined &&
+      run.setup !== 1 &&
+      run.commands.length === expected.length &&
+      run.commands.every((item, index) => item.name === expected[index].name && item.command === expected[index].command) &&
+      run.commands.every((item) => item.exit === 0),
+  )?.run;
+}
+
+export async function land(
+  global: GlobalConfig,
+  repo: Repo,
+  slug: string,
+  attempt: string,
+  pressureDir: string = '/proc/pressure',
+): Promise<void> {
   const lock: string = resolve(globalHome(), '.lock');
   for (let refusals: number = 0; ;) {
-    const { leaf } = await withLock(lock, async () => landClaim(repo, slug, attempt));
+    const { leaf, record } = await withLock(lock, async () => landClaim(repo, slug, attempt));
+    const top: string | undefined = record.top ?? record.candidate;
     const result = await verify(repo.root, undefined, attempt, undefined, false);
-    if (result.code !== 0 && (result.code !== 1 || !(await mainRedCover(repo, result.sha, result.id))))
-      return handOff(global, repo, slug, attempt, {
-        wake: 'red',
-        red: result.code === 1 ? result.id : await redRun(repo, leaf.state.worktree ?? repo.root),
-      });
-    const coverRun: string | undefined = result.code === 1 ? result.id : undefined;
+    let coverRun: string | undefined;
+    if (result.code !== 0) {
+      if (result.code === 1 && (await mainRedCover(repo, result.sha, result.id))) coverRun = result.id;
+      else if (result.code === 1) {
+        if (await taken8Trigger(repo, record, result.sha, result.id)) {
+          const verdict = await verify(repo.root, undefined, attempt, undefined, true);
+          if (verdict.code === 0) {
+            coverRun = result.id;
+          } else {
+            return repairExit(
+              global,
+              repo,
+              slug,
+              attempt,
+              {
+                reason: 'red',
+                run: result.id,
+                top,
+                base_verdict: await baseVerdictOf(repo, result.id),
+              },
+              endOf(record, pressureDir),
+            );
+          }
+        } else {
+          return repairExit(global, repo, slug, attempt, { reason: 'red', run: result.id, top }, endOf(record, pressureDir));
+        }
+      } else {
+        return repairExit(
+          global,
+          repo,
+          slug,
+          attempt,
+          {
+            reason: 'red',
+            run: await redRunId(repo, leaf.state.worktree ?? repo.root),
+            top,
+          },
+          endOf(record, pressureDir),
+        );
+      }
+    }
     const refusal: string | undefined = await withLock(lock, async () => {
       const claimed = landClaim(repo, slug, attempt);
       try {
@@ -100,21 +256,50 @@ async function land(global: GlobalConfig, repo: Repo, slug: string, attempt: str
         return error.message;
       }
     });
-    if (refusal !== undefined) return handOff(global, repo, slug, attempt, { wake: 'gate', refusal });
-    const pushed: LandPush = await landPush(repo, slug, attempt, coverRun);
+    if (refusal !== undefined)
+      return repairExit(global, repo, slug, attempt, { reason: 'gate', refusal, top }, endOf(record, pressureDir));
+    const pushed: LandPush = await landPush(repo, slug, attempt, coverRun, pressureDir);
     if (pushed.kind === 'landed') return landedWake(global, repo, slug);
-    if (pushed.kind === 'rebase') return handOff(global, repo, slug, attempt, {});
-    if (pushed.kind === 'error') return handOff(global, repo, slug, attempt, { wake: 'push', refusal: pushed.stderr });
+    if (pushed.kind === 'rebase')
+      return repairExit(
+        global,
+        repo,
+        slug,
+        attempt,
+        {
+          reason: await dirtyOrConflict(repo, leaf.state.worktree),
+          base: await command(['git', 'rev-parse', trackingRef(repo)], repo.root),
+          top,
+        },
+        endOf(record, pressureDir),
+      );
+    if (pushed.kind === 'error') return commandFailed(global, repo, slug, attempt, pushed.stderr, endOf(record, pressureDir));
     refusals += 1;
-    if (refusals > 1) return handOff(global, repo, slug, attempt, { wake: 'push', refusal: pushed.stderr });
+    if (refusals > 1) return keepPlace(global, repo, slug, attempt, endOf(record, pressureDir));
   }
 }
 
-export async function landCommand(slug: string, attempt: string): Promise<void> {
+// 'rebase' covers two exits: uncommitted work survives (dirty) and an apply failure is a conflict.
+async function dirtyOrConflict(repo: Repo, worktree: string | undefined): Promise<'conflict' | 'dirty'> {
+  if (worktree === undefined) return 'conflict';
+  const status: string = await command(['git', 'status', '--porcelain'], worktree);
+  return status === '' ? 'conflict' : 'dirty';
+}
+
+// The attempt row's end counter: absent without a stored start snapshot.
+function endOf(record: Batch, pressureDir: string): PressureSnapshot | undefined {
+  return record.pressure_start === undefined ? undefined : readPressure(pressureDir);
+}
+
+export async function landCommand(
+  slug: string,
+  attempt: string,
+  pressureDir: string = '/proc/pressure',
+): Promise<void> {
   const global: GlobalConfig = readGlobal();
   const repo: Repo = await requireRepo(global, process.cwd());
   try {
-    await land(global, repo, slug, attempt);
+    await land(global, repo, slug, attempt, pressureDir);
   } catch (error) {
     if (!(error instanceof StaleLandError)) throw error;
     console.log(error.message);

@@ -17,7 +17,7 @@ afterEach(() => {
   else process.env.HOME = originalHome;
 });
 
-const POINTER: string = 'skills/merge-issue/SKILL.md';
+const POINTER: string = 'skills/check-issue/SKILL.md';
 
 function legacyHeld(f: Fixture): string {
   const file: string = resolve(f.home, 'held.yaml');
@@ -80,7 +80,8 @@ test.serial('a nonempty legacy held.yaml is inert for status, pause, unpause and
     expect(unpause.code).toBe(0);
     expect(unpause.stdout).not.toContain('held');
     expect((await delivered(f, 'hold')).some((task) => task.text.includes('merge-issue hold slot=B'))).toBe(false);
-    expect(readState(holderPath).batch?.owner).toBe('command');
+    // The in-flight turn is an applied batch, launched without a seat.
+    expect(readState(holderPath).batch?.applied).toBe(true);
     expect(readFileSync(file, 'utf8')).toBe(before);
   } finally {
     await f.clean();

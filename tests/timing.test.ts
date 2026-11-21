@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { cli, fakeAkrogon, leaf, storeDir, yaml, type Fixture, verified, seatOwned } from './helpers';
+import { cli, fakeAkrogon, leaf, storeDir, yaml, type Fixture, verified } from './helpers';
 import { readState, saveState, type State } from '../src/state';
 import { command, quote, type Result } from '../src/shell';
 import { delivered, hcFixture, type HcFixture } from './hc-fixture';
@@ -72,12 +72,9 @@ test('visit events: a leaf driven to merged records every visit, prompt, seat_do
     expect((await phase(f, ['solo', 'merge', '--slot', 'B', '--verdict', 'ready'])).code).toBe(0);
     await idleAll(f, 'solo');
     expect((await next(f, ['solo'])).code).toBe(0);
-    seatOwned(path);
-    expect((await next(f, ['solo'])).code).toBe(0);
     const attempt: string = readState(path).batch!.attempt;
     await verified(f, 'solo', 'merge');
-    expect((await phase(f, ['solo', 'merged', '--check', '--slot', 'B', '--attempt', attempt])).code).toBe(0);
-    expect((await phase(f, ['solo', 'merged', '--slot', 'B', '--attempt', attempt])).code).toBe(0);
+    expect((await phase(f, ['solo', 'merged'])).code).toBe(0);
 
     const events: Event[] = leafEvents(f, 'solo');
     const startPhases: [string, number][] = ofKind(events, 'visit_start').map((v) => [
@@ -104,9 +101,9 @@ test('visit events: a leaf driven to merged records every visit, prompt, seat_do
     expect(delivered).toContainEqual(['B', 'check.repair', 0]);
     expect(delivered).toContainEqual(['A', 'check.fix', 0]);
     expect(delivered).toContainEqual(['B', 'check.review', 1]);
-    expect(delivered).toContainEqual(['B', 'merge', 0]);
-    const mergePrompt: Event | undefined = prompts.find((p) => p.phase === 'merge' && p.outcome === 'delivered');
-    expect(mergePrompt?.attempt).toBe(attempt);
+    expect(delivered.filter(([, phase]) => phase === 'merge')).toEqual([]);
+    const batchPrompt: Event | undefined = prompts.find((p) => p.attempt === attempt);
+    expect(batchPrompt).toBeUndefined();
     // The stand-in harness writes no transcript, so the resolver records null; the kinds tier
     // (tests/e2e/kinds.e2e.ts) covers resolved transcripts of real harnesses.
     expect(prompts.every((p) => Object.hasOwn(p, 'session') && p.session === null)).toBe(true);
@@ -249,22 +246,20 @@ test('waits: pause writes repo_pause on and off; parked, prerequisite and merge 
     expect(m2Waits.filter((e) => e.reason === 'merge_turn')).toHaveLength(1);
     expect(m2Waits[0]).toMatchObject({ reason: 'merge_turn', blocking: 'm1' });
     expect(ofKind(leafEvents(f, 'm1'), 'batch')).toHaveLength(1);
-    expect(ofKind(leafEvents(f, 'm1'), 'prompt').some((p) => p.outcome === 'delivered')).toBe(true);
+    expect(ofKind(leafEvents(f, 'm1'), 'prompt').filter((p) => p.phase === 'merge')).toHaveLength(0);
 
     const attempt: string = readState(m1).batch!.attempt;
     await verified(f, 'm1', 'merge');
-    expect((await phase(f, ['m1', 'merged', '--check', '--slot', 'B', '--attempt', attempt])).code).toBe(0);
-    expect((await phase(f, ['m1', 'merged', '--slot', 'B', '--attempt', attempt])).code).toBe(0);
+    expect((await phase(f, ['m1', 'merged'])).code).toBe(0);
     expect(readState(m1).phase).toBe('merged');
     const m2State: State = readState(resolve(f.root, 'issues/open/issue/m2'));
     expect(m2State.phase).toBe('merge');
 
-    seatOwned(resolve(f.root, 'issues/open/issue/m2'));
-    expect((await next(f, ['m2'])).code).toBe(0);
+    // The merged wake claimed m2's turn; m2 holds its own batch with no prompt.
+    expect(m2State.batch?.applied).toBe(true);
     const m2All: Event[] = ofKind(leafEvents(f, 'm2'), 'wait');
     expect(m2All.filter((e) => e.blocking === 'm1')).toHaveLength(1);
     expect(m2All.at(-1)).toMatchObject({ reason: 'merge_turn' });
-    expect(leafEvents(f, 'm2').findLast((e) => e.kind === 'wait' || e.kind === 'prompt')?.kind).toBe('prompt');
   } finally {
     await f.clean();
   }

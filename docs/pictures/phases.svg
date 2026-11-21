@@ -61,7 +61,7 @@
   <line class="edge" x1="370" y1="430" x2="250" y2="500" marker-end="url(#arrow)"/>
   <line class="edge" x1="470" y1="400" x2="470" y2="338" marker-end="url(#arrow)"/>
   <line class="edge" x1="370" y1="314" x2="270" y2="314" marker-end="url(#arrow)"/>
-  <path class="edge" d="M270,524 H604 V314 H570" marker-end="url(#arrow)"/>
+  <path class="edge" d="M270,524 H604 V424 H570" marker-end="url(#arrow)"/>
   <line class="edge" x1="170" y1="548" x2="170" y2="590" marker-end="url(#arrow)"/>
   <line class="edge-stop" x1="470" y1="564" x2="470" y2="590" marker-end="url(#arrow)"/>
 </svg>

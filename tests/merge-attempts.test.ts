@@ -217,6 +217,24 @@ function phaseBody(slug: string, phase: string, args: (string | boolean | undefi
   );
 }
 
+function landBody(repo: string, slug: string, attempt: string, dir: string): string {
+  return (
+    'import { land } from ' +
+    JSON.stringify(resolve(import.meta.dir, '../src/land.ts')) +
+    ';\nimport { readGlobal, readRepo } from ' +
+    JSON.stringify(resolve(import.meta.dir, '../src/config.ts')) +
+    ';\ntry { await land(readGlobal(), readRepo(' +
+    JSON.stringify(repo) +
+    ', process.cwd()), ' +
+    JSON.stringify(slug) +
+    ', ' +
+    JSON.stringify(attempt) +
+    ', ' +
+    JSON.stringify(dir) +
+    '); } catch (e) { console.error(e); process.exit(1); }\n'
+  );
+}
+
 const nextBody: string =
   'import { nextCommand } from ' +
   JSON.stringify(resolve(import.meta.dir, '../src/next.ts')) +
@@ -264,15 +282,7 @@ test.serial('a green batch appends one merged attempt line and log.jsonl keeps i
     const { record, proc } = await batchFixture(f);
     const logBefore: string | undefined = logBytes(f);
     await verified(f, 'hold', 'merge');
-    expect(
-      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, proc.env)).code,
-    ).toBe(0);
-    const merged: Result = await cli(
-      f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
-      f.root,
-      proc.env,
-    );
+    const merged: Result = await cli(f, ['land', 'hold', '--attempt', 'a1'], f.root, proc.env);
     expect(merged.code).toBe(0);
     const lines: Attempt[] = attemptLines(f);
     expect(lines).toHaveLength(1);
@@ -328,17 +338,13 @@ test.serial('a landed candidate reconciles to exactly one merged attempt line', 
   }
 });
 
-test.serial('a solo check.fix appends exactly one red attempt line', async () => {
+test.serial('a solo red land appends exactly one red attempt line', async () => {
   const f: Fixture = await fixture();
   try {
-    const { proc } = await soloFixture(f);
-    const moved: Result = await cli(
-      f,
-      ['phase', 'hold', 'check.fix', '--slot', 'B', '--attempt', 'a1'],
-      f.root,
-      proc.env,
-    );
-    expect(moved.code).toBe(0);
+    const { holder, proc } = await soloFixture(f);
+    const landed: Result = await cli(f, ['land', 'hold', '--attempt', 'a1'], f.root, proc.env);
+    expect(landed.code).toBe(0);
+    expect(readState(holder.path).phase).toBe('check.repair');
     const lines: Attempt[] = attemptLines(f);
     expect(lines).toHaveLength(1);
     expect(lines[0].outcome).toBe('red');
@@ -351,34 +357,20 @@ test.serial('a solo check.fix appends exactly one red attempt line', async () =>
 test.serial('a refused push restacked to rerun appends exactly one merged line at the landing push', async () => {
   const f: Fixture = await fixture();
   try {
-    const { proc } = await batchFixture(f);
+    const { holder, proc } = await batchFixture(f);
+    // The land run's verify executes the real checks on every top: a passing
+    // test file on the branch keeps each restacked head green.
+    const worktree: string = z.string().parse(holder.state.worktree);
+    writeFileSync(resolve(worktree, 'pass.test.ts'), "import { test } from 'bun:test';\ntest('x', () => {});\n");
+    await command(['git', 'add', 'pass.test.ts'], worktree);
+    await command(['git', 'commit', '-m', 'pass'], worktree);
     await verified(f, 'hold', 'merge');
-    expect(
-      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, proc.env)).code,
-    ).toBe(0);
     const advanced: string = await advanceRemote(f, {
       'issues/open/x/state.yaml': 'x\n',
       'learnings/history/y.md': 'y\n',
     });
-    const refused: Result = await cli(
-      f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
-      f.root,
-      proc.env,
-    );
-    expect(refused.code).toBe(0);
-    expect(refused.stdout).toMatch(/^rerun tested=[0-9a-f]{40} pushed=[0-9a-f]{40}$/);
-    expect(attemptLines(f)).toEqual([]);
-    await verified(f, 'hold', 'merge');
-    expect(
-      (await cli(f, ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'], f.root, proc.env)).code,
-    ).toBe(0);
-    const landed: Result = await cli(
-      f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1'],
-      f.root,
-      proc.env,
-    );
+    // The land run's first push is refused; it restacks in place and lands on the second.
+    const landed: Result = await cli(f, ['land', 'hold', '--attempt', 'a1'], f.root, proc.env);
     expect(landed.code).toBe(0);
     expect(await remoteTip(f)).not.toBe(advanced);
     const lines: Attempt[] = attemptLines(f);
@@ -418,7 +410,7 @@ test.serial('a failed unlanded holder records one red attempt before recovery di
     saveState(holder.path, { ...readState(holder.path), batch: { ...record, candidate: record.top } });
     const failed: Result = await cli(
       f,
-      ['phase', 'hold', 'failed', '--slot', 'B', '--reason', 'push interrupted before landing'],
+      ['phase', 'hold', 'failed', '--reason', 'push interrupted before landing'],
       f.root,
       proc.env,
     );
@@ -443,15 +435,10 @@ test.serial('stale-attempt and non-holder phase calls write no attempt line', as
   try {
     const { proc } = await batchFixture(f);
     leaf(f, 'other', 'merge', { merge_stamp: '2026-10-05T00:00:01.000Z' });
-    const stale: Result = await cli(
-      f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'bogus'],
-      f.root,
-      proc.env,
-    );
-    expect(stale.code).not.toBe(0);
-    expect(stale.stderr).toContain('Stale attempt');
-    const outsider: Result = await cli(f, ['phase', 'other', 'merged', '--slot', 'B'], f.root, proc.env);
+    const stale: Result = await cli(f, ['land', 'hold', '--attempt', 'bogus'], f.root, proc.env);
+    expect(stale.code).toBe(0);
+    expect(stale.stdout).toContain('Stale land run');
+    const outsider: Result = await cli(f, ['phase', 'other', 'merged'], f.root, proc.env);
     expect(outsider.code).not.toBe(0);
     expect(outsider.stderr).toContain('Merge turn refused');
     expect(existsSync(resolve(f.root, 'issues/merge-attempts.jsonl'))).toBe(false);
@@ -468,20 +455,7 @@ test.serial('a merged line carries PSI stall deltas from batch creation', async 
     saveBatch(holder.path, withStart(record, { cpu: 10, memory: 20, io: 30 }));
     const dir: string = pressureDir(f, { cpu: '60', memory: '90', io: '180' });
     await verified(f, 'hold', 'merge');
-    const checked: Result = await spawn(
-      f,
-      'check',
-      phaseBody('hold', 'merged', ['B', undefined, undefined, true, 'a1'], dir),
-      proc.env,
-    );
-    expect(checked.code).toBe(0);
-    expect(attemptLines(f)).toEqual([]);
-    const merged: Result = await spawn(
-      f,
-      'merged',
-      phaseBody('hold', 'merged', ['B', undefined, undefined, undefined, 'a1'], dir),
-      proc.env,
-    );
+    const merged: Result = await spawn(f, 'merged', landBody(f.repo, 'hold', 'a1', dir), proc.env);
     expect(merged.code).toBe(0);
     const lines: Attempt[] = attemptLines(f);
     expect(lines).toHaveLength(1);
@@ -498,35 +472,17 @@ test.serial('a restacked merged line carries PSI stall deltas from batch creatio
     const { holder, record, proc } = await batchFixture(f);
     saveBatch(holder.path, withStart(record, { cpu: 5, memory: 6, io: 7 }));
     const dir: string = pressureDir(f, { cpu: '15', memory: '26', io: '47' });
+    // A committed passing test file keeps every restacked verify green.
+    const worktree2: string = z.string().parse(holder.state.worktree);
+    writeFileSync(resolve(worktree2, 'pass.test.ts'), "import { test } from 'bun:test';\ntest('x', () => {});\n");
+    await command(['git', 'add', 'pass.test.ts'], worktree2);
+    await command(['git', 'commit', '-m', 'pass'], worktree2);
     await verified(f, 'hold', 'merge');
-    expect(
-      (await spawn(f, 'check', phaseBody('hold', 'merged', ['B', undefined, undefined, true, 'a1'], dir), proc.env))
-        .code,
-    ).toBe(0);
     const advanced: string = await advanceRemote(f, {
       'issues/open/x/state.yaml': 'x\n',
       'learnings/history/y.md': 'y\n',
     });
-    const refused: Result = await spawn(
-      f,
-      'refused',
-      phaseBody('hold', 'merged', ['B', undefined, undefined, undefined, 'a1'], dir),
-      proc.env,
-    );
-    expect(refused.code).toBe(0);
-    expect(refused.stdout).toMatch(/^rerun tested=[0-9a-f]{40} pushed=[0-9a-f]{40}$/);
-    expect(attemptLines(f)).toEqual([]);
-    await verified(f, 'hold', 'merge');
-    expect(
-      (await spawn(f, 'recheck', phaseBody('hold', 'merged', ['B', undefined, undefined, true, 'a1'], dir), proc.env))
-        .code,
-    ).toBe(0);
-    const landed: Result = await spawn(
-      f,
-      'landed',
-      phaseBody('hold', 'merged', ['B', undefined, undefined, undefined, 'a1'], dir),
-      proc.env,
-    );
+    const landed: Result = await spawn(f, 'landed', landBody(f.repo, 'hold', 'a1', dir), proc.env);
     expect(landed.code).toBe(0);
     const lines: Attempt[] = attemptLines(f);
     expect(lines).toHaveLength(1);
@@ -544,12 +500,7 @@ test.serial('a solo red line carries PSI stall deltas from batch creation', asyn
     const { holder, record, proc } = await soloFixture(f);
     saveBatch(holder.path, withStart(record, { cpu: 3, memory: 4, io: 5 }));
     const dir: string = pressureDir(f, { cpu: '7', memory: '12', io: '25' });
-    const red: Result = await spawn(
-      f,
-      'red',
-      phaseBody('hold', 'check.fix', ['B', undefined, undefined, undefined, 'a1'], dir),
-      proc.env,
-    );
+    const red: Result = await spawn(f, 'red', landBody(f.repo, 'hold', 'a1', dir), proc.env);
     expect(red.code).toBe(0);
     const lines: Attempt[] = attemptLines(f);
     expect(lines).toHaveLength(1);
@@ -600,12 +551,7 @@ test.serial('legacy held, split and ejected lines still parse beside a recorded 
         '\n',
     );
     const dir: string = pressureDir(f, { cpu: '6', memory: '8', io: '14' });
-    const red: Result = await spawn(
-      f,
-      'red',
-      phaseBody('hold', 'check.fix', ['B', undefined, undefined, undefined, 'a1'], dir),
-      proc.env,
-    );
+    const red: Result = await spawn(f, 'red', landBody(f.repo, 'hold', 'a1', dir), proc.env);
     expect(red.code).toBe(0);
     const lines: Attempt[] = attemptLines(f);
     expect(lines.map((line) => line.outcome)).toEqual(['held', 'split', 'ejected', 'red']);
@@ -641,14 +587,10 @@ test.serial('a merged line without pressure_start keeps no pressure key even wit
     const { proc } = await batchFixture(f);
     const dir: string = pressureDir(f, { cpu: 'abc', memory: '90', io: '180' });
     await verified(f, 'hold', 'merge');
-    expect(
-      (await spawn(f, 'check', phaseBody('hold', 'merged', ['B', undefined, undefined, true, 'a1'], dir), proc.env))
-        .code,
-    ).toBe(0);
     const merged: Result = await spawn(
       f,
       'merged',
-      phaseBody('hold', 'merged', ['B', undefined, undefined, undefined, 'a1'], dir),
+      landBody(f.repo, 'hold', 'a1', dir),
       proc.env,
     );
     expect(merged.code).toBe(0);
@@ -668,14 +610,10 @@ test.serial('a merged line with an absent pressure dir keeps no pressure key', a
     saveBatch(holder.path, withStart(record, { cpu: 10, memory: 20, io: 30 }));
     const dir: string = resolve(f.home, 'psi/proc/pressure');
     await verified(f, 'hold', 'merge');
-    expect(
-      (await spawn(f, 'check', phaseBody('hold', 'merged', ['B', undefined, undefined, true, 'a1'], dir), proc.env))
-        .code,
-    ).toBe(0);
     const merged: Result = await spawn(
       f,
       'merged',
-      phaseBody('hold', 'merged', ['B', undefined, undefined, undefined, 'a1'], dir),
+      landBody(f.repo, 'hold', 'a1', dir),
       proc.env,
     );
     expect(merged.code).toBe(0);
@@ -695,14 +633,10 @@ test.serial('a merged line with a changed boot id keeps no pressure key', async 
     saveBatch(holder.path, withStart(record, { cpu: 10, memory: 20, io: 30 }, 'boot-old'));
     const dir: string = pressureDir(f, { cpu: '60', memory: '90', io: '180' }, 'boot-new');
     await verified(f, 'hold', 'merge');
-    expect(
-      (await spawn(f, 'check', phaseBody('hold', 'merged', ['B', undefined, undefined, true, 'a1'], dir), proc.env))
-        .code,
-    ).toBe(0);
     const merged: Result = await spawn(
       f,
       'merged',
-      phaseBody('hold', 'merged', ['B', undefined, undefined, undefined, 'a1'], dir),
+      landBody(f.repo, 'hold', 'a1', dir),
       proc.env,
     );
     expect(merged.code).toBe(0);
@@ -726,14 +660,15 @@ test.serial('a malformed pressure file stops the ending call before any push or 
     const merged: Result = await spawn(
       f,
       'merged',
-      phaseBody('hold', 'merged', ['B', undefined, undefined, undefined, 'a1'], dir),
+      landBody(f.repo, 'hold', 'a1', dir),
       proc.env,
     );
     expect(merged.code).not.toBe(0);
     expect(merged.stderr).toContain(resolve(dir, 'cpu'));
     expect(merged.stderr).toContain('total=');
     expect(attemptLines(f)).toEqual([]);
-    expect(readState(holder.path).batch).toEqual(batch);
+    expect(readState(holder.path).phase).toBe('merge');
+    expect(readState(holder.path).batch?.pressure_start).toEqual(batch.pressure_start);
     expect(await remoteTip(f)).toBe(tip);
   } finally {
     f.clean();
@@ -766,26 +701,19 @@ test.serial('a decimal pressure total stops the ending call before any push or s
     saveBatch(holder.path, batch);
     const dir: string = pressureDir(f, { cpu: '12.5', memory: '90', io: '180' });
     await verified(f, 'hold', 'merge');
-    const checked: Result = await spawn(
-      f,
-      'check',
-      phaseBody('hold', 'merged', ['B', undefined, undefined, true, 'a1'], dir),
-      proc.env,
-    );
-    expect(checked.code).toBe(0);
-    const before: State = readState(holder.path);
     const tip: string = await remoteTip(f);
     const merged: Result = await spawn(
       f,
       'merged',
-      phaseBody('hold', 'merged', ['B', undefined, undefined, undefined, 'a1'], dir),
+      landBody(f.repo, 'hold', 'a1', dir),
       proc.env,
     );
     expect(merged.code).not.toBe(0);
     expect(merged.stderr).toContain(resolve(dir, 'cpu'));
     expect(merged.stderr).toContain('total=');
     expect(attemptLines(f)).toEqual([]);
-    expect(readState(holder.path)).toEqual(before);
+    expect(readState(holder.path).phase).toBe('merge');
+    expect(readState(holder.path).batch?.pressure_start).toEqual(batch.pressure_start);
     expect(await remoteTip(f)).toBe(tip);
   } finally {
     f.clean();
@@ -813,13 +741,17 @@ test.serial('a decimal pressure total stops batch creation before any batch or l
   }
 });
 
-test.serial('a created batch preserves PSI counters through two reruns', async () => {
+test.serial('a created batch preserves PSI counters through a rerun', async () => {
   const f: Fixture = await fixture();
   try {
     process.env.AKROGON_LEAF_TEMP_ROOT = leafTempRoot(f);
     const proc: ProcFixture = procFixture(f);
     const base: string = await remoteTip(f);
     const holder: Branch = await branchAt(f, 'hold', base, 'file-hold');
+    // A committed passing test file keeps the restacked verify green.
+    writeFileSync(resolve(holder.worktree, 'pass.test.ts'), "import { test } from 'bun:test';\ntest('x', () => {});\n");
+    await command(['git', 'add', 'pass.test.ts'], holder.worktree);
+    await command(['git', 'commit', '-m', 'pass'], holder.worktree);
     const holderPath: string = leaf(f, 'hold', 'merge', {
       worktree: holder.worktree,
       merge_stamp: '2026-10-05T00:00:00.000Z',
@@ -831,70 +763,9 @@ test.serial('a created batch preserves PSI counters through two reruns', async (
     expect(batch.pressure_start).toEqual({ cpu: 5, memory: 6, io: 7, boot_id: 'boot-1' });
     expect(batch.top).toBeDefined();
     await verified(f, 'hold', 'merge');
-    expect(
-      (
-        await spawn(
-          f,
-          'check',
-          phaseBody('hold', 'merged', ['B', undefined, undefined, true, batch.attempt], dir),
-          proc.env,
-        )
-      ).code,
-    ).toBe(0);
     await advanceRemote(f, { file: 'advanced\n' });
-    pressureDir(f, { cpu: '9', memory: '16', io: '27' });
-    const rerun: Result = await spawn(
-      f,
-      'rerun',
-      phaseBody('hold', 'merged', ['B', undefined, undefined, undefined, batch.attempt], dir),
-      proc.env,
-    );
-    expect(rerun.code).toBe(0);
-    const restacked: Batch = readState(holderPath).batch!;
-    expect(restacked.decision).toBe('rerun');
-    expect(restacked.tested_top).toBeUndefined();
-    expect(restacked.pressure_start).toEqual(batch.pressure_start);
-    await verified(f, 'hold', 'merge');
-    expect(
-      (
-        await spawn(
-          f,
-          'recheck',
-          phaseBody('hold', 'merged', ['B', undefined, undefined, true, batch.attempt], dir),
-          proc.env,
-        )
-      ).code,
-    ).toBe(0);
-    await advanceRemote(f, { 'issues/open/x/state.yaml': 'x\n' });
     pressureDir(f, { cpu: '15', memory: '26', io: '47' });
-    const second: Result = await spawn(
-      f,
-      'second',
-      phaseBody('hold', 'merged', ['B', undefined, undefined, undefined, batch.attempt], dir),
-      proc.env,
-    );
-    expect(second.code).toBe(0);
-    const again: Batch = readState(holderPath).batch!;
-    expect(again.decision).toBe('rerun');
-    expect(again.pressure_start).toEqual(batch.pressure_start);
-    expect(attemptLines(f)).toEqual([]);
-    await verified(f, 'hold', 'merge');
-    expect(
-      (
-        await spawn(
-          f,
-          'third',
-          phaseBody('hold', 'merged', ['B', undefined, undefined, true, batch.attempt], dir),
-          proc.env,
-        )
-      ).code,
-    ).toBe(0);
-    const landed: Result = await spawn(
-      f,
-      'land',
-      phaseBody('hold', 'merged', ['B', undefined, undefined, undefined, batch.attempt], dir),
-      proc.env,
-    );
+    const landed: Result = await spawn(f, 'land', landBody(f.repo, 'hold', batch.attempt, dir), proc.env);
     expect(landed.code).toBe(0);
     const lines: Attempt[] = attemptLines(f);
     expect(lines).toHaveLength(1);
@@ -923,12 +794,7 @@ test.serial('a merge turn records declared tools on the batch and the attempt li
     const tools: Tool[] = [{ name: 'tool-a', path: resolve(bin, 'tool-a'), version: 'tool-a 1.2.3' }];
     const attempt: string = z.string().parse(readState(holderPath).batch?.attempt);
     expect(readState(holderPath).batch?.tools).toEqual(tools);
-    const red: Result = await cli(
-      f,
-      ['phase', 'hold', 'check.fix', '--slot', 'B', '--attempt', attempt],
-      f.root,
-      proc.env,
-    );
+    const red: Result = await cli(f, ['land', 'hold', '--attempt', attempt], f.root, proc.env);
     expect(red.code).toBe(0);
     const lines: Attempt[] = attemptLines(f);
     expect(lines).toHaveLength(1);
@@ -966,12 +832,7 @@ test.serial('a stored tools list lands on the solo red line', async () => {
     const { holder, record, proc } = await soloFixture(f);
     const tools: Tool[] = [{ name: 'tool-a', path: '/bin/tool-a', version: 'tool-a 1.2.3' }];
     saveBatch(holder.path, { ...record, tools });
-    const red: Result = await cli(
-      f,
-      ['phase', 'hold', 'check.fix', '--slot', 'B', '--attempt', 'a1'],
-      f.root,
-      proc.env,
-    );
+    const red: Result = await cli(f, ['land', 'hold', '--attempt', 'a1'], f.root, proc.env);
     expect(red.code).toBe(0);
     const lines: Attempt[] = attemptLines(f);
     expect(lines).toHaveLength(1);

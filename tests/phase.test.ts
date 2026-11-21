@@ -24,7 +24,7 @@ import {
   verified,
   holding,
 } from './helpers';
-import { readState, saveState, type Batch, type Failure } from '../src/state';
+import { readState, saveState, type Batch, type Failure, type State } from '../src/state';
 import { command, run, type Result } from '../src/shell';
 import type { GhStep } from './fake-gh';
 import { z } from 'zod';
@@ -151,10 +151,7 @@ test('review fix routes to check.repair, B hands to A past the configured count,
     ).toBe('moved failed');
     expect((await cli(f, ['phase', 'repair', 'implement'], f.root, proc.env)).code).toBe(0);
     expect(readState(path)).toMatchObject({ phase: 'implement', fix_rounds: 2 });
-    const mergePath: string = leaf(f, 'conflict', 'merge');
-    expect((await cli(f, ['phase', 'conflict', 'check.fix'])).code).toBe(0);
-    expect(readState(mergePath).fix_rounds).toBe(1);
-    const cappedPath: string = leaf(f, 'capped', 'merge', { fix_rounds: 1 });
+    const cappedPath: string = leaf(f, 'capped', 'check.repair', { fix_rounds: 1 });
     expect((await cli(f, ['phase', 'capped', 'check.fix'], f.root, proc.env)).stdout).toBe('moved check.fix');
     expect(readState(cappedPath)).toMatchObject({
       phase: 'check.fix',
@@ -1165,7 +1162,6 @@ test('stops land in failed immediately without phase advance and validate slots'
     expect(readState(mergePath).failure).toEqual({
       cause: 'blocked',
       phase: 'merge',
-      slot: 'B',
       reason: 'x',
       delivery: 'pending',
     });
@@ -1641,7 +1637,8 @@ for (const { phase, slot, extra } of [
       const before: string = bytes(path);
       const result: Result = await cli(f, ['phase', 'wrong-seat', 'failed', '--slot', slot, '--reason', 'x']);
       expect(result.code).not.toBe(0);
-      expect(result.stderr).toContain('required --slot');
+      // Merge holds no seats, so its wrong-slot refusal names the rule instead of the missing slot.
+      expect(result.stderr).toContain(phase === 'merge' ? 'cannot make merge calls' : 'required --slot');
       expect(bytes(path)).toBe(before);
       expect(existsSync(resolve(f.root, 'issues/log.jsonl'))).toBe(false);
     } finally {
@@ -1991,7 +1988,6 @@ test('merge turn refusal names the holder for merged and check.fix while failed 
     // Unstamped merge leaves take turns in slug order, so aa holds the queue.
     const refuses: Result[] = [
       await cli(f, ['phase', 'bb', 'merged']),
-      await cli(f, ['phase', 'bb', 'merged', '--check']),
       await cli(f, ['phase', 'bb', 'check.fix']),
     ];
     for (const result of refuses) {
@@ -2002,8 +1998,7 @@ test('merge turn refusal names the holder for merged and check.fix while failed 
     const failed: Result = await cli(f, ['phase', 'bb', 'failed', '--reason', 'x'], f.root, core.env);
     expect(failed.code).toBe(0);
     expect(readState(nonHolderPath).phase).toBe('failed');
-    expect((await cli(f, ['phase', 'aa', 'merged', '--check'])).stdout).toBe('ok');
-    greenReceipt(f, await command(['git', 'rev-parse', 'HEAD'], f.root), 'merge');
+    // The seat check is gone from merge: the holder lands its applied record.
     const moved: Result = await cli(f, ['phase', 'aa', 'merged']);
     expect(moved.code).toBe(0);
     expect(readState(holderPath).phase).toBe('merged');
@@ -2046,7 +2041,7 @@ test('an earlier merge_stamp takes the turn over slug order', async () => {
   }
 });
 
-test('moving into merge writes merge_stamp and re-entering refreshes it', async () => {
+test('moving into merge writes merge_stamp and re-entering keeps the first stamp', async () => {
   const f: Fixture = await fixture();
   try {
     const proc: ProcFixture = procFixture(f);
@@ -2060,11 +2055,21 @@ test('moving into merge writes merge_stamp and re-entering refreshes it', async 
     expect((await cli(f, ['phase', 'stamper', 'merge'])).stdout).toBe('moved merge');
     const second: string | undefined = readState(path).merge_stamp;
     expect(Date.parse(second ?? '')).not.toBeNaN();
-    expect(second).not.toBe(first);
+    expect(second).toBe(first);
   } finally {
     f.clean();
   }
 });
+
+function attemptLines(f: Fixture): { outcome: string; tested_top?: string }[] {
+  const file: string = resolve(f.root, 'issues/merge-attempts.jsonl');
+  return existsSync(file)
+    ? readFileSync(file, 'utf8')
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line) as { outcome: string; tested_top?: string })
+    : [];
+}
 
 async function lessonsMain(f: Fixture): Promise<{ builtOn: string; lessons: string[] }> {
   writeFileSync(resolve(f.root, '.gitattributes'), 'learnings/LESSONS.md merge=union\n');
@@ -2086,7 +2091,7 @@ async function lessonsMain(f: Fixture): Promise<{ builtOn: string; lessons: stri
   return { builtOn, lessons };
 }
 
-test('merged --check refuses an applied stack whose top still contains a retired lesson line', async () => {
+test('the land gates refuse an applied stack whose top still contains a retired lesson line', async () => {
   const f: Fixture = await fixture();
   try {
     const { builtOn } = await lessonsMain(f);
@@ -2117,30 +2122,25 @@ test('merged --check refuses an applied stack whose top still contains a retired
     saveState(path, { ...readState(path), batch: record });
     const proc: ProcFixture = procFixture(f);
     await verified(f, 'hold', 'merge');
-    const refused: Result = await cli(
-      f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
-      f.root,
-      proc.env,
-    );
-    expect(refused.code).not.toBe(0);
-    expect(refused.stderr).toContain('history/alpha');
-    expect(readState(path).batch?.tested_top).toBeUndefined();
+    const refused: Result = await cli(f, ['land', 'hold', '--attempt', 'a1'], f.root, proc.env);
+    expect(refused.code).toBe(0);
+    const state: State = readState(path);
+    expect(state.phase).toBe('check.repair');
+    expect(state.merge_exit?.reason).toBe('gate');
+    expect(state.merge_exit?.refusal).toContain('history/alpha');
+    expect(state.batch).toBeUndefined();
     writeFileSync(resolve(worktree, 'learnings/LESSONS.md'), '- lesson beta. 2026-09-11. [beta](history/beta.md)\n');
     await command(['git', 'add', '.'], worktree);
     await command(['git', 'commit', '-m', 'lessons: retire applied lines'], worktree);
     const fixedTop: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
-    saveState(path, { ...readState(path), batch: { ...record, top: fixedTop } });
+    // Repair the exit, give it a fresh batch on the fixed top and land again.
+    saveState(path, { ...readState(path), phase: 'merge', batch: { ...record, top: fixedTop } });
     await verified(f, 'hold', 'merge');
-    const checked: Result = await cli(
-      f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
-      f.root,
-      proc.env,
-    );
-    expect(checked.code).toBe(0);
-    expect(checked.stdout).toBe('ok');
-    expect(readState(path).batch?.tested_top).toBe(fixedTop);
+    const landed: Result = await cli(f, ['land', 'hold', '--attempt', 'a1'], f.root, proc.env);
+    expect(landed.code).toBe(0);
+    const lines = attemptLines(f);
+    expect(lines.at(-1)?.outcome).toBe('merged');
+    expect(lines.at(-1)?.tested_top).toBe(fixedTop);
   } finally {
     f.clean();
   }
@@ -2169,19 +2169,7 @@ test('a solo merge push keeps citations valid when the remote ref advanced', asy
     saveState(path, { ...readState(path), batch: record });
     const proc: ProcFixture = procFixture(f);
     await verified(f, 'push-cite', 'merge');
-    const checked: Result = await cli(
-      f,
-      ['phase', 'push-cite', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
-      f.root,
-      proc.env,
-    );
-    expect(checked.code).toBe(0);
-    const merged: Result = await cli(
-      f,
-      ['phase', 'push-cite', 'merged', '--slot', 'B', '--attempt', 'a1'],
-      f.root,
-      proc.env,
-    );
+    const merged: Result = await cli(f, ['land', 'push-cite', '--attempt', 'a1'], f.root, proc.env);
     expect(merged.code).toBe(0);
     expect(readState(resolve(f.root, 'issues/closed/issue/push-cite')).phase).toBe('merged');
     const remoteMain: string = await command(['git', 'rev-parse', 'origin/main'], f.root);
@@ -2191,7 +2179,7 @@ test('a solo merge push keeps citations valid when the remote ref advanced', asy
   }
 });
 
-test('merged --check refuses a solo record whose rebased head contains a retired lesson line', async () => {
+test('the land gates refuse a solo record whose rebased head contains a retired lesson line', async () => {
   const f: Fixture = await fixture();
   try {
     const { builtOn } = await lessonsMain(f);
@@ -2217,28 +2205,24 @@ test('merged --check refuses a solo record whose rebased head contains a retired
     saveState(path, { ...readState(path), batch: record });
     const proc: ProcFixture = procFixture(f);
     await verified(f, 'hold', 'merge');
-    const refused: Result = await cli(
-      f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
-      f.root,
-      proc.env,
-    );
-    expect(refused.code).not.toBe(0);
-    expect(refused.stderr).toContain('history/alpha');
-    expect(readState(path).batch?.tested_top).toBeUndefined();
+    const refused: Result = await cli(f, ['land', 'hold', '--attempt', 'a1'], f.root, proc.env);
+    expect(refused.code).toBe(0);
+    const refusedState: State = readState(path);
+    expect(refusedState.phase).toBe('check.repair');
+    expect(refusedState.merge_exit?.reason).toBe('gate');
+    expect(refusedState.merge_exit?.refusal).toContain('history/alpha');
+    expect(refusedState.batch).toBeUndefined();
     writeFileSync(resolve(worktree, 'learnings/LESSONS.md'), '- lesson beta. 2026-09-11. [beta](history/beta.md)\n');
     await command(['git', 'add', '.'], worktree);
     await command(['git', 'commit', '-m', 'lessons: retire applied lines'], worktree);
+    saveState(path, { ...readState(path), phase: 'merge', batch: record });
     await verified(f, 'hold', 'merge');
-    const checked: Result = await cli(
-      f,
-      ['phase', 'hold', 'merged', '--slot', 'B', '--attempt', 'a1', '--check'],
-      f.root,
-      proc.env,
-    );
-    expect(checked.code).toBe(0);
-    expect(checked.stdout).toBe('ok');
-    expect(readState(path).batch?.tested_top).toBe(await command(['git', 'rev-parse', 'HEAD'], worktree));
+    const landed: Result = await cli(f, ['land', 'hold', '--attempt', 'a1'], f.root, proc.env);
+    expect(landed.code).toBe(0);
+    const fixedHead: string = await command(['git', 'rev-parse', 'HEAD'], worktree);
+    const lines = attemptLines(f);
+    expect(lines.at(-1)?.outcome).toBe('merged');
+    expect(lines.at(-1)?.tested_top).toBe(fixedHead);
   } finally {
     f.clean();
   }

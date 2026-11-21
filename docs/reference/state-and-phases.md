@@ -13,7 +13,7 @@ Each leaf has a `state.yaml` file in its folder. It says which phase the leaf is
 | check.review   | [check-issue](../../skills/check-issue/SKILL.md)         | A and B, only B once `fix_rounds` is above 0                                     | the required seats, each with a verdict (`ready`, `nits` or `fix`)                                                                         | merge, check.repair, failed           |
 | check.repair   | [check-issue](../../skills/check-issue/SKILL.md)         | B                                                                                | B                                                                                                                                          | merge, check.fix, failed              |
 | check.fix      | [implement-issue](../../skills/implement-issue/SKILL.md) | A                                                                                | A                                                                                                                                          | check.review, failed                  |
-| merge          | [merge-issue](../../skills/merge-issue/SKILL.md)         | B, only when the command's land run hands the attempt over, or for a solo rebase | normally the command's land run moves it to merged with no seat, otherwise B's `merged` call (the command pushes) or B's move to check.fix | merged, check.fix, failed             |
+| merge          | none — see [merge-issue](../../skills/merge-issue/SKILL.md) | none                                                                            | the command's merge turn and land run, or the operator's slot-less `merged` call                                                        | merged, check.repair, failed          |
 | merged         | none                                                     | none                                                                             | terminal                                                                                                                                   | none                                  |
 | failed         | none                                                     | none                                                                             | the operator, with no `--slot`                                                                                                             | any active phase except merged        |
 
@@ -29,9 +29,9 @@ akrogon phase <slug> <next-phase> --slot <A|B> [--verdict <ready|nits|fix>] [--r
 
 - In a phase with two seats, the first call only records that seat as done. The leaf moves when the last required seat calls. In a one-seat phase `--slot` may be left out.
 - check.review needs `--verdict`, and every other phase refuses it. When all required seats are done, any `fix` verdict sends the leaf to check.repair. Otherwise it goes to merge.
-- `--check` runs the same gates and moves nothing. It prints `ok` when the move would pass.
-- The gates refuse a move when the worktree has uncommitted work, the branch changes files under `issues/`, or a changed test file has no `Test-Change:` trailer. The move into check.review also needs a non-empty branch and a green `akrogon verify` receipt for HEAD. The move from check.repair to merge needs the same receipt.
-- In merge, `merged` and `check.fix` calls need `--attempt` with the current batch attempt, and only the leaf holding the repo's merge turn may make them. See [merge-issue](../../skills/merge-issue/SKILL.md).
+- `--check` runs the same gates and moves nothing. It prints `ok` when the move would pass. A merge leaf refuses it, as the merge rule below states.
+- The gates refuse a move when the worktree has uncommitted work, the branch changes files under `issues/`, or a changed test file has no `Test-Change:` trailer. The move into check.review also needs a non-empty branch and a green `akrogon verify` receipt for HEAD. The move from check.repair to merge needs the same receipt, skipped only for a leaf returning unedited from a red merge exit as `merge_exit` below states.
+- A merge leaf holds no seat: a `phase` call on it carrying `--slot` or `--attempt` is refused, and `merged --check` is refused as the seat protocol. `check.fix` is refused there at all — a second red takes check.fix from check.repair. A slot-less `merged` call on the leaf holding the turn lands an applied batch; on a non-holder it is refused naming the holder. See [merge-issue](../../skills/merge-issue/SKILL.md).
 - Every completed move clears the pass records: `done`, `verdict`, `prompted`, `prompted_at`, `delivery_error`, `attempts` and `lost`.
 
 Any seat can stop the leaf:
@@ -98,7 +98,8 @@ Leave these to the commands. Editing them by hand makes the file disagree with t
 | `prompted_at`    | Per seat, when that prompt was delivered.                                                                                                                                                          | `akrogon next`                                       |
 | `delivery_error` | Per seat, the last failed prompt delivery. See below.                                                                                                                                              | `akrogon next`                                       |
 | `failure`        | Why the leaf stopped in failed. See below. Cleared when the leaf leaves failed.                                                                                                                    | `akrogon phase`                                      |
-| `merge_stamp`    | When the leaf entered merge. Orders leaves waiting for the merge turn.                                                                                                                             | `akrogon phase`                                      |
+| `merge_stamp`    | When the leaf entered merge. Orders leaves waiting for the merge turn. The first return to merge keeps it; a second mints a new one.                                                                 | `akrogon phase`                                      |
+| `merge_exit`     | Why a command-run merge moved the leaf to check.repair. See below. Written on that move and cleared on any other.                                                                                    | merge turn, land run                                 |
 | `batch`          | The record of the current merge attempt. See below.                                                                                                                                                | `akrogon next` merge turn, land run, `akrogon phase` |
 | `broadcast`      | The completion update waiting for a broadcast seat after a command-run merge. See below.                                                                                                           | land run, `akrogon next`                             |
 | `frozen`         | Every path the branch changed at the plan.synthesis to implement move, with its git blob id. Later changes to them need a `Test-Change:` trailer.                                                  | `akrogon phase`                                      |
@@ -123,17 +124,26 @@ Exact shapes are in [src/state.ts](../../src/state.ts).
 - `at` is when it failed.
 - An entry written before hc seats keeps its old shape (`command`, `code`, `message`, `pane`, `session`, `offset`) and still parses.
 
+`merge_exit` (`mergeExitSchema`) is written when the merge turn or land run moves the leaf to check.repair and is cleared on any other move, so it survives only inside check.repair:
+
+- `reason` is `red`, `gate`, `conflict` or `dirty`: the verify run went red, a land gate refused, the rebase or restack conflicted, or the worktree was dirty.
+- `top` is the candidate head the exit rejected, present on `red`, `gate` and a land-side `conflict` or `dirty`.
+- `run` is the red merge-scope verify run, on `red`.
+- `refusal` is the gate's refusal text, on `gate`.
+- `base` is the remote base the leaf rebased onto, on `conflict` and `dirty`.
+- `base_verdict` is the run land used to prove the base, present on `red` when the base pass ran. Its green verdict means the head red is the leaf's own.
+
+The repair seat's prompt carries `merge-exit=<reason>` plus each present field. A `check.repair → merge` move skips the leaf green-receipt requirement exactly when `reason` is `red` and `top` still equals the worktree HEAD.
+
 `batch` (`batchSchema`) belongs to the leaf holding the merge turn. The merge turn creates it, and the reconcile step in `akrogon next` removes it once the push is settled. A record with no `candidate` is dropped when the leaf leaves `failed`, so the merge turn rebuilds on the current base:
 
-- `attempt` is the id every `merged` and `check.fix` call must repeat with `--attempt`.
+- `attempt` is the id the land unit `akrogon-land-<id>` and `akrogon verify --attempt <id>` run under.
 - `started` and `pressure_start` are the start time and a CPU, memory and IO pressure reading.
 - `built_on` is the remote base the holder is rebased onto. `holder` is the branch's merge-base and head before the rebase.
 - `tools` lists the configured tools with their path and version.
-- `applied` is true once the rebase step ran. `top` is the rebased top when the command rebased the branch, and absent when B rebases by hand.
-- `owner` is `command` while the land run owns the attempt and `seat` after it hands over. Absent means seat.
-- `wake`, `red` and `refusal` say where the land run stopped: `red` with the red verify run, `gate` or `push` with the refusal text.
-- `tested_top` and `tested_main` are the head the merge check passed and the remote base under it.
-- `candidate` is the head sent to the push. `decision` is `rerun` after a refused push forced a new rebase.
+- `applied` is true once the rebase step ran. `top` is the rebased top the command applied.
+- `tested_top` and `tested_main` are the head the land gates passed and the remote base under it.
+- `candidate` is the head sent to the push.
 - `recorded` is true once the attempt's outcome is in the attempts log. `notified` is `pending` while the notice that a failed holder's push landed waits as a file and `shown` once it is gone, absent before it is written or when the write failed. It is dropped, and a pending file removed, when the leaf leaves `failed`.
 
 `broadcast` (`broadcastSchema`) is written when the command's own merge completes an issue or epic:
