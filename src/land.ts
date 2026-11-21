@@ -136,8 +136,10 @@ function nameless(test: string): boolean {
 // Taken-8: the returning leaf's last red merge run sits on exactly the recorded holder head (no
 // edit between exits), every failing unit names a real title, and at least one failing unit the
 // main-red cover misses repeats in that previous run.
-async function taken8Trigger(repo: Repo, record: Batch, sha: string, runId: string): Promise<boolean> {
+async function taken8Trigger(repo: Repo, record: Batch, runId: string): Promise<boolean> {
   const runs: VerifyRun[] = readVerifyRuns(repo);
+  const current: VerifyRun | undefined = runs.find((run) => run.run === runId);
+  if (current === undefined) return false;
   const previous: VerifyRun | undefined = runs
     .filter(
       (run) =>
@@ -145,14 +147,13 @@ async function taken8Trigger(repo: Repo, record: Batch, sha: string, runId: stri
         run.compares === undefined &&
         run.end !== undefined &&
         run.setup === 0 &&
-        run.sha === record.holder.head &&
-        run.sha !== sha &&
+        run.leaf === current.leaf &&
+        run.run !== runId &&
+        run.end <= current.start &&
         run.commands.some((item) => item.exit !== 0),
     )
     .sort((a, b) => b.end!.localeCompare(a.end!))[0];
-  if (previous === undefined) return false;
-  const current: VerifyRun | undefined = runs.find((run) => run.run === runId);
-  if (current === undefined) return false;
+  if (previous?.sha !== record.holder.head) return false;
   const { failedTests } = await import('./flaky');
   let overlap: boolean = false;
   for (const item of current.commands) {
@@ -211,7 +212,7 @@ export async function land(
     if (result.code !== 0) {
       if (result.code === 1 && (await mainRedCover(repo, result.sha, result.id))) coverRun = result.id;
       else if (result.code === 1) {
-        if (await taken8Trigger(repo, record, result.sha, result.id)) {
+        if (await taken8Trigger(repo, record, result.id)) {
           const verdict = await verify(repo.root, undefined, attempt, undefined, true);
           if (verdict.code === 0) {
             coverRun = result.id;
