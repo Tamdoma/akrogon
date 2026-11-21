@@ -196,6 +196,39 @@ test('alpha', () => expect(existsSync(${JSON.stringify(marker)})).toBe(true));
   }
 });
 
+test('changing whitespace in a string to fix a test does not count as a flip', async (): Promise<void> => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', checks: { test: 'bun test alpha.test.ts' } });
+    await commitIn(
+      f.root,
+      'alpha.test.ts',
+      `import { expect, test } from 'bun:test';
+import { state } from './code';
+test('alpha', () => expect(state).toBe('readynow'));
+`,
+    );
+    await commitIn(f.root, 'code.ts', "export const state = 'initial';\n");
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    const { worktree } = await callerWorktree(f, 'caller');
+    leaf(f, 'caller', 'merge', { worktree });
+    await commitIn(worktree, 'code.ts', "export const state = 'ready now';\n");
+    expect((await verify(f, [], worktree)).code).toBe(1);
+
+    await commitIn(worktree, 'code.ts', "export const state = 'readynow';\n");
+    await commitIn(f.root, 'main-file');
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    await command(['git', 'rebase', 'origin/main'], worktree);
+    expect((await verify(f, [], worktree)).code).toBe(0);
+
+    const result: Result = await cli(f, ['flaky']);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toBe('');
+  } finally {
+    f.clean();
+  }
+});
+
 test('verify runs checks on an explicitly selected commit with unrelated history', async (): Promise<void> => {
   const f: Fixture = await fixture();
   try {
