@@ -230,6 +230,9 @@ test.serial(
       expect(run.code).toBe(0);
       const watcher: string = z.object({ address: z.string() }).parse(JSON.parse(run.stdout)).address;
       tier.record('cwds.json', [tier.root, leafTemp]);
+      // src/hc calls from this process (waitFor, transcriptFor) resolve the session socket
+      // under our own XDG_RUNTIME_DIR — point it at the tier's, as watch-live's startCell does.
+      process.env.XDG_RUNTIME_DIR = tier.runtime;
       // pi must be listening before the task lands: a send before its idle state sits
       // unsubmitted in the input line (plan-red run and the first lane run both lost it).
       const ready: Seen | null = await waitFor(
