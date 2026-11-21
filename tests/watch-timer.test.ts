@@ -1014,10 +1014,13 @@ test.serial('dues queued behind a busy watcher coalesce to the latest boundary',
   try {
     const rig: Rig = await watchUp(f);
     rig.timer = await started(rig);
-    await waitTick(rig, 1);
-    // due 1's check call is held across three intervals: dues 2, 3 and 4 accrue while the
-    // watcher is busy. The timer must not queue them all.
+    // The hold must grab due 1's check call: it is written once the start check's status call
+    // has run, so the next status call — due 1's — is the one that sleeps.
+    for (let n: number = 0; n < 50 && statusCalls(rig) < 1; n += 1) await Bun.sleep(200);
+    expect(statusCalls(rig)).toBe(1); // the start check's status call
     writeFileSync(resolve(rig.flags, 'hold-status'), '6');
+    await waitTick(rig, 1);
+    // dues 2, 3 and 4 accrue while the watcher is busy. The timer must not queue them all.
     await waitLabel(rig, 1);
     await Bun.sleep(7500);
     // The check ends; the held dues collapse into one send carrying the newest due number.
