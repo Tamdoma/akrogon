@@ -8,6 +8,7 @@ import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { command, spawnCaptured, type Result, type SpawnResult } from '../src/shell';
+import { withLock } from '../src/state';
 import { cli, leaf, leafTempRoot } from './helpers';
 import { hcCore, hcFixture, type HcCore, type HcFixture } from './hc-fixture';
 
@@ -1107,6 +1108,43 @@ test.serial('stop closes the watch consultant after the timer, tolerating none',
     expect((await get(f.core, foreign)).state).toBe('live');
     await f.core.hc(['kill', foreign]);
     await f.core.hc(['rm', foreign]);
+  } finally {
+    await f.clean();
+  }
+});
+
+test.serial('stop waits for an admitted consultant launch and removes the consultant', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    const rig: Rig = await watchUp(f, { interval: '3600' });
+    rig.timer = await started(rig);
+    const lock: string = resolve(f.home, 'watch', f.repo, '.consultant.lock');
+    const attempted: string = resolve(rig.flags, 'stop-acquiring-lock');
+    writeFileSync(resolve(rig.bin, 'flock'), '#!/bin/sh\n: > "$STOP_LOCK_ATTEMPT"\nexec "$REAL_FLOCK" "$@"\n', {
+      mode: 0o755,
+    });
+    const { consultant, stopping } = await withLock(lock, async () => {
+      let returned: boolean = false;
+      const stopping: Promise<SpawnResult> = spawnCaptured([bun, resolve(skilldir, 'scripts/stop.ts'), f.root], {
+        env: {
+          ...directEnv(f, rig.bin),
+          STOP_LOCK_ATTEMPT: attempted,
+          REAL_FLOCK: z.string().parse(Bun.which('flock')),
+        },
+        timeout: 10_000,
+      }).then((result: SpawnResult): SpawnResult => {
+        returned = true;
+        return result;
+      });
+      const deadline: number = Date.now() + 8_000;
+      while (!returned && !existsSync(attempted) && Date.now() < deadline) await Bun.sleep(25);
+      expect(returned || existsSync(attempted)).toBe(true);
+      return { consultant: await consultTerm(rig), stopping };
+    });
+    const stopped: SpawnResult = await stopping;
+    expect(stopped.code, stopped.stderr).toBe(0);
+    expect(await notFound(f.core, rig.timer)).toBe(true);
+    expect(await notFound(f.core, consultant)).toBe(true);
   } finally {
     await f.clean();
   }
