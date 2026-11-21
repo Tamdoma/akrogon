@@ -59,6 +59,7 @@ export const verifyRunSchema = z.strictObject({
   scope: verifyScopeSchema,
   compares: z.string().optional(),
   patch_id: z.string().optional(),
+  patch_base: z.string().optional(),
   notice: z.string().optional(),
   path: z.string(),
   pid: z.number().int(),
@@ -124,25 +125,46 @@ function treeOf(repo: Repo, sha: string): Promise<string> {
   return command(['git', 'rev-parse', `${sha}^{tree}`], repo.root);
 }
 
-// Hash the leaf's edits without surrounding lines and with whitespace preserved. A run with
-// no merge base or an empty own diff records no patch id.
-async function ownPatchId(repo: Repo, sha: string): Promise<string | undefined> {
+async function patchBase(repo: Repo, sha: string, tree: string): Promise<string | undefined> {
   const argv: string[] = ['git', 'merge-base', sha, trackingRef(repo)];
   const base: Result = await run(argv, repo.root);
   if (base.code === 1) return undefined;
   if (base.code !== 0) throw new CommandError(argv, repo.root, base);
-  const out: string = await command(
-    [
-      'sh',
-      '-c',
-      'git diff --unified=0 --inter-hunk-context=0 "$1" "$2" | git patch-id --verbatim',
-      'sh',
-      base.stdout,
-      sha,
-    ],
-    repo.root,
-  );
-  return out === '' ? undefined : out.split(/\s/)[0];
+  return (await treeOf(repo, base.stdout)) === tree ? undefined : base.stdout;
+}
+
+// Replay the current change onto the previous merge base. The previous top may
+// have been evicted, so compare with its tree ID saved in the receipt.
+async function inheritedPatchId(repo: Repo, current: VerifyRun, runs: VerifyRun[]): Promise<string | undefined> {
+  const base: string | undefined = current.patch_base;
+  if (base === undefined || current.scope !== 'merge' || current.compares !== undefined || !completed(current))
+    return undefined;
+  let previous: VerifyRun | undefined;
+  for (const receipt of runs) {
+    if (receipt.leaf !== current.leaf || receipt.scope !== 'merge' || receipt.compares !== undefined) continue;
+    if (!completed(receipt) || receipt.end! > current.end!) continue;
+    if (previous === undefined || receipt.end! >= previous.end!) previous = receipt;
+  }
+  if (previous?.patch_base === undefined || previous.patch_id === undefined) return undefined;
+  if (base === previous.patch_base) return current.tree === previous.tree ? previous.patch_id : undefined;
+
+  const priorBase: string[] = ['git', 'rev-parse', '--verify', '--quiet', `${previous.patch_base}^{commit}`];
+  const anchor: Result = await run(priorBase, repo.root);
+  if (anchor.code === 1) return undefined;
+  if (anchor.code !== 0) throw new CommandError(priorBase, repo.root, anchor);
+  const argv: string[] = [
+    'git',
+    'merge-tree',
+    '--write-tree',
+    '--no-messages',
+    `--merge-base=${base}`,
+    anchor.stdout,
+    current.sha,
+  ];
+  const replay: Result = await run(argv, repo.root);
+  if (replay.code === 1) return undefined;
+  if (replay.code !== 0) throw new CommandError(argv, repo.root, replay);
+  return replay.stdout === previous.tree ? previous.patch_id : undefined;
 }
 
 function sameCommands(actual: readonly NamedCommand[], expected: readonly NamedCommand[]): boolean {
@@ -487,7 +509,7 @@ async function runOnce(repo: Repo, record: PassRecord): Promise<VerifyRun> {
   checkLocation(target);
   const lock: string = await recordLock(repo);
   mkdirSync(caller.target, { recursive: true });
-  const patch: string | undefined = await ownPatchId(repo, sha);
+  const ownBase: string | undefined = await patchBase(repo, sha, tree);
   const receipt: VerifyRun = {
     run: id,
     repo: repo.name,
@@ -496,7 +518,7 @@ async function runOnce(repo: Repo, record: PassRecord): Promise<VerifyRun> {
     tree,
     scope,
     ...(compares === undefined ? {} : { compares }),
-    ...(patch === undefined ? {} : { patch_id: patch }),
+    ...(ownBase === undefined ? {} : { patch_base: ownBase, patch_id: id }),
     path: target,
     pid: process.pid,
     boot_id: bootId(),
@@ -604,12 +626,14 @@ async function runOnce(repo: Repo, record: PassRecord): Promise<VerifyRun> {
       const runs: VerifyRun[] = foldShown(readVerifyRuns(repo), notices.folder);
       const index: number = runs.findIndex((run) => run.run === id);
       if (index === -1) return;
-      runs[index] = {
+      const finished: VerifyRun = {
         ...runs[index],
         ...(setupExit === undefined ? {} : { setup: setupExit }),
         commands: ran,
         ...(end === undefined ? {} : { end }),
       };
+      const inherited: string | undefined = await inheritedPatchId(repo, finished, runs);
+      runs[index] = inherited === undefined ? finished : { ...finished, patch_id: inherited };
       if (compares !== undefined && completed(runs[index])) {
         const names: string[] = await newRedUnits(repo, runs[index], runs, notices.folder);
         if (names.length > 0)
