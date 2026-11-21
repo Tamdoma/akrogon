@@ -165,10 +165,8 @@ export async function flips(repo: Repo, runs: VerifyRun[]): Promise<Flip[]> {
       }
       if (run.scope === 'merge' && run.compares === undefined) {
         const pending: Pending | undefined = mergeRed.get(mergeKey);
-        if (pending !== undefined && pending.run.tree !== run.tree) {
-          mergeRed.delete(mergeKey);
-          await pair(pending, entry);
-        }
+        mergeRed.delete(mergeKey);
+        if (pending !== undefined && pending.run.tree !== run.tree) await pair(pending, entry);
       }
     }
   return out;
