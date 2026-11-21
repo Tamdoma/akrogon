@@ -1061,11 +1061,7 @@ async function consultTerm(
     `akrogon.watch-consult=${opts.repo ?? rig.f.repo}`,
     ...(opts.parent === null
       ? ['--no-parent']
-      : [
-          '--parent',
-          opts.parent ?? rig.watcher,
-          ...(opts.outlive === true ? ['--outlive-parent'] : []),
-        ]),
+      : ['--parent', opts.parent ?? rig.watcher, ...(opts.outlive === true ? ['--outlive-parent'] : [])]),
     '--',
     'cat',
   ]);

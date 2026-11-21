@@ -63,11 +63,7 @@ async function send(tier: WatchTier, address: string, text: string): Promise<voi
   expect(sent.code).toBe(0);
 }
 
-async function waitLabelled(
-  tier: WatchTier,
-  labels: Record<string, string>,
-  ms: number,
-): Promise<Term | null> {
+async function waitLabelled(tier: WatchTier, labels: Record<string, string>, ms: number): Promise<Term | null> {
   const deadline: number = Date.now() + ms;
   while (Date.now() < deadline) {
     const listed = z
@@ -192,7 +188,10 @@ test.serial(
       await command(['git', 'commit', '-m', 'stage base red'], tier.root);
       await command(['git', 'push', 'origin', 'HEAD:main'], tier.root);
       await stageLeaf(tier, worktrees);
-      tier.record('staged.txt', `base=${(await spawnCaptured(['git', 'rev-parse', 'origin/main'], { cwd: tier.root })).stdout.trim()}\n`);
+      tier.record(
+        'staged.txt',
+        `base=${(await spawnCaptured(['git', 'rev-parse', 'origin/main'], { cwd: tier.root })).stdout.trim()}\n`,
+      );
 
       // The watcher session (pi, low): the leaf's skill copy plus its scripts on PATH, then
       // `watch-issues <root>` starts the timer.
@@ -252,7 +251,10 @@ test.serial(
       const consultant: Term | null = await waitLabelled(
         tier,
         { 'akrogon.watch-consult': 'akre2e' },
-        Math.min(Number(process.env.AKROGON_E2E_CONSULT_WAIT_MS ?? '420000'), Math.max(60_000, deadline - Date.now() - 8 * 60_000)),
+        Math.min(
+          Number(process.env.AKROGON_E2E_CONSULT_WAIT_MS ?? '420000'),
+          Math.max(60_000, deadline - Date.now() - 8 * 60_000),
+        ),
       );
       expect(consultant, `no consultant started; watcher screen:\n${await screen(tier, watcher)}`).not.toBeNull();
       expect(consultant!.name).toBe('aw-watch-consult');
@@ -278,13 +280,7 @@ test.serial(
       );
       tier.record('seat.json', seat);
       expect(seat, `no leaf seat after resume to ${phase}`).not.toBeNull();
-      await answerTrust(
-        tier,
-        'codex-seat',
-        async () => seat!.address,
-        'Trust and continue',
-        Bun.sleep(90_000),
-      );
+      await answerTrust(tier, 'codex-seat', async () => seat!.address, 'Trust and continue', Bun.sleep(90_000));
 
       // The case close trails the resume: the watcher's turn finishes `next`, then closes the
       // consultant (hc kill + rm) on the same beat.
