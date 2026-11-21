@@ -21,6 +21,7 @@ export const VERB_OPTIONS: Record<string, Record<string, FlagSpec>> = {
     harness: { type: 'string' },
     model: { type: 'string' },
     effort: { type: 'string' },
+    'watch-consultant': { type: 'boolean' },
   },
   pull: { all: { type: 'boolean' } },
   close: { by: { type: 'string' } },

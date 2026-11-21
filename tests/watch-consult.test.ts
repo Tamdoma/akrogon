@@ -87,13 +87,11 @@ test('seat --watch-consultant starts the recipe harness named <prefix>-watch-con
     expect(child.labels['akrogon.leaf']).toBeUndefined();
     expect(child.labels['akrogon.seat']).toBeUndefined();
     // outlive: false — the hc run line parents to the caller without --outlive-parent.
-    const runLine: string = z
-      .string()
-      .parse(
-        readFileSync(core.shimLog, 'utf8')
-          .split('\n')
-          .find((line: string) => line.startsWith('run\t') && line.includes(`${f.prefix}-watch-consult`)),
-      );
+    const runLine: string = z.string().parse(
+      readFileSync(core.shimLog, 'utf8')
+        .split('\n')
+        .find((line: string) => line.startsWith('run\t') && line.includes(`${f.prefix}-watch-consult`)),
+    );
     expect(runLine).toContain(`--parent\t${caller}`);
     expect(runLine).not.toContain('--outlive-parent');
     expect(core.tasks(child.address)).toEqual([task]);
@@ -159,12 +157,10 @@ test.each([
     const core: HcCore = await hcCore(f);
     try {
       const caller: string = await startWatcher(core, f);
-      const refused: Result = await cli(
-        f,
-        ['seat', '--watch-consultant', '--task', 'x', ...extra],
-        f.root,
-        { ...core.env, HC_TERMINAL_ID: caller },
-      );
+      const refused: Result = await cli(f, ['seat', '--watch-consultant', '--task', 'x', ...extra], f.root, {
+        ...core.env,
+        HC_TERMINAL_ID: caller,
+      });
       expect(refused.code).not.toBe(0);
       expect(refused.stderr).toContain('--watch-consultant');
       expect(refused.stderr).toContain(needle);

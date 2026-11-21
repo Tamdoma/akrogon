@@ -567,6 +567,10 @@ export function consultantName(prefix: string, letter: string): string {
   return `${prefix}-slot-${letter}`;
 }
 
+export function watchConsultName(prefix: string): string {
+  return `${prefix}-watch-consult`;
+}
+
 export function leafTab(repo: string, slug: string): string {
   return 'ak' + sha256(`${repo}/${slug}`).slice(0, 30);
 }

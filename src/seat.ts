@@ -15,6 +15,7 @@ import { type Slot } from './routing';
 import { leafSeats } from './reconcile';
 import {
   consultantName,
+  watchConsultName,
   docGet,
   end,
   HcError,
@@ -341,13 +342,14 @@ export async function startSeat(
 }
 
 // A consultant or direct reviewer: a child of the calling terminal, in the caller's tab when it sits
-// in one, started in the caller's folder without the leaf scope.
-export async function startConsultant(
+// in one, started in the caller's folder without the leaf scope. The caller supplies the hc name and
+// the akrogon labels; herdr labels follow the caller's tab.
+async function launch(
   global: GlobalConfig,
   repo: Repo,
   space: Place,
   caller: string,
-  letter: string,
+  spec: { name: string; labels: Record<string, string> },
   config: SlotConfig,
   task: string | undefined,
 ): Promise<Started | null> {
@@ -356,13 +358,13 @@ export async function startConsultant(
     s.tabs.filter((t) => t.terminals.includes(caller)).map((t) => ({ space: s.id, tab: t.id })),
   );
   const launched: Seen = await run(space.session, {
-    name: consultantName(repoPrefix(global, repo.name), letter),
+    name: spec.name,
     cwd: process.cwd(),
     parent: { address: caller, outlive: false },
     labels: {
       akrogon: '1',
       'akrogon.repo': repo.name,
-      'akrogon.seat': letter,
+      ...spec.labels,
       ...(tabs.length === 0
         ? { 'herdr.space': space.space }
         : { 'herdr.space': tabs[0].space, 'herdr.tab': tabs[0].tab }),
@@ -376,4 +378,51 @@ export async function startConsultant(
   const started: Started = await firstTask(launched, harness.kind, task);
   announce(started);
   return started;
+}
+
+export async function startConsultant(
+  global: GlobalConfig,
+  repo: Repo,
+  space: Place,
+  caller: string,
+  letter: string,
+  config: SlotConfig,
+  task: string | undefined,
+): Promise<Started | null> {
+  return launch(
+    global,
+    repo,
+    space,
+    caller,
+    {
+      name: consultantName(repoPrefix(global, repo.name), letter),
+      labels: { 'akrogon.seat': letter },
+    },
+    config,
+    task,
+  );
+}
+
+// The watcher repo's consultant: same child-of-caller launch as a door consultant, with its own
+// fixed name and watch label so it never collides with <prefix>-slot-<letter> terminals.
+export async function startWatchConsult(
+  global: GlobalConfig,
+  repo: Repo,
+  space: Place,
+  caller: string,
+  recipe: SlotConfig,
+  task: string | undefined,
+): Promise<Started | null> {
+  return launch(
+    global,
+    repo,
+    space,
+    caller,
+    {
+      name: watchConsultName(repoPrefix(global, repo.name)),
+      labels: { 'akrogon.watch-consult': repo.name },
+    },
+    recipe,
+    task,
+  );
 }

@@ -307,7 +307,10 @@ test('config loads and prints a machine slots.consultant recipe', async () => {
   const f: Fixture = await fixture();
   try {
     const file: string = resolve(f.home, 'config.yaml');
-    const global = z.record(z.string(), z.unknown()).parse(Bun.YAML.parse(readFileSync(file, 'utf8')));
+    const global = z
+      .object({ slots: z.record(z.string(), z.unknown()) })
+      .passthrough()
+      .parse(Bun.YAML.parse(readFileSync(file, 'utf8')));
     yaml(file, {
       ...global,
       slots: {
@@ -331,7 +334,10 @@ test('config refuses a machine slots.consultant whose harness is not in harnesse
   const f: Fixture = await fixture();
   try {
     const file: string = resolve(f.home, 'config.yaml');
-    const global = z.record(z.string(), z.unknown()).parse(Bun.YAML.parse(readFileSync(file, 'utf8')));
+    const global = z
+      .object({ slots: z.record(z.string(), z.unknown()) })
+      .passthrough()
+      .parse(Bun.YAML.parse(readFileSync(file, 'utf8')));
     yaml(file, {
       ...global,
       slots: { ...global.slots, consultant: { harness: 'absent', model: 'm', effort: 'low' } },
@@ -354,7 +360,10 @@ test.each([
   const f: Fixture = await fixture();
   try {
     const file: string = resolve(f.home, 'config.yaml');
-    const global = z.record(z.string(), z.unknown()).parse(Bun.YAML.parse(readFileSync(file, 'utf8')));
+    const global = z
+      .object({ slots: z.record(z.string(), z.unknown()) })
+      .passthrough()
+      .parse(Bun.YAML.parse(readFileSync(file, 'utf8')));
     yaml(file, { ...global, slots: { ...global.slots, consultant: recipe } });
     const refused: Result = await cli(f, ['config']);
     expect(refused.code).not.toBe(0);
@@ -393,10 +402,7 @@ test('seats refuses slots.consultant in ISSUE.md front matter naming the file an
     const leafPath: string = resolve(owner, 'leaf');
     mkdirSync(leafPath, { recursive: true });
     const file: string = resolve(owner, 'ISSUE.md');
-    writeFileSync(
-      file,
-      '---\nslots:\n  consultant:\n    harness: fake\n    model: m\n    effort: low\n---\n# t\n',
-    );
+    writeFileSync(file, '---\nslots:\n  consultant:\n    harness: fake\n    model: m\n    effort: low\n---\n# t\n');
     try {
       seats(global, repo, leafPath);
       throw new Error('seats did not throw');

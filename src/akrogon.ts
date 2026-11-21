@@ -1,10 +1,12 @@
 #!/usr/bin/env bun
 import { randomUUID } from 'node:crypto';
+import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { z } from 'zod';
 import {
   currentRepo,
   effectiveConfig,
+  globalHome,
   readGlobal,
   requireRepo,
   type GlobalConfig,
@@ -132,6 +134,32 @@ switch (verb) {
     break;
   case 'seat': {
     const task: string | undefined = z.string().trim().min(1).optional().parse(values.task);
+    if (values['watch-consultant'] === true) {
+      if (positionals.length > 0)
+        throw new Error(`akrogon seat --watch-consultant takes no positional leaf seat: ${positionals.join(' ')}`);
+      for (const flag of ['slot', 'harness', 'model', 'effort'])
+        if (values[flag] !== undefined)
+          throw new Error(
+            `akrogon seat --watch-consultant conflicts with --${flag}: the recipe comes from slots.consultant`,
+          );
+      const caller: string | undefined = process.env.HC_TERMINAL_ID;
+      if (caller === undefined || caller === '')
+        throw new Error('akrogon seat --watch-consultant runs only inside an hc terminal: HC_TERMINAL_ID is not set');
+      const global: GlobalConfig = readGlobal();
+      const recipe: SlotConfig | undefined = global.slots.consultant;
+      if (recipe === undefined)
+        throw new Error(
+          `akrogon seat --watch-consultant needs slots.consultant in ${resolve(globalHome(), 'config.yaml')}`,
+        );
+      const repo: Repo = await requireRepo(global, process.cwd());
+      const space: SpaceResolution = await (await import('./hc')).repoSpace(repo);
+      if (!space.ok) throw new Error(space.reason);
+      const started: Started | null = await (
+        await import('./seat')
+      ).startWatchConsult(global, repo, { session: space.session, space: space.space.id }, caller, recipe, task);
+      if (started?.outcome === 'failed') process.exitCode = 1;
+      break;
+    }
     if (positionals.length > 0) {
       const [slug, slot]: [string, 'A' | 'B'] = z.tuple([z.string(), slotSchema]).parse(positionals);
       if (values.slot !== undefined || values.harness !== undefined || values.model !== undefined)
