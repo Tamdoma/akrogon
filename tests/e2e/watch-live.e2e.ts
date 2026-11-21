@@ -772,6 +772,7 @@ test.serial(
         await waitDue(tier, timer.address, 3, 90_000 + intervalSec * 2000);
         expect(await waitDueCall(tier, timer.address, callLog, 3, 'status', 90_000)).toBeGreaterThan(busy2);
         const timerScreen: string = await screen(tier, timer.address);
+        tier.record('timer-screen.txt', timerScreen);
         expect(timerScreen.match(/due=3 sent/g) ?? []).toHaveLength(1);
         expect(timerScreen).not.toContain('due=3 dropped');
 
@@ -787,6 +788,7 @@ test.serial(
         // Agent exit leaves no new tick text in the shell (7).
         await exitAgent(cell);
         await waitGone(tier, timer.address, 60_000);
+        tier.record('pre-exit-screen.txt', await screen(tier, cell.watcher));
         await noLaterTick(cell, intervalSec * 1000 + 15_000);
         await teardownCell(cell);
         return;
@@ -820,6 +822,7 @@ test.serial(
       await waitDue(tier, timer.address, 3, 90_000 + intervalSec * 2000);
       expect(await waitDueCall(tier, timer.address, callLog, 3, 'status', 90_000)).toBeGreaterThan(busy2r);
       const heldScreen: string = await screen(tier, timer.address);
+      tier.record('timer-screen.txt', heldScreen);
       expect(heldScreen.match(/due=3 sent/g) ?? []).toHaveLength(1);
       expect(heldScreen).not.toContain('due=3 dropped');
 
@@ -947,11 +950,13 @@ test.serial(
         await waitDue(tier, timer.address, 3, 120_000 + intervalSec * 2000);
         expect(await waitDueCall(tier, timer.address, callLog, 3, 'status', 120_000)).toBeGreaterThan(busy2p);
         const timerScreen: string = await screen(tier, timer.address);
+        tier.record('timer-screen.txt', timerScreen);
         expect(timerScreen.match(/due=3 sent/g) ?? []).toHaveLength(1);
         expect(timerScreen).not.toContain('due=3 dropped');
         // Agent exit leaves no tick text in the shell (7).
         await exitAgent(cell);
         await waitGone(tier, timer.address, 90_000);
+        tier.record('pre-exit-screen.txt', await screen(tier, cell.watcher));
         await noLaterTick(cell, intervalSec * 1000 + 15_000);
         await teardownCell(cell);
         return;
@@ -972,6 +977,7 @@ test.serial(
       await waitDue(tier, timer.address, 3, 120_000 + intervalSec * 2000);
       expect(await waitDueCall(tier, timer.address, callLog, 3, 'status', 120_000)).toBeGreaterThan(busy2pr);
       const timerScreen: string = await screen(tier, timer.address);
+      tier.record('timer-screen.txt', timerScreen);
       expect(timerScreen.match(/due=3 sent/g) ?? []).toHaveLength(1);
       expect(timerScreen).not.toContain('due=3 dropped');
       // Stop with no stray tick (5).
@@ -979,6 +985,7 @@ test.serial(
       await turnDone(tier, cell.watcher, turnStop, 120_000);
       await settleIdle(tier, cell.watcher, 60_000);
       expect(await labelled(tier)).toHaveLength(0);
+      tier.record('post-stop-screen.txt', await screen(tier, cell.watcher));
       await noLaterTick(cell, intervalSec * 1000 + 10_000);
       // A second start, then the reset: /clear ends claude's and agy's watch; codex and pi record
       // their /new outcome as the stated limit (7).
