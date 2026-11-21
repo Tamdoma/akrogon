@@ -124,8 +124,8 @@ function treeOf(repo: Repo, sha: string): Promise<string> {
   return command(['git', 'rev-parse', `${sha}^{tree}`], repo.root);
 }
 
-// The stable patch id of the leaf's own diff against the tracking base; an empty own diff
-// (a base run at its merge-base) records no field.
+// Hash the leaf's edits without surrounding lines and with whitespace preserved. A run with
+// no merge base or an empty own diff records no patch id.
 async function ownPatchId(repo: Repo, sha: string): Promise<string | undefined> {
   const argv: string[] = ['git', 'merge-base', sha, trackingRef(repo)];
   const base: Result = await run(argv, repo.root);
@@ -135,7 +135,7 @@ async function ownPatchId(repo: Repo, sha: string): Promise<string | undefined> 
     [
       'sh',
       '-c',
-      'git diff --unified=0 --inter-hunk-context=0 "$1" "$2" | git patch-id --stable',
+      'git diff --unified=0 --inter-hunk-context=0 "$1" "$2" | git patch-id --verbatim',
       'sh',
       base.stdout,
       sha,
