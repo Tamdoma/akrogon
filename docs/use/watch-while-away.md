@@ -12,7 +12,7 @@ watch-issues <root>
 
 (Claude also accepts `/watch-issues`.) It runs one check right away and starts a timer terminal named `<prefix>-watch` in the same session, which sends a `watch-issues tick` line to your agent every 20 minutes. If a watch is already running, it reports it and starts no second one.
 
-A tick that queues up while a check runs gets its own check afterwards.
+A tick that queues up while a check runs gets its own check afterwards. A prompt typed into the watcher terminal when a tick is due can receive the tick instead: claude and agy run the check inside that turn, and on codex the prompt's task is dropped and must be retyped.
 
 ## What each check does
 
@@ -41,6 +41,6 @@ watch-issues stop <root>
 
 (Claude also accepts `/watch-issues stop`.) The watch also ends when the agent exits, when its terminal finishes or is reused, and when claude or agy shows a `/clear` reset. Codex and pi `/new` may leave the watch running into the new conversation. The first tick attempts to stop it. A compaction summary before a tick keeps the watch running, as does having no open leaves.
 
-If you exit a shell-launched agent while hc holds a tick behind your unfinished draft, the tick can reach the shell or a program you start in it during that hold. A replacement agent running `watch-issues` refuses the tick when its process ID differs.
+If you exit a shell-launched agent right as a tick goes out — with or without a held draft — the tick can reach the shell or a program you start there. A replacement agent running `watch-issues` refuses the tick when its process ID differs.
 
 Next: [Commands](../reference/commands.md)
