@@ -800,24 +800,22 @@ async function runOnce(repo: Repo, record: PassRecord): Promise<VerifyRun> {
         };
         slowPrint = decision.print;
       }
-      // An accepted close leaves its notice send state on the closing row; an
-      // uncovered state (undefined included) sends here and retries in place.
-      const accepted: number = runs.findLastIndex((run) => run.slow?.close === 'accepted');
+      const accepted: number = slowChecked(runs[index])
+        ? runs.findLastIndex((run) => run.slow?.close === 'accepted')
+        : -1;
       if (accepted !== -1) {
-        const acceptedId: string = noticeId(repo.name, 'merge-slow-accepted', runs[accepted].slow!.first!.run);
-        if (!noticeCovers(runs[accepted].slow!.accepted_notice, notices.folder, acceptedId)) {
+        const slow: NonNullable<VerifyRun['slow']> = runs[accepted].slow!;
+        // foldShown handles consumption. A pending send already succeeded.
+        if (slow.accepted_notice === undefined || slow.accepted_notice === 'error') {
+          const acceptedId: string = noticeId(repo.name, 'merge-slow-accepted', slow.first!.run);
           const body: string =
             accepted === index && decision !== undefined && decision.sendAccepted !== undefined
               ? decision.sendAccepted
-              : acceptedBody(
-                  runs[accepted].slow!.first!,
-                  runs[accepted].slow!.normal_ms,
-                  episodeWindow(runs, accepted, runs[accepted].slow!.first!.run),
-                );
+              : acceptedBody(slow.first!, slow.normal_ms, episodeWindow(runs, accepted, slow.first!.run));
           runs[accepted] = {
             ...runs[accepted],
             slow: {
-              ...runs[accepted].slow!,
+              ...slow,
               accepted_notice: recordNotice(notices, acceptedId, {
                 title: `${repo.name} merge slow accepted`,
                 body,
