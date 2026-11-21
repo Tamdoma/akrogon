@@ -969,17 +969,16 @@ test('requireGreenReceipt accepts a covered merge head and refuses uncovered and
     reset();
     headRun(['alpha']);
     baseRun(['alpha']);
-    // A green run whose sha never landed resolves nothing; a different command
-    // string also keeps it out of the green-run shortcut.
+    // A green run whose sha never landed resolves nothing; a foreign tree also
+    // keeps it out of the green-run shortcut.
     seedRun(f, {
       sha: head,
-      tree,
+      tree: 'x',
       scope: 'merge',
       start: later,
       end: later,
       commands: cmds.map((item) => ({
-        name: item.name,
-        command: 'other',
+        ...item,
         exit: 0,
         log: resolve(f.home, 'landed.log'),
       })),
