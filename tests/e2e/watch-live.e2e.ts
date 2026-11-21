@@ -551,14 +551,15 @@ async function exitAgent(cell: Cell): Promise<number> {
   return agentPid;
 }
 
-// `atStart` is the caller's tick-text baseline (before the agent's exit, or after a stop):
-// any tick the timer could still legitimately send must already be counted, or it would
-// pass a baseline taken after it landed.
+// The baseline is taken by the caller's placement: a tick landing after the screen count but
+// before the timer dies still shows in `ms`, because a count can only lose text (redraws
+// shrink the screen) — a new line makes the count rise, a redraw never does. So the end
+// count must not exceed the baseline, never equal it.
 async function noNewTicks(cell: Cell, atStart: number, ms: number): Promise<void> {
   const count = async (): Promise<number> =>
     ((await screen(cell.tier, cell.watcher)).match(/watch-issues tick /g) ?? []).length;
   await Bun.sleep(ms);
-  expect(await count()).toBe(atStart);
+  expect(await count()).toBeLessThanOrEqual(atStart);
 }
 
 // A probe tick that must run no check: wait for the hook's `tick exit=` boundary, then read the
@@ -755,10 +756,12 @@ test.serial(
         await Bun.sleep(2500); // a would-be next call lands right after its status call
         expect(nextCalls(callLog)).toBe(beforeNext);
 
-        // Agent exit leaves no new tick text in the shell (7).
-        const ticksAtExit: number = ((await screen(tier, cell.watcher)).match(/watch-issues tick /g) ?? []).length;
+        // Agent exit leaves no new tick text in the shell (7). Baseline right after the
+        // exit completes: a tick sent in the exit window lands inside the wait below, and
+        // dead-agent screens only lose text, so `<=` is the invariant.
         await exitAgent(cell);
         await waitGone(tier, timer.address, 60_000);
+        const ticksAtExit: number = ((await screen(tier, cell.watcher)).match(/watch-issues tick /g) ?? []).length;
         await noNewTicks(cell, ticksAtExit, intervalSec * 1000 + 15_000);
         await teardownCell(cell);
         return;
@@ -915,10 +918,12 @@ test.serial(
         const timerScreen: string = await screen(tier, timer.address);
         expect(timerScreen.match(/due=3 sent/g) ?? []).toHaveLength(1);
         expect(timerScreen).not.toContain('due=3 dropped');
-        // Agent exit leaves no tick text in the shell (7).
-        const ticksAtExit: number = ((await screen(tier, cell.watcher)).match(/watch-issues tick /g) ?? []).length;
+        // Agent exit leaves no tick text in the shell (7). The baseline is the count right
+        // after the exit completes: a tick sent in the exit window lands inside the wait
+        // below, and dead-agent screens only lose text, so `<=` is the invariant.
         await exitAgent(cell);
         await waitGone(tier, timer.address, 90_000);
+        const ticksAtExit: number = ((await screen(tier, cell.watcher)).match(/watch-issues tick /g) ?? []).length;
         await noNewTicks(cell, ticksAtExit, intervalSec * 1000 + 15_000);
         await teardownCell(cell);
         return;
