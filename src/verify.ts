@@ -132,7 +132,14 @@ async function ownPatchId(repo: Repo, sha: string): Promise<string | undefined> 
   if (base.code === 1) return undefined;
   if (base.code !== 0) throw new CommandError(argv, repo.root, base);
   const out: string = await command(
-    ['sh', '-c', 'git diff "$1" "$2" | git patch-id --stable', 'sh', base.stdout, sha],
+    [
+      'sh',
+      '-c',
+      'git diff --unified=0 --inter-hunk-context=0 "$1" "$2" | git patch-id --stable',
+      'sh',
+      base.stdout,
+      sha,
+    ],
     repo.root,
   );
   return out === '' ? undefined : out.split(/\s/)[0];
