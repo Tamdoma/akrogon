@@ -376,6 +376,33 @@ test('a second non-fast-forward refusal clears the batch and keeps the leaf in m
   }
 }, 90000);
 
+test('a conflict after the second push refusal belongs to a fresh turn', async () => {
+  const f: HcFixture = await hcFixture();
+  const first: string = await advancer(f, 'unrelated', 'first remote update');
+  const second: string = await advancer(f, 'file', 'conflicting remote update');
+  const mark: string = resolve(f.home, 'advanced');
+  const g: GreenFixture = await greenFrom(f, {
+    adv: `sh -c 'if [ -e ${mark} ]; then ${second}; else touch ${mark} && ${first}; fi'`,
+  });
+  try {
+    const aa: string = await allocated(g, 'aa', 'issue-aa');
+    await commitIn(aa, 'file', 'holder side\n');
+    toMerge(aa);
+    const { attempt } = await claimed(g, aa);
+    const before: string = await remoteTip(g);
+    expect((await land(g, 'aa', attempt)).code).toBe(0);
+    const latestBase: string = await remoteTip(g);
+    expect(await command(['git', 'rev-list', '--count', `${before}..${latestBase}`], g.root)).toBe('2');
+    expect(readState(aa).merge_exit).toEqual({ reason: 'conflict', base: latestBase });
+    const rows = attemptRows(g);
+    expect(rows.map((row) => row.outcome)).toEqual(['red', 'red']);
+    expect(rows[0].attempt).toBe(attempt);
+    expect(rows[1].attempt).not.toBe(attempt);
+  } finally {
+    await g.clean();
+  }
+}, 90000);
+
 test('a push error moves the leaf to failed with git stderr and frees the line', async () => {
   const f: GreenFixture = await greenFixture({ ok: 'true' });
   try {
