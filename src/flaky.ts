@@ -1,7 +1,10 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { isAncestor } from './batch';
 import { readGlobal, requireRepo, type Repo } from './config';
 import { LogError, readLog } from './evidence';
+import { trackingRef } from './preflight';
+import { command, run, type Result } from './shell';
 import { readVerifyRuns, type VerifyRun } from './verify';
 
 type Flip = { name: string; command: string; test: string; end: string };
@@ -62,26 +65,111 @@ export async function failedTests(repo: Repo, recorded: string): Promise<string[
   return names(new TextDecoder().decode(bytes));
 }
 
-// A command red then green on the same tree, in completed runs whose setup passed, is one flip per failed test.
+// A command red then green on the same tree, in completed runs whose setup passed, is one flip
+// per failed test. On a merge head the same pairing also counts across trees inside one leaf's
+// consecutive sequence when the run's recorded patch id proves the leaf's own commits unchanged and
+// no completed run failed the test between: neither a base run (compares) nor a run on landed main.
+type Pending = { item: Red; run: VerifyRun };
+
+// Nameless names say nothing about which unit failed, so only real titles flip across trees.
+function nameless(test: string): boolean {
+  return (
+    test === '(no test name)' ||
+    test === '(log gone)' ||
+    test.startsWith('(script) ') ||
+    test.startsWith('(unnamed)')
+  );
+}
+
 export async function flips(repo: Repo, runs: VerifyRun[]): Promise<Flip[]> {
   const completed: VerifyRun[] = runs
     .filter((run: VerifyRun) => run.end !== undefined && run.setup === 0)
     .sort((a: VerifyRun, b: VerifyRun) => a.end!.localeCompare(b.end!));
-  const red: Map<string, Red> = new Map();
+  const red: Map<string, Pending> = new Map();
+  const mergeRed: Map<string, Pending> = new Map();
+  // The tracked tip resolves once and only when a between-run needs it, so ledgers whose pairs
+  // never span a breaking candidate — or carry no real shas at all — never touch git.
+  let tip: string | undefined;
+  const landed: Map<string, boolean> = new Map();
+  const onMain = async (sha: string): Promise<boolean> => {
+    if (!landed.has(sha)) {
+      const object: Result = await run(['git', 'cat-file', '-e', `${sha}^{commit}`], repo.root);
+      landed.set(
+        sha,
+        object.code === 0 &&
+          (await isAncestor(repo.root, sha, (tip ??= await command(['git', 'rev-parse', trackingRef(repo)], repo.root)))),
+      );
+    }
+    return landed.get(sha)!;
+  };
+  // The named tests a completed run ending strictly between the pair fails under the same name and
+  // command, when that run is a base run or ran on landed main.
+  const broken = async (from: Pending, to: Pending, name: string, cmd: string): Promise<Set<string>> => {
+    const out: Set<string> = new Set();
+    for (const between of completed) {
+      if (between.end! <= from.run.end! || between.end! >= to.run.end!) continue;
+      const entry: Red | undefined = between.commands.find(
+        (item) =>
+          item.name === name &&
+          item.command === cmd &&
+          item.exit !== 0 &&
+          item.reused === undefined &&
+          item.blocked === undefined,
+      );
+      if (entry === undefined) continue;
+      if (between.compares === undefined && !(await onMain(between.sha))) continue;
+      for (const test of entry.failures ?? (await failedTests(repo, entry.log))) out.add(test);
+    }
+    return out;
+  };
+  const pair = async (prior: Pending, green: Pending): Promise<void> => {
+    const item: Red = prior.item;
+    const tests: string[] = item.failures ?? (await failedTests(repo, item.log));
+    if (prior.run.tree === green.run.tree) {
+      for (const test of tests)
+        out.push({ name: item.name, command: item.command, test, end: green.run.end! });
+      return;
+    }
+    if (
+      prior.run.scope !== 'merge' ||
+      prior.run.compares !== undefined ||
+      green.run.scope !== 'merge' ||
+      green.run.compares !== undefined ||
+      prior.run.leaf !== green.run.leaf ||
+      prior.run.patch_id === undefined ||
+      green.run.patch_id !== prior.run.patch_id
+    )
+      return;
+    const wanted: string[] = tests.filter((test) => !nameless(test));
+    if (wanted.length === 0) return;
+    const brokenTests: Set<string> = await broken(prior, green, item.name, item.command);
+    for (const test of wanted)
+      if (!brokenTests.has(test)) out.push({ name: item.name, command: item.command, test, end: green.run.end! });
+  };
   const out: Flip[] = [];
   for (const run of completed)
     for (const item of run.commands) {
       if (item.reused !== undefined || item.blocked !== undefined) continue;
-      const key: string = `${run.tree}\0${item.command}`;
+      const entry: Pending = { item, run };
+      const key: string = `${run.leaf}\0${run.tree}\0${item.command}`;
+      const mergeKey: string = `${run.leaf}\0${item.name}\0${item.command}`;
       if (item.exit !== 0) {
-        red.set(key, item);
+        red.set(key, entry);
+        if (run.scope === 'merge' && run.compares === undefined) mergeRed.set(mergeKey, entry);
         continue;
       }
-      const prior: Red | undefined = red.get(key);
-      if (prior === undefined) continue;
-      red.delete(key);
-      for (const test of prior.failures ?? (await failedTests(repo, prior.log)))
-        out.push({ name: prior.name, command: prior.command, test, end: run.end! });
+      const prior: Pending | undefined = red.get(key);
+      if (prior !== undefined) {
+        red.delete(key);
+        await pair(prior, entry);
+      }
+      if (run.scope === 'merge' && run.compares === undefined) {
+        const pending: Pending | undefined = mergeRed.get(mergeKey);
+        if (pending !== undefined && pending.run.tree !== run.tree) {
+          mergeRed.delete(mergeKey);
+          await pair(pending, entry);
+        }
+      }
     }
   return out;
 }

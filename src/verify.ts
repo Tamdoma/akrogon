@@ -58,6 +58,7 @@ export const verifyRunSchema = z.strictObject({
   tree: z.string(),
   scope: verifyScopeSchema,
   compares: z.string().optional(),
+  patch_id: z.string().optional(),
   notice: z.string().optional(),
   path: z.string(),
   pid: z.number().int(),
@@ -121,6 +122,17 @@ export function verifyCommands(config: RepoConfig, scope: VerifyScope): NamedCom
 
 function treeOf(repo: Repo, sha: string): Promise<string> {
   return command(['git', 'rev-parse', `${sha}^{tree}`], repo.root);
+}
+
+// The stable patch id of the leaf's own diff against the tracking base; an empty own diff
+// (a base run at its merge-base) records no field.
+async function ownPatchId(repo: Repo, sha: string): Promise<string | undefined> {
+  const mergeBase: string = await command(['git', 'merge-base', sha, trackingRef(repo)], repo.root);
+  const out: string = await command(
+    ['sh', '-c', 'git diff "$1" "$2" | git patch-id --stable', 'sh', mergeBase, sha],
+    repo.root,
+  );
+  return out === '' ? undefined : out.split(/\s/)[0];
 }
 
 function sameCommands(actual: readonly NamedCommand[], expected: readonly NamedCommand[]): boolean {
@@ -465,6 +477,7 @@ async function runOnce(repo: Repo, record: PassRecord): Promise<VerifyRun> {
   checkLocation(target);
   const lock: string = await recordLock(repo);
   mkdirSync(caller.target, { recursive: true });
+  const patch: string | undefined = await ownPatchId(repo, sha);
   const receipt: VerifyRun = {
     run: id,
     repo: repo.name,
@@ -473,6 +486,7 @@ async function runOnce(repo: Repo, record: PassRecord): Promise<VerifyRun> {
     tree,
     scope,
     ...(compares === undefined ? {} : { compares }),
+    ...(patch === undefined ? {} : { patch_id: patch }),
     path: target,
     pid: process.pid,
     boot_id: bootId(),
