@@ -615,6 +615,60 @@ test('an episode recovers once its own eligible median is back under', async () 
   }
 }, 30000);
 
+test('an episode with under five eligible runs does not recover', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      setup: 'mkdir -p node_modules',
+      checks: { unit: 'echo unit' },
+      grounding: 'none',
+    });
+    const env: NodeJS.ProcessEnv = mergeEnv(f);
+    const { direct, holder } = await mergeCaller(f);
+    const episode: string = seedEpisode(f);
+    seedInEpisode(f, episode, 300000);
+    seedInEpisode(f, episode, 300000);
+    // In-episode eligible rows: opener + two stamped + me = four, one short of
+    // the recovery gate, even though their median 300000 is under the threshold.
+    const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
+    const id: string = await backdate(f, 300000);
+    expect((await pending).code).toBe(0);
+    const row: VerifyRun = records(f).find((run) => run.run === id)!;
+    expect(row.slow).toMatchObject({ first: { run: episode } });
+    expect(row.slow!.close).toBeUndefined();
+  } finally {
+    f.clean();
+  }
+}, 30000);
+
+test('an episode median counts only its own last 20 eligible runs', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      setup: 'mkdir -p node_modules',
+      checks: { unit: 'echo unit' },
+      grounding: 'none',
+    });
+    const env: NodeJS.ProcessEnv = mergeEnv(f);
+    const { direct, holder } = await mergeCaller(f);
+    const episode: string = seedEpisode(f);
+    for (let i = 0; i < 21; i++) seedInEpisode(f, episode, 300000);
+    for (let i = 0; i < 20; i++) seedInEpisode(f, episode, 950000);
+    // The last 20 in-episode eligible rows are all 950000ms: a flagged median,
+    // so the episode stays open. An all-episode median would see the early fast
+    // rows and read 300000 — under the threshold — and wrongly recover. me is
+    // unflagged and the episode is nowhere near 14 days old.
+    const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
+    const id: string = await backdate(f, 300000);
+    expect((await pending).code).toBe(0);
+    const row: VerifyRun = records(f).find((run) => run.run === id)!;
+    expect(row.slow).toMatchObject({ first: { run: episode } });
+    expect(row.slow!.close).toBeUndefined();
+  } finally {
+    f.clean();
+  }
+}, 30000);
+
 test('an episode under 14 days old does not close accepted', async () => {
   const f: Fixture = await fixture();
   const core: HcCore = await hcCore(f);
