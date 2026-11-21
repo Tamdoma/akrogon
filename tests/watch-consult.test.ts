@@ -78,9 +78,11 @@ test('seat --watch-consultant starts the recipe harness named <prefix>-watch-con
       ...core.env,
       HC_TERMINAL_ID: caller,
     });
+    // A confirmed start prints the bare address; `started, not confirmed <address>` also exits 0
+    // but must not satisfy this success case.
     expect(started.code).toBe(0);
     const child: Terminal = await watchConsult(core, f);
-    expect(started.stdout).toContain(child.address);
+    expect(started.stdout).toBe(child.address);
     expect(child.parent).toBe(caller);
     expect(child.labels).toMatchObject({
       akrogon: '1',
@@ -145,7 +147,7 @@ test('seat --watch-consultant with an agy recipe answers the trust dialog then s
     });
     expect(started.code).toBe(0);
     const child: Terminal = await watchConsult(core, f);
-    expect(started.stdout).toContain(child.address);
+    expect(started.stdout).toBe(child.address);
     expect(child.parent).toBe(caller);
     // agy takes no task in argv: ENTER answered the trust dialog, then the task went over hc send.
     expect(core.tasks(child.address)).toEqual(['ENTER', task]);
