@@ -27,7 +27,7 @@ import { checkLocation } from './guard';
 import { createSparseWorktree, emitEnvFile } from './next';
 import { trackingRef } from './preflight';
 import { checkedRun, leafFields, leafTarget, refuse, type LeafTarget } from './run-check';
-import { command, CommandError, spawnCaptured, type SpawnResult } from './shell';
+import { command, CommandError, run, spawnCaptured, type Result, type SpawnResult } from './shell';
 import { repoSpace, type SpaceResolution } from './hc';
 import { noticeFolder, noticeId, noticeState, writeNotice, type Notice } from './notice';
 import { allLeaves, withLock, type Leaf } from './state';
@@ -127,9 +127,12 @@ function treeOf(repo: Repo, sha: string): Promise<string> {
 // The stable patch id of the leaf's own diff against the tracking base; an empty own diff
 // (a base run at its merge-base) records no field.
 async function ownPatchId(repo: Repo, sha: string): Promise<string | undefined> {
-  const mergeBase: string = await command(['git', 'merge-base', sha, trackingRef(repo)], repo.root);
+  const argv: string[] = ['git', 'merge-base', sha, trackingRef(repo)];
+  const base: Result = await run(argv, repo.root);
+  if (base.code === 1) return undefined;
+  if (base.code !== 0) throw new CommandError(argv, repo.root, base);
   const out: string = await command(
-    ['sh', '-c', 'git diff "$1" "$2" | git patch-id --stable', 'sh', mergeBase, sha],
+    ['sh', '-c', 'git diff "$1" "$2" | git patch-id --stable', 'sh', base.stdout, sha],
     repo.root,
   );
   return out === '' ? undefined : out.split(/\s/)[0];
