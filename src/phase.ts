@@ -820,14 +820,12 @@ async function restack(repo: Repo, leaf: Leaf, record: Batch): Promise<Restacked
       throw new Error('Batch attempt superseded during restack; record left for the next pass');
     const applied: string | undefined =
       staged.ok && (await applyTop(repo, current, staged.top, holderHead)) ? staged.top : undefined;
-    if (applied === undefined) return undefined;
     saveState(current.path, {
       ...readState(current.path),
       batch: {
         ...batch,
-        built_on: builtOn,
-        holder: { base: batch.holder.base, head: holderHead },
-        applied: true,
+        ...(applied === undefined ? {} : { built_on: builtOn, holder: { base: batch.holder.base, head: holderHead } }),
+        applied: applied !== undefined,
         top: applied,
         candidate: undefined,
         tested_top: undefined,
