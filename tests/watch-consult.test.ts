@@ -12,7 +12,7 @@ import type { Result } from '../src/shell';
 
 // Writes or removes the machine slots.consultant recipe; the stand-in harness template for the
 // chosen harness name is kept in harnesses so the recipe resolves.
-function setConsultant(f: Fixture, recipe: { harness: string; model: string } | undefined): void {
+function setConsultant(f: Fixture, recipe: { harness: string; model: string; effort?: string } | undefined): void {
   const path: string = resolve(f.home, 'config.yaml');
   const global = z
     .object({ slots: z.record(z.string(), z.unknown()), harnesses: z.record(z.string(), z.string()) })
@@ -26,7 +26,10 @@ function setConsultant(f: Fixture, recipe: { harness: string; model: string } | 
       slots:
         recipe === undefined
           ? slots
-          : { ...slots, consultant: { harness: recipe.harness, model: recipe.model, effort: 'low' } },
+          : {
+              ...slots,
+              consultant: { harness: recipe.harness, model: recipe.model, effort: recipe.effort ?? 'low' },
+            },
       harnesses:
         recipe === undefined
           ? global.harnesses
@@ -66,7 +69,7 @@ async function watchConsult(core: HcCore, f: Fixture): Promise<Terminal> {
 
 test('seat --watch-consultant starts the recipe harness named <prefix>-watch-consult with the task in argv', async () => {
   const f: Fixture = await fixture();
-  setConsultant(f, { harness: 'fake', model: 'work' });
+  setConsultant(f, { harness: 'fake', model: 'work', effort: 'high' });
   const core: HcCore = await hcCore(f);
   try {
     const caller: string = await startWatcher(core, f);
@@ -94,7 +97,35 @@ test('seat --watch-consultant starts the recipe harness named <prefix>-watch-con
     );
     expect(runLine).toContain(`--parent\t${caller}`);
     expect(runLine).not.toContain('--outlive-parent');
+    // The launch argv carries the recipe's own model and effort, not the caller's seat slots.
+    const argv: string[] = runLine.split('\t');
+    expect(argv[argv.indexOf('--model') + 1]).toBe('work');
+    expect(argv[argv.indexOf('--effort') + 1]).toBe('high');
     expect(core.tasks(child.address)).toEqual([task]);
+  } finally {
+    await core.stop();
+    f.clean();
+  }
+});
+
+test('a recipe harness that exits fails the start with the address on the output', async () => {
+  const f: Fixture = await fixture();
+  setConsultant(f, { harness: 'fake', model: 'exit' });
+  const core: HcCore = await hcCore(f);
+  try {
+    const caller: string = await startWatcher(core, f);
+    const started: Result = await cli(f, ['seat', '--watch-consultant', '--task', 'x'], f.root, {
+      ...core.env,
+      HC_TERMINAL_ID: caller,
+    });
+    expect(started.code).not.toBe(0);
+    const children: Terminal[] = (await core.terminals({ akrogon: '1' })).filter(
+      (t: Terminal) => t.name === `${f.prefix}-watch-consult`,
+    );
+    expect(children).toHaveLength(1);
+    expect(`${started.stdout}\n${started.stderr}`).toContain('start failed');
+    expect(`${started.stdout}\n${started.stderr}`).toContain(children[0].address);
+    expect(children[0].parent).toBe(caller);
   } finally {
     await core.stop();
     f.clean();
@@ -136,6 +167,14 @@ test('seat --watch-consultant without slots.consultant exits non-zero naming the
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain('slots.consultant');
     expect(refused.stderr).toContain('config.yaml');
+    // The bare form criterion 4 names is refused the same way.
+    const bare: Result = await cli(f, ['seat', '--watch-consultant'], f.root, {
+      ...core.env,
+      HC_TERMINAL_ID: caller,
+    });
+    expect(bare.code).not.toBe(0);
+    expect(bare.stderr).toContain('slots.consultant');
+    expect(bare.stderr).toContain('config.yaml');
     expect(await core.terminals({ akrogon: '1' })).toEqual([]);
   } finally {
     await core.stop();
@@ -162,8 +201,13 @@ test.each([
         HC_TERMINAL_ID: caller,
       });
       expect(refused.code).not.toBe(0);
+      // The refusal names the conflicting flag, not a generic unknown-option rejection — the
+      // parser knows --watch-consultant, so a parse error here means the conflict check fell
+      // through.
       expect(refused.stderr).toContain('--watch-consultant');
       expect(refused.stderr).toContain(needle);
+      expect(refused.stderr).not.toContain('unknown flag');
+      expect(refused.stderr).not.toContain('ZodError');
       expect(await core.terminals({ akrogon: '1' })).toEqual([]);
     } finally {
       await core.stop();
@@ -184,6 +228,7 @@ test('seat --watch-consultant outside an hc terminal exits non-zero naming the c
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain('--watch-consultant');
     expect(refused.stderr).toContain('HC_TERMINAL_ID');
+    expect(refused.stderr).not.toContain('unknown flag');
     expect(await core.terminals({ akrogon: '1' })).toEqual([]);
   } finally {
     await core.stop();
