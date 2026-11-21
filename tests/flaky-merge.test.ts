@@ -122,7 +122,7 @@ test('a named unit red then green on the leaf’s next merge run across a rebase
   }
 });
 
-test('a verify receipt records the merge-base..sha patch id, and none on an empty own diff', async (): Promise<void> => {
+test('a verify receipt records its merge base and a fresh change identity, and neither on an empty own diff', async (): Promise<void> => {
   const f: Fixture = await fixture();
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), {
@@ -134,25 +134,17 @@ test('a verify receipt records the merge-base..sha patch id, and none on an empt
     const sha: string = await commitIn(worktree, 'code.ts');
     expect((await verify(f, [], worktree)).code).toBe(0);
     const run: VerifyRun = records(f)[0];
-    const expected: string = (
-      await command(
-        [
-          'sh',
-          '-c',
-          'git diff --unified=0 --inter-hunk-context=0 "$(git merge-base "$1" refs/remotes/origin/main)" "$1" | git patch-id --verbatim',
-          'sh',
-          sha,
-        ],
-        f.root,
-      )
-    ).split(/\s/)[0];
-    expect(run.patch_id).toBe(expected);
-    // A run whose sha is its merge-base has no own diff and records no field.
+    const base: string = await command(['git', 'merge-base', sha, 'refs/remotes/origin/main'], f.root);
+    expect(run.patch_base).toBe(base);
+    // No earlier merge run exists to inherit from, so the receipt starts its own identity.
+    expect(run.patch_id).toBe(run.run);
+    // A run whose sha is its merge-base has no own diff and records neither field.
     const holder: string = resolve(f.home, 'chart/direct');
     mkdirSync(holder, { recursive: true });
     const mainSha: string = await command(['git', 'rev-parse', 'refs/remotes/origin/main'], f.root);
     expect((await verify(f, ['--sha', mainSha, '--holder', holder], f.root)).code).toBe(0);
     const empty: VerifyRun | undefined = records(f).find((item) => item.sha === mainSha);
+    expect(empty?.patch_base).toBeUndefined();
     expect(empty?.patch_id).toBeUndefined();
   } finally {
     f.clean();
