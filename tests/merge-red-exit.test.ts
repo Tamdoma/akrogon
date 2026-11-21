@@ -15,7 +15,7 @@ import {
 } from './helpers';
 import { hcFixture, type HcFixture } from './hc-fixture';
 import { readState, saveState, type State } from '../src/state';
-import { command, type Result } from '../src/shell';
+import { command, quote, type Result } from '../src/shell';
 import { leafSlice } from '../src/scope';
 
 type GreenFixture = HcFixture & { launches: string; systemctl: SystemctlFixture };
@@ -228,6 +228,58 @@ test('a refused push whose restack conflicts exits to check.repair', async () =>
     expect(state.merge_exit?.reason).toBe('conflict');
     expect(state.merge_exit?.base).toBe(await remoteTip(g));
     expect(attemptRows(g).map((row) => row.outcome)).toEqual(['red']);
+  } finally {
+    await g.clean();
+  }
+}, 90000);
+
+test('a wake cannot replace the conflict exit of a live land restack', async () => {
+  const f: HcFixture = await hcFixture();
+  const advanced: string = resolve(f.home, 'advanced');
+  const script: string = await advancer(f, 'file', 'main');
+  const g: GreenFixture = await greenFrom(f, {
+    adv: `sh -c '[ -e ${advanced} ] || { touch ${advanced} && ${script}; }'`,
+  });
+  try {
+    const aa: string = await allocated(g, 'aa', 'issue-aa');
+    const bb: string = await allocated(g, 'bb', 'issue-bb');
+    await commitIn(aa, 'file', 'holder side\n');
+    await commitIn(bb, 'bb-file', 'waiting leaf\n');
+    const worktree: string = z.string().parse(readState(aa).worktree);
+    toMerge(aa, '2026-10-19T00:00:00.000Z');
+    toMerge(bb, '2026-10-20T00:00:00.000Z');
+    const firstBase: string = await remoteTip(g);
+    const { attempt, top } = await claimed(g, aa);
+    writeFileSync(
+      g.systemctl.db,
+      JSON.stringify({ units: [{ unit: `akrogon-land-${attempt}.service`, sub: 'running' }] }),
+    );
+    const aborted: string = resolve(g.home, 'restack-aborted');
+    const woke: string = resolve(g.home, 'woke');
+    const git: string = z.string().parse(Bun.which('git'));
+    const wrapper: string = resolve(g.home, 'bin/git');
+    writeFileSync(
+      wrapper,
+      `#!/bin/sh
+if [ "$1" = rebase ] && [ "$2" = --abort ]; then
+  touch ${quote(aborted)}
+fi
+if [ "$PWD" = ${quote(worktree)} ] && [ "$1" = status ] && [ -e ${quote(aborted)} ] && [ ! -e ${quote(woke)} ]; then
+  touch ${quote(woke)}
+  (cd ${quote(g.root)} && ${quote(process.execPath)} ${quote(resolve(import.meta.dir, '../src/akrogon.ts'))} next) >> ${quote(woke)} 2>&1 || exit $?
+fi
+exec ${quote(git)} "$@"
+`,
+    );
+    chmodSync(wrapper, 0o755);
+    const run: Result = await land(g, 'aa', attempt);
+    expect(run.code, run.stderr).toBe(0);
+    expect(existsSync(woke)).toBe(true);
+    const latestBase: string = await remoteTip(g);
+    expect(latestBase).not.toBe(firstBase);
+    expect(readState(aa).merge_exit).toMatchObject({ reason: 'conflict', base: latestBase, top });
+    expect(attemptRows(g)).toEqual([{ outcome: 'red', attempt }]);
+    expect(landLaunches(g).filter((line) => line.includes('land bb --attempt'))).toHaveLength(1);
   } finally {
     await g.clean();
   }
@@ -609,7 +661,11 @@ test('a base verdict names the green leaf receipt reused when main landed', asyn
     const main = await claimed(f, bb);
     expect((await land(f, 'bb', main.attempt)).code).toBe(0);
     expect(await remoteTip(f)).toBe(main.top);
-    expect(verifyRuns(f).filter((run) => run.sha === main.top).map((run) => run.run)).toEqual([greenRun]);
+    expect(
+      verifyRuns(f)
+        .filter((run) => run.sha === main.top)
+        .map((run) => run.run),
+    ).toEqual([greenRun]);
 
     await idleAll(f);
     expect((await cli(f, ['phase', 'aa', 'merge', '--slot', 'B'], f.root, f.env)).code).toBe(0);
