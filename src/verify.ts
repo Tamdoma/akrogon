@@ -498,7 +498,7 @@ function acceptedBody(first: { run: string; leaf: string }, oldNormal: number, w
 }
 
 // Decided once inside the run's locked final rewrite over earlier ledger rows
-// only (ledger order is append order). An open episode pins its pre-jump
+// only. An open episode pins its pre-jump
 // normal; outside one the stored normal carries forward, lowered to the
 // rolling last-20-eligible median when that median exists and is lower, with an
 // accepted close resetting the baseline to that median outright. The bare
@@ -760,7 +760,7 @@ async function runOnce(repo: Repo, record: PassRecord): Promise<VerifyRun> {
     await withLock(lock, async () => {
       const file: string = recordsPath(repo);
       const runs: VerifyRun[] = foldShown(readVerifyRuns(repo), notices.folder);
-      const index: number = runs.findIndex((run) => run.run === id);
+      let index: number = runs.findIndex((run) => run.run === id);
       if (index === -1) return;
       const finished: VerifyRun = {
         ...runs[index],
@@ -770,6 +770,16 @@ async function runOnce(repo: Repo, record: PassRecord): Promise<VerifyRun> {
       };
       const inherited: string | undefined = await inheritedPatchId(repo, finished, runs);
       runs[index] = inherited === undefined ? finished : { ...finished, patch_id: inherited };
+      const checked: boolean = slowChecked(runs[index]);
+      if (checked) {
+        // A late completion belongs after prior decisions so their windows stay fixed.
+        const latest: number = runs.findLastIndex(slowChecked);
+        if (latest > index) {
+          const [row]: VerifyRun[] = runs.splice(index, 1);
+          runs.splice(latest, 0, row);
+          index = latest;
+        }
+      }
       if (compares !== undefined && completed(runs[index])) {
         const names: string[] = await newRedUnits(repo, runs[index], runs, notices.folder);
         if (names.length > 0)
@@ -800,9 +810,7 @@ async function runOnce(repo: Repo, record: PassRecord): Promise<VerifyRun> {
         };
         slowPrint = decision.print;
       }
-      const accepted: number = slowChecked(runs[index])
-        ? runs.findLastIndex((run) => run.slow?.close === 'accepted')
-        : -1;
+      const accepted: number = checked ? runs.findLastIndex((run) => run.slow?.close === 'accepted') : -1;
       if (accepted !== -1) {
         const slow: NonNullable<VerifyRun['slow']> = runs[accepted].slow!;
         // foldShown handles consumption. A pending send already succeeded.
