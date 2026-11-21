@@ -98,7 +98,7 @@ export type VerifyRun = z.infer<typeof verifyRunSchema>;
 
 type NamedCommand = { name: string; command: string };
 type VerifyPass = { id: string; code: number };
-type VerifyResult = VerifyPass & { sha: string };
+type VerifyResult = VerifyPass & { sha: string; baseRun?: string };
 
 function recordsPath(repo: Repo): string {
   return resolve(repo.root, 'issues/verify-runs.jsonl');
@@ -1110,11 +1110,13 @@ export async function verify(
   } else headId = recorded.run;
   const baseSha: string = await command(['git', 'merge-base', sha, trackingRef(repo)], repo.root);
   const baseTree: string = await treeOf(repo, baseSha);
-  if (greenRun(repo, baseTree, verifyCommands(repo.config, scope)) === undefined) {
-    const compared: VerifyPass = await passOnce(repo, caller, baseSha, scope, baseSha, headId);
-    if (compared.code === 2) return { id: headId, code: compared.code, sha };
-  }
-  const pass: boolean = await knownRedReceipt(repo, sha, scope);
+  const greenBase: VerifyRun | undefined = greenRun(repo, baseTree, verifyCommands(repo.config, scope));
+  const comparison: VerifyPass =
+    greenBase === undefined
+      ? await passOnce(repo, caller, baseSha, scope, baseSha, headId)
+      : { id: greenBase.run, code: 0 };
+  if (comparison.code === 2) return { id: headId, code: comparison.code, sha, baseRun: comparison.id };
+  const pass: boolean = greenBase === undefined && (await knownRedReceipt(repo, sha, scope));
   process.stdout.write(`verify known-red ${sha}: ${pass ? 'pass' : 'fail'}\n`);
-  return { id: headId, code: pass ? 0 : 1, sha };
+  return { id: headId, code: pass ? 0 : 1, sha, baseRun: comparison.id };
 }

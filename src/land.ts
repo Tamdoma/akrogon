@@ -5,7 +5,7 @@ import { allLeaves, readState, saveState, withLock, type Batch, type Leaf, type 
 import { command, CommandError, spawnCaptured, type SpawnResult } from './shell';
 import { commitMove, landClaim, landGates, landPush, StaleLandError, type LandPush } from './phase';
 import { appendAttempt, readPressure, type PressureSnapshot } from './attempts';
-import { readVerifyRuns, uncoveredMainRedUnits, verify, verifyCommands, type Unit, type VerifyRun } from './verify';
+import { readVerifyRuns, uncoveredMainRedUnits, verify, type Unit, type VerifyRun } from './verify';
 import { leafSlice, sessionBusAddress } from './scope';
 import { landedWake, mergeWake, phaseWake } from './next';
 
@@ -157,33 +157,6 @@ async function taken8Trigger(repo: Repo, record: Batch, runId: string, uncovered
   return false;
 }
 
-// The base evidence a red exit names: the compares run just written, or the standing whole-green
-// row at the merge-base the verdict pass reused instead of running again.
-async function baseVerdictOf(repo: Repo, headId: string): Promise<string | undefined> {
-  const runs: VerifyRun[] = readVerifyRuns(repo);
-  const compared: VerifyRun | undefined = runs
-    .filter((run) => run.compares === headId && run.end !== undefined)
-    .sort((a, b) => b.end!.localeCompare(a.end!))[0];
-  if (compared !== undefined) return compared.run;
-  const head: VerifyRun | undefined = runs.find((run) => run.run === headId);
-  if (head === undefined) return undefined;
-  const baseSha: string = await command(['git', 'merge-base', head.sha, trackingRef(repo)], repo.root);
-  const baseTree: string = await command(['git', 'rev-parse', `${baseSha}^{tree}`], repo.root);
-  const expected = verifyCommands(repo.config, 'merge');
-  return runs.find(
-    (run) =>
-      run.tree === baseTree &&
-      run.scope === 'merge' &&
-      run.end !== undefined &&
-      run.setup !== 1 &&
-      run.commands.length === expected.length &&
-      run.commands.every(
-        (item, index) => item.name === expected[index].name && item.command === expected[index].command,
-      ) &&
-      run.commands.every((item) => item.exit === 0),
-  )?.run;
-}
-
 export async function land(
   global: GlobalConfig,
   repo: Repo,
@@ -216,7 +189,7 @@ export async function land(
                 reason: 'red',
                 run: result.id,
                 top,
-                base_verdict: await baseVerdictOf(repo, result.id),
+                base_verdict: verdict.baseRun,
               },
               endOf(record, pressureDir),
             );
