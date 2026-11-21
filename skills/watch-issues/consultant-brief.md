@@ -40,5 +40,5 @@ Your turn files report, and the last one closes with:
 - Root cause: what failed and why — or, for a named-prerequisite failure, the evidence that the prerequisite is already met.
 - Fix: each commit you made and where it landed — base worktree pushed to <remote>/<default_branch>, or a leaf worktree — or why none was permitted.
 - Verification: every command run and its result, including the akrogon verify run.
-- Resume: which leaf and which phase should resume, and why.
+- Resume: which leaf and which phase should resume, and why. The phase is check.fix when the leaf's failure.phase is merge, check.repair or check.review (check.review is never a direct target), else failure.phase.
 - Disagreement: anywhere you and the watch differ, with the smallest check that would tell the two predictions apart.
