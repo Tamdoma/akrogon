@@ -96,6 +96,8 @@ export const verifyRunSchema = z.strictObject({
 export type VerifyRun = z.infer<typeof verifyRunSchema>;
 
 type NamedCommand = { name: string; command: string };
+type VerifyPass = { id: string; code: number };
+type VerifyResult = VerifyPass & { sha: string };
 
 function recordsPath(repo: Repo): string {
   return resolve(repo.root, 'issues/verify-runs.jsonl');
@@ -335,13 +337,16 @@ async function resolvedOnMain(
 // red unit and every red unit is a named title a completed base run at or
 // before the head's merge-base already fails, still unresolved on landed main.
 // Unit names read stored `failures` first and the log second, as newRedUnits does.
-export async function mainRedCover(repo: Repo, sha: string): Promise<boolean> {
+export async function mainRedCover(repo: Repo, sha: string, runId?: string): Promise<boolean> {
   const runs: VerifyRun[] = readVerifyRuns(repo);
   const tree: string = await treeOf(repo, sha);
+  const expected: NamedCommand[] = verifyCommands(repo.config, 'merge');
   const heads: VerifyRun[] = runs.filter(
-    (run) => run.tree === tree && completed(run) && sameCommands(run.commands, verifyCommands(repo.config, 'merge')),
+    (run) =>
+      run.tree === tree && run.compares === undefined && run.end !== undefined && sameCommands(run.commands, expected),
   );
-  if (heads.length === 0) return false;
+  const head: VerifyRun | undefined = runId === undefined ? newest(heads) : heads.find((run) => run.run === runId);
+  if (head === undefined || !completed(head)) return false;
   const mergeBase: string = await command(['git', 'merge-base', sha, trackingRef(repo)], repo.root);
   const { onMain, before } = await mainAncestors(repo);
   const covered = async (unit: Unit): Promise<boolean> => {
@@ -357,23 +362,15 @@ export async function mainRedCover(repo: Repo, sha: string): Promise<boolean> {
     }
     return false;
   };
-  for (const head of heads) {
-    const units: Unit[] = [];
-    for (const item of head.commands) {
-      if (item.exit === 0 || item.blocked !== undefined) continue;
-      for (const test of item.failures ?? (await failedTests(repo, item.log)))
-        units.push({ name: item.name, command: item.command, test });
+  let hasRed: boolean = false;
+  for (const item of head.commands) {
+    if (item.exit === 0 || item.blocked !== undefined) continue;
+    for (const test of item.failures ?? (await failedTests(repo, item.log))) {
+      if (!(await covered({ name: item.name, command: item.command, test }))) return false;
+      hasRed = true;
     }
-    if (units.length === 0) continue;
-    let all: boolean = true;
-    for (const unit of units)
-      if (!(await covered(unit))) {
-        all = false;
-        break;
-      }
-    if (all) return true;
   }
-  return false;
+  return hasRed;
 }
 
 // A pending notice covers only while its file waits in the folder; `error` never covers, `shown` and
@@ -541,17 +538,21 @@ function decideSlow(runs: VerifyRun[], index: number, folder: string | null): Sl
   };
 }
 
-export async function requireGreenReceipt(repo: Repo, sha: string, scope: VerifyScope): Promise<void> {
-  const tree: string = await treeOf(repo, sha);
-  const green: VerifyRun | undefined = greenRun(repo, tree, verifyCommands(repo.config, scope));
-  if (
-    green === undefined &&
-    !(await knownRedReceipt(repo, sha, scope)) &&
-    !(scope === 'merge' && (await mainRedCover(repo, sha)))
-  )
-    throw new Error(
-      `No green ${scope} verify receipt for ${sha} under the current config; run akrogon verify on this commit`,
-    );
+export async function requireGreenReceipt(
+  repo: Repo,
+  sha: string,
+  scope: VerifyScope,
+  coverRun?: string,
+): Promise<void> {
+  if (coverRun === undefined) {
+    const tree: string = await treeOf(repo, sha);
+    if (greenRun(repo, tree, verifyCommands(repo.config, scope)) !== undefined) return;
+    if (await knownRedReceipt(repo, sha, scope)) return;
+  }
+  if (scope === 'merge' && (await mainRedCover(repo, sha, coverRun))) return;
+  throw new Error(
+    `No green ${scope} verify receipt for ${sha} under the current config; run akrogon verify on this commit`,
+  );
 }
 
 async function recordLock(repo: Repo): Promise<string> {
@@ -875,7 +876,7 @@ async function passOnce(
   scope: VerifyScope,
   akrogonBase: string,
   compares?: string,
-): Promise<{ id: string; code: number }> {
+): Promise<VerifyPass> {
   const tree: string = await treeOf(repo, sha);
   const lock: string = await recordLock(repo);
   const memberCount: number = scope === 'merge' ? Object.keys(repo.config.merge_checks).length : 0;
@@ -972,7 +973,7 @@ export async function verify(
   attempt: string | undefined,
   holder: string | undefined,
   knownRed: boolean,
-): Promise<number> {
+): Promise<VerifyResult> {
   if (attempt !== undefined && holder !== undefined) throw new Error('Use --attempt or --holder, not both');
   refuse();
   const repo: Repo = await requireRepo(readGlobal(), cwd);
@@ -991,31 +992,31 @@ export async function verify(
     }),
   );
   if (live !== undefined) process.stderr.write(`run ${live.record.run}\n`);
-  const joined: { id: string; code: number } | undefined =
+  const joined: VerifyPass | undefined =
     live === undefined ? undefined : { id: live.record.run, code: await waitPass(live.dir) };
   const reused: VerifyRun | undefined =
     joined === undefined ? greenRun(repo, tree, verifyCommands(repo.config, scope)) : undefined;
   if (reused !== undefined) {
     process.stdout.write(`reuse receipt ${reused.run} tree=${tree}\n`);
-    return 0;
+    return { id: reused.run, code: 0, sha };
   }
   const akrogonBase: string = await base(repo, at);
-  if (!knownRed) return (joined ?? (await passOnce(repo, caller, sha, scope, akrogonBase))).code;
+  if (!knownRed) return { ...(joined ?? (await passOnce(repo, caller, sha, scope, akrogonBase))), sha };
   const recorded: VerifyRun | undefined =
     joined === undefined ? redRun(repo, tree, verifyCommands(repo.config, scope)) : undefined;
   let headId: string;
   if (recorded === undefined) {
-    const head: { id: string; code: number } = joined ?? (await passOnce(repo, caller, sha, scope, akrogonBase));
+    const head: VerifyPass = joined ?? (await passOnce(repo, caller, sha, scope, akrogonBase));
     headId = head.id;
-    if (head.code !== 1) return head.code;
+    if (head.code !== 1) return { ...head, sha };
   } else headId = recorded.run;
   const baseSha: string = await command(['git', 'merge-base', sha, trackingRef(repo)], repo.root);
   const baseTree: string = await treeOf(repo, baseSha);
   if (greenRun(repo, baseTree, verifyCommands(repo.config, scope)) === undefined) {
-    const compared: { id: string; code: number } = await passOnce(repo, caller, baseSha, scope, baseSha, headId);
-    if (compared.code === 2) return compared.code;
+    const compared: VerifyPass = await passOnce(repo, caller, baseSha, scope, baseSha, headId);
+    if (compared.code === 2) return { id: headId, code: compared.code, sha };
   }
   const pass: boolean = await knownRedReceipt(repo, sha, scope);
   process.stdout.write(`verify known-red ${sha}: ${pass ? 'pass' : 'fail'}\n`);
-  return pass ? 0 : 1;
+  return { id: headId, code: pass ? 0 : 1, sha };
 }

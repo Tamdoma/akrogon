@@ -83,20 +83,17 @@ async function land(global: GlobalConfig, repo: Repo, slug: string, attempt: str
   const lock: string = resolve(globalHome(), '.lock');
   for (let refusals: number = 0; ;) {
     const { leaf } = await withLock(lock, async () => landClaim(repo, slug, attempt));
-    // A red head lands without a rerun or a base run when every failing unit is
-    // already an unresolved named red on main; any other red hands off as before.
-    if (
-      (await verify(repo.root, undefined, attempt, undefined, false)) !== 0 &&
-      !(await mainRedCover(repo, await command(['git', 'rev-parse', 'HEAD'], leaf.state.worktree ?? repo.root)))
-    )
+    const result = await verify(repo.root, undefined, attempt, undefined, false);
+    if (result.code !== 0 && (result.code !== 1 || !(await mainRedCover(repo, result.sha, result.id))))
       return handOff(global, repo, slug, attempt, {
         wake: 'red',
-        red: await redRun(repo, leaf.state.worktree ?? repo.root),
+        red: result.code === 1 ? result.id : await redRun(repo, leaf.state.worktree ?? repo.root),
       });
+    const coverRun: string | undefined = result.code === 1 ? result.id : undefined;
     const refusal: string | undefined = await withLock(lock, async () => {
       const claimed = landClaim(repo, slug, attempt);
       try {
-        await landGates(repo, claimed.leaf, claimed.record);
+        await landGates(repo, claimed.leaf, claimed.record, coverRun);
         return undefined;
       } catch (error) {
         if (!(error instanceof Error) || error instanceof StaleLandError) throw error;
@@ -104,7 +101,7 @@ async function land(global: GlobalConfig, repo: Repo, slug: string, attempt: str
       }
     });
     if (refusal !== undefined) return handOff(global, repo, slug, attempt, { wake: 'gate', refusal });
-    const pushed: LandPush = await landPush(repo, slug, attempt);
+    const pushed: LandPush = await landPush(repo, slug, attempt, coverRun);
     if (pushed.kind === 'landed') return landedWake(global, repo, slug);
     if (pushed.kind === 'rebase') return handOff(global, repo, slug, attempt, {});
     if (pushed.kind === 'error') return handOff(global, repo, slug, attempt, { wake: 'push', refusal: pushed.stderr });

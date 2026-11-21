@@ -332,7 +332,7 @@ switch (verb) {
   case 'verify': {
     z.tuple([]).parse(positionals);
     const optional: z.ZodOptional<z.ZodString> = z.string().trim().min(1).optional();
-    process.exitCode = await (
+    const { code } = await (
       await import('./verify')
     ).verify(
       process.cwd(),
@@ -341,6 +341,7 @@ switch (verb) {
       optional.parse(values.holder),
       values['known-red'] === true,
     );
+    process.exitCode = code;
     break;
   }
   case 'verify-pass': {

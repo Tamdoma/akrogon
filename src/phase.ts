@@ -695,8 +695,8 @@ async function batchGuards(repo: Repo, leaf: Leaf, record: Batch): Promise<strin
   return head;
 }
 
-async function recordTested(repo: Repo, leaf: Leaf, record: Batch, head: string): Promise<void> {
-  await requireGreenReceipt(repo, head, 'merge');
+async function recordTested(repo: Repo, leaf: Leaf, record: Batch, head: string, coverRun?: string): Promise<void> {
+  await requireGreenReceipt(repo, head, 'merge', coverRun);
   saveState(leaf.path, {
     ...readState(leaf.path),
     batch: {
@@ -722,10 +722,10 @@ async function batchCheck(
 }
 
 // The land run's gates: everything a seat's `merged --check` and its move would refuse. A throw is the refusal.
-export async function landGates(repo: Repo, leaf: Leaf, record: Batch): Promise<void> {
+export async function landGates(repo: Repo, leaf: Leaf, record: Batch, coverRun?: string): Promise<void> {
   const head: string = await batchGuards(repo, leaf, record);
   await moveGuards(repo, leaf, readState(leaf.path), 'merged', record.built_on);
-  await recordTested(repo, leaf, record, head);
+  await recordTested(repo, leaf, record, head, coverRun);
 }
 
 export class StaleLandError extends Error {}
@@ -755,6 +755,7 @@ async function batchPush(
   tested: boolean,
   move: Move,
   end: PressureSnapshot | undefined,
+  coverRun?: string,
 ): Promise<BatchPending> {
   const state: State = readState(leaf.path);
   const worktree: string = state.worktree ?? repo.root;
@@ -767,7 +768,7 @@ async function batchPush(
   if (record.top !== undefined) await requireBatchTop(worktree, record, head);
   if (tested && head !== record.tested_top)
     throw new Error(`Untested top: ${head} does not match tested_top ${record.tested_top}`);
-  await requireGreenReceipt(repo, head, 'merge');
+  await requireGreenReceipt(repo, head, 'merge', coverRun);
   await command(['git', 'rev-parse', trackingRef(repo)], repo.root);
   saveState(leaf.path, { ...readState(leaf.path), batch: { ...record, candidate: head } });
   const pushed: Result = await run(
@@ -881,13 +882,13 @@ export type LandPush =
   | { kind: 'error'; stderr: string };
 
 // The land run's push: the claim and the push hold the global lock, the refusal follow-up takes it itself.
-export async function landPush(repo: Repo, slug: string, attempt: string): Promise<LandPush> {
+export async function landPush(repo: Repo, slug: string, attempt: string, coverRun?: string): Promise<LandPush> {
   const move: Move = (holderNow, pushed) => commandMerged(repo, holderNow, pushed);
   const pending: BatchPending = await withLock(resolve(globalHome(), '.lock'), async () => {
     const { leaf, record } = landClaim(repo, slug, attempt);
     const end: PressureSnapshot | undefined =
       record.pressure_start === undefined ? undefined : readPressure('/proc/pressure');
-    return batchPush(repo, leaf, record, true, move, end);
+    return batchPush(repo, leaf, record, true, move, end, coverRun);
   });
   if (pending.kind === 'none') return { kind: 'landed' };
   const finished: Finished = await finishPush(repo, slug, pending, move);
