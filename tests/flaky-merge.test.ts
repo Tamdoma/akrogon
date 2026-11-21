@@ -158,6 +158,25 @@ test('a verify receipt records the merge-base..sha patch id, and none on an empt
   }
 });
 
+test('verify runs checks on an explicitly selected commit with unrelated history', async (): Promise<void> => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      grounding: 'none',
+      checks: { probe: 'echo probe' },
+    });
+    const { worktree } = await callerWorktree(f, 'caller');
+    const orphan: string = await command(['git', 'commit-tree', 'HEAD^{tree}', '-m', 'unrelated'], f.root);
+    const result: Result = await verify(f, ['--sha', orphan], worktree);
+    expect(result.code).toBe(0);
+    const receipt: VerifyRun = records(f)[0];
+    expect(receipt).toMatchObject({ sha: orphan, setup: 0, commands: [{ name: 'probe', exit: 0 }] });
+    expect(receipt.patch_id).toBeUndefined();
+  } finally {
+    f.clean();
+  }
+});
+
 test('nameless failures never flip across trees while a named one does', async (): Promise<void> => {
   const f: Fixture = await fixture();
   try {
