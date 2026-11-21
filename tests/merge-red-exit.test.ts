@@ -586,6 +586,42 @@ test('a covered repeat and a new uncovered failure do not trigger a base pass', 
   }
 }, 60000);
 
+test('a base verdict names the green leaf receipt reused when main landed', async () => {
+  const f: GreenFixture = await greenFixture({ test: 'sh check.sh' });
+  try {
+    writeFileSync(resolve(f.root, 'check.sh'), 'exit 0\n');
+    await command(['git', 'add', 'check.sh'], f.root);
+    await command(['git', 'commit', '-m', 'add passing main check'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    const aa: string = await allocated(f, 'aa', 'issue-aa');
+    await commitIn(aa, 'check.sh', 'echo "(fail) alpha"; exit 7\n');
+    toMerge(aa);
+    const first = await claimed(f, aa);
+    expect((await land(f, 'aa', first.attempt)).code).toBe(0);
+    expect(readState(aa).phase).toBe('check.repair');
+
+    const bb: string = await allocated(f, 'bb', 'issue-bb');
+    await commitIn(bb, 'bb-file', 'independent main update');
+    const bbWorktree: string = z.string().parse(readState(bb).worktree);
+    expect((await cli(f, ['verify'], bbWorktree, f.env)).code).toBe(0);
+    const greenRun: string = z.string().parse(verifyRuns(f).find((run) => run.scope === 'leaf')?.run);
+    toMerge(bb);
+    const main = await claimed(f, bb);
+    expect((await land(f, 'bb', main.attempt)).code).toBe(0);
+    expect(await remoteTip(f)).toBe(main.top);
+    expect(verifyRuns(f).filter((run) => run.sha === main.top).map((run) => run.run)).toEqual([greenRun]);
+
+    await idleAll(f);
+    expect((await cli(f, ['phase', 'aa', 'merge', '--slot', 'B'], f.root, f.env)).code).toBe(0);
+    const second = await claimed(f, aa);
+    expect((await land(f, 'aa', second.attempt)).code).toBe(0);
+    expect(verifyRuns(f).filter((run) => run.compares !== undefined)).toHaveLength(0);
+    expect(readState(aa).merge_exit).toMatchObject({ reason: 'red', base_verdict: greenRun });
+  } finally {
+    await f.clean();
+  }
+}, 60000);
+
 test('a green row at the merge-base skips the base pass and exits with its run as the verdict', async () => {
   const f: GreenFixture = await greenFixture({ ok: 'true' });
   try {
