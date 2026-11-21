@@ -66,7 +66,9 @@ function attempts(f: Fixture): string[] {
         .map((line) => z.object({ outcome: z.string() }).parse(JSON.parse(line)).outcome)
     : [];
 }
-function verifyRuns(f: Fixture): { run: string; sha: string; compares?: string; commands: { exit: number }[] }[] {
+function verifyRuns(
+  f: Fixture,
+): { run: string; sha: string; compares?: string; commands: { exit: number; failures?: string[] }[] }[] {
   const file: string = resolve(f.root, 'issues/verify-runs.jsonl');
   return existsSync(file)
     ? readFileSync(file, 'utf8')
@@ -263,6 +265,54 @@ test('a named red unit that is not an unresolved red on main hands off to the se
     expect(state.batch).toMatchObject({ owner: 'seat', wake: 'red' });
     expect(prompts(f, 'merge-issue')).toHaveLength(1);
     expect(prompts(f, 'merge-issue')[0]).toContain(`wake=red red=${z.string().parse(state.batch?.red)}`);
+  } finally {
+    await f.clean();
+  }
+}, 60000);
+
+test('an older covered run does not hide a new failure on the same tree', async () => {
+  const f: GreenFixture = await greenFixture({ ok: 'true' });
+  try {
+    const marker: string = resolve(f.home, 'fail-beta');
+    writeFileSync(
+      resolve(f.root, 'regression.test.ts'),
+      `import { test, expect } from 'bun:test';
+import { existsSync } from 'node:fs';
+test('alpha', () => expect(false).toBe(true));
+test('beta', () => expect(existsSync(${JSON.stringify(marker)})).toBe(false));
+`,
+    );
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      checks: { test: `${JSON.stringify(process.execPath)} test regression.test.ts` },
+      grounding: 'none',
+    });
+    await command(['git', 'add', 'regression.test.ts', 'issues/config.yaml'], f.root);
+    await command(['git', 'commit', '-m', 'failing test'], f.root);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    const before: string = await remoteTip(f);
+    const holder: string = resolve(f.home, 'direct');
+    mkdirSync(holder);
+    expect((await cli(f, ['verify', '--holder', holder, '--known-red'], f.root, f.env)).code).toBe(0);
+    const path: string = await allocated(f, 'aa', 'issue-aa');
+    await commitIn(path, 'aa-file', 'aa\n');
+    toMerge(path);
+    const { attempt, top } = await claimed(f, path);
+    expect((await cli(f, ['verify', '--attempt', attempt], f.root, f.env)).code).toBe(1);
+
+    writeFileSync(marker, '');
+    expect((await land(f, 'aa', attempt)).code).toBe(0);
+    expect(await remoteTip(f)).toBe(before);
+    const heads = verifyRuns(f).filter((run) => run.sha === top);
+    expect(heads.map((run) => run.commands[0].failures)).toEqual([['alpha'], ['alpha', 'beta']]);
+    expect(readState(path).batch).toMatchObject({ owner: 'seat', wake: 'red', red: heads[1].run });
+    const gate: Result = await cli(
+      f,
+      ['phase', 'aa', 'merged', '--slot', 'B', '--attempt', attempt, '--check'],
+      f.root,
+      f.env,
+    );
+    expect(gate.code).not.toBe(0);
+    expect(readState(path).batch?.tested_top).toBeUndefined();
   } finally {
     await f.clean();
   }
