@@ -64,7 +64,7 @@ function note(line: string): void {
   lastNote = line;
   console.log(`[watch-timer] ${line}`);
 }
-type Due = { n: number; attempts: number; sent: { at: number; turn: number } | null; coalescing: boolean };
+type Due = { n: number; attempts: number; sent: { at: number; turn: number } | null };
 
 const dues: Due[] = [];
 let dueCount: number = 0;
@@ -153,24 +153,15 @@ async function poll(): Promise<'exit' | 'stay'> {
     return 'stay';
   }
   const status: string | null = watcher.status?.state ?? null;
-  // Dues accrued while the watcher still works its first turn — the sent, receipted head due
-  // whose delivery opened it — coalesce to the latest boundary (plan D6): the first such due is
-  // marked `coalescing`, later crossed boundaries update its number instead of queueing. Dues
-  // accrued in any later shape keep their own entry and drain in order.
-  const backedUp: boolean =
-    status !== 'idle' &&
-    status !== 'done' &&
-    watcher.turn === 0 &&
-    dues[0] !== undefined &&
-    dues[0].sent !== null &&
-    Number(rcpt) >= dues[0].n;
-  // The pending entry is re-found each crossed boundary: several boundaries can fall inside
-  // one poll gap, and the first push in this poll must coalesce with the second.
+  // While the watcher works (plan D6), a crossed boundary moves the queue's unsent due to the
+  // latest number instead of queueing another; an idle watcher keeps one entry per due.
+  const busy: boolean = status !== 'idle' && status !== 'done';
+  // Several boundaries can fall inside one poll gap; each re-finds the unsent due.
   while (nextBoundary <= now) {
     dueCount += 1;
-    const pending: Due | undefined = dues.find((due: Due) => due.coalescing && due.sent === null);
+    const pending: Due | undefined = busy ? dues.findLast((due: Due) => due.sent === null) : undefined;
     if (pending !== undefined) pending.n = dueCount;
-    else dues.push({ n: dueCount, attempts: 0, sent: null, coalescing: backedUp });
+    else dues.push({ n: dueCount, attempts: 0, sent: null });
     nextBoundary += intervalMs;
   }
 

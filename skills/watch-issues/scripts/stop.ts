@@ -1,6 +1,7 @@
 // watch-issues stop <root>: end the repo's verified timer from any terminal. The session comes
 // from the repo itself, never from HC_TERMINAL_ID. Prints `stopped` (nothing running, or after
-// kill+rm it prints `stopped <address>`) exit 0, or `conflict <details>` exit 2 touching nothing.
+// kill+rm it prints `stopped <address>`, then `stopped consultant <address>` on its own line for
+// each closed consultant) exit 0, or `conflict <details>` exit 2 touching nothing.
 import { terminals, watchConsultName, type Seen } from '../../../src/hc';
 import { getTerm, hcCall, isVerifiedConsultant, isVerifiedTimer, timerWatcher, type HcReply, type Term } from './hc';
 import { watchTarget, withConsultantLock, type WatchTarget } from './repo';
@@ -90,7 +91,7 @@ async function stop(target: WatchTarget): Promise<StopResult> {
     }
     lines.push(`stopped consultant ${consultant.address}`);
   }
-  return { line: lines.join(' '), code: 0 };
+  return { line: lines.join('\n'), code: 0 };
 }
 
 try {
