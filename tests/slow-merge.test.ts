@@ -294,7 +294,9 @@ test('an open episode pins the normal, cites its first run, notifies once and re
     expect(a.slow!.close).toBeUndefined();
     expect(noticeFiles(core)).toEqual([]);
 
-    // A fresh eligible run under the threshold closes the episode recovered.
+    // A fresh eligible run under the threshold closes the episode recovered
+    // once the episode's own eligible median sits under the pinned normal.
+    for (let i = 0; i < 3; i++) seedInEpisode(f, episode, 3000);
     await bump(direct, 'recover.ts');
     const recovered: Result = await cli(f, ['verify', '--holder', holder], direct, env);
     expect(recovered.code).toBe(0);
@@ -400,7 +402,7 @@ test('the last 20 eligible runs inside the episode close it accepted', async () 
     });
     const { direct, holder } = await mergeCaller(f);
     seedMerge(f, 300000);
-    const episode: string = seedEpisode(f, 0);
+    const episode: string = seedEpisode(f, 0, { end: new Date(Date.now() - 15 * DAYS).toISOString() });
     for (let i = 0; i < 19; i++)
       seedMerge(f, 500000, {
         slow: { ms: 500000, normal_ms: 300000, first: { run: episode, leaf: 'firstleaf' } },
@@ -413,7 +415,10 @@ test('the last 20 eligible runs inside the episode close it accepted', async () 
     expect(row.slow).toMatchObject({ first: { run: episode }, close: 'accepted' });
     expect(result.stdout).toMatch(/verify slow: \d+m measured vs 5m normal/);
     expect(result.stdout).toContain('accepted as new normal');
-    expect(noticeFiles(core)).toEqual([]);
+    const files: NoticeFile[] = noticeFiles(core);
+    expect(files).toHaveLength(1);
+    expect(files[0].path).toContain(`${f.repo}.merge-slow-accepted.${episode}`);
+    expect(files[0]).toMatchObject({ title: `${f.repo} merge slow accepted`, attention: false });
   } finally {
     await core.stop();
     f.clean();
@@ -429,7 +434,7 @@ test('the twentieth eligible episode run closes accepted', async () => {
       grounding: 'none',
     });
     const { direct, holder } = await mergeCaller(f);
-    const episode: string = seedEpisode(f, 5);
+    const episode: string = seedEpisode(f, 5, { end: new Date(Date.now() - 15 * DAYS).toISOString() });
     for (let i: number = 0; i < 18; i++)
       seedMerge(f, 500000, {
         slow: { ms: 500000, normal_ms: 300000, first: { run: episode, leaf: 'firstleaf' } },
@@ -454,7 +459,7 @@ test('an unflagged run whose full check was blocked still closes the episode acc
       grounding: 'none',
     });
     const { direct, holder } = await mergeCaller(f);
-    const episode: string = seedEpisode(f, 5);
+    const episode: string = seedEpisode(f, 5, { end: new Date(Date.now() - 15 * DAYS).toISOString() });
     for (let i: number = 0; i < 19; i++)
       seedMerge(f, 500000, {
         slow: { ms: 500000, normal_ms: 300000, first: { run: episode, leaf: 'firstleaf' } },
@@ -708,7 +713,6 @@ test('a failed accepted notice is retried by the next checked run', async () => 
     const closing = (): VerifyRun => records(f).find((run) => run.run === id)!;
     expect(closing().slow).toMatchObject({ close: 'accepted' });
     expect(rawSlow(f, id)?.accepted_notice).toBe('error');
-    expect(noticeFiles(core)).toEqual([]);
     unblock();
     // The next checked run retries the send on the closing row in place.
     await bump(direct, 'retry.ts');

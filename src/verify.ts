@@ -87,6 +87,7 @@ export const verifyRunSchema = z.strictObject({
       first: z.strictObject({ run: z.string(), leaf: z.string() }).optional(),
       close: z.enum(['recovered', 'accepted']).optional(),
       notice: z.string().optional(),
+      accepted_notice: z.string().optional(),
     })
     .optional(),
   start: z.string(),
@@ -403,10 +404,21 @@ function foldShown(runs: VerifyRun[], folder: string | null): VerifyRun[] {
     ...(run.notice === 'pending' && noticeState(folder, noticeId(run.repo, 'main-red', run.run)) === 'shown'
       ? { notice: 'shown' }
       : {}),
-    ...(run.slow?.notice === 'pending' &&
-    noticeState(folder, noticeId(run.repo, 'merge-slow', run.slow.first!.run)) === 'shown'
-      ? { slow: { ...run.slow, notice: 'shown' } }
-      : {}),
+    ...(run.slow === undefined || (run.slow.notice !== 'pending' && run.slow.accepted_notice !== 'pending')
+      ? {}
+      : {
+          slow: {
+            ...run.slow,
+            ...(run.slow.notice === 'pending' &&
+            noticeState(folder, noticeId(run.repo, 'merge-slow', run.slow.first!.run)) === 'shown'
+              ? { notice: 'shown' }
+              : {}),
+            ...(run.slow.accepted_notice === 'pending' &&
+            noticeState(folder, noticeId(run.repo, 'merge-slow-accepted', run.slow.first!.run)) === 'shown'
+              ? { accepted_notice: 'shown' }
+              : {}),
+          },
+        }),
   }));
 }
 
@@ -457,12 +469,40 @@ async function newRedUnits(repo: Repo, me: VerifyRun, runs: VerifyRun[], folder:
   return [...new Set(fresh)];
 }
 
-type SlowDecision = { slow: NonNullable<VerifyRun['slow']>; print?: string; send?: string };
+type SlowDecision = { slow: NonNullable<VerifyRun['slow']>; print?: string; send?: string; sendAccepted?: string };
+
+// The episode's last 20 eligible in-episode rows ending at index; the index row
+// counts by identity so a decision can see the run it is still stamping.
+function episodeWindow(runs: VerifyRun[], index: number, first: string): VerifyRun[] {
+  return runs
+    .filter(
+      (run, i) => i <= index && slowEligible(run) && (run.run === runs[index].run || run.slow?.first?.run === first),
+    )
+    .slice(-20);
+}
+
+// The accepted notice names the old normal, the episode window's median as the
+// new normal, and the episode's first sighting.
+function acceptedBody(first: { run: string; leaf: string }, oldNormal: number, window: VerifyRun[]): string {
+  const newNormal: number = median(window.map((run) => Date.parse(run.end!) - Date.parse(run.start)));
+  return (
+    'merge slow accepted: ' +
+    minutes(newNormal) +
+    'm is the new normal (was ' +
+    minutes(oldNormal) +
+    'm); first seen at ' +
+    first.leaf +
+    ' ' +
+    first.run
+  );
+}
 
 // Decided once inside the run's locked final rewrite over earlier ledger rows
 // only (ledger order is append order). An open episode pins its pre-jump
-// normal; outside an episode the normal is the median of the last 20 eligible
-// rows, computed only at 5 or more.
+// normal; outside one the stored normal carries forward, lowered to the
+// rolling last-20-eligible median when that median exists and is lower, with an
+// accepted close resetting the baseline to that median outright. The bare
+// median rule still stands when no row carries a stored normal.
 function decideSlow(runs: VerifyRun[], index: number, folder: string | null): SlowDecision | undefined {
   const me: VerifyRun = runs[index];
   if (!slowChecked(me)) return undefined;
@@ -478,22 +518,40 @@ function decideSlow(runs: VerifyRun[], index: number, folder: string | null): Sl
     normal = open.normal_ms;
   } else {
     const eligible: VerifyRun[] = earlier.filter(slowEligible).slice(-20);
-    if (eligible.length < 5) return undefined;
-    normal = median(eligible.map((run) => Date.parse(run.end!) - Date.parse(run.start)));
+    const rolling: number | undefined =
+      eligible.length < 5 ? undefined : median(eligible.map((run) => Date.parse(run.end!) - Date.parse(run.start)));
+    if (latest !== undefined && latest.slow!.close === 'accepted') {
+      if (rolling === undefined) return undefined;
+      normal = rolling;
+    } else if (latest !== undefined) {
+      normal = rolling === undefined ? latest.slow!.normal_ms : Math.min(latest.slow!.normal_ms, rolling);
+    } else {
+      if (rolling === undefined) return undefined;
+      normal = rolling;
+    }
   }
   const flagged: boolean = ms > 1.5 * normal && ms - normal >= 120000;
   const first: { run: string; leaf: string } | undefined = flagged
     ? (open?.first ?? { run: me.run, leaf: me.leaf })
     : open?.first;
   let close: 'recovered' | 'accepted' | undefined;
+  let sendAccepted: string | undefined;
   if (open !== undefined) {
     const window: VerifyRun[] = [...earlier, me].filter(slowEligible).slice(-20);
-    if (!flagged && slowEligible(me)) close = 'recovered';
+    const episode: VerifyRun[] = episodeWindow(runs, index, open.first!.run);
+    const m: number = median(episode.map((run) => Date.parse(run.end!) - Date.parse(run.start)));
+    const firstRow: VerifyRun | undefined = earlier.find((run) => run.run === open.first!.run);
+    if (!flagged && slowEligible(me) && episode.length >= 5 && !(m > 1.5 * normal && m - normal >= 120000))
+      close = 'recovered';
     else if (
       window.length === 20 &&
-      window.every((run) => run.run === me.run || run.slow?.first?.run === open.first!.run)
-    )
+      window.every((run) => run.run === me.run || run.slow?.first?.run === open.first!.run) &&
+      firstRow !== undefined &&
+      Date.parse(me.end!) - Date.parse(firstRow.end!) >= 14 * 24 * 60 * 60 * 1000
+    ) {
       close = 'accepted';
+      sendAccepted = acceptedBody(open.first!, normal, episode);
+    }
   }
   const send: boolean =
     first !== undefined &&
@@ -522,6 +580,7 @@ function decideSlow(runs: VerifyRun[], index: number, folder: string | null): Sl
       ...(close === undefined ? {} : { close }),
     },
     ...(print === undefined ? {} : { print }),
+    ...(sendAccepted === undefined ? {} : { sendAccepted }),
     ...(send
       ? {
           send:
@@ -740,6 +799,33 @@ async function runOnce(repo: Repo, record: PassRecord): Promise<VerifyRun> {
                 },
         };
         slowPrint = decision.print;
+      }
+      // An accepted close leaves its notice send state on the closing row; an
+      // uncovered state (undefined included) sends here and retries in place.
+      const accepted: number = runs.findLastIndex((run) => run.slow?.close === 'accepted');
+      if (accepted !== -1) {
+        const acceptedId: string = noticeId(repo.name, 'merge-slow-accepted', runs[accepted].slow!.first!.run);
+        if (!noticeCovers(runs[accepted].slow!.accepted_notice, notices.folder, acceptedId)) {
+          const body: string =
+            accepted === index && decision !== undefined && decision.sendAccepted !== undefined
+              ? decision.sendAccepted
+              : acceptedBody(
+                  runs[accepted].slow!.first!,
+                  runs[accepted].slow!.normal_ms,
+                  episodeWindow(runs, accepted, runs[accepted].slow!.first!.run),
+                );
+          runs[accepted] = {
+            ...runs[accepted],
+            slow: {
+              ...runs[accepted].slow!,
+              accepted_notice: recordNotice(notices, acceptedId, {
+                title: `${repo.name} merge slow accepted`,
+                body,
+                attention: false,
+              }),
+            },
+          };
+        }
       }
       const temporary: string = `${file}.${process.pid}.tmp`;
       writeFileSync(temporary, runs.map((run) => JSON.stringify(run)).join('\n') + '\n');
