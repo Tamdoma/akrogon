@@ -88,8 +88,8 @@ async function callerWorktree(f: Fixture, slug: string): Promise<{ leafPath: str
   return { leafPath, worktree };
 }
 
-async function commitIn(worktree: string, file: string): Promise<string> {
-  writeFileSync(resolve(worktree, file), `${file}\n`);
+async function commitIn(worktree: string, file: string, contents: string = `${file}\n`): Promise<string> {
+  writeFileSync(resolve(worktree, file), contents);
   await command(['git', 'add', file], worktree);
   await command(['git', 'commit', '-m', `add ${file}`], worktree);
   return command(['git', 'rev-parse', 'HEAD'], worktree);
@@ -153,6 +153,44 @@ test('a verify receipt records the merge-base..sha patch id, and none on an empt
     expect((await verify(f, ['--sha', mainSha, '--holder', holder], f.root)).code).toBe(0);
     const empty: VerifyRun | undefined = records(f).find((item) => item.sha === mainSha);
     expect(empty?.patch_id).toBeUndefined();
+  } finally {
+    f.clean();
+  }
+});
+
+test('a clean rebase over a nearby edit preserves the leaf patch identity', async (): Promise<void> => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), { grounding: 'none', checks: { test: 'bun test alpha.test.ts' } });
+    const marker: string = resolve(f.home, 'ready');
+    await commitIn(
+      f.root,
+      'alpha.test.ts',
+      `import { existsSync } from 'node:fs';
+import { expect, test } from 'bun:test';
+test('alpha', () => expect(existsSync(${JSON.stringify(marker)})).toBe(true));
+`,
+    );
+    const original: string =
+      '// header\n// old comment\nexport const a = 1;\nexport const b = 2;\nexport const own = 3;\n';
+    await commitIn(f.root, 'code.ts', original);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    const { worktree } = await callerWorktree(f, 'caller');
+    leaf(f, 'caller', 'merge', { worktree });
+    await commitIn(worktree, 'code.ts', original.replace('own = 3', 'own = 4'));
+    expect((await verify(f, [], worktree)).code).toBe(1);
+
+    await commitIn(f.root, 'code.ts', original.replace('old comment', 'new comment'));
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    await command(['git', 'rebase', 'origin/main'], worktree);
+    writeFileSync(marker, 'ready\n');
+    expect((await verify(f, [], worktree)).code).toBe(0);
+
+    const [red, green]: VerifyRun[] = records(f);
+    expect(green.tree).not.toBe(red.tree);
+    const result: Result = await cli(f, ['flaky']);
+    expect(result.code).toBe(0);
+    expect(result.stdout.split(' ')).toEqual(['1', green.end, 'test', 'alpha']);
   } finally {
     f.clean();
   }
