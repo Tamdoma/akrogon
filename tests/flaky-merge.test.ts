@@ -479,6 +479,7 @@ test('fieldless same-tree receipts still count across leaf names', async (): Pro
   const f: Fixture = await fixture();
   try {
     const [red, green]: Step[] = pair('bun test', undefined);
+    assert(green.end !== undefined);
     seedRun(f, run(f, red, 0));
     seedRun(f, run(f, { ...green, tree: red.tree, leaf: 'other-leaf' }, 1));
 
