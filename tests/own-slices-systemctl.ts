@@ -15,9 +15,10 @@ const real: Bun.SyncSubprocess<'pipe', 'inherit'> = Bun.spawnSync(
 );
 if (!args.includes('list-units') || !args.includes('akrogon-l*.slice') || !real.success) {
   process.stdout.write(real.stdout);
-  // A signaled systemctl dies by the same signal here, never reading as exit 0.
+  // A signaled systemctl dies by the same signal here, or exits 1 when Bun ignores that signal
+  // (SIGPIPE, SIGXFSZ); it never reads as exit 0.
   if (real.signalCode !== undefined) process.kill(process.pid, real.signalCode);
-  process.exit(real.exitCode);
+  process.exit(real.signalCode === undefined ? real.exitCode : 1);
 }
 const folders = (dir: string): string[] =>
   readdirSync(dir, { withFileTypes: true })
