@@ -13,13 +13,14 @@ const rowSchema = z.strictObject({
 });
 
 type Row = z.infer<typeof rowSchema>;
+type Ledger = { rows: Row[]; separator: string };
 
 const day: number = 24 * 3600_000;
 
 // The ledger refuses rather than skips: every line parses strictly and a read
 // failure is a refusal, never an empty list (unlike readTimings).
-function readLedger(path: string): Row[] {
-  if (!existsSync(path)) return [];
+function readLedger(path: string): Ledger {
+  if (!existsSync(path)) return { rows: [], separator: '' };
   let text: string;
   try {
     text = readFileSync(path, 'utf8');
@@ -28,16 +29,16 @@ function readLedger(path: string): Row[] {
       cause: error,
     });
   }
-  return text
-    .replace(/(?:\r?\n)+$/, '')
-    .split('\n')
-    .map((line: string, index: number): Row => {
-      try {
-        return rowSchema.parse(JSON.parse(line));
-      } catch (error) {
-        throw new Error(`Invalid ${path} row ${index + 1}: ${line}`, { cause: error });
-      }
-    });
+  const terminated: boolean = text.endsWith('\n');
+  const lines: string[] = (terminated ? text.slice(0, -1) : text).split('\n');
+  const rows: Row[] = lines.map((line: string, index: number): Row => {
+    try {
+      return rowSchema.parse(JSON.parse(line));
+    } catch (error) {
+      throw new Error(`Invalid ${path} row ${index + 1}: ${line}`, { cause: error });
+    }
+  });
+  return { rows, separator: terminated ? '' : '\n' };
 }
 
 export async function reserve(
@@ -54,7 +55,8 @@ export async function reserve(
     const paidBudget = readGlobal().paid_budget;
     if (paidBudget === undefined) throw new Error(`Missing paid_budget in ${resolve(home, 'config.yaml')}`);
     const cap: number = paidBudget.sessions_per_day;
-    const rows: Row[] = readLedger(ledger)
+    const { rows: ledgerRows, separator }: Ledger = readLedger(ledger);
+    const rows: Row[] = ledgerRows
       .filter((row: Row): boolean => Date.parse(row.at) > Date.now() - day)
       .sort((a: Row, b: Row): number => Date.parse(a.at) - Date.parse(b.at));
     const total: number = rows.reduce((sum: number, row: Row): number => sum + row.sessions, 0);
@@ -73,7 +75,7 @@ export async function reserve(
     try {
       appendFileSync(
         ledger,
-        JSON.stringify({ at: new Date().toISOString(), repo: repo.name, slug, run, sessions: n }) + '\n',
+        separator + JSON.stringify({ at: new Date().toISOString(), repo: repo.name, slug, run, sessions: n }) + '\n',
       );
     } catch (error) {
       throw new Error(`Append failed ${ledger}: ${error instanceof Error ? error.message : String(error)}`, {
