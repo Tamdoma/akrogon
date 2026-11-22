@@ -4,7 +4,18 @@ import { resolve } from 'node:path';
 import { command, finishCaptured, spawnFiles, type Captured, type Result } from '../src/shell';
 import { readState, saveState, type State } from '../src/state';
 import { z } from 'zod';
-import { cli, entry, fakeSystemctl, killTree, leaf, leafTempRoot, yaml, type Fixture } from './helpers';
+import {
+  cli,
+  entry,
+  fakeSystemctl,
+  killTree,
+  leaf,
+  leafTempRoot,
+  yaml,
+  type Fixture,
+  type SystemctlFixture,
+} from './helpers';
+import { leafSlice } from '../src/scope';
 import { delivered, hcFixture, setPrefixes, type HcFixture } from './hc-fixture';
 
 type DispatchFixture = HcFixture;
@@ -662,6 +673,88 @@ test('a freed slot starts the leaf that has waited longest on capacity, never a 
     expect(readState(older).tab).toBeDefined();
     expect(readState(newer).tab).toBeUndefined();
     expect(readState(quiet).tab).toBeUndefined();
+  } finally {
+    await f.clean();
+  }
+}, 60000);
+
+test('a restarted stopped leaf queues behind an older capacity waiter', async () => {
+  const f: DispatchFixture = await hcFixture();
+  try {
+    const systemctl: SystemctlFixture = fakeSystemctl(f);
+    const sys: NodeJS.ProcessEnv = { ...systemctl.env, PATH: `${resolve(f.home, 'bin')}:${f.env.PATH}` };
+    const slices: { unit: string; sub: string }[] = ['younger', 'running', 'first'].map((slug) => ({
+      unit: leafSlice({ name: f.repo }, slug),
+      sub: 'active',
+    }));
+    writeFileSync(systemctl.db, JSON.stringify({ units: slices }));
+    capRepo(f.root, 1);
+    const younger: string = leaf(f, 'younger', 'plan.synthesis');
+    expect((await next(f, ['younger'])).code).toBe(0);
+    expect((await cli(f, ['stop', 'younger'], f.root, { ...f.env, ...sys })).code).toBe(0);
+    leaf(f, 'running', 'plan.synthesis');
+    expect((await next(f, ['running'])).code).toBe(0);
+    const older: string = leaf(f, 'older', 'plan.synthesis');
+    await next(f, ['older']);
+    await Bun.sleep(20);
+    await cli(f, ['start', 'younger'], f.root, f.env);
+    expect((await f.core.terminals({ 'akrogon.leaf': 'younger' })).length).toBe(0);
+    expect((await cli(f, ['stop', 'running'], f.root, { ...f.env, ...sys })).code).toBe(0);
+    expect((await next(f, ['--wake'])).code).toBe(0);
+    expect(readState(older).tab).toBeDefined();
+    expect((await f.core.terminals({ 'akrogon.leaf': 'older' })).length).toBeGreaterThan(0);
+    expect((await f.core.terminals({ 'akrogon.leaf': 'younger' })).length).toBe(0);
+    expect(readState(younger).worktree).toBeDefined();
+  } finally {
+    await f.clean();
+  }
+}, 60000);
+
+test('unpause refills a slot freed while the repo was paused', async () => {
+  const f: DispatchFixture = await hcFixture();
+  try {
+    const systemctl: SystemctlFixture = fakeSystemctl(f);
+    const sys: NodeJS.ProcessEnv = { ...systemctl.env, PATH: `${resolve(f.home, 'bin')}:${f.env.PATH}` };
+    const slices: { unit: string; sub: string }[] = ['younger', 'running', 'first'].map((slug) => ({
+      unit: leafSlice({ name: f.repo }, slug),
+      sub: 'active',
+    }));
+    writeFileSync(systemctl.db, JSON.stringify({ units: slices }));
+    capRepo(f.root, 1);
+    leaf(f, 'first', 'plan.synthesis');
+    expect((await next(f, ['first'])).code).toBe(0);
+    const waiter: string = leaf(f, 'waiter', 'plan.synthesis');
+    await next(f, ['waiter']);
+    expect((await cli(f, ['pause'], f.root, f.env)).code).toBe(0);
+    expect((await cli(f, ['stop', 'first'], f.root, { ...f.env, ...sys })).code).toBe(0);
+    expect((await next(f, ['--wake'])).code).toBe(0);
+    expect(readState(waiter).tab).toBeUndefined();
+    expect((await cli(f, ['unpause'], f.root, f.env)).code).toBe(0);
+    expect(readState(waiter).tab).toBeDefined();
+  } finally {
+    await f.clean();
+  }
+}, 60000);
+
+test('the older capacity waiter wins even in the repo visited later', async () => {
+  const f: DispatchFixture = await hcFixture({ occupiedPrefix: 'yp' });
+  try {
+    capMachine(f, 1);
+    const xRun: string = leaf(f, 'xrun', 'plan.synthesis');
+    expect((await next(f, ['xrun'])).code).toBe(0);
+    const yRoot: string = await secondRepo(f, 'y');
+    setPrefixes(f, { [f.repo]: f.prefix, y: 'yp' });
+    await addSpace(f, 'y', yRoot);
+    const yWait: string = leafIn(yRoot, 'y', 'ywait', 'plan.synthesis');
+    await next(f, ['ywait'], {}, yRoot);
+    await Bun.sleep(20);
+    const xWait: string = leaf(f, 'xwait', 'plan.synthesis');
+    await next(f, ['xwait']);
+    expect([yWait, xWait].map((path) => readState(path).tab)).toEqual([undefined, undefined]);
+    toMerge(xRun);
+    expect((await next(f, ['--wake'])).code).toBe(0);
+    expect(readState(yWait).tab).toBeDefined();
+    expect(readState(xWait).tab).toBeUndefined();
   } finally {
     await f.clean();
   }

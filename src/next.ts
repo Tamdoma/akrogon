@@ -826,6 +826,32 @@ async function sweepAll(global: GlobalConfig, invocation: Invocation, isAutomati
       );
 }
 
+// The automatic pass: seated and merged leaves resume, then capacity waiters refill free slots
+// in wait order; a seated waiter (a restarted stop) is left to the refill so it keeps its place.
+async function resumeRepos(
+  global: GlobalConfig,
+  repos: Repo[],
+  invocation: Invocation,
+  isAutomatic: boolean,
+): Promise<void> {
+  for (const repo of repos) {
+    const events: TimingEvent[] = readTimings(repo.root);
+    await sweep(
+      global,
+      repo,
+      discover(repo, invocation).leaves.filter(
+        (leaf) =>
+          (leaf.state.phase === 'merged' || leaf.state.tab !== undefined || leaf.state.worktree !== undefined) &&
+          capacitySince(events, leaf.state.slug) === undefined,
+      ),
+      invocation,
+      false,
+      isAutomatic,
+    );
+  }
+  await refill(global, repos, invocation);
+}
+
 // A freed slot goes to the leaf that has waited longest on capacity, across repos; a leaf
 // whose repo is at its own cap stays waiting and the next one is tried.
 async function refill(global: GlobalConfig, repos: Repo[], invocation: Invocation): Promise<void> {
@@ -1483,19 +1509,7 @@ export async function nextCommand(input: string | undefined, pressureDir: string
       } else if (input === '--resume' || input === '--wake') {
         const registered: { repos: Repo[]; unknown: boolean } = registeredRepos(global, invocation);
         const active: Repo[] = registered.repos.filter((repo) => !isPaused(repo.name));
-        for (const repo of active)
-          await sweep(
-            global,
-            repo,
-            discover(repo, invocation).leaves.filter(
-              (leaf) =>
-                leaf.state.phase === 'merged' || leaf.state.tab !== undefined || leaf.state.worktree !== undefined,
-            ),
-            invocation,
-            false,
-            true,
-          );
-        await refill(global, active, invocation);
+        await resumeRepos(global, active, invocation, true);
         for (const repo of active) touched.set(repo.name, { repo, isAutomatic: true });
       }
     });
@@ -1526,16 +1540,7 @@ export async function unpausePass(repo: Repo, pressureDir: string = '/proc/press
   const global: GlobalConfig = readGlobal();
   const invocation: Invocation = { skipped: new Set(), dispatched: new Set(), sessionRefusals: new Set() };
   await withLock(resolve(globalHome(), '.lock'), async () => {
-    await sweep(
-      global,
-      repo,
-      discover(repo, invocation).leaves.filter(
-        (leaf) => leaf.state.phase === 'merged' || leaf.state.tab !== undefined || leaf.state.worktree !== undefined,
-      ),
-      invocation,
-      false,
-      false,
-    );
+    await resumeRepos(global, [repo], invocation, false);
   });
   try {
     await mergePass(global, repo, invocation, false, pressureDir);
