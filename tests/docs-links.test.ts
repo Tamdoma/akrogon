@@ -271,13 +271,17 @@ test('seat texts and refs name every non-title red name', (): void => {
     const text: string = readFileSync(resolve(root, file), 'utf8');
     expect(text, `${file} lists the script name`).toContain('(script)');
     expect(text, `${file} lists the nameless name`).toContain('(no test name)');
-    for (const link of [
-      join(root, 'skills/plan-issue/lifecycle-rules.md'),
-      join(root, 'skills/implement-issue/lifecycle-rules.md'),
-      join(root, 'skills/check-issue/lifecycle-rules.md'),
-      join(root, 'skills/merge-issue/lifecycle-rules.md'),
-    ])
+    const linkRows: string[] = Bun.spawnSync(['git', 'ls-files', '-s', '--', 'skills/*/lifecycle-rules.md'], {
+      cwd: root,
+    })
+      .stdout.toString()
+      .split('\n')
+      .filter((line: string) => line !== '');
+    expect(linkRows.length, 'five skills link lifecycle-rules.md').toBe(5);
+    for (const row of linkRows) {
+      const link: string = join(root, row.split('\t')[1]);
       expect(lstatSync(link).isSymbolicLink(), `${link} stays a symlink`).toBe(true);
+    }
   }
   const checks: string = readFileSync(resolve(root, 'docs/reference/checks.md'), 'utf8');
   expect(checks, 'checks.md states the script name').toContain('(script)');

@@ -29,6 +29,7 @@ test('shapes.md readiness.yaml example parses against readinessSchema', () => {
     'file',
   ]);
   expect(readiness.grants[0].fixtures.length).toBeGreaterThan(0);
+  expect(readiness.grants.some((grant) => grant.approved.by === 'standing')).toBe(true);
 });
 
 test('draft readiness.yaml gaps without state.yaml', async () => {
