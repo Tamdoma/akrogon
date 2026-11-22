@@ -265,7 +265,26 @@ test.serial(
       // The fix lands: the leaf resumes out of failed, and the case end already closed the
       // consultant (hc kill + rm) before the resume commands ran: its terminal is gone.
       const resumed: string[] = ['check.fix', 'check.review', 'check.repair'];
-      while (!resumed.includes(statePhase(tier.root, SLUG)) && Date.now() < deadline) await Bun.sleep(5000);
+      // The sends are read off the screens while the case runs: `hc read` returns only pi's last
+      // screenful, so a send seen once is kept. The consultant's sends land on the watcher's
+      // screen inside `<hc from="<consultant> ...">` and its own screen shows its `hc send`; the
+      // watcher's go out as `hc send` commands on its screen.
+      const named = (l: string): string[] => [...l.matchAll(/turn-\d+-(?:watch|consultant)\.md/g)].map((m) => m[0]);
+      const inbound: Set<string> = new Set();
+      const outbound: Set<string> = new Set();
+      const sample = async (): Promise<void> => {
+        for (const l of (await screen(tier, watcher, 200)).split('\n')) {
+          if (l.includes(`<hc from="${consultant!.address} `)) for (const f of named(l)) inbound.add(f);
+          else if (/\bhc send\b/.test(l)) for (const f of named(l)) outbound.add(f);
+        }
+        for (const l of (await screen(tier, consultant!.address, 200)).split('\n'))
+          if (/\bhc send\b/.test(l)) for (const f of named(l)) inbound.add(f);
+      };
+      while (!resumed.includes(statePhase(tier.root, SLUG)) && Date.now() < deadline) {
+        await sample();
+        await Bun.sleep(2000);
+      }
+      await sample();
       const phase: string = statePhase(tier.root, SLUG);
       const removed: boolean = await gone(tier, consultant!.address);
       tier.record('watcher-screen.txt', await screen(tier, watcher, 200));
@@ -321,18 +340,10 @@ test.serial(
       expect(seen.length).toBeGreaterThanOrEqual(2);
       expect(seen.every((n) => n.attention === false)).toBe(true);
 
-      // Every turn file named in a send exists, with a send each way: the consultant's sends land
-      // on the watcher's screen inside `<hc from="<consultant> ...">`, the watcher's go out as
-      // `hc send` commands.
-      const full: string = await screen(tier, watcher, 2000);
-      tier.record('watcher-screen-full.txt', full);
-      const named = (l: string): string[] => [...l.matchAll(/turn-\d+-(?:watch|consultant)\.md/g)].map((m) => m[0]);
-      const lines: string[] = full.split('\n');
-      const inbound: string[] = lines.filter((l) => l.includes(`<hc from="${consultant!.address} `)).flatMap(named);
-      const outbound: string[] = lines.filter((l) => /\bhc send\b/.test(l)).flatMap(named);
-      tier.record('sent-turn-files.json', { inbound, outbound });
-      expect(inbound.some((f) => f.endsWith('-consultant.md'))).toBe(true);
-      expect(outbound.some((f) => f.endsWith('-watch.md'))).toBe(true);
+      // Every turn file named in a send exists, with a send each way.
+      tier.record('sent-turn-files.json', { inbound: [...inbound], outbound: [...outbound] });
+      expect([...inbound].some((f) => f.endsWith('-consultant.md'))).toBe(true);
+      expect([...outbound].some((f) => f.endsWith('-watch.md'))).toBe(true);
       for (const file of [...inbound, ...outbound])
         expect(existsSync(resolve(caseDir, file)), `sent ${file} missing from the case`).toBe(true);
 
