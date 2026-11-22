@@ -4433,6 +4433,8 @@ async function selfUpdateCli(
       AKROGON_HOME: f.home,
       HOME: f.home,
       HERDR_PANE_ID: '',
+      AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
+      AKROGON_RETIRED_TEMP_ROOT: resolve(f.home, 'retired-temp'),
       SELF_UPDATE_LOG: resolve(f.home, 'self-update.log'),
       ...env,
     },
