@@ -268,8 +268,10 @@ test.serial(
       // The sends are read off the screens while the case runs: `hc read` returns only pi's last
       // screenful, so a send seen once is kept. A consultant's sends land on the watcher's screen
       // inside `<hc from="<address> aw-watch-consult">` and its own screen shows its `hc send`;
-      // the watcher's go out as `hc send` commands on its screen.
-      const named = (l: string): string[] => [...l.matchAll(/turn-\d+-(?:watch|consultant)\.md/g)].map((m) => m[0]);
+      // the watcher's go out as `hc send` commands on its screen. Each send's absolute path is
+      // kept as sent.
+      const named = (l: string): string[] =>
+        [...l.matchAll(/(?:^|[\s"'])(\/[^\s"'<>]*turn-\d+-(?:watch|consultant)\.md)/g)].map((m) => m[1]);
       const inbound: Set<string> = new Set();
       const outbound: Set<string> = new Set();
       const consultants = async (): Promise<Term[]> =>
@@ -349,12 +351,14 @@ test.serial(
       expect(seen.length).toBeGreaterThanOrEqual(2);
       expect(seen.every((n) => n.attention === false)).toBe(true);
 
-      // Every turn file named in a send exists, with a send each way.
+      // Every turn file named in a send is a file of this case, with a send each way.
       tier.record('sent-turn-files.json', { inbound: [...inbound], outbound: [...outbound] });
       expect([...inbound].some((f) => f.endsWith('-consultant.md'))).toBe(true);
       expect([...outbound].some((f) => f.endsWith('-watch.md'))).toBe(true);
-      for (const file of [...inbound, ...outbound])
-        expect(existsSync(resolve(caseDir, file)), `sent ${file} missing from the case`).toBe(true);
+      for (const file of [...inbound, ...outbound]) {
+        expect(dirname(file), `sent ${file} is outside the case ${caseDir}`).toBe(caseDir);
+        expect(existsSync(file), `sent ${file} missing`).toBe(true);
+      }
 
       // The base fix advanced the remote default branch fast-forward from the staged base.
       await command(['git', 'fetch', '-q', 'origin'], tier.root);
