@@ -368,7 +368,7 @@ grants:
     stop_line: <never-cross condition>
   - approved:
       by: standing
-      date: <YYYY-MM-DD of the paid_budget approval>
+      date: <YYYY-MM-DD of the paid_budget approval; "pending" while the key is absent>
       answer: '~/.akrogon/config.yaml paid_budget'
     principal: <agent identity>
     account: <logged-in harness account>
