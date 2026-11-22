@@ -151,10 +151,10 @@ test.serial(
     expect(required('AKROGON_E2E')).toBe('watch-consults');
     // The session budget (grant bound): each paid session is ended by teardown; the run
     // itself must finish inside AKROGON_SESSION_MINUTES per session.
+    reservedSessions(2);
     const minutes: number = z.coerce.number().positive().parse(process.env.AKROGON_SESSION_MINUTES);
     const deadline: number = Date.now() + minutes * 60_000;
     console.log(`session deadline: ${new Date(deadline).toISOString()} (AKROGON_SESSION_MINUTES=${minutes})`);
-    reservedSessions(2);
     const name: string = 'akr-e2e-watch-consults';
     const tier: WatchTier = await startWatchTier(
       name,
