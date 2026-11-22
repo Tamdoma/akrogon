@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { fixture, cli, entry, leaf, yaml, fakeAkrogon, leafTempRoot, type Fixture } from './helpers';
-import { command, finishCaptured, spawnFiles, type Result, type SpawnResult } from '../src/shell';
+import { command, finishCaptured, quote, spawnFiles, type Result, type SpawnResult } from '../src/shell';
 import { readState, saveState } from '../src/state';
 import type { Phase } from '../src/routing';
 
@@ -354,6 +354,60 @@ test('a reserved run waits behind the budget lock, then writes its row and runs'
     }
     expect(existsSync(marker)).toBe(true);
     expect(rows(f)).toHaveLength(1);
+  } finally {
+    f.clean();
+  }
+});
+
+test('a reservation waiting on the lock uses the lowered ceiling', async () => {
+  const f: Fixture = await fixture();
+  try {
+    budget(f, 3);
+    const { worktree } = await leafWorktree(f, 'lowered-ceiling');
+    const marker: string = resolve(f.home, 'ran');
+    const waitingAtLock: string = resolve(f.home, 'waiting-at-lock');
+    const lock: string = ledgerLock(f);
+    const flock: string = Bun.which('flock')!;
+    writeFileSync(
+      resolve(f.home, 'unitbin/flock'),
+      [
+        '#!/bin/sh',
+        'if [ "$2" = "$TEST_BUDGET_LOCK" ]; then touch "$TEST_BUDGET_WAITING"; fi',
+        `exec ${quote(flock)} "$@"`,
+        '',
+      ].join('\n'),
+      { mode: 0o755 },
+    );
+    const holder: Bun.Subprocess<'pipe', 'pipe', 'pipe'> = Bun.spawn(
+      [flock, '-x', lock, 'sh', '-c', 'printf locked; cat >/dev/null'],
+      { stdin: 'pipe', stdout: 'pipe', stderr: 'pipe' },
+    );
+    const reader: ReadableStreamDefaultReader<Uint8Array> = holder.stdout.getReader();
+    try {
+      expect((await reader.read()).done).toBe(false);
+      const waiting = spawnFiles([process.execPath, entry, 'run-check', '--sessions', '2', '--', 'touch', marker], {
+        cwd: worktree,
+        env: { ...runEnv(f), TEST_BUDGET_LOCK: lock, TEST_BUDGET_WAITING: waitingAtLock },
+        timeout: 10000,
+        killSignal: 'SIGKILL',
+      });
+      try {
+        await waitForFile(waitingAtLock, 5000);
+        budget(f, 1);
+        holder.stdin.end();
+        const result: SpawnResult = await finishCaptured(waiting.child, waiting.captured);
+        expect(result.code, result.stderr).toBe(1);
+        expect(result.stderr).toContain('0 of 1');
+        expect(existsSync(marker)).toBe(false);
+        expect(rows(f)).toEqual([]);
+      } finally {
+        if (waiting.child.exitCode === null) waiting.child.kill('SIGKILL');
+      }
+    } finally {
+      if (holder.exitCode === null) holder.kill();
+      reader.releaseLock();
+      await holder.exited;
+    }
   } finally {
     f.clean();
   }
