@@ -784,21 +784,17 @@ test("unpause gives a freed slot to another repo's older waiter", async () => {
   }
 }, 60000);
 
-test('a seat refused at a cap without --task waits for the refill', async () => {
+test('a refused seat stays a manual failure and never joins the refill', async () => {
   const f: DispatchFixture = await hcFixture();
   try {
     capMachine(f, 1);
     const running: string = leaf(f, 'running', 'plan.synthesis');
     expect((await next(f, ['running'])).code).toBe(0);
     const waiter: string = leaf(f, 'waiter', 'plan.synthesis');
-    const refused: Result = await cli(f, ['seat', 'waiter', 'A'], f.root, f.env);
-    expect(refused.code).not.toBe(0);
-    const tasked: string = leaf(f, 'tasked', 'plan.synthesis');
-    expect((await cli(f, ['seat', 'tasked', 'A', '--task', 'own task'], f.root, f.env)).code).not.toBe(0);
+    expect((await cli(f, ['seat', 'waiter', 'A'], f.root, f.env)).code).not.toBe(0);
     toMerge(running);
     expect((await next(f, ['--wake'])).code).toBe(0);
-    expect(readState(waiter).tab).toBeDefined();
-    expect(readState(tasked).tab).toBeUndefined();
+    expect(readState(waiter).tab).toBeUndefined();
   } finally {
     await f.clean();
   }

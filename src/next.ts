@@ -1255,8 +1255,6 @@ export async function seatCommand(slug: string, slot: Slot, task: string | undef
   await withLock(resolve(globalHome(), '.lock'), async () => {
     const leaf: Leaf = findLeaf(repo, slug);
     const allocated: Allocation | null = await allocate(global, repo, leaf, invocation);
-    // A refusal with the leaf's own phase task queues it for the refill like a pass refusal.
-    if (allocated === null && task === undefined) recordWait(repo, slug, 'capacity');
     if (allocated === null)
       throw new Error(
         `No free seat capacity: ${await capRefusal(global, repo, invocation)} (leaves waiting in merge are not counted)`,
