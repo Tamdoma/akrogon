@@ -6,8 +6,8 @@
 // base and push fast-forward, resumes the leaf with `akrogon phase` + `akrogon next`, writes
 // the case record and its signature, notices the push and the move non-attention, and closes
 // the consultant before the resume.
-// Count the watcher (pi), initial consultant (agy neon high) and each replacement that receives
-// a task. Reserve at least 2 sessions. Reconcile the tier evidence before counting a retry. The resumed leaf uses a stand-in.
+// The tier records the watcher (pi), initial consultant (agy neon high) and all consultant
+// replacements. Reserve at least 2 sessions. The resumed leaf uses a stand-in.
 // Run: akrogon run-check --name watch-consults --sessions <n> -- env AKROGON_E2E=watch-consults
 //      AKROGON_E2E_ROOT=<leaf temp> AKROGON_E2E_OUT=<leaf>/implementation/watch-consults-e2e
 //      WATCH_TICK_SECONDS=15
@@ -16,7 +16,7 @@ import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
-import { waitFor, type Seen } from '../../src/hc';
+import { follow, waitFor, type Seen } from '../../src/hc';
 import { command, spawnCaptured, type SpawnResult } from '../../src/shell';
 import { transcriptFor } from '../../src/transcript';
 import { realHome, required, reservedSessions } from './tier';
@@ -184,6 +184,10 @@ test.serial(
     const worktrees: string = resolve(leafTemp, `${name}-wtr`);
     let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
     let deadlineStop: Promise<SpawnResult> | undefined;
+    let watcherAddress: string | null = null;
+    const consultantStarts: Set<string> = new Set();
+    let observing: Promise<void> | undefined;
+    let closingTier: boolean = false;
     try {
       await observeReady(tier);
       // The leaf's skill copy must be the only watch-issues pi sees.
@@ -214,6 +218,20 @@ test.serial(
         `WATCH_TICK_SECONDS=${intervalSec}`,
         `AKROGON_E2E_ROOT=${leafTemp}`,
       ];
+      // Subscribe before the first launch so even a consultant removed before polling is counted.
+      process.env.XDG_RUNTIME_DIR = tier.runtime;
+      const subscribed = Promise.withResolvers<void>();
+      const events = follow(session, ['--label', 'akrogon.watch-consult=akre2e'], (line): void => {
+        if ('terminals' in line) {
+          subscribed.resolve();
+        } else if ('terminal' in line.params && line.params.type === 'created') {
+          consultantStarts.add(line.params.terminal);
+        }
+      });
+      observing = events.ended.then((): void => {
+        if (!closingTier) throw new Error('watch-consults lost its consultant launch stream before teardown');
+      });
+      await Promise.race([subscribed.promise, observing]);
       requireTime();
       const run: SpawnResult = await tier.hc([
         'run',
@@ -240,14 +258,12 @@ test.serial(
       ]);
       expect(run.code).toBe(0);
       const watcher: string = z.object({ address: z.string() }).parse(JSON.parse(run.stdout)).address;
+      watcherAddress = watcher;
       // The watcher owns the paid consultant terminals. Ending it ends those children too.
       deadlineTimer = setTimeout(() => {
         deadlineStop = tier.hc(['kill', watcher]);
       }, remaining(780_000));
       tier.record('cwds.json', [tier.root, leafTemp]);
-      // src/hc calls from this process (waitFor, transcriptFor) resolve the session socket
-      // under our own XDG_RUNTIME_DIR — point it at the tier's, as watch-live's startCell does.
-      process.env.XDG_RUNTIME_DIR = tier.runtime;
       // pi must be listening before the task lands: a send before its idle state sits
       // unsubmitted in the input line (plan-red run and the first lane run both lost it).
       const ready: Seen | null = await waitFor(
@@ -407,9 +423,19 @@ test.serial(
     } finally {
       clearTimeout(deadlineTimer);
       const stopped: SpawnResult | undefined = await deadlineStop;
+      closingTier = true;
       const left: string[] = await stopWatchTier(tier, [leafTemp]);
       tier.record('absence.json', { left });
       expect(left).toEqual([]);
+      // Core shutdown closes the stream after it has sent the queued terminal events.
+      await observing;
+      const usage: { watcher: string | null; consultants: string[]; sessions: number } = {
+        watcher: watcherAddress,
+        consultants: [...consultantStarts],
+        sessions: (watcherAddress === null ? 0 : 1) + consultantStarts.size,
+      };
+      tier.record('paid-sessions.json', usage);
+      console.log(JSON.stringify(usage));
       if (stopped !== undefined) expect(stopped.code, stopped.stderr).toBe(0);
     }
   },
