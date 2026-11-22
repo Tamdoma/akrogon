@@ -69,6 +69,7 @@ type Due = { n: number; attempts: number; sent: { at: number; turn: number } | n
 const dues: Due[] = [];
 let dueCount: number = 0;
 let nextBoundary: number = Date.now() + intervalMs;
+console.log(`[watch-timer] up: due 1 at ${new Date(nextBoundary).toISOString()}`);
 let effectiveTranscript: string | null = args.transcript;
 let transcriptMiss: number = 0;
 

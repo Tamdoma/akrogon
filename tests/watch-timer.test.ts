@@ -1078,28 +1078,35 @@ test.serial('dues queued during an idle timer gap coalesce when the watcher work
   try {
     const rig: Rig = await watchUp(f);
     rig.timer = await started(rig);
-    for (let n: number = 0; n < 40 && statusCalls(rig) === 0; n += 1) await Bun.sleep(25);
-    expect(statusCalls(rig)).toBe(1);
-    expect(tickLines(rig)).toHaveLength(0);
+    await waitChecks(rig, 1);
     const timer: Term = await get(f.core, rig.timer);
     const pid: number = z.number().parse(timer.foreground?.pid ?? timer.pid);
+    // The timer's boundaries count from its own start, which a loaded host can delay past
+    // the stop below: wait for its up line so the stop really skips boundaries.
+    const deadline: number = Date.now() + WAIT_MS;
+    const upLine = /\[watch-timer\] up: due 1 at (\S+)/;
+    while (Date.now() < deadline && !upLine.test(await screenOf(f.core, rig.timer))) await Bun.sleep(200);
+    const firstDue: number = Date.parse(z.string().parse(upLine.exec(await screenOf(f.core, rig.timer))?.[1]));
 
-    // Several boundaries pass without a timer poll, as after host suspend. The first due
-    // starts a long turn and the other unsent dues must collapse behind it.
+    // Several boundaries pass without a timer poll, as after host suspend. Ticks may already
+    // have gone out before the stop; the backlog the pause leaves is every due up to the last
+    // boundary before resume, counted on the timer's own clock while it is still stopped. Its
+    // oldest unsent due starts a long turn, and the rest of the backlog must collapse behind it.
     process.kill(pid, 'SIGSTOP');
-    try {
-      await Bun.sleep(6500);
-      writeFileSync(resolve(rig.flags, 'hold-status'), '8');
-    } finally {
-      process.kill(pid, 'SIGCONT');
-    }
-    await waitTick(rig, 1);
-    await waitLabel(rig, 1);
-    for (let n: number = 0; n < 80 && tickLines(rig).length < 2; n += 1) await Bun.sleep(200);
-    const delivered: number[] = tickLines(rig).map((line: string) => Number(/due=(\d+)/.exec(line)?.[1]));
-    expect(delivered).toHaveLength(2);
-    expect(delivered[1]).toBeGreaterThanOrEqual(6);
-    await waitLabel(rig, delivered[1]);
+    const backlog: number = await (async (): Promise<number> => {
+      try {
+        await Bun.sleep(6500);
+        writeFileSync(resolve(rig.flags, 'hold-status'), '8');
+        return Math.floor((Date.now() - firstDue) / 2000) + 1;
+      } finally {
+        process.kill(pid, 'SIGCONT');
+      }
+    })();
+    const [head, coalesced]: [number, number] = await heldPair(rig);
+    expect(coalesced).toBeGreaterThan(backlog);
+    await waitLabel(rig, coalesced);
+    const sent: number[] = await sentDues(rig);
+    expect(sent.slice(sent.indexOf(head), sent.indexOf(head) + 2)).toEqual([head, coalesced]);
   } finally {
     await f.clean();
   }
