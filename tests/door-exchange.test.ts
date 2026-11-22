@@ -104,12 +104,14 @@ async function foreground(core: HcCore, door: Door, until: (argv: string[] | nul
     const lines: string[] = buffer.split('\n');
     buffer = lines.pop() ?? '';
     for (const line of lines.filter((l: string) => l.trim() !== '')) {
+      const json = z.object({ method: z.string().optional() }).passthrough().parse(JSON.parse(line));
+      if (json.method === 'heartbeat') continue;
       const message = z
         .object({
           terminals: z.array(z.object({ foreground: fg.optional() })).optional(),
           params: z.object({ type: z.string(), data: z.unknown() }).optional(),
         })
-        .parse(JSON.parse(line));
+        .parse(json);
       const argv: string[] | null | undefined =
         message.terminals !== undefined
           ? (message.terminals[0]?.foreground?.argv ?? null)

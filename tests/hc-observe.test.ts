@@ -78,12 +78,14 @@ function restarted(core: HcCore, address: string, ms: number = WAIT_MS): { ready
         const parts: string[] = buffer.split('\n');
         buffer = parts.pop() ?? '';
         for (const line of parts.filter((l: string) => l.trim() !== '')) {
+          const json = z.object({ method: z.string().optional() }).passthrough().parse(JSON.parse(line));
+          if (json.method === 'heartbeat') continue;
           const message = z
             .object({
               terminals: z.array(z.unknown()).optional(),
               params: z.object({ type: z.string(), terminal: z.string().optional() }).optional(),
             })
-            .parse(JSON.parse(line));
+            .parse(json);
           if (message.terminals !== undefined) snapshot();
           if (message.params?.type === 'restarted' && message.params.terminal === address) return;
         }

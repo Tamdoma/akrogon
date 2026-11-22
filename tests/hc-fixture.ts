@@ -297,6 +297,7 @@ export async function hcCore(
           buffer = lines.pop() ?? '';
           for (const line of lines.filter((l) => l.trim() !== '')) {
             const message = z.record(z.string(), z.unknown()).parse(JSON.parse(line));
+            if (message.method === 'heartbeat') continue;
             if (Array.isArray(message.terminals)) current = z.array(terminalSchema).parse(message.terminals)[0] ?? null;
             else if (current !== null) {
               const params = z
