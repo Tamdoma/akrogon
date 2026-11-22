@@ -296,6 +296,35 @@ test('a malformed ledger row refuses naming the file and the bad row', async () 
   }
 });
 
+test('ledger row boundaries survive append and expose a trailing blank row', async () => {
+  const f: Fixture = await fixture();
+  try {
+    budget(f, 10);
+    const { worktree } = await leafWorktree(f, 'ledger-boundary');
+    const previous: string = JSON.stringify(row(f.repo, 'earlier', 1, 1));
+    writeFileSync(ledger(f), previous);
+    const admitted: Result = await cli(f, ['run-check', '--sessions', '1', '--', 'true'], worktree, baseEnv(f));
+    const appended: string[] = readFileSync(ledger(f), 'utf8').split('\n');
+
+    const malformed: string = previous + '\n\n';
+    writeFileSync(ledger(f), malformed);
+    const marker: string = resolve(f.home, 'blank-row-ran');
+    const refused: Result = await cli(f, ['run-check', '--sessions', '1', '--', 'touch', marker], worktree, baseEnv(f));
+    expect({
+      admitted: admitted.code,
+      firstRow: appended[0],
+      rows: appended.length - 1,
+      refused: refused.code,
+      started: existsSync(marker),
+      ledger: readFileSync(ledger(f), 'utf8'),
+    }).toEqual({ admitted: 0, firstRow: previous, rows: 2, refused: 1, started: false, ledger: malformed });
+    expect(JSON.parse(appended[1])).toMatchObject({ repo: f.repo, slug: 'ledger-boundary', sessions: 1 });
+    expect(refused.stderr).toContain(`${ledger(f)} row 2:`);
+  } finally {
+    f.clean();
+  }
+});
+
 test('a failed ledger append refuses and starts no command', async () => {
   const f: Fixture = await fixture();
   try {
