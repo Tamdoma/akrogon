@@ -209,7 +209,7 @@ test('a reservation over the rolling 24-hour ceiling is refused naming the total
     expect(result.stderr).toContain('paid session budget');
     expect(result.stderr).toContain('24-hour total 3 of 3');
     expect(result.stderr).toContain('fits at');
-    const fitsAt: string = /fits at (\S+)/.exec(result.stderr)?.[1] ?? '';
+    const fitsAt: string = /fits at (\d{4}-\d{2}-\d{2}T\S+)/.exec(result.stderr)?.[1] ?? '';
     const expected: number = Date.parse(first.at) + 24 * 3600_000;
     expect(Math.abs(Date.parse(fitsAt) - expected)).toBeLessThan(5000);
     expect(existsSync(marker)).toBe(false);
