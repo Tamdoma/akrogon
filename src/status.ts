@@ -378,26 +378,19 @@ function render(titles: string[], lines: string[][]): string[] {
 
 const chartHeader: string[] = ['CHART', 'TAKEN', 'FOG', 'STAGE', 'AGE'];
 
-const lineHeader: string[] = ['REPO', 'LEAF', 'CHECK', 'STATE', 'AGE', 'RUN'];
-
-// Shown only while a listed run waits: each repo's holder first, then its
-// waiters in queue order.
-function lineRows(runs: RunRecord[], now: number): string[][] {
-  let perRepo: number = 0;
-  let lastRepo: string = '';
-  return runs.map((run) => {
-    perRepo = run.repo === lastRepo ? perRepo : 0;
-    lastRepo = run.repo;
-    if (run.state === 'waiting') perRepo += 1;
-    return [
-      `  ${run.repo}`,
-      run.leaf,
-      run.check,
-      run.state === 'waiting' ? `waiting ${perRepo}` : run.state === 'ended' ? 'ended' : 'running',
-      clock(now - Date.parse(run.since)),
-      run.run,
-    ];
-  });
+// Shown only while a listed run waits: one block per repo, started runs first,
+// then waiters by arrival. Arrival is not admission order (a land's own runs go
+// first), so waiters carry no position.
+function lineText(runs: RunRecord[], now: number): string[] {
+  return [...new Set(runs.map((run) => run.repo))].flatMap((repo: string): string[] => [
+    `  ${paint('1', repo)}`,
+    ...runs
+      .filter((run) => run.repo === repo)
+      .map((run) => {
+        const state: string = run.state === 'waiting' ? 'waiting' : run.state === 'ended' ? 'ended' : 'running';
+        return `    ${paint(lineColor[state], state.padEnd(7))}  ${run.leaf} · ${run.check} · queued ${clock(now - Date.parse(run.since))} ago  ${paint('2', run.run)}`;
+      }),
+  ]);
 }
 
 export type ChartStage = 'handed off' | 'closed' | 'held';
@@ -818,10 +811,7 @@ export async function statusCommand(
       .slice(0, 5);
     const runs: RunRecord[] = lineRuns();
     const run: string | null = runs.some((record) => record.state === 'waiting')
-      ? [
-          'run line (one per repo)',
-          ...render(lineHeader, [['  REPO', ...lineHeader.slice(1)], ...lineRows(runs, now)]),
-        ].join('\n')
+      ? ['run line (one queue per repo)', ...lineText(runs, now)].join('\n')
       : null;
     const leafReds: number = repos.reduce((sum, repo) => sum + repo.leaves.filter((leaf) => leaf.red).length, 0);
     const unreadables: number = repos.reduce((sum, repo) => sum + repo.unreadable.length, 0);
@@ -934,8 +924,8 @@ export async function statusCommand(
   }
   const runs: RunRecord[] = lineRuns();
   if (runs.some((run) => run.state === 'waiting')) {
-    console.log(paint('1;4', 'run line (one per repo)'));
-    console.log(render(lineHeader, [['  REPO', ...lineHeader.slice(1)], ...lineRows(runs, now)]).join('\n'));
+    console.log(paint('1;4', 'run line (one queue per repo)'));
+    console.log(lineText(runs, now).join('\n'));
   }
   if (scans.some((scan) => !scan.ok || scan.failures.length > 0)) process.exitCode = 1;
 }

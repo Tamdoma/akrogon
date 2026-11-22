@@ -176,7 +176,7 @@ test('envelope carries every board alert fact', async () => {
       attempted: 'abc123def4567890abc123def4567890abc123de',
       step: 'verify',
     });
-    expect(env.run).toContain('run line (one per repo)');
+    expect(env.run).toContain('run line (one queue per repo)');
     expect(env.run).toContain('waiting-run');
     expect(repoOf(env, 'other').error).toContain('/nonexistent-registered-path');
     expect(repoOf(env, 'other').unreadable).toHaveLength(1);

@@ -1083,15 +1083,19 @@ test('status shows the run line only while a listed run waits', async () => {
     });
     const board: string = (await cli(f, ['status'])).stdout;
     expect(board).toMatch(/run line/);
-    expect(board).toMatch(/REPO\s+LEAF\s+CHECK\s+STATE\s+AGE\s+RUN/);
-    expect(board).toMatch(new RegExp(`${f.repo}\\s+seeded\\s+test\\s+running\\s+\\d+h \\d+m\\s+r-live`));
-    expect(board).toMatch(new RegExp(`${f.repo}\\s+leaf-two\\s+test\\s+waiting 1\\s+\\d+h \\d+m\\s+repo-w1`));
-    expect(board).toMatch(new RegExp(`${f.repo}\\s+leaf-one\\s+test\\s+waiting 2\\s+\\d+h \\d+m\\s+repo-w2`));
-    expect(board).toMatch(/other\s+oleaf\s+test\s+running\s+\d+h \d+m\s+other-h/);
-    expect(board).toMatch(/other\s+oleaf2\s+test\s+waiting 1\s+\d+h \d+m\s+other-w/);
+    const at = (text: string): number => board.indexOf(text);
+    expect(board.match(new RegExp(`^  ${f.repo}$`, 'gm'))).toHaveLength(1);
+    expect(board).toMatch(/^  other$/m);
+    expect(board).toMatch(/running\s+seeded · test · queued \d+h \d+m ago\s+r-live/);
+    expect(board).toMatch(/waiting\s+leaf-two · test · queued \d+h \d+m ago\s+repo-w1/);
+    expect(board).toMatch(/waiting\s+leaf-one · test · queued \d+h \d+m ago\s+repo-w2/);
+    expect(board).toMatch(/running\s+oleaf · test · queued \d+h \d+m ago\s+other-h/);
+    expect(board).toMatch(/waiting\s+oleaf2 · test · queued \d+h \d+m ago\s+other-w/);
+    expect(at('r-live')).toBeLessThan(at('repo-w1'));
+    expect(at('repo-w1')).toBeLessThan(at('repo-w2'));
     expect(board).not.toMatch(/unlisted/);
     // An ended record still holds its repo's line until removal, so it shows its real state.
-    expect(board).toMatch(new RegExp(`${f.repo}\\s+seeded\\s+test\\s+ended\\s+\\d+h \\d+m\\s+r-ended`));
+    expect(board).toMatch(/ended\s+seeded · test · queued \d+h \d+m ago\s+r-ended/);
   } finally {
     f.clean();
   }
