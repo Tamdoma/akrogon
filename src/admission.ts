@@ -16,6 +16,7 @@ export interface AdmissionHolder {
   unit: string;
   full: boolean;
   attempt?: string;
+  land?: true;
 }
 
 export type Admission =
@@ -37,6 +38,7 @@ const recordSchema = z.object({
   unit: z.string(),
   full: z.boolean().default(false),
   attempt: z.string().optional(),
+  land: z.literal(true).optional(),
   since: z.iso.datetime(),
 });
 export type RunRecord = z.infer<typeof recordSchema>;
@@ -119,11 +121,11 @@ export function liveRuns(): RunRecord[] {
     });
 }
 
-// A live run of a merge attempt holds its repo: a run of that repo that
-// arrived after it and carries no attempt or another one waits until it ends.
+// A live land record holds its repo: a run of that repo that arrived after it
+// and carries no attempt or another one waits until it ends.
 function holds(hold: RunRecord, run: RunRecord): boolean {
   return (
-    hold.attempt !== undefined &&
+    hold.land === true &&
     hold.state === 'live' &&
     hold.repo === run.repo &&
     hold.attempt !== run.attempt &&
@@ -131,7 +133,7 @@ function holds(hold: RunRecord, run: RunRecord): boolean {
   );
 }
 
-// Runs named in a `full` list, merge-attempt runs and every waiting run, from
+// Runs named in a `full` list, land records and every waiting run, from
 // every repo, sorted for each repo's line: the holders (live or ended, whose
 // units may still be stopping) before waiters in arrival order. Cancelled and
 // unreadable records never join.
@@ -144,7 +146,7 @@ export function lineRuns(): RunRecord[] {
     .flatMap((name) => {
       const record: RunRecord | undefined = readRecord(resolve(dir, name));
       return record !== undefined &&
-        (record.full || record.attempt !== undefined || record.state === 'waiting') &&
+        (record.full || record.land === true || record.state === 'waiting') &&
         record.state !== 'cancelled' &&
         live(record, boot)
         ? [record]
@@ -178,8 +180,12 @@ async function awaitTurn(record: RunRecord): Promise<void> {
         const held = (run: RunRecord): RunRecord | undefined => runs.find((hold) => holds(hold, run));
         // A waiting run of the holding attempt goes ahead of the line's other waiters.
         const holding = (run: RunRecord): boolean =>
-          run.attempt !== undefined && runs.some((hold) => hold.state === 'live' && hold.attempt === run.attempt);
-        const line: RunRecord[] = runs.filter((entry) => entry.full && held(entry) === undefined);
+          run.attempt !== undefined &&
+          runs.some((hold) => hold.land === true && hold.state === 'live' && hold.attempt === run.attempt);
+        // Started listed runs stay ahead whatever their arrival; a hold only filters waiters.
+        const line: RunRecord[] = runs.filter(
+          (entry) => entry.full && (entry.state !== 'waiting' || held(entry) === undefined),
+        );
         const ahead: RunRecord | undefined =
           held(record) ??
           (record.full ? (line.find((entry) => entry.state !== 'waiting') ?? line.find(holding) ?? line[0]) : record);

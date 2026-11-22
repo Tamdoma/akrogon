@@ -203,10 +203,18 @@ test('a land run holds its repo: a leaf run-check waits for it and starts after 
     mkdirSync(marks, { recursive: true });
     const aa: string = await allocated(f, 'aa', 'issue-aa');
     const bb: string = await allocated(f, 'bb', 'issue-bb');
+    const cc: string = await allocated(f, 'cc', 'issue-cc');
     await commitIn(aa, 'aa-file', 'aa\n');
+    await commitIn(bb, 'bb-file', 'bb\n');
     toMerge(aa);
     const { attempt } = await claimed(f, aa);
-    const landing: Promise<Result> = land(f, 'aa', attempt);
+    // bb waits in merge, so aa's exit launches its land: the launch must see no hold.
+    toMerge(bb, '2026-10-19T00:00:01.000Z');
+    const holdsLog: string = resolve(marks, 'launch-holds');
+    const landing: Promise<Result> = cli(f, ['land', 'aa', '--attempt', attempt], f.root, {
+      ...f.env,
+      FAKE_LAND_HOLDS_LOG: holdsLog,
+    });
     const deadline: number = Date.now() + 30000;
     while (!existsSync(resolve(marks, 'land.held'))) {
       if (Date.now() > deadline) throw new Error('land check never started');
@@ -219,7 +227,7 @@ test('a land run holds its repo: a leaf run-check waits for it and starts after 
     expect(holds).toHaveLength(1);
     expect(holds[0]).toMatchObject({ attempt, leaf: 'aa', state: 'live' });
     expect(String(holds[0].unit)).not.toContain('akrogon-land-');
-    const worktree: string = z.string().parse(readState(bb).worktree);
+    const worktree: string = z.string().parse(readState(cc).worktree);
     const waiting: Promise<Result> = cli(
       f,
       ['run-check', '--name', 'probe', '--', 'touch', `${marks}/probe`],
@@ -238,6 +246,11 @@ test('a land run holds its repo: a leaf run-check waits for it and starts after 
     expect(probe.stderr).toContain(`waiting for ${f.repo}/aa land`);
     expect(existsSync(resolve(marks, 'probe'))).toBe(true);
     expect(readState(aa).phase).toBe('check.repair');
+    const launches: string[] = readFileSync(holdsLog, 'utf8')
+      .split('\n')
+      .filter((line) => line.includes('--unit=akrogon-land-'));
+    expect(launches).toHaveLength(1);
+    expect(launches[0]).toEndWith(' holds=0');
   } finally {
     await f.clean();
   }

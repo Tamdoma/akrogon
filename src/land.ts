@@ -187,6 +187,7 @@ export async function land(
     unit: `${runUnitBase(run)}.scope`,
     full: false,
     attempt,
+    land: true,
   };
   const exit: Exit = await withAdmission(hold, () => landAttempt(global, repo, slug, attempt, pressureDir));
   await exit();

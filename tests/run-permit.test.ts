@@ -755,9 +755,9 @@ test('no run.lock lanes, run-holder files or name exemptions remain in src, and 
   }
 });
 
-// #147: a run carrying a merge attempt holds its repo. A merge leaf's batch
-// attempt reaches its run-checks through leafFields, as the land run's own
-// verify commands carry it.
+// #147: a land record holds its repo. The record is the one `land` takes; a
+// merge leaf's batch attempt reaches its run-checks through leafFields, as the
+// land run's own verify commands carry it.
 async function attemptWorktree(f: Fixture, slug: string, attempt: string): Promise<string> {
   const worktree: string = resolve(storeDir(f), slug);
   await command(['git', 'worktree', 'add', worktree, '-b', slug], f.root);
@@ -768,7 +768,28 @@ async function attemptWorktree(f: Fixture, slug: string, attempt: string): Promi
   return worktree;
 }
 
-test('a merge attempt holds its repo: later runs wait, earlier and other-repo runs do not', async () => {
+// A land record held until `<dir>/<release>` appears; `<dir>/<name>.held` marks it live.
+function landHold(f: Fixture, dir: string, name: string, repo: string, attempt: string, release: string): Cap {
+  const admission: string = resolve(import.meta.dir, '../src/admission.ts');
+  const script: string = [
+    `const { withAdmission } = await import(${JSON.stringify(admission)});`,
+    `const { existsSync, writeFileSync } = await import('node:fs');`,
+    `const run = crypto.randomUUID();`,
+    `await withAdmission({ repo: ${JSON.stringify(repo)}, leaf: ${JSON.stringify(name)}, check: 'land', run, slice: 'akrogon.slice', scope: '', unit: run + '.scope', full: false, attempt: ${JSON.stringify(attempt)}, land: true }, async () => {`,
+    `  writeFileSync(${JSON.stringify(`${dir}/${name}.held`)}, '');`,
+    `  while (!existsSync(${JSON.stringify(`${dir}/${release}`)})) await Bun.sleep(50);`,
+    `});`,
+  ].join('\n');
+  const proc: Proc = Bun.spawn([process.execPath, '-e', script], {
+    stdin: 'ignore',
+    stdout: 'pipe',
+    stderr: 'pipe',
+    env: { ...process.env, AKROGON_HOME: f.home, HOME: f.home, AKROGON_RUN: '' },
+  });
+  return { proc, text: async () => await new Response(proc.stderr).text() };
+}
+
+test('a land holds its repo: later runs wait, earlier, own-attempt and other-repo runs do not', async () => {
   const f: Fixture = await fixture();
   const caps: Cap[] = [];
   try {
@@ -780,14 +801,19 @@ test('a merge attempt holds its repo: later runs wait, earlier and other-repo ru
     const before: Cap = run(f, ['run-check', '--name', 'format', '--', ...hold(dir, 'before')], early);
     caps.push(before);
     await waitFor(resolve(dir, 'before.held'));
-    // The hold starts at once beside a run that was already live.
-    const held: Cap = run(f, ['run-check', '--name', 'format', '--', ...hold(dir, 'land')], landing);
+    // Another repo's land holds nothing here.
+    const elsewhere: Cap = landHold(f, dir, 'elsewhere', 'other-repo', 'att-9', 'release');
+    caps.push(elsewhere);
+    await waitFor(resolve(dir, 'elsewhere.held'));
+    const free: Result = await cli(f, ['run-check', '--name', 'format', '--', ...touch(dir, 'free')], late);
+    expect(free.code).toBe(0);
+    // The land starts at once beside a run that was already live.
+    const held: Cap = landHold(f, dir, 'landing', f.repo, 'att-1', 'release');
     caps.push(held);
-    await waitFor(resolve(dir, 'land.held'));
+    await waitFor(resolve(dir, 'landing.held'));
     const after: Cap = run(f, ['run-check', '--name', 'format', '--', ...touch(dir, 'after')], late);
     caps.push(after);
-    await waitForText(after, new RegExp(`waiting for ${f.repo}/landing format`));
-    // A run of the holding attempt is not held back.
+    await waitForText(after, new RegExp(`waiting for ${f.repo}/landing land`));
     const own: Result = await cli(f, ['run-check', '--name', 'format', '--', ...touch(dir, 'own')], landing);
     expect(own.code).toBe(0);
     expect(existsSync(resolve(dir, 'after'))).toBe(false);
@@ -796,13 +822,14 @@ test('a merge attempt holds its repo: later runs wait, earlier and other-repo ru
     expect(await after.proc.exited).toBe(0);
     expect(existsSync(resolve(dir, 'after'))).toBe(true);
     expect(await before.proc.exited).toBe(0);
+    expect(await elsewhere.proc.exited).toBe(0);
   } finally {
     stop(caps);
     f.clean();
   }
 }, 75000);
 
-test('a killed hold stops holding and stop-run cancels a run waiting behind a hold', async () => {
+test('a dead land stops holding even while its own check lives, and stop-run cancels a held-back run', async () => {
   const f: Fixture = await fixture();
   const caps: Cap[] = [];
   try {
@@ -810,26 +837,32 @@ test('a killed hold stops holding and stop-run cancels a run waiting behind a ho
     yaml(resolve(f.root, 'issues/config.yaml'), FULL_CONFIG);
     const late: string = await leafWorktree(f, 'late-leaf');
     const landing: string = await attemptWorktree(f, 'landing', 'att-1');
-    const held: Cap = run(f, ['run-check', '--name', 'format', '--', ...hold(dir, 'land')], landing);
+    const held: Cap = landHold(f, dir, 'landing', f.repo, 'att-1', 'never');
     caps.push(held);
-    await waitFor(resolve(dir, 'land.held'));
+    await waitFor(resolve(dir, 'landing.held'));
+    const check: Cap = run(f, ['run-check', '--name', 'format', '--', ...hold(dir, 'check')], landing);
+    caps.push(check);
+    await waitFor(resolve(dir, 'check.held'));
     const scopeName: string = 'pane-cancel.scope';
     const cancelled: Cap = run(f, ['run-check', '--name', 'format', '--', ...touch(dir, 'cancelled')], late, {
       AKROGON_PROC_ROOT: scopedProcRoot(f, scopeName),
     });
     caps.push(cancelled);
-    await waitForText(cancelled, new RegExp(`waiting for ${f.repo}/landing format`));
+    await waitForText(cancelled, new RegExp(`waiting for ${f.repo}/landing land`));
     const stopped: Result = await cli(f, ['stop-run'], late, { AKROGON_PROC_ROOT: scopedProcRoot(f, scopeName) });
     expect(stopped.code).toBe(0);
     expect(await cancelled.proc.exited).not.toBe(0);
     expect(existsSync(resolve(dir, 'cancelled'))).toBe(false);
     const after: Cap = run(f, ['run-check', '--name', 'format', '--', ...touch(dir, 'after')], late);
     caps.push(after);
-    await waitForText(after, new RegExp(`waiting for ${f.repo}/landing format`));
+    await waitForText(after, new RegExp(`waiting for ${f.repo}/landing land`));
     killTree(held.proc);
     await held.proc.exited;
+    // The land's own check still runs; the later run starts anyway.
     expect(await after.proc.exited).toBe(0);
     expect(existsSync(resolve(dir, 'after'))).toBe(true);
+    writeFileSync(resolve(dir, 'release'), '');
+    expect(await check.proc.exited).toBe(0);
   } finally {
     stop(caps);
     f.clean();
@@ -851,10 +884,10 @@ test("a listed run of the holding attempt starts ahead of the line's earlier wai
     const early: Cap = run(f, ['run-check', '--name', 'test', '--', ...record('early', dir)], second);
     caps.push(early);
     await waitForText(early, new RegExp(`waiting for ${f.repo}/leaf-one test`));
-    const hold2: string[] = ['sh', '-c', `touch ${dir}/land.held; while [ ! -e ${dir}/release2 ]; do sleep 0.05; done`];
-    const held: Cap = run(f, ['run-check', '--name', 'format', '--', ...hold2], landing);
+    const held: Cap = landHold(f, dir, 'landing', f.repo, 'att-1', 'release2');
     caps.push(held);
-    await waitFor(resolve(dir, 'land.held'));
+    await waitFor(resolve(dir, 'landing.held'));
+    // The started listed run stays ahead of the land's own listed run.
     const own: Cap = run(f, ['run-check', '--name', 'test', '--', ...record('own', dir)], landing);
     caps.push(own);
     await waitForText(own, new RegExp(`waiting for ${f.repo}/leaf-one test`));
@@ -871,7 +904,7 @@ test("a listed run of the holding attempt starts ahead of the line's earlier wai
   }
 }, 75000);
 
-test('a listed run nested under a hold of its repo starts at once', async () => {
+test('a listed run nested under a run of a land attempt starts at once', async () => {
   const f: Fixture = await fixture();
   const caps: Cap[] = [];
   try {
@@ -879,39 +912,42 @@ test('a listed run nested under a hold of its repo starts at once', async () => 
     yaml(resolve(f.root, 'issues/config.yaml'), FULL_CONFIG);
     const other: string = await leafWorktree(f, 'other-leaf');
     const landing: string = await attemptWorktree(f, 'landing', 'att-1');
+    const held: Cap = landHold(f, dir, 'landing', f.repo, 'att-1', 'release');
+    caps.push(held);
+    await waitFor(resolve(dir, 'landing.held'));
     const shim: NodeJS.ProcessEnv = fakeAkrogon(f).env;
     const script: string = `cd ${other}; akrogon run-check --name test -- touch ${dir}/inner`;
     const outer: Result = await cli(f, ['run-check', '--name', 'format', '--', 'sh', '-c', script], landing, shim);
     expect(outer.code).toBe(0);
     expect(existsSync(resolve(dir, 'inner'))).toBe(true);
+    writeFileSync(resolve(dir, 'release'), '');
+    expect(await held.proc.exited).toBe(0);
   } finally {
     stop(caps);
     f.clean();
   }
 }, 75000);
 
-test('a run that waited behind one hold starts when it ends, beside a later hold', async () => {
+test('a run that waited behind one land starts when it ends, beside a later land', async () => {
   const f: Fixture = await fixture();
   const caps: Cap[] = [];
   try {
     const dir: string = marks(f);
     yaml(resolve(f.root, 'issues/config.yaml'), FULL_CONFIG);
     const late: string = await leafWorktree(f, 'late-leaf');
-    const one: string = await attemptWorktree(f, 'land-one', 'att-1');
-    const two: string = await attemptWorktree(f, 'land-two', 'att-2');
-    const first: Cap = run(f, ['run-check', '--name', 'format', '--', ...hold(dir, 'one')], one);
+    const first: Cap = landHold(f, dir, 'land-one', f.repo, 'att-1', 'release');
     caps.push(first);
-    await waitFor(resolve(dir, 'one.held'));
+    await waitFor(resolve(dir, 'land-one.held'));
     const waiter: Cap = run(f, ['run-check', '--name', 'format', '--', ...touch(dir, 'waiter')], late);
     caps.push(waiter);
-    await waitForText(waiter, new RegExp(`waiting for ${f.repo}/land-one format`));
-    const hold2: string[] = ['sh', '-c', `touch ${dir}/two.held; while [ ! -e ${dir}/release2 ]; do sleep 0.05; done`];
-    const second: Cap = run(f, ['run-check', '--name', 'format', '--', ...hold2], two);
+    await waitForText(waiter, new RegExp(`waiting for ${f.repo}/land-one land`));
+    const second: Cap = landHold(f, dir, 'land-two', f.repo, 'att-2', 'release2');
     caps.push(second);
-    await waitForText(second, new RegExp(`waiting for ${f.repo}/land-one format`));
+    await Bun.sleep(1500);
+    expect(existsSync(resolve(dir, 'land-two.held'))).toBe(false);
     writeFileSync(resolve(dir, 'release'), '');
     expect(await first.proc.exited).toBe(0);
-    await waitFor(resolve(dir, 'two.held'));
+    await waitFor(resolve(dir, 'land-two.held'));
     expect(await waiter.proc.exited).toBe(0);
     writeFileSync(resolve(dir, 'release2'), '');
     expect(await second.proc.exited).toBe(0);

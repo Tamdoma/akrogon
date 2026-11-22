@@ -21,7 +21,7 @@ A build conflict or a dirty holder worktree never reaches land: the turn exits t
 
 ## The land run
 
-`akrogon land <slug> --attempt <id>` runs as the user unit `akrogon-land-<id>` — no prompt, no seat, no seat identity. It claims the leaf only while the leaf is in merge on its attempt, and holds its repo for the attempt: runs of the repo that start later wait until it ends ([checks](../../docs/reference/checks.md)). Its exits and wakes run after the hold ends.
+`akrogon land <slug> --attempt <id>` runs as the user unit `akrogon-land-<id>` — no prompt, no seat, no seat identity. It claims the leaf only while the leaf is in merge on its attempt, and holds its repo for the attempt: runs of the repo that start later wait until it ends. Its exits and wakes run after the hold ends.
 
 1. `akrogon verify --attempt <id>` on the candidate worktree head: every `checks` command not named in `merge_covers`, then every `merge_checks` command at once. It is the only runner of `merge_checks`; `akrogon run-check` refuses them.
 2. The land gates — everything a refused non-failed move enforces, plus the merge ones: clean worktree, no `issues/` files on the branch, `Test-Change:` trailers over the pushed range, no retired-lesson line resurrected in the range, HEAD descending from the recorded `top`, and a green merge receipt for HEAD. Passing stamps `batch.tested_top` and `batch.tested_main`.
