@@ -18,6 +18,8 @@ For the plan-issue and implement-issue seats only, a producer's key is saved onl
 
 A seat keeps command output only through `akrogon run-check --name <label> -- <cmd>` and cites the `check <label>: <exit> <path>` line it prints to stderr; a cited log is read back with `akrogon log <path>`. Exempt: the printed `checks` commands and `akrogon verify`, which already keep logs; `akrogon phase ... merged`, which moves its own owner; and coordination commands (fetch, push), whose errors are quoted in the report as text.
 
+A run that prints `waiting for <repo>/<leaf> land` has not started: a land run holds the repo until it ends, so the wait is no failure and no hung check. Wait it out or rerun the same command.
+
 ## Red check with no cause in the leaf's diff
 
 Wherever a lifecycle seat meets a red test or check with no cause in the leaf's diff — a failing planned check for plan-issue, implement end and check.fix for implement-issue, check.review and check.repair for check-issue — the same judgment applies, run through the seat's own command form and recorded in its record file. The judging seat is the seat running the pass, except where its skill assigns the head/base log judgment to another slot.

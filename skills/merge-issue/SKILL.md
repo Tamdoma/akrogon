@@ -21,7 +21,7 @@ A build conflict or a dirty holder worktree never reaches land: the turn exits t
 
 ## The land run
 
-`akrogon land <slug> --attempt <id>` runs as the user unit `akrogon-land-<id>` — no prompt, no seat, no seat identity. It claims the leaf only while the leaf is in merge on its attempt:
+`akrogon land <slug> --attempt <id>` runs as the user unit `akrogon-land-<id>` — no prompt, no seat, no seat identity. It claims the leaf only while the leaf is in merge on its attempt, and holds its repo for the attempt: runs of the repo that start later wait until it ends ([checks](../../docs/reference/checks.md)). Its exits and wakes run after the hold ends.
 
 1. `akrogon verify --attempt <id>` on the candidate worktree head: every `checks` command not named in `merge_covers`, then every `merge_checks` command at once. It is the only runner of `merge_checks`; `akrogon run-check` refuses them.
 2. The land gates — everything a refused non-failed move enforces, plus the merge ones: clean worktree, no `issues/` files on the branch, `Test-Change:` trailers over the pushed range, no retired-lesson line resurrected in the range, HEAD descending from the recorded `top`, and a green merge receipt for HEAD. Passing stamps `batch.tested_top` and `batch.tested_main`.
@@ -50,7 +50,7 @@ Push outcomes are not exits: a first non-fast-forward refusal restacks onto the 
 
 ## Phase calls on a merge leaf
 
-A call on a merge leaf carrying `--slot` or `--attempt` is refused: `A seat cannot make merge calls: <requested>`. `merged --check` is refused: `--check is the seat protocol and merge holds no seat: run the move without --check`. `merged` or `check.fix` on a leaf that does not hold the turn is refused, naming the holder when one holds it. `check.fix` is always refused on a merge leaf: `Merge moves to check.repair itself; a second red takes check.fix from check.repair`.
+A call on a merge leaf carrying `--slot` or `--attempt` is refused: `A seat cannot make merge calls: <requested>`. `merged --check` is refused: `--check is the seat protocol and merge holds no seat: run the move without --check`. `merged` or `check.fix` on a leaf that does not hold the turn is refused, naming the holder when one holds it. `check.fix` is always refused on a merge leaf: `Merge moves to check.repair itself; a leaf-caused red takes check.fix from check.repair`.
 
 The one legal move call is the operator's slot-less `akrogon phase <slug> merged`, which lands the leaf's applied batch: it pushes the tested head fast-forward, restacks once on a non-fast-forward refusal and pushes again, completes the owner and moves the leaf — or fails the call when nothing was pushed. Any seat or the operator can still stop the leaf with `akrogon phase <slug> failed --reason "<text>"`, and a failed leaf's operator recovery back into `merge` re-enters the queue.
 

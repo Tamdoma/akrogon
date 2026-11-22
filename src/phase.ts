@@ -948,7 +948,7 @@ export async function phaseCommand(
         record.pressure_start === undefined ? undefined : readPressure(pressureDir);
       pending = await batchPush(repo, leaf, record, false, seatMove, end);
     } else if (leaf.state.phase === 'merge' && requested === 'check.fix')
-      throw new Error('Merge moves to check.repair itself; a second red takes check.fix from check.repair');
+      throw new Error('Merge moves to check.repair itself; a leaf-caused red takes check.fix from check.repair');
     else {
       await transition(repo, leaf, requested, slot, verdict, reason, check, onCommitted);
     }

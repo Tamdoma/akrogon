@@ -189,6 +189,60 @@ test('a red land run exits to check.repair and the next holder launches in the s
   }
 }, 60000);
 
+// #147: the land run holds its repo for its attempt. A run of another leaf
+// that starts during it waits for the land and starts after it; the hold names
+// no land unit, so a stale sweep never stops a relaunch; the exit and its wakes
+// run after the hold ends.
+test('a land run holds its repo: a leaf run-check waits for it and starts after the exit', async () => {
+  const base: HcFixture = await hcFixture();
+  const marks: string = resolve(base.home, 'land-marks');
+  const f: GreenFixture = await greenFrom(base, {
+    gate: `sh -c 'touch ${marks}/land.held; while [ ! -e ${marks}/release ]; do sleep 0.05; done; false'`,
+  });
+  try {
+    mkdirSync(marks, { recursive: true });
+    const aa: string = await allocated(f, 'aa', 'issue-aa');
+    const bb: string = await allocated(f, 'bb', 'issue-bb');
+    await commitIn(aa, 'aa-file', 'aa\n');
+    toMerge(aa);
+    const { attempt } = await claimed(f, aa);
+    const landing: Promise<Result> = land(f, 'aa', attempt);
+    const deadline: number = Date.now() + 30000;
+    while (!existsSync(resolve(marks, 'land.held'))) {
+      if (Date.now() > deadline) throw new Error('land check never started');
+      await Bun.sleep(50);
+    }
+    const holds: Record<string, unknown>[] = readdirSync(resolve(f.home, 'runs'))
+      .filter((name) => name.endsWith('.yaml'))
+      .map((name) => Bun.YAML.parse(readFileSync(resolve(f.home, 'runs', name), 'utf8')) as Record<string, unknown>)
+      .filter((record) => record.check === 'land');
+    expect(holds).toHaveLength(1);
+    expect(holds[0]).toMatchObject({ attempt, leaf: 'aa', state: 'live' });
+    expect(String(holds[0].unit)).not.toContain('akrogon-land-');
+    const worktree: string = z.string().parse(readState(bb).worktree);
+    const waiting: Promise<Result> = cli(
+      f,
+      ['run-check', '--name', 'probe', '--', 'touch', `${marks}/probe`],
+      worktree,
+      {
+        ...f.env,
+        AKROGON_RUN: '',
+      },
+    );
+    await Bun.sleep(1500);
+    expect(existsSync(resolve(marks, 'probe'))).toBe(false);
+    writeFileSync(resolve(marks, 'release'), '');
+    expect((await landing).code).toBe(0);
+    const probe: Result = await waiting;
+    expect(probe.code).toBe(0);
+    expect(probe.stderr).toContain(`waiting for ${f.repo}/aa land`);
+    expect(existsSync(resolve(marks, 'probe'))).toBe(true);
+    expect(readState(aa).phase).toBe('check.repair');
+  } finally {
+    await f.clean();
+  }
+}, 90000);
+
 // Criterion 2 (gate): a gate refusal moves the leaf to check.repair with the
 // refusal text, clears the batch and starts the next leaf's turn.
 test('a gate refusal exits to check.repair with the refusal and starts the next turn', async () => {

@@ -15,6 +15,7 @@ export interface AdmissionHolder {
   scope: string;
   unit: string;
   full: boolean;
+  attempt?: string;
 }
 
 export type Admission =
@@ -35,6 +36,7 @@ const recordSchema = z.object({
   scope: z.string(),
   unit: z.string(),
   full: z.boolean().default(false),
+  attempt: z.string().optional(),
   since: z.iso.datetime(),
 });
 export type RunRecord = z.infer<typeof recordSchema>;
@@ -89,7 +91,8 @@ const live = (record: RunRecord, boot: string): boolean =>
   record.boot_id === boot && liveStartTime(record.pid) === record.start_time;
 
 // A run named in its repo's `full` list counts as nested only under a run that
-// itself holds its repo's line: under any other run it takes its own turn.
+// itself holds its repo's line or a land run of its repo: under any other run
+// it takes its own turn.
 function nested(token: string, repo: string, full: boolean): boolean {
   const hash: string = createHash('sha256').update(token).digest('hex');
   const record: RunRecord | undefined = readRecord(recordPath(hash));
@@ -97,7 +100,7 @@ function nested(token: string, repo: string, full: boolean): boolean {
     record !== undefined &&
     record.token_hash === hash &&
     record.state === 'live' &&
-    ((record.full && record.repo === repo) || !full) &&
+    (((record.full || record.attempt !== undefined) && record.repo === repo) || !full) &&
     live(record, bootId())
   );
 }
@@ -116,9 +119,22 @@ export function liveRuns(): RunRecord[] {
     });
 }
 
-// Runs named in a `full` list from every repo, sorted for each repo's line:
-// the holder (live or ended, whose units may still be stopping) before waiters
-// in arrival order. Cancelled and unreadable records never join.
+// A live run of a merge attempt holds its repo: a run of that repo that
+// arrived after it and carries no attempt or another one waits until it ends.
+function holds(hold: RunRecord, run: RunRecord): boolean {
+  return (
+    hold.attempt !== undefined &&
+    hold.state === 'live' &&
+    hold.repo === run.repo &&
+    hold.attempt !== run.attempt &&
+    (hold.since.localeCompare(run.since) || hold.token_hash.localeCompare(run.token_hash)) < 0
+  );
+}
+
+// Runs named in a `full` list, merge-attempt runs and every waiting run, from
+// every repo, sorted for each repo's line: the holders (live or ended, whose
+// units may still be stopping) before waiters in arrival order. Cancelled and
+// unreadable records never join.
 export function lineRuns(): RunRecord[] {
   const dir: string = runsDir();
   if (!existsSync(dir)) return [];
@@ -127,7 +143,12 @@ export function lineRuns(): RunRecord[] {
     .filter((name) => name.endsWith('.yaml'))
     .flatMap((name) => {
       const record: RunRecord | undefined = readRecord(resolve(dir, name));
-      return record !== undefined && record.full && record.state !== 'cancelled' && live(record, boot) ? [record] : [];
+      return record !== undefined &&
+        (record.full || record.attempt !== undefined || record.state === 'waiting') &&
+        record.state !== 'cancelled' &&
+        live(record, boot)
+        ? [record]
+        : [];
     })
     .sort(
       (a, b) =>
@@ -141,10 +162,11 @@ export function lineRuns(): RunRecord[] {
 const lineLock = (repo: string): string => resolve(runsDir(), 'locks', `line-${repo}`);
 const POLL_MS: number = 1000;
 
-// A listed run waits until it is the oldest listed run of its repo. The turn
+// A run waits while a merge attempt holds its repo, and a listed run also
+// until it is the oldest listed run of its repo that nothing holds. The turn
 // check and the switch to live share one exclusive lock, so two waiters of the
 // same repo never both start; a cancel write takes the same lock pair.
-async function awaitLineTurn(record: RunRecord): Promise<void> {
+async function awaitTurn(record: RunRecord): Promise<void> {
   let shown: string = '';
   for (;;) {
     const started: boolean = await withAdmissionLock(record.slice, () =>
@@ -152,10 +174,17 @@ async function awaitLineTurn(record: RunRecord): Promise<void> {
         const mine: RunRecord | undefined = readRecord(recordPath(record.token_hash));
         if (mine === undefined) writeRecord(record);
         else if (mine.state === 'cancelled') throw new Error(`run ${record.run} cancelled by akrogon stop-run`);
-        const queue: RunRecord[] = lineRuns().filter((entry) => entry.repo === record.repo);
-        const first: RunRecord | undefined = queue[0];
-        if (first === undefined || first.token_hash !== record.token_hash) {
-          const holder: string = first === undefined ? 'the line' : `${first.repo}/${first.leaf} ${first.check}`;
+        const runs: RunRecord[] = lineRuns().filter((entry) => entry.repo === record.repo);
+        const held = (run: RunRecord): RunRecord | undefined => runs.find((hold) => holds(hold, run));
+        // A waiting run of the holding attempt goes ahead of the line's other waiters.
+        const holding = (run: RunRecord): boolean =>
+          run.attempt !== undefined && runs.some((hold) => hold.state === 'live' && hold.attempt === run.attempt);
+        const line: RunRecord[] = runs.filter((entry) => entry.full && held(entry) === undefined);
+        const ahead: RunRecord | undefined =
+          held(record) ??
+          (record.full ? (line.find((entry) => entry.state !== 'waiting') ?? line.find(holding) ?? line[0]) : record);
+        if (ahead === undefined || ahead.token_hash !== record.token_hash) {
+          const holder: string = ahead === undefined ? 'the line' : `${ahead.repo}/${ahead.leaf} ${ahead.check}`;
           if (holder !== shown) process.stderr.write(`waiting for ${holder}\n`);
           shown = holder;
           return false;
@@ -223,9 +252,10 @@ export function callerScope(): string {
 
 // Admission registers the run and starts it at once: the memory reading, the
 // 48 GiB limit, per-run reservations and the 30 s start spacing were dropped
-// by the operator on 2026-10-14 (run-units brief criterion 5). The one bound is
-// for runs the repo names in `full`: they start one at a time per repo, in
-// arrival order (operator 2026-10-24, host-run-load; per-repo 2026-10-26).
+// by the operator on 2026-10-14 (run-units brief criterion 5). Runs the repo
+// names in `full` start one at a time per repo, in arrival order (operator
+// 2026-10-24, host-run-load; per-repo 2026-10-26), and a land run holds its
+// repo for its whole attempt (#147: leaf runs beside it failed its suite).
 export async function withAdmission<T>(holder: AdmissionHolder, fn: (admission: Admission) => Promise<T>): Promise<T> {
   const inherited: string | undefined = process.env.AKROGON_RUN;
   if (inherited !== undefined && inherited !== '' && nested(inherited, holder.repo, holder.full))
@@ -245,16 +275,12 @@ export async function withAdmission<T>(holder: AdmissionHolder, fn: (admission: 
     start_time: startTime(process.pid),
     boot_id: bootId(),
     ...holder,
-    state: holder.full ? 'waiting' : 'live',
+    state: 'waiting',
     since: new Date().toISOString(),
   };
   const begun: number = Date.now();
   try {
-    if (holder.full) await awaitLineTurn(record);
-    else
-      await withAdmissionLock(holder.slice, async (): Promise<void> => {
-        writeRecord(record);
-      });
+    await awaitTurn(record);
     process.stderr.write(`run ${holder.run}\n`);
     let ended: boolean = false;
     return await fn({

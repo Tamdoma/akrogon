@@ -754,3 +754,169 @@ test('no run.lock lanes, run-holder files or name exemptions remain in src, and 
     expect({ doc, hit: text.match(/run permit/i)?.[0] }).toEqual({ doc, hit: undefined });
   }
 });
+
+// #147: a run carrying a merge attempt holds its repo. A merge leaf's batch
+// attempt reaches its run-checks through leafFields, as the land run's own
+// verify commands carry it.
+async function attemptWorktree(f: Fixture, slug: string, attempt: string): Promise<string> {
+  const worktree: string = resolve(storeDir(f), slug);
+  await command(['git', 'worktree', 'add', worktree, '-b', slug], f.root);
+  leaf(f, slug, 'merge', {
+    worktree,
+    batch: { attempt, built_on: 'base', holder: { base: 'base', head: 'head' }, applied: true },
+  });
+  return worktree;
+}
+
+test('a merge attempt holds its repo: later runs wait, earlier and other-repo runs do not', async () => {
+  const f: Fixture = await fixture();
+  const caps: Cap[] = [];
+  try {
+    const dir: string = marks(f);
+    yaml(resolve(f.root, 'issues/config.yaml'), FULL_CONFIG);
+    const early: string = await leafWorktree(f, 'early-leaf');
+    const late: string = await leafWorktree(f, 'late-leaf');
+    const landing: string = await attemptWorktree(f, 'landing', 'att-1');
+    const before: Cap = run(f, ['run-check', '--name', 'format', '--', ...hold(dir, 'before')], early);
+    caps.push(before);
+    await waitFor(resolve(dir, 'before.held'));
+    // The hold starts at once beside a run that was already live.
+    const held: Cap = run(f, ['run-check', '--name', 'format', '--', ...hold(dir, 'land')], landing);
+    caps.push(held);
+    await waitFor(resolve(dir, 'land.held'));
+    const after: Cap = run(f, ['run-check', '--name', 'format', '--', ...touch(dir, 'after')], late);
+    caps.push(after);
+    await waitForText(after, new RegExp(`waiting for ${f.repo}/landing format`));
+    // A run of the holding attempt is not held back.
+    const own: Result = await cli(f, ['run-check', '--name', 'format', '--', ...touch(dir, 'own')], landing);
+    expect(own.code).toBe(0);
+    expect(existsSync(resolve(dir, 'after'))).toBe(false);
+    writeFileSync(resolve(dir, 'release'), '');
+    expect(await held.proc.exited).toBe(0);
+    expect(await after.proc.exited).toBe(0);
+    expect(existsSync(resolve(dir, 'after'))).toBe(true);
+    expect(await before.proc.exited).toBe(0);
+  } finally {
+    stop(caps);
+    f.clean();
+  }
+}, 75000);
+
+test('a killed hold stops holding and stop-run cancels a run waiting behind a hold', async () => {
+  const f: Fixture = await fixture();
+  const caps: Cap[] = [];
+  try {
+    const dir: string = marks(f);
+    yaml(resolve(f.root, 'issues/config.yaml'), FULL_CONFIG);
+    const late: string = await leafWorktree(f, 'late-leaf');
+    const landing: string = await attemptWorktree(f, 'landing', 'att-1');
+    const held: Cap = run(f, ['run-check', '--name', 'format', '--', ...hold(dir, 'land')], landing);
+    caps.push(held);
+    await waitFor(resolve(dir, 'land.held'));
+    const scopeName: string = 'pane-cancel.scope';
+    const cancelled: Cap = run(f, ['run-check', '--name', 'format', '--', ...touch(dir, 'cancelled')], late, {
+      AKROGON_PROC_ROOT: scopedProcRoot(f, scopeName),
+    });
+    caps.push(cancelled);
+    await waitForText(cancelled, new RegExp(`waiting for ${f.repo}/landing format`));
+    const stopped: Result = await cli(f, ['stop-run'], late, { AKROGON_PROC_ROOT: scopedProcRoot(f, scopeName) });
+    expect(stopped.code).toBe(0);
+    expect(await cancelled.proc.exited).not.toBe(0);
+    expect(existsSync(resolve(dir, 'cancelled'))).toBe(false);
+    const after: Cap = run(f, ['run-check', '--name', 'format', '--', ...touch(dir, 'after')], late);
+    caps.push(after);
+    await waitForText(after, new RegExp(`waiting for ${f.repo}/landing format`));
+    killTree(held.proc);
+    await held.proc.exited;
+    expect(await after.proc.exited).toBe(0);
+    expect(existsSync(resolve(dir, 'after'))).toBe(true);
+  } finally {
+    stop(caps);
+    f.clean();
+  }
+}, 75000);
+
+test("a listed run of the holding attempt starts ahead of the line's earlier waiters", async () => {
+  const f: Fixture = await fixture();
+  const caps: Cap[] = [];
+  try {
+    const dir: string = marks(f);
+    yaml(resolve(f.root, 'issues/config.yaml'), FULL_CONFIG);
+    const first: string = await leafWorktree(f, 'leaf-one');
+    const second: string = await leafWorktree(f, 'leaf-two');
+    const landing: string = await attemptWorktree(f, 'landing', 'att-1');
+    const holder: Cap = run(f, ['run-check', '--name', 'test', '--', ...hold(dir, 'a')], first);
+    caps.push(holder);
+    await waitFor(resolve(dir, 'a.held'));
+    const early: Cap = run(f, ['run-check', '--name', 'test', '--', ...record('early', dir)], second);
+    caps.push(early);
+    await waitForText(early, new RegExp(`waiting for ${f.repo}/leaf-one test`));
+    const hold2: string[] = ['sh', '-c', `touch ${dir}/land.held; while [ ! -e ${dir}/release2 ]; do sleep 0.05; done`];
+    const held: Cap = run(f, ['run-check', '--name', 'format', '--', ...hold2], landing);
+    caps.push(held);
+    await waitFor(resolve(dir, 'land.held'));
+    const own: Cap = run(f, ['run-check', '--name', 'test', '--', ...record('own', dir)], landing);
+    caps.push(own);
+    await waitForText(own, new RegExp(`waiting for ${f.repo}/leaf-one test`));
+    writeFileSync(resolve(dir, 'release'), '');
+    expect(await holder.proc.exited).toBe(0);
+    expect(await own.proc.exited).toBe(0);
+    expect(await early.proc.exited).toBe(0);
+    expect(readFileSync(resolve(dir, 'order'), 'utf8').trim().split('\n')).toEqual(['own', 'early']);
+    writeFileSync(resolve(dir, 'release2'), '');
+    expect(await held.proc.exited).toBe(0);
+  } finally {
+    stop(caps);
+    f.clean();
+  }
+}, 75000);
+
+test('a listed run nested under a hold of its repo starts at once', async () => {
+  const f: Fixture = await fixture();
+  const caps: Cap[] = [];
+  try {
+    const dir: string = marks(f);
+    yaml(resolve(f.root, 'issues/config.yaml'), FULL_CONFIG);
+    const other: string = await leafWorktree(f, 'other-leaf');
+    const landing: string = await attemptWorktree(f, 'landing', 'att-1');
+    const shim: NodeJS.ProcessEnv = fakeAkrogon(f).env;
+    const script: string = `cd ${other}; akrogon run-check --name test -- touch ${dir}/inner`;
+    const outer: Result = await cli(f, ['run-check', '--name', 'format', '--', 'sh', '-c', script], landing, shim);
+    expect(outer.code).toBe(0);
+    expect(existsSync(resolve(dir, 'inner'))).toBe(true);
+  } finally {
+    stop(caps);
+    f.clean();
+  }
+}, 75000);
+
+test('a run that waited behind one hold starts when it ends, beside a later hold', async () => {
+  const f: Fixture = await fixture();
+  const caps: Cap[] = [];
+  try {
+    const dir: string = marks(f);
+    yaml(resolve(f.root, 'issues/config.yaml'), FULL_CONFIG);
+    const late: string = await leafWorktree(f, 'late-leaf');
+    const one: string = await attemptWorktree(f, 'land-one', 'att-1');
+    const two: string = await attemptWorktree(f, 'land-two', 'att-2');
+    const first: Cap = run(f, ['run-check', '--name', 'format', '--', ...hold(dir, 'one')], one);
+    caps.push(first);
+    await waitFor(resolve(dir, 'one.held'));
+    const waiter: Cap = run(f, ['run-check', '--name', 'format', '--', ...touch(dir, 'waiter')], late);
+    caps.push(waiter);
+    await waitForText(waiter, new RegExp(`waiting for ${f.repo}/land-one format`));
+    const hold2: string[] = ['sh', '-c', `touch ${dir}/two.held; while [ ! -e ${dir}/release2 ]; do sleep 0.05; done`];
+    const second: Cap = run(f, ['run-check', '--name', 'format', '--', ...hold2], two);
+    caps.push(second);
+    await waitForText(second, new RegExp(`waiting for ${f.repo}/land-one format`));
+    writeFileSync(resolve(dir, 'release'), '');
+    expect(await first.proc.exited).toBe(0);
+    await waitFor(resolve(dir, 'two.held'));
+    expect(await waiter.proc.exited).toBe(0);
+    writeFileSync(resolve(dir, 'release2'), '');
+    expect(await second.proc.exited).toBe(0);
+  } finally {
+    stop(caps);
+    f.clean();
+  }
+}, 75000);

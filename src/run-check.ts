@@ -349,6 +349,7 @@ export async function checkedRun(
         scope: callerScope(),
         unit: runUnit,
         full: repo.config.full.includes(name),
+        ...(attempt === undefined ? {} : { attempt }),
       },
       async (admission) => {
         env.AKROGON_RUN = admission.token;

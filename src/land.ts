@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { readGlobal, requireRepo, globalHome, toolRoot, type GlobalConfig, type Repo } from './config';
 import { allLeaves, readState, saveState, withLock, type Batch, type Leaf, type MergeExit } from './state';
@@ -14,7 +15,8 @@ import {
 } from './phase';
 import { appendAttempt, readPressure, type PressureSnapshot } from './attempts';
 import { readVerifyRuns, uncoveredMainRedUnits, verify, type Unit, type VerifyRun } from './verify';
-import { leafSlice, sessionBusAddress } from './scope';
+import { leafSlice, runSlice, runUnitBase, sessionBusAddress } from './scope';
+import { callerScope, withAdmission, type AdmissionHolder } from './admission';
 import { landedWake, mergeWake, phaseWake } from './next';
 
 export function landUnit(attempt: string): string {
@@ -165,6 +167,8 @@ async function taken8Trigger(repo: Repo, record: Batch, runId: string, uncovered
   return false;
 }
 
+// The land run holds its repo for the whole attempt (head run, base pass and
+// restack reruns): runs of the repo that arrive later wait until it ends.
 export async function land(
   global: GlobalConfig,
   repo: Repo,
@@ -172,6 +176,33 @@ export async function land(
   attempt: string,
   pressureDir: string = '/proc/pressure',
 ): Promise<void> {
+  const run: string = randomUUID();
+  const hold: AdmissionHolder = {
+    repo: repo.name,
+    leaf: slug,
+    check: 'land',
+    run,
+    slice: runSlice(leafSlice(repo, slug)),
+    scope: callerScope(),
+    unit: `${runUnitBase(run)}.scope`,
+    full: false,
+    attempt,
+  };
+  const exit: Exit = await withAdmission(hold, () => landAttempt(global, repo, slug, attempt, pressureDir));
+  await exit();
+}
+
+// An exit's moves and wakes run after the hold ends, so the next land and the
+// slice cleanup they start never see it.
+type Exit = () => Promise<void>;
+
+async function landAttempt(
+  global: GlobalConfig,
+  repo: Repo,
+  slug: string,
+  attempt: string,
+  pressureDir: string,
+): Promise<Exit> {
   const lock: string = resolve(globalHome(), '.lock');
   for (let refusals: number = 0; ;) {
     const { leaf, record } = await withLock(lock, async () => landClaim(repo, slug, attempt));
@@ -188,43 +219,39 @@ export async function land(
           if (verdict.code === 0) {
             coverRun = result.id;
           } else {
-            return repairExit(
-              global,
-              repo,
-              slug,
-              attempt,
-              {
-                reason: 'red',
-                run: result.id,
-                top,
-                base_verdict: verdict.baseRun,
-              },
-              endOf(record, pressureDir),
-            );
+            return () =>
+              repairExit(
+                global,
+                repo,
+                slug,
+                attempt,
+                {
+                  reason: 'red',
+                  run: result.id,
+                  top,
+                  base_verdict: verdict.baseRun,
+                },
+                endOf(record, pressureDir),
+              );
           }
         } else {
-          return repairExit(
+          return () =>
+            repairExit(global, repo, slug, attempt, { reason: 'red', run: result.id, top }, endOf(record, pressureDir));
+        }
+      } else {
+        return async () =>
+          repairExit(
             global,
             repo,
             slug,
             attempt,
-            { reason: 'red', run: result.id, top },
+            {
+              reason: 'red',
+              run: await redRunId(repo, leaf.state.worktree ?? repo.root),
+              top,
+            },
             endOf(record, pressureDir),
           );
-        }
-      } else {
-        return repairExit(
-          global,
-          repo,
-          slug,
-          attempt,
-          {
-            reason: 'red',
-            run: await redRunId(repo, leaf.state.worktree ?? repo.root),
-            top,
-          },
-          endOf(record, pressureDir),
-        );
       }
     }
     const refusal: string | undefined = await withLock(lock, async () => {
@@ -238,26 +265,28 @@ export async function land(
       }
     });
     if (refusal !== undefined)
-      return repairExit(global, repo, slug, attempt, { reason: 'gate', refusal, top }, endOf(record, pressureDir));
+      return () =>
+        repairExit(global, repo, slug, attempt, { reason: 'gate', refusal, top }, endOf(record, pressureDir));
     const pushed: LandPush = await landPush(repo, slug, attempt, coverRun, pressureDir);
-    if (pushed.kind === 'landed') return landedWake(global, repo, slug);
+    if (pushed.kind === 'landed') return () => landedWake(global, repo, slug);
     if (pushed.kind === 'error')
-      return commandFailed(global, repo, slug, attempt, pushed.stderr, endOf(record, pressureDir));
-    if (refusals > 0) return keepPlace(global, repo, slug, attempt, endOf(record, pressureDir));
+      return () => commandFailed(global, repo, slug, attempt, pushed.stderr, endOf(record, pressureDir));
+    if (refusals > 0) return () => keepPlace(global, repo, slug, attempt, endOf(record, pressureDir));
     const restacked: Restacked = await restack(repo, slug, pushed.record);
     if (restacked.kind === 'rebase')
-      return repairExit(
-        global,
-        repo,
-        slug,
-        attempt,
-        {
-          reason: await dirtyOrConflict(repo, leaf.state.worktree),
-          base: restacked.base,
-          top,
-        },
-        endOf(record, pressureDir),
-      );
+      return async () =>
+        repairExit(
+          global,
+          repo,
+          slug,
+          attempt,
+          {
+            reason: await dirtyOrConflict(repo, leaf.state.worktree),
+            base: restacked.base,
+            top,
+          },
+          endOf(record, pressureDir),
+        );
     refusals += 1;
   }
 }
