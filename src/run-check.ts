@@ -21,6 +21,7 @@ import { command, type Result } from './shell';
 import { RUN_CHECK_USAGE } from './usage';
 import { appendTiming } from './timing';
 import { callerScope, withAdmission } from './admission';
+import { reserve } from './budget';
 import { locate, type LogTarget } from './evidence';
 import { FlockError, flockHold } from './flock';
 import { captureAncestry } from './pack';
@@ -200,6 +201,7 @@ export async function runCheck(
   leafOverride: string | undefined,
   holder: string | undefined,
   argv: string[],
+  sessions?: string,
 ): Promise<number> {
   if (leafOverride !== undefined && holder !== undefined) throw new Error('Use --leaf or --holder, not both');
   if (argv.length === 0) throw new Error(RUN_CHECK_USAGE);
@@ -223,6 +225,7 @@ export async function runCheck(
     name ?? 'run',
     argv,
     cwd,
+    sessions,
   );
   process.stderr.write(`${result.stderr_final_nl ? '' : '\n'}check ${name ?? 'run'}: ${result.code} ${result.log}\n`);
   return result.code;
@@ -297,6 +300,7 @@ export async function checkedRun(
   name: string,
   argv: string[],
   cwd: string,
+  sessions?: string,
 ): Promise<{ code: number; log: string; stderr_final_nl: boolean }> {
   const early: string | undefined = await ownerRefusal(target, repo, false);
   if (early !== undefined) throw new PublishRefusedError(early);
@@ -312,6 +316,8 @@ export async function checkedRun(
     ...(attempt === undefined ? {} : { attempt }),
   };
   failedRefusal(caller, repo, name, run);
+  const reserved: { sessions: number; minutes: number } | undefined =
+    sessions === undefined ? undefined : await reserve(repo, slug, run, sessions);
   const runRoot: string = mkdtempSync(resolve(ensureLeafTemp(repo, slug), 'run-'));
   let refused: boolean = false;
   let keepRunRoot: boolean = false;
@@ -324,6 +330,10 @@ export async function checkedRun(
       JSON.stringify({ pid: process.pid, boot_id: boot, started: new Date().toISOString() }),
     );
     const env: Record<string, string> = constructedEnv(repo, runRoot);
+    if (reserved !== undefined) {
+      env.AKROGON_SESSIONS = String(reserved.sessions);
+      env.AKROGON_SESSION_MINUTES = String(reserved.minutes);
+    }
     env.AKROGON_BASE = akrogonBase;
     const log: string = join(runRoot, 'out.log');
     const { path: owner, kind }: { path: string; kind: 'holder' | 'issue' } = await captureOwner(target, repo);

@@ -38,7 +38,12 @@ export const VERB_OPTIONS: Record<string, Record<string, FlagSpec>> = {
   timing: { cohort: { type: 'boolean' }, flow: { type: 'boolean' }, since: { type: 'string' } },
   flaky: {},
   log: {},
-  'run-check': { name: { type: 'string' }, leaf: { type: 'string' }, holder: { type: 'string' } },
+  'run-check': {
+    name: { type: 'string' },
+    leaf: { type: 'string' },
+    holder: { type: 'string' },
+    sessions: { type: 'string' },
+  },
   verify: {
     sha: { type: 'string' },
     attempt: { type: 'string' },
@@ -58,7 +63,7 @@ export const TIMING_USAGE: string =
   'Usage: akrogon timing <slug> | --cohort --since <iso> | --flow --since <YYYY-MM-DD>';
 export const GUARD_USAGE: string = 'Usage: akrogon guard <ancestors|own-modules>';
 export const RUN_CHECK_USAGE: string =
-  'Usage: akrogon run-check [--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...';
+  'Usage: akrogon run-check [--name <n>] [--leaf <path>] [--holder <dir>] [--sessions <n>] -- <argv>...';
 
 export const USAGE_LINES: Record<string, string> = {
   pack: PACK_USAGE,

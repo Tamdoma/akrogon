@@ -326,6 +326,7 @@ switch (verb) {
       optional.parse(values.leaf),
       optional.parse(values.holder),
       positionals,
+      optional.parse(values.sessions),
     );
     break;
   }
