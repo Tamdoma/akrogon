@@ -82,7 +82,9 @@ async function receipt(): Promise<string | null> {
 async function readWatcher(): Promise<Seen | 'exit' | 'stay'> {
   const start: string | null = procStart(args.pinPid);
   if (start === null || start !== args.pinStart) {
-    console.log(`[watch-timer] exit: pinned process ${args.pinPid} ${start === null ? 'gone' : `replaced (start ${start} != ${args.pinStart})`}`);
+    console.log(
+      `[watch-timer] exit: pinned process ${args.pinPid} ${start === null ? 'gone' : `replaced (start ${start} != ${args.pinStart})`}`,
+    );
     return 'exit';
   }
 
@@ -154,16 +156,21 @@ async function poll(): Promise<'exit' | 'stay'> {
   }
   const status: string | null = watcher.status?.state ?? null;
   const busy: boolean = status !== 'idle' && status !== 'done';
-  // One idle poll can queue several elapsed dues. Once the watcher works, keep the sent head
-  // and only the newest unsent due, even if this poll crosses no new boundary.
-  if (busy) {
+  const head: Due | undefined = dues[0];
+  const delivered: boolean =
+    head !== undefined && head.sent !== null && watcher.turn > head.sent.turn && Number(rcpt) >= head.n;
+  // One idle poll can queue several elapsed dues. While the watcher works, and on the poll that
+  // first sees its head due's turn done (boundaries can pass between the last busy poll and this
+  // one), keep the sent head and only the newest unsent due.
+  const working: boolean = busy || delivered;
+  if (working) {
     const firstUnsent: number = dues[0]?.sent ? 1 : 0;
     const obsolete: number = dues.length - firstUnsent - 1;
     if (obsolete > 0) dues.splice(firstUnsent, obsolete);
   }
   while (nextBoundary <= now) {
     dueCount += 1;
-    const pending: Due | undefined = busy ? dues.at(-1) : undefined;
+    const pending: Due | undefined = working ? dues.at(-1) : undefined;
     if (pending?.sent === null) pending.n = dueCount;
     else dues.push({ n: dueCount, attempts: 0, sent: null });
     nextBoundary += intervalMs;
@@ -175,9 +182,7 @@ async function poll(): Promise<'exit' | 'stay'> {
     note(`hold due=${oldest.n}: watcher ${status ?? 'has no reported status'}`);
     return 'stay';
   }
-  if (oldest.sent !== null && watcher.turn > oldest.sent.turn && Number(rcpt) >= oldest.n) {
-    dues.shift();
-  }
+  if (delivered) dues.shift();
   const due: Due | undefined = dues[0];
   if (due === undefined) return 'stay';
   if (due.sent !== null) {
@@ -257,9 +262,7 @@ async function sweepConsultant(): Promise<void> {
   try {
     listed = await terminals(args.session, {});
   } catch (error) {
-    console.log(
-      `[watch-timer] consultant sweep failed: ${error instanceof HcError ? error.kind : String(error)}`,
-    );
+    console.log(`[watch-timer] consultant sweep failed: ${error instanceof HcError ? error.kind : String(error)}`);
     return;
   }
   for (const term of listed.filter((t: Seen) => isVerifiedConsultant(prefix, args.repo, args.watcher, t))) {
