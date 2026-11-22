@@ -99,3 +99,12 @@ It skips runs that never finished, runs whose setup failed and entries marked `r
 Leaf code lives outside the checkout. The default store is `~/.akrogon/worktrees/<repo>`, with one folder per leaf. `akrogon config` prints the resolved path as `worktree_store`.
 
 The repo key `worktree_root` in `issues/config.yaml` moves the store. It must point outside the checkout, or Akrogon refuses with an error. See [config.ts](../../src/config.ts) `worktreeStore`.
+
+## State home files
+
+The state home is `~/.akrogon`, or the folder in `AKROGON_HOME`. `akrogon run-check --sessions <n>` writes its paid-session reservation there:
+
+| File           | Written by                                                                       | What it is                                                                                                                 |
+| -------------- | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `budget.jsonl` | [run-check.ts](../../src/run-check.ts), [state-home.ts](../../src/state-home.ts) | The paid-session reservation ledger: one `{at, repo, slug, run, sessions}` row per reservation, kept whatever the outcome. |
+| `budget.lock`  | [run-check.ts](../../src/run-check.ts)                                           | The exclusive lock the reservation takes.                                                                                  |
