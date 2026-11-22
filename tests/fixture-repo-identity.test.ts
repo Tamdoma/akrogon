@@ -25,8 +25,8 @@ function repoNameOf(f: Fixture): string {
   return z.string().parse(name);
 }
 
-async function stopSlice(name: string, slug: string): Promise<void> {
-  await spawnCaptured(['systemctl', '--user', 'stop', leafSlice({ name }, slug)]);
+async function stopSlice(name: string, slug: string, home: string): Promise<void> {
+  await spawnCaptured(['systemctl', '--user', 'stop', leafSlice({ name }, slug, home)]);
 }
 
 async function seatA(core: HcCore, slug: string): Promise<Terminal> {
@@ -65,16 +65,16 @@ test("one fixture's teardown stops only its own slices; a second fixture's same-
     await coreTwo.waitFor(seatTwo.address, (t) => t.status?.state === 'working');
     // One's teardown lands while two's seat is live: core stop, slice stop, home removal.
     await coreOne.stop();
-    await stopSlice(nameOne, slug);
+    await stopSlice(nameOne, slug, one.home);
     one.clean();
     // Survival is read at the real boundary: the seat's own process still lives inside two's
     // leaf slice (`/proc/<pid>/cgroup` ending `/<slice>/<unit>`), not a terminal row that can
     // lag the kill. `systemctl --user stop` returns after the slice is stopped.
-    expect(leafSlice({ name: nameOne }, slug)).not.toBe(leafSlice({ name: nameTwo }, slug));
+    expect(leafSlice({ name: nameOne }, slug, one.home)).not.toBe(leafSlice({ name: nameTwo }, slug, two.home));
     const procFile: string = `/proc/${z.number().parse(seatTwo.pid)}/cgroup`;
     expect(existsSync(procFile), `seat ${seatTwo.address} pid ${seatTwo.pid} ended`).toBe(true);
     const cgroup: string = readFileSync(procFile, 'utf8').trim();
-    expect(cgroup).toContain(`/${leafSlice({ name: nameTwo }, slug)}/`);
+    expect(cgroup).toContain(`/${leafSlice({ name: nameTwo }, slug, two.home)}/`);
     writeFileSync(gate, 'go\n');
     await coreTwo.waitFor(seatTwo.address, (t) => t.turn >= 2 && t.status?.state === 'idle');
     expect(coreTwo.tasks(seatTwo.address)).toEqual([
@@ -84,8 +84,8 @@ test("one fixture's teardown stops only its own slices; a second fixture's same-
   } finally {
     await coreOne.stop();
     await coreTwo.stop();
-    await stopSlice(nameOne, slug);
-    await stopSlice(nameTwo, slug);
+    await stopSlice(nameOne, slug, one.home);
+    await stopSlice(nameTwo, slug, two.home);
     one.clean();
     two.clean();
   }

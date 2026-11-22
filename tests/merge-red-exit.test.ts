@@ -697,7 +697,7 @@ test('a merge leaf holding a batch keeps its slice with both seats gone', async 
       merge_stamp: '2026-10-19T00:00:00.000Z',
       batch: { attempt: 'a1', built_on: main, holder: { base: main, head: main }, applied: true, top: main },
     });
-    const slice: string = leafSlice({ name: f.repo }, 'held');
+    const slice: string = leafSlice({ name: f.repo }, 'held', f.home);
     writeFileSync(systemctl.db, JSON.stringify({ units: [{ unit: slice, sub: 'active' }] }));
     expect((await next(f)).code).toBe(0);
     const calls: string[] = existsSync(systemctl.log) ? readFileSync(systemctl.log, 'utf8').trim().split('\n') : [];

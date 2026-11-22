@@ -687,7 +687,7 @@ test('a restarted stopped leaf queues behind an older capacity waiter', async ()
     const systemctl: SystemctlFixture = fakeSystemctl(f);
     const sys: NodeJS.ProcessEnv = { ...systemctl.env, PATH: `${resolve(f.home, 'bin')}:${f.env.PATH}` };
     const slices: { unit: string; sub: string }[] = ['younger', 'running', 'first'].map((slug) => ({
-      unit: leafSlice({ name: f.repo }, slug),
+      unit: leafSlice({ name: f.repo }, slug, f.home),
       sub: 'active',
     }));
     writeFileSync(systemctl.db, JSON.stringify({ units: slices }));
@@ -719,7 +719,7 @@ test('unpause refills a slot freed while the repo was paused', async () => {
     const systemctl: SystemctlFixture = fakeSystemctl(f);
     const sys: NodeJS.ProcessEnv = { ...systemctl.env, PATH: `${resolve(f.home, 'bin')}:${f.env.PATH}` };
     const slices: { unit: string; sub: string }[] = ['younger', 'running', 'first'].map((slug) => ({
-      unit: leafSlice({ name: f.repo }, slug),
+      unit: leafSlice({ name: f.repo }, slug, f.home),
       sub: 'active',
     }));
     writeFileSync(systemctl.db, JSON.stringify({ units: slices }));

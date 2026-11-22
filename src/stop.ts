@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import { z } from 'zod';
-import { globalHome, readGlobal, requireRepo, type Repo } from './config';
+import { globalHome, homePath, readGlobal, requireRepo, type Repo } from './config';
 import { HcError, repoSpace, type SpaceResolution } from './hc';
 import { endSeats } from './reconcile';
 import { leafSlice } from './scope';
@@ -55,7 +55,7 @@ function writeStopped(keys: Set<string>): void {
 async function stopLeaf(repo: Repo, leaf: Leaf): Promise<void> {
   const space: SpaceResolution = await repoSpace(repo);
   if (space.ok) await endSeats(space.session, repo, leaf.state);
-  await command(['systemctl', '--user', 'stop', leafSlice(repo, leaf.state.slug)]);
+  await command(['systemctl', '--user', 'stop', leafSlice(repo, leaf.state.slug, homePath())]);
   console.log(`stopped: ${repo.name}/${leaf.state.slug}`);
 }
 

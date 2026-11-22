@@ -18,6 +18,7 @@ import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import {
   globalHome,
+  homePath,
   leafTemp,
   leafTempRoot,
   retiredLeafTempRoot,
@@ -503,7 +504,7 @@ export async function reconcileNeedsPanes(repo: Repo, leaves: Leaf[]): Promise<b
   if (candidates.length === 0) return false;
   const loaded: Set<string> | null = await loadedLeafSlices();
   if (loaded === null) return true;
-  return candidates.some((leaf) => loaded.has(leafSlice(repo, leaf.state.slug)));
+  return candidates.some((leaf) => loaded.has(leafSlice(repo, leaf.state.slug, homePath())));
 }
 
 export async function registeredWorktrees(root: string): Promise<Map<string, WorktreeRow>> {
@@ -575,7 +576,7 @@ export async function reconcile(
     const own: Set<string> = ownSlices();
     const runs: Set<string> = new Set(liveRuns().map((record) => record.slice));
     for (const leaf of leaves) {
-      const slice: string = leafSlice(repo, leaf.state.slug);
+      const slice: string = leafSlice(repo, leaf.state.slug, homePath());
       if (loadedSlices === null || !loadedSlices.has(slice)) continue;
       const reason: string | null = sliceKeepReason(slice, leaf, live, own, runs);
       if (reason !== null) {
@@ -953,7 +954,7 @@ export async function reconcile(
     (
       await Promise.all(
         leaves.map(async (leaf): Promise<boolean> => {
-          const slice: string = leafSlice(repo, leaf.state.slug);
+          const slice: string = leafSlice(repo, leaf.state.slug, homePath());
           return (
             loadedSlices !== null &&
             loadedSlices.has(slice) &&
@@ -1212,7 +1213,7 @@ export async function reconcile(
               keep(dir, 'unit list unavailable', 'restore the systemd unit inventory and retry cleanup');
               continue;
             }
-            const slice: string = leafSlice(repo, leaf.state.slug);
+            const slice: string = leafSlice(repo, leaf.state.slug, homePath());
             if (
               loadedSlices !== null &&
               loadedSlices.has(slice) &&
@@ -1305,28 +1306,11 @@ export async function reconcileHost(
   let scanned: Map<number, string[]> | undefined;
   const targets = (): Map<number, string[]> => scanned ?? (scanned = procTargets());
   const loaded: Set<string> | null = await loadedLeafSlices();
-  const failedRuns: Set<string> | null = await loadedUnits('akrogon-run-*', '--failed');
   if (loaded !== null) {
     const leafOf: Map<string, { repo: Repo; leaf: Leaf }> = new Map();
-    // An unreadable leaf's folder basename is the only name its slice still
-    // answers to; matching slices are kept, not stopped.
-    const badSlices: Set<string> = new Set();
-    const inventoryErrors: string[] = [];
-    for (const repo of repos) {
-      const inventory: Inventory = repoInventory(repo);
-      for (const leaf of inventory.leaves) leafOf.set(leafSlice(repo, leaf.state.slug), { repo, leaf });
-      for (const failure of inventory.unreadable) {
-        badSlices.add(leafSlice(repo, basename(failure.path)));
-        inventoryErrors.push(`${failure.path}: ${failure.error}`);
-      }
-      for (const failure of inventory.unknown) inventoryErrors.push(`${failure.path}: ${failure.error}`);
-      for (const leaf of inventory.foreign) {
-        badSlices.add(leafSlice(repo, basename(leaf.path)));
-        inventoryErrors.push(
-          `${leaf.path}: leaf repo mismatch, stored key "${leaf.stored}", registered key "${repo.name}"`,
-        );
-      }
-    }
+    for (const repo of repos)
+      for (const leaf of repoInventory(repo).leaves)
+        leafOf.set(leafSlice(repo, leaf.state.slug, homePath()), { repo, leaf });
     const own: Set<string> = ownSlices();
     const runs: Set<string> = new Set(liveRuns().map((record) => record.slice));
     for (const slice of [...loaded].sort()) {
@@ -1344,50 +1328,9 @@ export async function reconcileHost(
         }
         const error: string | null = await stopSlice(slice);
         if (error !== null) keep(slice, error, 'resolve the systemd stop error and retry cleanup');
-        continue;
       }
-      if (badSlices.has(slice)) {
-        keep(
-          slice,
-          `unreadable leaf state: ${inventoryErrors.join('; ')}`,
-          'restore the leaf state file and retry cleanup',
-        );
-        continue;
-      }
-      if (own.has(slice)) {
-        keep(slice, 'own slice', 'removed by a later pass outside this slice');
-        continue;
-      }
-      if (inventoryErrors.length > 0) {
-        keep(
-          slice,
-          `leaf inventory unavailable: ${inventoryErrors.join('; ')}`,
-          'restore readable repository leaf records and retry cleanup',
-        );
-        continue;
-      }
-      if (runs.has(slice)) {
-        keep(slice, 'live run record', 'removed once the recorded run exits');
-        continue;
-      }
-      if (await sliceHasProcess(slice)) {
-        keep(slice, 'process inside', 'removed once the processes in this slice exit');
-        continue;
-      }
-      const error: string | null = await stopSlice(slice);
-      if (error !== null) keep(slice, error, 'resolve the systemd stop error and retry cleanup');
     }
   }
-  if (failedRuns !== null)
-    for (const unit of [...failedRuns].sort()) {
-      const result: Result = await systemctl('reset-failed', unit);
-      if (result.code !== 0)
-        keep(
-          unit,
-          result.stderr || `systemctl reset-failed exited ${result.code}`,
-          'resolve the systemd reset-failed error and retry cleanup',
-        );
-    }
 
   // Host filesystem sweep (D6): retired temp root, unregistered worktree-store
   // and leaf-temp repo dirs, temp-root strays, runs/last-start, dead-pid tmp

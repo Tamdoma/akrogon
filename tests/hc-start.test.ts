@@ -48,7 +48,7 @@ const userBus: string[] = [
 
 async function teardown(f: Fixture, core: HcCore, slug: string): Promise<void> {
   await core.stop();
-  await spawnCaptured([...userBus, 'systemctl', '--user', 'stop', leafSlice({ name: f.repo }, slug)]);
+  await spawnCaptured([...userBus, 'systemctl', '--user', 'stop', leafSlice({ name: f.repo }, slug, f.home)]);
   f.clean();
 }
 
@@ -94,7 +94,7 @@ test('the start verb starts a parentless leaf seat by name, labels, scope, env a
     const pid: number = z.number().parse(seat.pid);
     expect(readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0')).toContain('--model');
     expect(readFileSync(`/proc/${pid}/cmdline`, 'utf8')).toContain('/fake');
-    const slice: string = leafSlice({ name: f.repo }, 'hs-one');
+    const slice: string = leafSlice({ name: f.repo }, 'hs-one', f.home);
     const cgroup: string = readFileSync(`/proc/${pid}/cgroup`, 'utf8').trim();
     expect(cgroup).toMatch(
       new RegExp(
@@ -132,7 +132,7 @@ test('slot B starts under the live A, so the sidebar indents it, and outlives it
       '--user',
       '--quiet',
       '--collect',
-      `--slice=${leafSlice({ name: f.repo }, 'hs-pair')}`,
+      `--slice=${leafSlice({ name: f.repo }, 'hs-pair', f.home)}`,
       'sleep',
       '300',
     ]);

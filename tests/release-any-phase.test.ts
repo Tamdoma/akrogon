@@ -202,7 +202,7 @@ test('an unfinished leaf slice is stopped and its temp removed once its recorded
   try {
     leaf(f, 'open-slice', 'implement', { tab: 'akopenslice' });
     stopLeaf(f, 'open-slice');
-    const slice: string = leafSlice(repo(f), 'open-slice');
+    const slice: string = leafSlice(repo(f), 'open-slice', f.home);
     busyCgroup(f, 'busy-open');
     const { db, log } = sliceDb(f, [{ unit: slice, sub: 'active', cgroup: '/busy-open' }]);
     const temp: string = tempFor(f, 'open-slice');
@@ -225,7 +225,7 @@ test('a pass from a session without the repo workspace keeps its slice and temp'
     leaf(f, 'away-slice', 'implement', { tab: 'akawayslice' });
     stopLeaf(f, 'away-slice');
     await editSpaces(f, (spaces: Space[]) => spaces.map((space: Space) => ({ ...space, name: `not-${space.name}` })));
-    const slice: string = leafSlice(repo(f), 'away-slice');
+    const slice: string = leafSlice(repo(f), 'away-slice', f.home);
     busyCgroup(f, 'busy-away');
     const { db, log } = sliceDb(f, [{ unit: slice, sub: 'active', cgroup: '/busy-away' }]);
     const temp: string = tempFor(f, 'away-slice');
@@ -250,7 +250,7 @@ test('a pass from a session without the repo workspace keeps a merged leaf workt
     await command(['git', 'worktree', 'add', '-b', 'away-merged', worktree], f.root);
     leaf(f, 'away-merged', 'merged', { tab: 'akawaymerged', worktree });
     await editSpaces(f, (spaces: Space[]) => spaces.map((space: Space) => ({ ...space, name: `not-${space.name}` })));
-    const slice: string = leafSlice(repo(f), 'away-merged');
+    const slice: string = leafSlice(repo(f), 'away-merged', f.home);
     emptyCgroup(f, 'empty-away');
     const { db, log } = sliceDb(f, [{ unit: slice, sub: 'active', cgroup: '/empty-away' }]);
     const temp: string = tempFor(f, 'away-merged');
@@ -272,7 +272,7 @@ test('a failed session list stops no slice on a typed pass or an automatic wake'
     leaf(f, 'blind-slice', 'implement', { tab: 'akblindslice' });
     stopLeaf(f, 'blind-slice');
     const restore: () => void = paneListUnavailable(f);
-    const slice: string = leafSlice(repo(f), 'blind-slice');
+    const slice: string = leafSlice(repo(f), 'blind-slice', f.home);
     busyCgroup(f, 'busy-blind');
     const { db, log } = sliceDb(f, [{ unit: slice, sub: 'active', cgroup: '/busy-blind' }]);
     await cli(f, ['next', '--all'], f.root, env(f, db, log));
@@ -292,7 +292,7 @@ test('a live run record keeps an unfinished leaf slice and its temp', async () =
   try {
     leaf(f, 'run-held', 'implement', { tab: 'akrunheld' });
     stopLeaf(f, 'run-held');
-    const slice: string = leafSlice(repo(f), 'run-held');
+    const slice: string = leafSlice(repo(f), 'run-held', f.home);
     busyCgroup(f, 'busy-run');
     const { db, log } = sliceDb(f, [{ unit: slice, sub: 'active', cgroup: '/busy-run' }]);
     const temp: string = tempFor(f, 'run-held');
@@ -317,7 +317,7 @@ test('an unfinished leaf with a live tab keeps its slice and temp folder', async
     leaf(f, 'temped', 'implement', { tab: 'aktemped' });
     stopLeaf(f, 'temped');
     await addTab(f, 'aktemped');
-    const tempedSlice: string = leafSlice(repo(f), 'temped');
+    const tempedSlice: string = leafSlice(repo(f), 'temped', f.home);
     const { db, log } = sliceDb(f, [{ unit: tempedSlice, sub: 'active', cgroup: '/temped' }]);
     emptyCgroup(f, 'temped');
     const temp: string = tempFor(f, 'temped');
@@ -342,7 +342,7 @@ test('an unfinished leaf with a live tab and no temp folder keeps its slice', as
     leaf(f, 'untemped', 'implement', { tab: 'akuntemped' });
     stopLeaf(f, 'untemped');
     await addTab(f, 'akuntemped');
-    const untempedSlice: string = leafSlice(repo(f), 'untemped');
+    const untempedSlice: string = leafSlice(repo(f), 'untemped', f.home);
     const { db, log } = sliceDb(f, [{ unit: untempedSlice, sub: 'active', cgroup: '/untemped' }]);
     emptyCgroup(f, 'untemped');
     const result: Result = await cli(f, ['next', '--all'], f.root, env(f, db, log));
@@ -366,7 +366,7 @@ test('an unfinished leaf keeps slice and temp when the pane list is unavailable'
     leaf(f, 'no-panes', 'implement', { tab: 'aknopanes' });
     stopLeaf(f, 'no-panes');
     const restore: () => void = paneListUnavailable(f);
-    const slice: string = leafSlice(repo(f), 'no-panes');
+    const slice: string = leafSlice(repo(f), 'no-panes', f.home);
     const { db, log } = sliceDb(f, [{ unit: slice, sub: 'active', cgroup: '/no-panes' }]);
     emptyCgroup(f, 'no-panes');
     const temp: string = tempFor(f, 'no-panes');
@@ -390,7 +390,7 @@ test('an unfinished leaf with no recorded tab keeps its loaded slice', async () 
   try {
     leaf(f, 'no-tab', 'implement');
     stopLeaf(f, 'no-tab');
-    const slice: string = leafSlice(repo(f), 'no-tab');
+    const slice: string = leafSlice(repo(f), 'no-tab', f.home);
     busyCgroup(f, 'busy-notab');
     const { db, log } = sliceDb(f, [{ unit: slice, sub: 'active', cgroup: '/busy-notab' }]);
     const result: Result = await cli(f, ['next', '--all'], f.root, env(f, db, log));
@@ -469,11 +469,11 @@ test('the host slice step keeps unfinished leaf slices under the same tab rules'
       'other/other-gone': true,
       'other/other-run': true,
     });
-    const tabSlice: string = leafSlice(repo(f), 'host-tab');
-    const noteSlice: string = leafSlice(repo(f), 'host-note');
-    const goneSlice: string = leafSlice({ name: 'other' }, 'other-gone');
-    const runSlice: string = leafSlice({ name: 'other' }, 'other-run');
-    const idleSlice: string = leafSlice({ name: 'other' }, 'other-idle');
+    const tabSlice: string = leafSlice(repo(f), 'host-tab', f.home);
+    const noteSlice: string = leafSlice(repo(f), 'host-note', f.home);
+    const goneSlice: string = leafSlice({ name: 'other' }, 'other-gone', f.home);
+    const runSlice: string = leafSlice({ name: 'other' }, 'other-run', f.home);
+    const idleSlice: string = leafSlice({ name: 'other' }, 'other-idle', f.home);
     const hex = (text: string): string => createHash('sha256').update(text).digest('hex');
     const otherTemp: string = resolve(leafTempRoot(f), hex(other).slice(0, 4), hex(`${other}\nother-gone`).slice(0, 8));
     mkdirSync(otherTemp, { recursive: true });
@@ -532,7 +532,7 @@ test('a wake after tab loss re-dispatches seats into the same slice and the next
     expect((await cli(f, ['next', 'lost-tab'], f.root, f.env)).code).toBe(0);
     const firstTab: string = z.string().parse(readState(path).tab);
     const first: string[] = (await f.core.terminals({ 'herdr.tab': firstTab }, true)).map((t: Terminal) => t.address);
-    const slice: string = leafSlice(repo(f), 'lost-tab');
+    const slice: string = leafSlice(repo(f), 'lost-tab', f.home);
     const { db, log } = sliceDb(f, [{ unit: slice, sub: 'active' }]);
     const e: NodeJS.ProcessEnv = env(f, db, log);
     await closeTab(f, firstTab);
@@ -571,7 +571,7 @@ test('a failed leaf with a live tab keeps its tab, slice and temp', async () => 
       failure: { cause: 'blocked', phase: 'implement', slot: 'A', reason: 'x' },
     });
     const holder: string = await addTab(f, 'akfailedlive');
-    const slice: string = leafSlice(repo(f), 'failed-live');
+    const slice: string = leafSlice(repo(f), 'failed-live', f.home);
     const { db, log } = sliceDb(f, [{ unit: slice, sub: 'active', cgroup: '/failed' }]);
     busyCgroup(f, 'failed');
     const temp: string = tempFor(f, 'failed-live');

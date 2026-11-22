@@ -15,7 +15,7 @@ import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { parse } from 'shell-quote';
-import { base, ensureLeafTemp, readGlobal, requireRepo, setupCommand, type Repo } from './config';
+import { base, ensureLeafTemp, homePath, readGlobal, requireRepo, setupCommand, type Repo } from './config';
 import { repoInventory, RepoMismatchError, readState, type Inventory, type Leaf, type State } from './state';
 import { command, type Result } from './shell';
 import { RUN_CHECK_USAGE } from './usage';
@@ -338,7 +338,7 @@ export async function checkedRun(
     env.AKROGON_BASE = akrogonBase;
     const log: string = join(runRoot, 'out.log');
     const { path: owner, kind }: { path: string; kind: 'holder' | 'issue' } = await captureOwner(target, repo);
-    const slice: string = runSlice(slug === 'checkout' ? 'akrogon.slice' : leafSlice(repo, slug));
+    const slice: string = runSlice(slug === 'checkout' ? 'akrogon.slice' : leafSlice(repo, slug, homePath()));
     const runUnit: string = `${runUnitBase(run)}.scope`;
     return await withAdmission(
       {

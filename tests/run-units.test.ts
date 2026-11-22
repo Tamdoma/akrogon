@@ -526,7 +526,7 @@ test.serial('a verify places its scope under the resolved leaf slice by default'
     const calls: string[] = existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n') : [];
     const scoped: string[] = calls.filter((line) => line.includes('--scope'));
     expect(scoped.length).toBeGreaterThan(0);
-    expect(scoped.some((line) => line.includes(`--slice=${expectedSlice(f.repo, 'verify-place')}`))).toBe(true);
+    expect(scoped.some((line) => line.includes(`--slice=${expectedSlice(f.repo, 'verify-place', f.home)}`))).toBe(true);
   } finally {
     f.clean();
   }
@@ -646,8 +646,10 @@ test.serial(
       expect(held.code).toBe(0);
       const calls: string[] = readFileSync(log, 'utf8').trim().split('\n');
       const scopeCalls: string[] = calls.filter((line) => line.includes('--scope'));
-      expect(scopeCalls.some((line) => line.includes(`--slice=${expectedSlice(f.repo, 'sliced')}`))).toBe(true);
-      expect(scopeCalls.some((line) => line.includes(`--slice=${expectedSlice(f.repo, 'explicit')}`))).toBe(true);
+      expect(scopeCalls.some((line) => line.includes(`--slice=${expectedSlice(f.repo, 'sliced', f.home)}`))).toBe(true);
+      expect(scopeCalls.some((line) => line.includes(`--slice=${expectedSlice(f.repo, 'explicit', f.home)}`))).toBe(
+        true,
+      );
       expect(scopeCalls.some((line) => line.includes('--slice=akrogon.slice'))).toBe(true);
       expect(calls.filter((line) => line.includes('--unit=akrogon-run-')).length).toBeGreaterThanOrEqual(6);
     } finally {

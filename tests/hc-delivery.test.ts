@@ -31,7 +31,7 @@ async function setup(slug: string, harness: 'fake' | 'agy', mode: string) {
 
 async function teardown(f: Fixture, core: HcCore, slug: string): Promise<void> {
   await core.stop();
-  await spawnCaptured(['systemctl', '--user', 'stop', leafSlice({ name: f.repo }, slug)]);
+  await spawnCaptured(['systemctl', '--user', 'stop', leafSlice({ name: f.repo }, slug, f.home)]);
   f.clean();
 }
 
@@ -522,7 +522,7 @@ done
   } finally {
     await core.stop();
     await starting;
-    await spawnCaptured(['systemctl', '--user', 'stop', leafSlice({ name: f.repo }, 'hd-status-retry')]);
+    await spawnCaptured(['systemctl', '--user', 'stop', leafSlice({ name: f.repo }, 'hd-status-retry', f.home)]);
     f.clean();
   }
 });

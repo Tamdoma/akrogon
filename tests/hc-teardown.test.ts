@@ -23,7 +23,7 @@ async function setup(slug: string, window: 'open' | 'closed' = 'closed') {
 
 async function teardown(f: Fixture, core: HcCore, slug: string): Promise<void> {
   await core.stop();
-  await spawnCaptured(['systemctl', '--user', 'stop', leafSlice({ name: f.repo }, slug)]);
+  await spawnCaptured(['systemctl', '--user', 'stop', leafSlice({ name: f.repo }, slug, f.home)]);
   f.clean();
 }
 

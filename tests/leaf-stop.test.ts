@@ -69,9 +69,9 @@ async function run(f: StopFixture, args: string[], env: NodeJS.ProcessEnv = {}):
   return cli(f, args, f.root, { ...f.env, ...env });
 }
 
-function slice(path: string): string {
+function slice(f: StopFixture, path: string): string {
   const state: State = readState(path);
-  return leafSlice({ name: state.repo }, state.slug);
+  return leafSlice({ name: state.repo }, state.slug, f.home);
 }
 
 /** Allocate a leaf, then wait until its seats ended their turn, so any later pass would prompt again (D13). */
@@ -104,7 +104,7 @@ test('stop records the leaf, then stops its leaf slice and keeps the worktree', 
     const stopped: Result = await run(f, ['stop', 'build']);
     expect(stopped.code).toBe(0);
     expect(stoppedKeys(f)).toEqual([`${f.repo}/build`]);
-    expect(systemctlCalls(f)).toEqual([`--user stop ${slice(path)}`]);
+    expect(systemctlCalls(f)).toEqual([`--user stop ${slice(f, path)}`]);
     expect(existsSync(worktree)).toBe(true);
     expect(readState(path).phase).toBe('plan.synthesis');
   } finally {
@@ -167,14 +167,14 @@ test('a failed slice stop keeps the record, prints the error, exits non-zero and
   const f: StopFixture = await stopFixture();
   try {
     const path: string = await allocatedIdle(f, 'build');
-    const failed: Result = await run(f, ['stop', 'build'], { FAKE_SYSTEMCTL_FAIL: slice(path) });
+    const failed: Result = await run(f, ['stop', 'build'], { FAKE_SYSTEMCTL_FAIL: slice(f, path) });
     expect(failed.code).not.toBe(0);
-    expect(failed.stderr).toContain(slice(path));
+    expect(failed.stderr).toContain(slice(f, path));
     expect(failed.stderr).toContain('fake failure');
     expect(stoppedKeys(f)).toEqual([`${f.repo}/build`]);
     const retried: Result = await run(f, ['stop', 'build']);
     expect(retried.code).toBe(0);
-    expect(systemctlCalls(f)).toEqual([`--user stop ${slice(path)}`, `--user stop ${slice(path)}`]);
+    expect(systemctlCalls(f)).toEqual([`--user stop ${slice(f, path)}`, `--user stop ${slice(f, path)}`]);
     expect(stoppedKeys(f)).toEqual([`${f.repo}/build`]);
   } finally {
     await f.clean();
@@ -187,11 +187,11 @@ test('stop --all stops every allocated leaf, reports each, and one failure does 
     const aa: string = await allocatedIdle(f, 'aa');
     const bb: string = await allocatedIdle(f, 'bb');
     leaf(f, 'cc', 'plan.synthesis', { 'blocked-by': ['aa'] });
-    const all: Result = await run(f, ['stop', '--all'], { FAKE_SYSTEMCTL_FAIL: slice(aa) });
+    const all: Result = await run(f, ['stop', '--all'], { FAKE_SYSTEMCTL_FAIL: slice(f, aa) });
     expect(all.code).not.toBe(0);
     expect(`${all.stdout}\n${all.stderr}`).toContain('aa');
     expect(`${all.stdout}\n${all.stderr}`).toContain('bb');
-    expect(systemctlCalls(f).sort()).toEqual([`--user stop ${slice(aa)}`, `--user stop ${slice(bb)}`].sort());
+    expect(systemctlCalls(f).sort()).toEqual([`--user stop ${slice(f, aa)}`, `--user stop ${slice(f, bb)}`].sort());
     expect(stoppedKeys(f)).toEqual([`${f.repo}/aa`, `${f.repo}/bb`]);
   } finally {
     await f.clean();
@@ -302,7 +302,7 @@ test('stop --all skips merged and closed leaves that keep their tab', async () =
     const all: Result = await run(f, ['stop', '--all']);
     expect(all.code).toBe(0);
     expect(stoppedKeys(f)).toEqual([`${f.repo}/live`]);
-    expect(systemctlCalls(f)).toEqual([`--user stop ${slice(live)}`]);
+    expect(systemctlCalls(f)).toEqual([`--user stop ${slice(f, live)}`]);
   } finally {
     await f.clean();
   }

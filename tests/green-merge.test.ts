@@ -416,7 +416,7 @@ test('stop --all stops a tabless command merge', async () => {
         top: main,
       },
     });
-    const slice: string = leafSlice({ name: f.repo }, 'aa');
+    const slice: string = leafSlice({ name: f.repo }, 'aa', f.home);
     writeFileSync(systemctl.db, JSON.stringify({ units: [{ unit: slice, sub: 'active' }] }));
     const stopped: Result = await cli(f, ['stop', '--all'], f.root, {
       ...systemctl.env,

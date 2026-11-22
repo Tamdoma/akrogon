@@ -31,7 +31,7 @@ async function setup(prefixes?: Record<string, string>) {
 }
 
 async function stopSlice(f: Fixture, slug: string): Promise<void> {
-  await spawnCaptured(['systemctl', '--user', 'stop', leafSlice({ name: f.repo }, slug)]);
+  await spawnCaptured(['systemctl', '--user', 'stop', leafSlice({ name: f.repo }, slug, f.home)]);
 }
 
 function refused(stderr: string): string[] {

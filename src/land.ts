@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
-import { readGlobal, requireRepo, globalHome, toolRoot, type GlobalConfig, type Repo } from './config';
+import { readGlobal, requireRepo, globalHome, homePath, toolRoot, type GlobalConfig, type Repo } from './config';
 import { allLeaves, readState, saveState, withLock, type Batch, type Leaf, type MergeExit } from './state';
 import { command, CommandError, spawnCaptured, type SpawnResult } from './shell';
 import {
@@ -31,7 +31,7 @@ export async function launchLand(repo: Repo, slug: string, attempt: string): Pro
     '--user',
     '--quiet',
     `--unit=${landUnit(attempt)}`,
-    `--slice=${leafSlice(repo, slug)}`,
+    `--slice=${leafSlice(repo, slug, homePath())}`,
     '-p',
     'CollectMode=inactive-or-failed',
     '-p',
@@ -183,7 +183,7 @@ export async function land(
     leaf: slug,
     check: 'land',
     run,
-    slice: runSlice(leafSlice(repo, slug)),
+    slice: runSlice(leafSlice(repo, slug, homePath())),
     scope: callerScope(),
     unit: `${runUnitBase(run)}.scope`,
     full: false,

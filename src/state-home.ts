@@ -1,8 +1,7 @@
 import { cpSync, existsSync, readdirSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { expandPath, toolRoot } from './config';
+import { expandPath, homePath, toolRoot } from './config';
 import { withLock } from './state';
 import { writeYaml } from './shell';
 
@@ -63,7 +62,7 @@ function liveRecords(runsDir: string): number {
 }
 
 export async function migrateStateHome(): Promise<void> {
-  const stateHome: string = resolve(process.env.AKROGON_HOME ?? resolve(homedir(), '.akrogon'));
+  const stateHome: string = homePath();
   const needed = (): boolean => !existsSync(resolve(stateHome, 'config.yaml'));
   if (stateHome === toolRoot || !needed() || !existsSync(resolve(toolRoot, 'config.yaml'))) return;
   const settled = (): boolean => liveRecords(resolve(toolRoot, 'runs')) === 0;

@@ -1,11 +1,14 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { homedir } from 'node:os';
 import { isAbsolute, resolve } from 'node:path';
 import type { Repo } from './config';
 import { CommandError, quote, spawnCaptured, type SpawnResult } from './shell';
 
-export function leafSlice(repo: Pick<Repo, 'name'>, slug: string): string {
-  return `akrogon-l${createHash('sha256').update(`${repo.name}/${slug}`).digest('hex').slice(0, 12)}.slice`;
+export function leafSlice(repo: Pick<Repo, 'name'>, slug: string, home: string): string {
+  const key: string =
+    resolve(home) === resolve(homedir(), '.akrogon') ? `${repo.name}/${slug}` : `${resolve(home)}:${repo.name}/${slug}`;
+  return `akrogon-l${createHash('sha256').update(key).digest('hex').slice(0, 12)}.slice`;
 }
 
 export function runUnitBase(run: string): string {

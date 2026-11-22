@@ -203,7 +203,7 @@ test('F4 repo activity follows live tabs and occupied slices instead of phase', 
         JSON.stringify({
           units:
             scenario === 'busy-slice'
-              ? [{ unit: leafSlice({ name: f.repo }, 'seat'), sub: 'active', cgroup: '/busy' }]
+              ? [{ unit: leafSlice({ name: f.repo }, 'seat', f.home), sub: 'active', cgroup: '/busy' }]
               : [],
         }),
       );

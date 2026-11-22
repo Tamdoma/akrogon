@@ -1,6 +1,7 @@
 import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import {
@@ -40,7 +41,7 @@ test('a repo-local pass preserves another registered repo slice with a live tab'
     f.core.link(otherCore);
     leaf(other, 'other-finished', 'merged', { repo: other.repo, tab: 'akotherfinished8' });
     await tabTerminal(otherCore, 'akotherfinished8');
-    const slice: string = leafSlice({ name: other.repo }, 'other-finished');
+    const slice: string = leafSlice({ name: other.repo }, 'other-finished', f.home);
     const cgRoot: string = resolve(f.home, 'cgroups');
     mkdirSync(resolve(cgRoot, 'other'), { recursive: true });
     writeFileSync(resolve(cgRoot, 'other/cgroup.procs'), '');
@@ -65,11 +66,11 @@ test('a repo-local pass preserves another registered repo slice with a live tab'
 
 const uid: number = process.getuid!();
 
-test('bad leaf ownership keeps uncertain slices without aborting failed-unit cleanup', async () => {
+test('a host pass stops no slice of a leaf stored under another repo key and resets no failed run unit', async () => {
   const f: SliceFixture = await slicesFixture();
   try {
     leaf(f, 'bad-state', 'merged', { repo: 'old-repo-name', tab: 'akbadstate9' });
-    const slice: string = leafSlice({ name: f.repo }, 'bad-state');
+    const slice: string = leafSlice({ name: f.repo }, 'bad-state', f.home);
     const cgRoot: string = resolve(f.home, 'cgroups');
     mkdirSync(resolve(cgRoot, 'bad-state'), { recursive: true });
     writeFileSync(resolve(cgRoot, 'bad-state/cgroup.procs'), '');
@@ -85,23 +86,27 @@ test('bad leaf ownership keeps uncertain slices without aborting failed-unit cle
         ],
       }),
     );
-    const result: Result = await cli(f, ['next', '--all'], f.root, {
+    await cli(f, ['next', '--all'], f.root, {
       ...f.env,
       FAKE_SYSTEMCTL_DB: db,
       FAKE_SYSTEMCTL_LOG: log,
       AKROGON_CGROUP_ROOT: cgRoot,
     });
-    expect(result.code).toBe(1);
     const calls: string = readFileSync(log, 'utf8');
-    expect(calls).toContain('reset-failed akrogon-run-bad-state.service');
+    expect(calls).not.toContain('reset-failed');
     expect(calls).not.toContain(`stop ${slice}`);
-    const report = z
-      .object({ kept: z.array(z.object({ path: z.string(), reason: z.string() })) })
-      .parse(JSON.parse(readFileSync(resolve(f.home, 'reconcile-host.json'), 'utf8')));
-    expect(report.kept.some((entry) => entry.path === slice && entry.reason.includes('old-repo-name'))).toBe(true);
   } finally {
     await f.clean();
   }
+});
+
+test('two homes derive different slice names for one repo and slug, and the default home keeps the bare name', () => {
+  const bare: string = `akrogon-l${createHash('sha256').update('repo/slug').digest('hex').slice(0, 12)}.slice`;
+  expect(leafSlice({ name: 'repo' }, 'slug', resolve(homedir(), '.akrogon'))).toBe(bare);
+  expect(leafSlice({ name: 'repo' }, 'slug', '/tmp/home-one')).not.toBe(bare);
+  expect(leafSlice({ name: 'repo' }, 'slug', '/tmp/home-one')).not.toBe(
+    leafSlice({ name: 'repo' }, 'slug', '/tmp/home-two'),
+  );
 });
 
 const realRuntime: string = `/run/user/${uid}`;
@@ -116,8 +121,8 @@ test('a shell run waits while another slice stops, then protects its own slice',
   try {
     leaf(f, 'a-control', 'merged');
     leaf(f, 'z-protected', 'merge');
-    const control: string = leafSlice({ name: f.repo }, 'a-control');
-    const protectedSlice: string = leafSlice({ name: f.repo }, 'z-protected');
+    const control: string = leafSlice({ name: f.repo }, 'a-control', f.home);
+    const protectedSlice: string = leafSlice({ name: f.repo }, 'z-protected', f.home);
     const stopping: string = resolve(f.home, 'stopping');
     const held: string = resolve(f.home, 'run-held');
     const db: string = resolve(f.home, 'systemctl.json');
@@ -191,8 +196,6 @@ test('a shell run waits while another slice stops, then protects its own slice',
 
 async function slicesFixture(window: 'open' | 'closed' = 'closed'): Promise<SliceFixture> {
   const f: HcFixture = await hcFixture({ window });
-  mkdirSync(resolve(f.home, 'own-slices-bin'));
-  symlinkSync(resolve(import.meta.dir, 'own-slices-systemctl.ts'), resolve(f.home, 'own-slices-bin/systemctl'));
   // The fake /proc root the fake herdr env used to set: reconcile sees no process inside a worktree or temp.
   return { ...f, env: { ...f.env, AKROGON_PROC_ROOT: procRoot(f) } };
 }
@@ -227,12 +230,8 @@ function realEnv(f: SliceFixture, env: NodeJS.ProcessEnv = {}): NodeJS.ProcessEn
   return {
     ...process.env,
     ...f.env,
-    // The real systemctl, listing only this case's leaf slices: these cases use unique slugs, so their
-    // real slices collide with no other case.
-    PATH: `${resolve(f.home, 'own-slices-bin')}:${f.core.env.PATH}`,
-    OWN_SLICES_SYSTEMCTL: z.string().parse(Bun.which('systemctl', { PATH: f.core.env.PATH })),
-    OWN_SLICES_REPO: f.repo,
-    OWN_SLICES_ROOT: f.root,
+    // The real systemctl: these cases use unique slugs, so their real slices collide with no other case.
+    PATH: f.core.env.PATH,
     AKROGON_HOME: f.home,
     HERDR_PANE_ID: '',
     HOME: f.home,
@@ -284,15 +283,6 @@ function sdrun(...args: string[]): Promise<SpawnResult> {
 
 async function isActive(unit: string): Promise<boolean> {
   return (await sysctl('is-active', unit)).code === 0;
-}
-
-async function listed(pattern: string): Promise<string[]> {
-  const result: SpawnResult = await sysctl('list-units', '--all', pattern, '--output=json');
-  if (result.code !== 0) return [];
-  return z
-    .array(z.object({ unit: z.string() }))
-    .parse(JSON.parse(result.stdout))
-    .map((row) => row.unit);
 }
 
 async function waitFor(ok: () => Promise<boolean>, ms: number = WAIT_MS): Promise<void> {
@@ -359,8 +349,8 @@ test('merged and failed leaf slices with gone tabs are stopped and their process
     const failedSlug: string = unique('failed-leaf');
     const mergedPath: string = await dispatchLeaf(f, mergedSlug);
     const failedPath: string = await dispatchLeaf(f, failedSlug);
-    const mergedSlice: string = leafSlice({ name: f.repo }, mergedSlug);
-    const failedSlice: string = leafSlice({ name: f.repo }, failedSlug);
+    const mergedSlice: string = leafSlice({ name: f.repo }, mergedSlug, f.home);
+    const failedSlice: string = leafSlice({ name: f.repo }, failedSlug, f.home);
     const mergedPid: number = await sleeper(f, mergedSlice);
     const failedPid: number = await sleeper(f, failedSlice);
     units.push(mergedSlice, failedSlice);
@@ -385,7 +375,7 @@ test('merged and failed leaf slices with gone tabs are stopped and their process
 test('a finished leaf with a live tab keeps its slice, and the pass fetched the pane list', async () => {
   const f: SliceFixture = await slicesFixture('open');
   const slug: string = unique('tabbed-merged');
-  const sliceName: string = leafSlice({ name: f.repo }, slug);
+  const sliceName: string = leafSlice({ name: f.repo }, slug, f.home);
   const units: string[] = [sliceName];
   try {
     const tab: string = 'aktabbedmerged9';
@@ -411,7 +401,7 @@ test('a finished leaf slice named by a live run record is not stopped', async ()
   let sliceName: string | undefined;
   const runSlug: string = unique('run-leaf');
   const controlSlug: string = unique('control-leaf');
-  const control: string = leafSlice({ name: f.repo }, controlSlug);
+  const control: string = leafSlice({ name: f.repo }, controlSlug, f.home);
   try {
     // run-leaf owns issue 'run-issue' with an unmerged sibling: the pass never
     // completes that owner, so reconcile reaches the slice step while the run
@@ -420,7 +410,7 @@ test('a finished leaf slice named by a live run record is not stopped', async ()
     leaf(f, 'sibling', 'implement', {}, 'run-issue');
     const controlPath: string = await dispatchLeaf(f, controlSlug);
     const worktree: string = z.string().parse(readState(path).worktree);
-    sliceName = leafSlice({ name: f.repo }, runSlug);
+    sliceName = leafSlice({ name: f.repo }, runSlug, f.home);
     const controlPid: number = await sleeper(f, control);
     const cap: Cap = spawnReal(f, ['run-check', '--name', 'hold', '--', 'sleep', '60'], worktree);
     try {
@@ -451,7 +441,7 @@ test('a pass with the pane list unavailable stops no slice of a leaf that has a 
   const f: SliceFixture = await slicesFixture();
   try {
     leaf(f, 'no-panes', 'merged', { tab: 'aknopanes7' });
-    const sliceName: string = leafSlice({ name: f.repo }, 'no-panes');
+    const sliceName: string = leafSlice({ name: f.repo }, 'no-panes', f.home);
     const cgroup: string = `/user.slice/user-${uid}.slice/user@${uid}.service/akrogon.slice/${sliceName}`;
     const cgRoot: string = resolve(f.home, 'cgroups');
     mkdirSync(resolve(cgRoot, cgroup.slice(1)), { recursive: true });
@@ -479,7 +469,7 @@ test('a pass with the pane list unavailable stops no slice of a leaf that has a 
   }
 });
 
-test('a loaded slice matching no leaf record is stopped only when it holds no process', async () => {
+test('a host pass stops no loaded slice matching none of its own leaves, empty or busy', async () => {
   const f: SliceFixture = await slicesFixture();
   try {
     const empty: string = 'akrogon-ldeadbeef00.slice';
@@ -511,7 +501,7 @@ test('a loaded slice matching no leaf record is stopped only when it holds no pr
     });
     expect(result.code).toBe(0);
     const calls: string[] = existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n') : [];
-    expect(calls.some((line) => line.includes(`stop ${empty}`))).toBe(true);
+    expect(calls.some((line) => line.includes(`stop ${empty}`))).toBe(false);
     expect(calls.some((line) => line.includes(`stop ${busy}`))).toBe(false);
   } finally {
     await f.clean();
@@ -524,7 +514,7 @@ test('a reconcile pass running inside a leaf slice does not stop that slice', as
   try {
     const slug: string = unique('self-leaf');
     const path: string = await dispatchLeaf(f, slug);
-    sliceName = leafSlice({ name: f.repo }, slug);
+    sliceName = leafSlice({ name: f.repo }, slug, f.home);
     // A real sleeper keeps the slice occupied once the seat ends: a concurrent case's real host slice
     // step stops an empty unknown leaf slice, which would refuse the scope started below. The pass
     // reads the fake cgroup root, so the sleeper hides nothing from it.
@@ -583,7 +573,7 @@ test('akrogon phase merged inside the leaf slice stops no slice', async () => {
   try {
     const slug: string = unique('phase-leaf');
     leaf(f, slug, 'merge', { ...holding(f), merge_stamp: '2026-10-15T20:00:00Z' }, 'standalone');
-    sliceName = leafSlice({ name: f.repo }, slug);
+    sliceName = leafSlice({ name: f.repo }, slug, f.home);
     const pid: number = await sleeper(f, sliceName);
     const marker: string = resolve(f.home, 'phase.exit');
     const inner: string = [
@@ -746,7 +736,7 @@ test('a finished leaf temp stays while its slice holds a running unit', async ()
     const hex = (text: string): string => createHash('sha256').update(text).digest('hex');
     const temp: string = resolve(leafTempRoot(f), hex(f.root).slice(0, 4), hex(`${f.root}\nbusy-temp`).slice(0, 8));
     mkdirSync(temp, { recursive: true });
-    const slice: string = leafSlice({ name: f.repo }, 'busy-temp');
+    const slice: string = leafSlice({ name: f.repo }, 'busy-temp', f.home);
     const cgRoot: string = resolve(f.home, 'cgroups');
     mkdirSync(resolve(cgRoot, 'busy'), { recursive: true });
     writeFileSync(resolve(cgRoot, 'busy', 'cgroup.procs'), `${process.pid}\n`);
@@ -784,7 +774,7 @@ test('a finished leaf temp stays while its retained slice holds a running unit w
     const hex = (text: string): string => createHash('sha256').update(text).digest('hex');
     const temp: string = resolve(leafTempRoot(f), hex(f.root).slice(0, 4), hex(`${f.root}\nno-tab`).slice(0, 8));
     mkdirSync(temp, { recursive: true });
-    const slice: string = leafSlice({ name: f.repo }, 'no-tab');
+    const slice: string = leafSlice({ name: f.repo }, 'no-tab', f.home);
     const cgRoot: string = resolve(f.home, 'cgroups');
     mkdirSync(resolve(cgRoot, 'busy'), { recursive: true });
     writeFileSync(resolve(cgRoot, 'busy', 'cgroup.procs'), `${process.pid}\n`);
@@ -847,7 +837,7 @@ test('a finished leaf temp stays while its slice is named by a waiting run recor
     const hex = (text: string): string => createHash('sha256').update(text).digest('hex');
     const temp: string = resolve(leafTempRoot(f), hex(f.root).slice(0, 4), hex(`${f.root}\nno-tab-wait`).slice(0, 8));
     mkdirSync(temp, { recursive: true });
-    const slice: string = leafSlice({ name: f.repo }, 'no-tab-wait');
+    const slice: string = leafSlice({ name: f.repo }, 'no-tab-wait', f.home);
     const cgRoot: string = resolve(f.home, 'cgroups');
     mkdirSync(resolve(cgRoot, 'busy'), { recursive: true });
     writeFileSync(resolve(cgRoot, 'busy', 'cgroup.procs'), `${process.pid}\n`);
@@ -896,24 +886,6 @@ test('a finished leaf temp stays while its slice is named by a waiting run recor
   } finally {
     child.kill('SIGKILL');
     await child.exited;
-    await f.clean();
-  }
-});
-
-test('a loaded failed akrogon-run unit is cleared by a reconcile pass', async () => {
-  const f: SliceFixture = await slicesFixture();
-  const unit: string = `akrogon-run-flp-${process.pid}-dead`;
-  try {
-    leaf(f, 'seed', 'plan.synthesis');
-    // No CollectMode here: the unit must stay listed as failed until the pass clears it.
-    const seeded: SpawnResult = await sdrun('--quiet', `--unit=${unit}`, '--slice=akrogon.slice', 'false');
-    expect(seeded.code).toBe(0);
-    await waitFor(async () => (await listed('akrogon-run-flp-*')).includes(`${unit}.service`));
-    const pass: SpawnResult = await spawnReal(f, ['next', '--all'], f.root).result;
-    expect(pass.code, `${pass.stdout} | ${pass.stderr}`).toBe(0);
-    expect(await listed('akrogon-run-flp-*')).not.toContain(`${unit}.service`);
-  } finally {
-    await cleanupUnit(unit);
     await f.clean();
   }
 });

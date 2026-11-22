@@ -7,7 +7,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import { parse } from 'shell-quote';
-import { base, leafTemp, repoPrefix, seats, type GlobalConfig, type Repo, type SlotConfig } from './config';
+import { base, homePath, leafTemp, repoPrefix, seats, type GlobalConfig, type Repo, type SlotConfig } from './config';
 import { CommandError, quote } from './shell';
 import { readState, saveState, type Leaf, type State } from './state';
 import { leafSlice } from './scope';
@@ -261,7 +261,7 @@ export async function startSeat(
   const seat: 'a' | 'b' = slot === 'A' ? 'a' : 'b';
   const name: string = seatName(repo.name, repoPrefix(global, repo.name), state.slug, seat);
   const harness: Harness = harnessArgv(global, seats(global, repo, leaf.path)[seat]);
-  const slice: string = leafSlice(repo, state.slug);
+  const slice: string = leafSlice(repo, state.slug, homePath());
   const unit: string = `${slice.replace(/\.slice$/, '')}-${name}-${randomBytes(4).toString('hex')}.scope`;
   const a: Seen | undefined = slot === 'B' ? (await leafSeats(space.session, repo, readState(leaf.path))).A : undefined;
   const launched: Seen = await run(space.session, {

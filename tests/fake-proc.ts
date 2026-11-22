@@ -22,8 +22,11 @@ export function seedShell(root: string, paneId: string, cgroup: string): void {
   writeFileSync(resolve(dir, 'cgroup'), cgroup + '\n');
 }
 
-export function expectedSlice(repoName: string, slug: string): string {
-  return `akrogon-l${new Bun.CryptoHasher('sha256').update(`${repoName}/${slug}`).digest('hex').slice(0, 12)}.slice`;
+export function expectedSlice(repoName: string, slug: string, home: string): string {
+  return `akrogon-l${new Bun.CryptoHasher('sha256')
+    .update(`${resolve(home)}:${repoName}/${slug}`)
+    .digest('hex')
+    .slice(0, 12)}.slice`;
 }
 
 export function expectedScope(slice: string, paneId: string): string {

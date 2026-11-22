@@ -221,8 +221,12 @@ export function seats(
 
 export const toolRoot: string = resolve(import.meta.dir, '..');
 
+export function homePath(): string {
+  return resolve(process.env.AKROGON_HOME ?? resolve(homedir(), '.akrogon'));
+}
+
 export function globalHome(): string {
-  const home: string = resolve(process.env.AKROGON_HOME ?? resolve(homedir(), '.akrogon'));
+  const home: string = homePath();
   if (existsSync(resolve(home, 'config.yaml'))) return home;
   if (existsSync(resolve(toolRoot, 'config.yaml'))) return toolRoot;
   return home;
