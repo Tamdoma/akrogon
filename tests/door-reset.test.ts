@@ -287,6 +287,9 @@ test.each([
         kind === 'claude' ? 'no tab lists A or its name is blank' : 'harness is not claude',
       );
       const pre: string = z.string().parse(began.pre);
+      // A logs a line only after it reads it, which can trail the helper's exit: its turn on the start
+      // prompt has ended once that line is logged.
+      const fresh: string = await turnOf(run, start);
       // The first task was written before the helper started, so it is no operator input past the boundary.
       expect(inputs(run).map((r: Received) => r.input)).toEqual(['hold first task', key, start]);
       // Nothing reached A while a turn was open.
@@ -297,7 +300,6 @@ test.each([
       ).toEqual([]);
       // The start prompt opened a new conversation, and fresh A's own lookup names it; afterwards an outside
       // lookup agrees (pi's argv still names the first conversation, its published label answers).
-      const fresh: string = await turnOf(run, start);
       expect(fresh).not.toBe(pre);
       expect(await lookup(run, kind === 'pi' ? { PI_SESSION_FILE: fresh } : {})).toBe(fresh);
       expect(await lookup(run, null)).toBe(fresh);
@@ -479,10 +481,10 @@ test('a reset that leaves A on the same transcript lands the start prompt there,
       result: 'skipped',
       reason: 'no tab lists A or its name is blank',
     });
-    expect(inputs(run).map((r: Received) => r.input)).toEqual(['hold first task', '/clear', start]);
     const pre: string = z.string().parse(began.pre);
     // The receiving session's check (chart-issues SKILL.md) compares this answer with the entry and stops.
     expect(await turnOf(run, start)).toBe(pre);
+    expect(inputs(run).map((r: Received) => r.input)).toEqual(['hold first task', '/clear', start]);
     expect(await lookup(run, {})).toBe(pre);
   } finally {
     await run.core.stop();
@@ -505,13 +507,13 @@ test('claude: a session with its own name logs name kept and sends no rename', a
     await exited(run, address);
     const nameStep: Step | undefined = steps(run.log).find((s: Step) => s.step === 'name');
     expect(nameStep).toMatchObject({ result: 'kept', name: 'c-Last Name_2' });
+    expect(await turnOf(run, start)).not.toBe(pre);
     expect(inputs(run).map((r: Received) => r.input)).toEqual(['hold first task', '/clear', start]);
     expect(
       inputs(run)
         .slice(1)
         .filter((r: Received) => r.busy),
     ).toEqual([]);
-    expect(await turnOf(run, start)).not.toBe(pre);
   } finally {
     await run.core.stop();
     run.f.clean();
@@ -533,6 +535,7 @@ test('claude: a session with no name in a named tab gets the tab name sent and t
       result: 'sent',
       name: 'C Tab_4',
     });
+    const fresh: string = await turnOf(run, start);
     const got = agentLines(run);
     const rename: number = got.findIndex((l) => 'input' in l && l.input === '/rename C Tab_4');
     const clear: number = got.findIndex((l) => 'input' in l && l.input === '/clear');
@@ -546,7 +549,6 @@ test('claude: a session with no name in a named tab gets the tab name sent and t
         .filter((r: Received) => r.busy),
     ).toEqual([]);
     // The receiving session reads the name from its transcript, not the log or the inputs.
-    const fresh: string = await turnOf(run, start);
     expect(fresh).not.toBe(pre);
     expect(JSON.parse(readFileSync(fresh, 'utf8').split('\n')[0])).toEqual({
       type: 'custom-title',
@@ -572,6 +574,7 @@ test.each([
     await exited(run, address);
     expect(steps(run.log).map((s: Step) => s.step)).toEqual(STAGES);
     expect(steps(run.log).find((s: Step) => s.step === 'name')).toMatchObject({ result: 'skipped', reason });
+    await turnOf(run, start);
     expect(inputs(run).map((r: Received) => r.input)).toEqual(['hold first task', '/clear', start]);
   } finally {
     await run.core.stop();
