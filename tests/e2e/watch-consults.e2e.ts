@@ -1,14 +1,13 @@
-// watch-consults criteria 1-2, the paid attended run under readiness grants[1] (at most 4
-// harness sessions from its approval, watchers and consultants each counted, each ending within
-// 15 minutes): a real watcher in the akr-e2e-watch tier meets a staged notify-only failure
+// watch-consults criteria 1-2, the paid attended run under the applicable readiness grant:
+// a real watcher in the akr-e2e-watch tier meets a staged notify-only failure
 // (failed=blocked@check.review after two unproductive cycles, a base-red repo check), starts
 // its consultant with `akrogon seat --watch-consultant` from the machine slots.consultant
 // recipe, exchanges a turn file over hc send inside its own turn, lets the consultant fix the
 // base and push fast-forward, resumes the leaf with `akrogon phase` + `akrogon next`, writes
 // the case record and its signature, notices the push and the move non-attention, and closes
 // the consultant before the resume.
-// Sessions per run: watcher (pi), consultant (agy neon high, the N2 default recipe) — 2; the
-// resumed leaf's seat A is the tier stand-in (grants[1]: slots a/b use it), no paid session.
+// Count the watcher (pi), initial consultant (agy neon high) and each replacement that receives
+// a task. Reconcile the tier evidence before counting a retry. The resumed leaf uses a stand-in.
 // Run: akrogon run-check --name watch-consults -- env AKROGON_E2E=watch-consults
 //      AKROGON_E2E_ROOT=<leaf temp> AKROGON_E2E_OUT=<leaf>/implementation/watch-consults-e2e
 //      WATCH_TICK_SECONDS=15
