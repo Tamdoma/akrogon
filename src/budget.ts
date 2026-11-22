@@ -47,8 +47,9 @@ export async function reserve(
   run: string,
   sessionsText: string,
 ): Promise<{ sessions: number; minutes: number }> {
-  const n: number = Number(sessionsText);
-  if (!Number.isInteger(n) || n <= 0) throw new Error(`Invalid --sessions ${sessionsText}: a positive integer`);
+  const count: string = sessionsText.trim();
+  if (!/^\+?0*[1-9]\d*$/.test(count)) throw new Error(`Invalid --sessions ${sessionsText}: a positive integer`);
+  const n: number = Number(count);
   const home: string = globalHome();
   const ledger: string = resolve(home, 'budget.jsonl');
   return withLock(resolve(home, 'budget.lock'), async (): Promise<{ sessions: number; minutes: number }> => {
@@ -61,7 +62,7 @@ export async function reserve(
       .sort((a: Row, b: Row): number => Date.parse(a.at) - Date.parse(b.at));
     const total: number = rows.reduce((sum: number, row: Row): number => sum + row.sessions, 0);
     if (total + n > cap) {
-      const prefix: string = `paid session budget: --sessions ${n} over the rolling 24-hour total ${total} of ${cap} sessions per day`;
+      const prefix: string = `paid session budget: --sessions ${count} over the rolling 24-hour total ${total} of ${cap} sessions per day`;
       if (n > cap) throw new Error(`${prefix}; never fits`);
       const earliest: Row | undefined = rows.find((row: Row): boolean => {
         const later: number = rows
