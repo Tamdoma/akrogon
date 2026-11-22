@@ -8,7 +8,7 @@ import { cli, fixture, leaf, leafTempRoot, storeDir, type Fixture } from './help
 import { hcCore, setSeat, shortStartProof, type HcCore, type Terminal, stopCoresAfterFile } from './hc-fixture';
 import { readState } from '../src/state';
 import { leafSlice } from '../src/scope';
-import { spawnCaptured } from '../src/shell';
+import { spawnCaptured, type SpawnResult } from '../src/shell';
 
 stopCoresAfterFile();
 
@@ -37,9 +37,18 @@ async function setup(
   return { f, core, path };
 }
 
+// Verify runs the suite in a service without the user session's env: the user manager is reached
+// through the real runtime dir, as the test cores' systemd-run reaches it.
+const uid: number = process.getuid!();
+const userBus: string[] = [
+  'env',
+  `XDG_RUNTIME_DIR=/run/user/${uid}`,
+  `DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${uid}/bus`,
+];
+
 async function teardown(f: Fixture, core: HcCore, slug: string): Promise<void> {
   await core.stop();
-  await spawnCaptured(['systemctl', '--user', 'stop', leafSlice({ name: f.repo }, slug)]);
+  await spawnCaptured([...userBus, 'systemctl', '--user', 'stop', leafSlice({ name: f.repo }, slug)]);
   f.clean();
 }
 
@@ -114,6 +123,20 @@ test('slot B starts under the live A, so the sidebar indents it, and outlives it
     expect((await cli(f, ['seat', 'hs-pair', 'B'], f.root, core.env)).code).toBe(0);
     const alone: Terminal = await seatOf(core, `${f.prefix}-hs-pair-b`);
     expect(alone.parent).toBeNull();
+    // A real sleeper keeps the leaf slice occupied once B is killed: a concurrent case's host slice step
+    // stops an empty leaf slice it has no record of, which would refuse A's scope. Teardown's slice stop
+    // ends it.
+    const sleeper: SpawnResult = await spawnCaptured([
+      ...userBus,
+      'systemd-run',
+      '--user',
+      '--quiet',
+      '--collect',
+      `--slice=${leafSlice({ name: f.repo }, 'hs-pair')}`,
+      'sleep',
+      '300',
+    ]);
+    expect(sleeper.code, sleeper.stderr).toBe(0);
     expect((await core.hc(['kill', alone.address])).code).toBe(0);
     expect((await cli(f, ['seat', 'hs-pair', 'A'], f.root, core.env)).code).toBe(0);
     const a: Terminal = await seatOf(core, `${f.prefix}-hs-pair-a`);
