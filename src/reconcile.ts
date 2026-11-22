@@ -39,6 +39,8 @@ import {
   type Leaf,
   type SeatRef,
   type State,
+  withLock,
+  worktreeLock,
 } from './state';
 import { cgroupRoot, leafSlice, ownSlices, procRoot, sessionBusAddress } from './scope';
 import { liveRuns, liveStartTime, withAdmissionLock } from './admission';
@@ -626,7 +628,9 @@ export async function reconcile(
         return false;
       }
     }
-    const result: Result = await run(['git', 'worktree', 'remove', ...(force ? ['--force'] : []), path], repo.root);
+    const result: Result = await withLock(await worktreeLock(repo.root), () =>
+      run(['git', 'worktree', 'remove', ...(force ? ['--force'] : []), path], repo.root),
+    );
     if (result.code !== 0) {
       // Best-effort re-lock: a remove that unregistered first has nothing to
       // lock, and the removal error is already the recorded keep reason.
@@ -1250,7 +1254,8 @@ export async function reconcile(
       else dropChecked(lock);
     }
 
-  if (removed.length > 0) await command(['git', 'worktree', 'prune'], repo.root);
+  if (removed.length > 0)
+    await withLock(await worktreeLock(repo.root), () => command(['git', 'worktree', 'prune'], repo.root));
   writeKeptReport(repo, kept, removedWorktrees);
   return { removed, kept };
 }

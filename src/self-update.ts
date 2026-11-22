@@ -18,7 +18,7 @@ import {
 } from './release';
 import { eligibleRecord, integrate } from './sync';
 import { command, run, CommandError, type Result } from './shell';
-import { withLock } from './state';
+import { withLock, worktreeLock } from './state';
 
 function errorLine(result: Result): string {
   return (result.stderr !== '' ? result.stderr : result.stdout).replaceAll('\n', ' ');
@@ -114,10 +114,11 @@ async function gitStage(repo: Repo, target: string, lag: () => Promise<string>):
       const ahead: number = Number(await command(['git', 'rev-list', '--count', `${incoming}..HEAD`], root));
       if (ahead === 0) return { tip: null };
       rmSync(scratch, { recursive: true, force: true });
-      await command(['git', 'worktree', 'prune'], root);
+      const lock: string = await worktreeLock(root);
+      await withLock(lock, () => command(['git', 'worktree', 'prune'], root));
       try {
         ensureLeafTemp(repo, 'self-update');
-        await command(['git', 'worktree', 'add', '--detach', scratch, incoming], root);
+        await withLock(lock, () => command(['git', 'worktree', 'add', '--detach', scratch, incoming], root));
         const rebaseArgs: string[] = ['git', 'rebase', incoming, base];
         const rebased: Result = await run(rebaseArgs, scratch);
         if (rebased.code !== 0) {
@@ -131,9 +132,9 @@ async function gitStage(repo: Repo, target: string, lag: () => Promise<string>):
         const tip: string = await command(['git', 'rev-parse', 'HEAD'], scratch);
         return tip === incoming ? { tip: null } : { tip };
       } finally {
-        await run(['git', 'worktree', 'remove', '--force', scratch], root);
+        await withLock(lock, () => run(['git', 'worktree', 'remove', '--force', scratch], root));
         rmSync(scratch, { recursive: true, force: true });
-        await command(['git', 'worktree', 'prune'], root);
+        await withLock(lock, () => command(['git', 'worktree', 'prune'], root));
       }
     },
   );

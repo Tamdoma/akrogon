@@ -3,7 +3,7 @@ import { basename, dirname, relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import { historicalPhaseSchema, phaseSchema, slotSchema, verdictSchema } from './routing';
 import { within, withoutKey, type Repo } from './config';
-import { writeYaml } from './shell';
+import { command, writeYaml } from './shell';
 import { issueFolders } from './park';
 
 const counts = z.object({ A: z.number().int().nonnegative().default(0), B: z.number().int().nonnegative().default(0) });
@@ -364,6 +364,12 @@ export function findLeaf(repo: Repo, slug: string): Leaf {
   if (state.slug !== slug)
     throw new Error(`Leaf slug mismatch at ${path}: folder "${basename(path)}", state slug "${state.slug}"`);
   return { path, state };
+}
+
+// Git lists every registered worktree inside add and remove and dies when a concurrent remove
+// deletes an entry mid-listing, so both run under this repo-wide lock.
+export async function worktreeLock(root: string): Promise<string> {
+  return resolve(root, await command(['git', 'rev-parse', '--git-path', 'akrogon-worktree.lock'], root));
 }
 
 export async function withLock<T>(

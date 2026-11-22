@@ -1252,9 +1252,13 @@ test('lock finalization failures remain fatal', async () => {
   try {
     leaf(f, 'healthy', 'plan.synthesis');
     const flock: string = resolve(f.home, 'bin/flock');
-    writeFileSync(flock, '#!/bin/sh\nprintf locked\ncat >/dev/null\nprintf "finalization failure" >&2\nexit 7\n', {
-      mode: 0o755,
-    });
+    writeFileSync(
+      flock,
+      `#!/bin/sh\ncase "$2" in *akrogon-worktree.lock) exec ${Bun.which('flock')} "$@";; esac\nprintf locked\ncat >/dev/null\nprintf "finalization failure" >&2\nexit 7\n`,
+      {
+        mode: 0o755,
+      },
+    );
     const result: Result = await next(f, ['--all']);
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain('finalization failure');

@@ -30,7 +30,7 @@ import { checkedRun, leafFields, leafTarget, refuse, type LeafTarget } from './r
 import { command, CommandError, run, spawnCaptured, type Result, type SpawnResult } from './shell';
 import { repoSpace, type SpaceResolution } from './hc';
 import { noticeFolder, noticeId, noticeState, writeNotice, type Notice } from './notice';
-import { allLeaves, withLock, type Leaf } from './state';
+import { allLeaves, withLock, worktreeLock, type Leaf } from './state';
 import { isAncestor } from './batch';
 import { callerScope } from './admission';
 import { sessionBusAddress } from './scope';
@@ -844,7 +844,10 @@ async function runOnce(repo: Repo, record: PassRecord): Promise<VerifyRun> {
       renameSync(temporary, file);
     });
     if (slowPrint !== undefined) process.stdout.write(slowPrint + '\n');
-    if (existsSync(target)) await command(['git', 'worktree', 'remove', '--force', target], repo.root);
+    if (existsSync(target))
+      await withLock(await worktreeLock(repo.root), () =>
+        command(['git', 'worktree', 'remove', '--force', target], repo.root),
+      );
   }
   return {
     ...receipt,

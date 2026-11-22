@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { dirname, resolve, sep } from 'node:path';
 import { worktreeStore, type Repo } from './config';
 import { checkLocation } from './guard';
-import { type Leaf } from './state';
+import { withLock, worktreeLock, type Leaf } from './state';
 import { command, run, CommandError, type Result } from './shell';
 import { removeRetiredLessons } from './lessons';
 import { createSparseWorktree } from './next';
@@ -112,7 +112,9 @@ export async function buildStack(
     }
     return { ok: true, top: tip };
   } finally {
-    await command(['git', 'worktree', 'remove', '--force', dir], repo.root);
+    await withLock(await worktreeLock(repo.root), () =>
+      command(['git', 'worktree', 'remove', '--force', dir], repo.root),
+    );
     rmSync(owner, { force: true });
   }
 }

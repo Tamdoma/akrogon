@@ -38,6 +38,7 @@ import {
   type Leaf,
   type State,
   type Inventory,
+  worktreeLock,
 } from './state';
 import { requiredSlots, routing, type Phase, type Slot } from './routing';
 import { command, run, CommandError, type Result } from './shell';
@@ -242,26 +243,29 @@ export async function createSparseWorktree(
   opts: { detach?: boolean; branch?: string },
 ): Promise<void> {
   checkLocation(path);
+  const lock: string = await worktreeLock(repo.root);
   let added: boolean = false;
   try {
-    await command(
-      [
-        'git',
-        'worktree',
-        'add',
-        '--no-checkout',
-        ...(opts.detach === true ? ['--detach'] : []),
-        ...(opts.branch === undefined ? [] : ['-b', opts.branch]),
-        path,
-        ref,
-      ],
-      repo.root,
+    await withLock(lock, () =>
+      command(
+        [
+          'git',
+          'worktree',
+          'add',
+          '--no-checkout',
+          ...(opts.detach === true ? ['--detach'] : []),
+          ...(opts.branch === undefined ? [] : ['-b', opts.branch]),
+          path,
+          ref,
+        ],
+        repo.root,
+      ),
     );
     added = true;
     await command(['git', '-C', path, 'sparse-checkout', 'set', '--no-cone', '/*', '!/issues/'], repo.root);
     await command(['git', '-C', path, 'checkout'], repo.root);
   } catch (error) {
-    if (added) await command(['git', 'worktree', 'remove', '--force', path], repo.root);
+    if (added) await withLock(lock, () => command(['git', 'worktree', 'remove', '--force', path], repo.root));
     throw error;
   }
 }
