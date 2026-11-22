@@ -28,6 +28,13 @@ export const globalSchema = z
     toolkits: z.record(text, text).default({}),
     repos: z.record(text, text).default({}),
     prefixes: z.record(text, z.string().regex(/^[a-z]{2}$/, 'prefix must be two lowercase letters')).optional(),
+    paid_budget: z
+      .strictObject({
+        sessions_per_day: z.number().int().positive(),
+        session_minutes: z.number().int().positive(),
+        approved: z.strictObject({ date: z.string().trim().min(1), answer: z.string().trim().min(1) }),
+      })
+      .optional(),
   })
   .superRefine((config, ctx) => {
     const named: Record<string, SlotConfig | undefined> = {
@@ -85,6 +92,8 @@ export const repoSchema = z
       'CHROME_PATH',
       'CDP_BROWSER_BINARY',
       'DBUS_SESSION_BUS_ADDRESS',
+      'AKROGON_SESSIONS',
+      'AKROGON_SESSION_MINUTES',
     ]);
     const envName: RegExp = /^[A-Z_][A-Z0-9_]*$/;
     for (const [field, names] of [

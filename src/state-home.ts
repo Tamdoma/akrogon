@@ -15,6 +15,7 @@ const copiedEntries: string[] = [
   'reconcile-host.json',
   'reconcile',
   'runs',
+  'budget.jsonl',
 ];
 
 // The liveness subset of admission.ts's record check, applied to the tool
