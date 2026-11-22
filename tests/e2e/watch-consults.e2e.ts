@@ -149,11 +149,13 @@ test.serial(
   'watch consults: a notify-only failure consults, fixes the base and resumes the leaf',
   async () => {
     expect(required('AKROGON_E2E')).toBe('watch-consults');
-    // The session budget (grant bound): each paid session is ended by teardown; the run
-    // itself must finish inside AKROGON_SESSION_MINUTES per session.
     reservedSessions(2);
     const minutes: number = z.coerce.number().positive().parse(process.env.AKROGON_SESSION_MINUTES);
     const deadline: number = Date.now() + minutes * 60_000;
+    const remaining = (limit: number): number => Math.max(0, Math.min(limit, deadline - Date.now()));
+    const requireTime = (): void => {
+      if (Date.now() >= deadline) throw new Error(`watch-consults exceeded its ${minutes}-minute session deadline`);
+    };
     console.log(`session deadline: ${new Date(deadline).toISOString()} (AKROGON_SESSION_MINUTES=${minutes})`);
     const watcherBinary: string = z.string().parse(Bun.which('pi'));
     const name: string = 'akr-e2e-watch-consults';
@@ -180,6 +182,8 @@ test.serial(
     );
     const scratch: string = resolve(leafTemp, `${name}-scratch`);
     const worktrees: string = resolve(leafTemp, `${name}-wtr`);
+    let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+    let deadlineStop: Promise<SpawnResult> | undefined;
     try {
       await observeReady(tier);
       // The leaf's skill copy must be the only watch-issues pi sees.
@@ -210,6 +214,7 @@ test.serial(
         `WATCH_TICK_SECONDS=${intervalSec}`,
         `AKROGON_E2E_ROOT=${leafTemp}`,
       ];
+      requireTime();
       const run: SpawnResult = await tier.hc([
         'run',
         '--bg',
@@ -235,6 +240,10 @@ test.serial(
       ]);
       expect(run.code).toBe(0);
       const watcher: string = z.object({ address: z.string() }).parse(JSON.parse(run.stdout)).address;
+      // The watcher owns the paid consultant terminals. Ending it ends those children too.
+      deadlineTimer = setTimeout(() => {
+        deadlineStop = tier.hc(['kill', watcher]);
+      }, remaining(780_000));
       tier.record('cwds.json', [tier.root, leafTemp]);
       // src/hc calls from this process (waitFor, transcriptFor) resolve the session socket
       // under our own XDG_RUNTIME_DIR — point it at the tier's, as watch-live's startCell does.
@@ -245,20 +254,24 @@ test.serial(
         session,
         watcher,
         (t: Seen) => t.status?.state === 'idle' || t.status?.state === 'done',
-        120_000,
+        remaining(120_000),
       );
       expect(ready, `watcher never idle; screen:\n${await screen(tier, watcher)}`).not.toBeNull();
+      requireTime();
       await send(tier, watcher, `watch-issues ${tier.root}`);
 
       // The consult: the consultant terminal appears under the verified name and labels.
       const consultant: Term | null = await waitLabelled(
         tier,
         { 'akrogon.watch-consult': 'akre2e' },
-        Math.min(
-          Number(process.env.AKROGON_E2E_CONSULT_WAIT_MS ?? '420000'),
-          Math.max(60_000, deadline - Date.now() - 8 * 60_000),
+        remaining(
+          Math.min(
+            Number(process.env.AKROGON_E2E_CONSULT_WAIT_MS ?? '420000'),
+            Math.max(60_000, deadline - Date.now() - 8 * 60_000),
+          ),
         ),
       );
+      requireTime();
       expect(consultant, `no consultant started; watcher screen:\n${await screen(tier, watcher)}`).not.toBeNull();
       expect(consultant!.name).toBe('aw-watch-consult');
       expect(consultant!.parent).toBe(watcher);
@@ -294,8 +307,9 @@ test.serial(
       };
       while (!resumed.includes(statePhase(tier.root, SLUG)) && Date.now() < deadline) {
         await sample();
-        await Bun.sleep(2000);
+        await Bun.sleep(remaining(2000));
       }
+      requireTime();
       await sample();
       const phase: string = statePhase(tier.root, SLUG);
       const lingering: Term[] = await consultants();
@@ -311,8 +325,9 @@ test.serial(
       const seat: Term | null = await waitLabelled(
         tier,
         { 'akrogon.leaf': SLUG, 'akrogon.seat': 'a' },
-        Math.min(180_000, Math.max(30_000, deadline - Date.now() - 150_000)),
+        remaining(Math.min(180_000, Math.max(30_000, deadline - Date.now() - 150_000))),
       );
+      requireTime();
       tier.record('seat.json', seat);
       expect(seat, `no leaf seat after resume to ${phase}`).not.toBeNull();
 
@@ -326,8 +341,11 @@ test.serial(
       const status = (): string =>
         existsSync(resolve(caseDir, 'status')) ? readFileSync(resolve(caseDir, 'status'), 'utf8').trim() : 'missing';
       const ended: string[] = ['closed', 'resumed'];
-      const settleBy: number = Date.now() + Math.min(90_000, Math.max(10_000, deadline - Date.now() - 30_000));
-      while ((notices(scratch).length < 2 || !ended.includes(status())) && Date.now() < settleBy) await Bun.sleep(2000);
+      const settleBy: number =
+        Date.now() + remaining(Math.min(90_000, Math.max(10_000, deadline - Date.now() - 30_000)));
+      while ((notices(scratch).length < 2 || !ended.includes(status())) && Date.now() < settleBy)
+        await Bun.sleep(Math.max(0, Math.min(2000, settleBy - Date.now())));
+      requireTime();
       const seen = notices(scratch);
       tier.record('notices.json', seen);
       tier.record('case-status.txt', status());
@@ -377,9 +395,7 @@ test.serial(
       expect(tip).not.toBe(staged);
       expect(forward.code).toBe(0);
 
-      const left: string[] = await stopWatchTier(tier, [leafTemp]);
-      tier.record('absence.json', { left });
-      expect(left).toEqual([]);
+      requireTime();
     } catch (error) {
       try {
         const listed = z
@@ -387,8 +403,14 @@ test.serial(
           .parse(await tier.rpc('terminal.list', { all: true, labels: {} }));
         for (const t of listed.terminals) tier.record(`screen-${t.address}.txt`, await screen(tier, t.address, 120));
       } catch {}
-      await stopWatchTier(tier, [leafTemp]).catch(() => {});
       throw error;
+    } finally {
+      clearTimeout(deadlineTimer);
+      const stopped: SpawnResult | undefined = await deadlineStop;
+      const left: string[] = await stopWatchTier(tier, [leafTemp]);
+      tier.record('absence.json', { left });
+      expect(left).toEqual([]);
+      if (stopped !== undefined) expect(stopped.code, stopped.stderr).toBe(0);
     }
   },
   780_000,
