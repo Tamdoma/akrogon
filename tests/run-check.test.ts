@@ -152,7 +152,6 @@ await import(${JSON.stringify(entry)});
     const refusals: string[] = [...new Bun.Glob('**/run-*/refusal.json').scanSync({ cwd: leafTempRoot(f) })];
     expect(refusals).toHaveLength(1);
     expect(readFileSync(resolve(leafTempRoot(f), refusals[0]), 'utf8')).toContain('owner gone');
-    expect(existsSync(resolve(dirname(resolve(leafTempRoot(f), refusals[0])), '.akrogon-kept'))).toBe(false);
   } finally {
     f.clean();
   }
@@ -172,6 +171,7 @@ test('run-check builds an allowlisted env, copies declared names and omits undec
       'NODE_DISABLE_COMPILE_CACHE',
       'TMPDIR',
       'AKROGON_BASE',
+      'AKROGON_EVIDENCE',
       'AKROGON_RUN',
       'AKROGON_HOME',
       'AKROGON_CAPTURES',
@@ -305,32 +305,52 @@ test('run-check TMPDIR is a fresh run root under the leaf temp dir and is remove
   }
 });
 
-// A red run marks its run root with .akrogon-kept and leaves it where the
-// command printed it, so evidence the child wrote under $TMPDIR stays
-// readable until the leaf temp is released.
-test('a red run-check run keeps its run root marked .akrogon-kept and its files readable', async () => {
+test('a red run-check run removes its run root', async () => {
   const f: Fixture = await fixture();
   try {
     const { worktree } = await leafWorktree(f, 'tmpdir-red');
     const result = await cli(
       f,
-      [
-        'run-check',
-        '--',
-        ...sh('mkdir -p "$TMPDIR/evidence" && echo kept > "$TMPDIR/evidence/f"; printf %s "$TMPDIR"; exit 7'),
-      ],
+      ['run-check', '--', ...sh('echo x > "$TMPDIR/f"; printf %s "$TMPDIR"; exit 7')],
       worktree,
       baseEnv(f),
     );
     expect(result.code).toBe(7);
     const root: string = result.stdout.split('\n').pop()!;
-    expect(existsSync(resolve(root, '.akrogon-kept'))).toBe(true);
-    expect(existsSync(resolve(root, '.owner'))).toBe(true);
-    expect(readFileSync(resolve(root, 'evidence/f'), 'utf8')).toBe('kept\n');
-    const runs: string[] = [...new Bun.Glob('*/*/run-*').scanSync({ cwd: leafTempRoot(f), onlyFiles: false })].map(
-      (entry) => resolve(leafTempRoot(f), entry),
+    expect(root.startsWith(leafTempRoot(f))).toBe(true);
+    expect(existsSync(root)).toBe(false);
+    expect([...new Bun.Glob('*/*/run-*').scanSync({ cwd: leafTempRoot(f), onlyFiles: false })]).toEqual([]);
+  } finally {
+    f.clean();
+  }
+});
+
+// The evidence folder sits in the run's leaf temp beside the run root, named
+// by check and run, and run-check leaves creating it to the command.
+test('run-check exports AKROGON_EVIDENCE under the leaf temp and the folder outlives the run', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { worktree } = await leafWorktree(f, 'evidence-leaf');
+    const result = await cli(
+      f,
+      [
+        'run-check',
+        '--name',
+        'proof',
+        '--',
+        ...sh(
+          'test ! -e "$AKROGON_EVIDENCE" && mkdir -p "$AKROGON_EVIDENCE" && echo saved > "$AKROGON_EVIDENCE/f"; printf "%s\\n%s" "$TMPDIR" "$AKROGON_EVIDENCE"; exit 3',
+        ),
+      ],
+      worktree,
+      baseEnv(f),
     );
-    expect(runs).toEqual([root]);
+    expect(result.code).toBe(3);
+    const [root, evidence]: string[] = result.stdout.split('\n').slice(-2);
+    expect(dirname(evidence)).toBe(resolve(dirname(root), 'evidence'));
+    expect(basename(evidence)).toMatch(/^proof-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    expect(existsSync(root)).toBe(false);
+    expect(readFileSync(resolve(evidence, 'f'), 'utf8')).toBe('saved\n');
   } finally {
     f.clean();
   }

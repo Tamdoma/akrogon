@@ -18,6 +18,7 @@ import { command, quote, run, spawnCaptured, type Result } from '../src/shell';
 import {
   SeatIndexError,
   ensureLeafTemp,
+  globalSchema,
   leafTemp,
   readGlobal,
   readRepo,
@@ -1111,5 +1112,50 @@ test('repoSchema accepts rerun keys naming a checks or merge_checks entry and re
     const reserved = repoSchema.safeParse({ ...base, [field]: ['AKROGON_RERUN_NAMES'] });
     expect(reserved.success, field).toBe(false);
     expect(reserved.error?.message, field).toContain('Reserved');
+  }
+});
+
+test('repoSchema reserves AKROGON_EVIDENCE in env and pass_env', () => {
+  for (const field of ['env', 'pass_env']) {
+    const reserved = repoSchema.safeParse({ grounding: 'none', [field]: ['AKROGON_EVIDENCE'] });
+    expect(reserved.success, field).toBe(false);
+    expect(reserved.error?.message, field).toContain('Reserved');
+  }
+});
+
+test('globalSchema accepts an absolute short run_root and refuses relative, long or temp-root paths', () => {
+  const previous: { leaf: string | undefined; retired: string | undefined } = {
+    leaf: process.env.AKROGON_LEAF_TEMP_ROOT,
+    retired: process.env.AKROGON_RETIRED_TEMP_ROOT,
+  };
+  const seat = { harness: 'claude', model: 'm', effort: 'e' };
+  const machine = { slots: { a: seat, b: seat }, harnesses: { claude: 'claude' } };
+  try {
+    process.env.AKROGON_LEAF_TEMP_ROOT = '/var/tmp/leaf-root';
+    process.env.AKROGON_RETIRED_TEMP_ROOT = '/tmp/retired-root';
+    expect(globalSchema.parse(machine).run_root).toBeUndefined();
+    expect(globalSchema.parse({ ...machine, run_root: '/dev/shm/akr-runs' }).run_root).toBe('/dev/shm/akr-runs');
+    const refusals: [string, string][] = [
+      ['dev/shm/akr-runs', 'must be an absolute path'],
+      [`/dev/shm/${'x'.repeat(32)}`, 'at most 40 bytes'],
+      ['/var/tmp/leaf-root', 'leaf temp root'],
+      ['/var/tmp/leaf-root/runs', 'leaf temp root'],
+      ['/tmp/retired-root/', 'retired temp root'],
+      ['/tmp/retired-root/runs', 'retired temp root'],
+    ];
+    for (const [value, message] of refusals) {
+      const refused = globalSchema.safeParse({ ...machine, run_root: value });
+      expect(refused.success, value).toBe(false);
+      expect(refused.error?.message, value).toContain(message);
+    }
+    expect(globalSchema.safeParse({ ...machine, run_root: '/tmp/retired-root-2' }).success).toBe(true);
+  } finally {
+    for (const [name, value] of [
+      ['AKROGON_LEAF_TEMP_ROOT', previous.leaf],
+      ['AKROGON_RETIRED_TEMP_ROOT', previous.retired],
+    ] as const) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
   }
 });

@@ -38,8 +38,32 @@ export const globalSchema = z
         }),
       })
       .optional(),
+    run_root: z.string().optional(),
   })
   .superRefine((config, ctx) => {
+    if (config.run_root !== undefined) {
+      const runRoot: string = config.run_root;
+      const bytes: number = Buffer.byteLength(runRoot);
+      if (!isAbsolute(runRoot))
+        ctx.addIssue({ code: 'custom', path: ['run_root'], message: `run_root must be an absolute path: ${runRoot}` });
+      else
+        for (const [label, root] of [
+          ['leaf temp root', leafTempRoot()],
+          ['retired temp root', retiredLeafTempRoot()],
+        ] as const)
+          if (within(resolve(runRoot), root))
+            ctx.addIssue({
+              code: 'custom',
+              path: ['run_root'],
+              message: `run_root must not be the ${label} or inside it: ${runRoot} is within ${root}`,
+            });
+      if (bytes > 40)
+        ctx.addIssue({
+          code: 'custom',
+          path: ['run_root'],
+          message: `run_root must be at most 40 bytes (Chrome's socket path limit under TMPDIR): ${runRoot} is ${bytes} bytes`,
+        });
+    }
     const named: Record<string, SlotConfig | undefined> = {
       a: config.slots.a,
       b: config.slots.b,
@@ -90,6 +114,7 @@ export const repoSchema = z
       'TMPDIR',
       'AKROGON_BASE',
       'AKROGON_RERUN_NAMES',
+      'AKROGON_EVIDENCE',
       'AKROGON_RUN',
       'NODE_PATH',
       'BUN_OPTIONS',

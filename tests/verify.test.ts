@@ -427,7 +427,7 @@ test('the verify checkout .env carries the declared names only', async () => {
   }
 });
 
-test('verify keeps a red command TMPDIR marked .akrogon-kept and removes a green command TMPDIR', async () => {
+test('verify removes a red and a green command TMPDIR', async () => {
   const f: Fixture = await fixture();
   try {
     config(f, {
@@ -444,14 +444,11 @@ test('verify keeps a red command TMPDIR marked .akrogon-kept and removes a green
     const okTmp: string = readFileSync(byName.get('ok')!.log, 'utf8').trim();
     const badTmp: string = readFileSync(byName.get('bad')!.log, 'utf8').trim();
     expect(byName.get('gone')!.exit).toBe(5);
+    expect(byName.get('bad')!.exit).toBe(7);
     expect(existsSync(okTmp)).toBe(false);
-    expect(existsSync(resolve(badTmp, '.akrogon-kept'))).toBe(true);
-    expect(existsSync(resolve(badTmp, '.owner'))).toBe(true);
-    expect(existsSync(resolve(badTmp, 'command-temp'))).toBe(true);
-    const runs: string[] = [...new Bun.Glob('*/*/run-*').scanSync({ cwd: leafTempRoot(f), onlyFiles: false })].map(
-      (entry) => resolve(leafTempRoot(f), entry),
-    );
-    expect(runs).toEqual([badTmp]);
+    expect(existsSync(badTmp)).toBe(false);
+    const runs: string[] = [...new Bun.Glob('*/*/run-*').scanSync({ cwd: leafTempRoot(f), onlyFiles: false })];
+    expect(runs).toEqual([]);
   } finally {
     f.clean();
   }

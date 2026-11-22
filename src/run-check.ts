@@ -320,9 +320,9 @@ export async function checkedRun(
   failedRefusal(caller, repo, name, run);
   const reserved: { sessions: number; minutes: number } | undefined =
     sessions === undefined ? undefined : await reserve(repo, slug, run, sessions);
-  const runRoot: string = mkdtempSync(resolve(ensureLeafTemp(repo, slug), 'run-'));
+  const leafTempDir: string = ensureLeafTemp(repo, slug);
+  const runRoot: string = mkdtempSync(resolve(leafTempDir, 'run-'));
   let refused: boolean = false;
-  let keepRunRoot: boolean = false;
   try {
     const boot: string = existsSync('/proc/sys/kernel/random/boot_id')
       ? readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim()
@@ -338,6 +338,7 @@ export async function checkedRun(
     }
     env.AKROGON_BASE = akrogonBase;
     if (rerunNames !== undefined) env.AKROGON_RERUN_NAMES = rerunNames;
+    env.AKROGON_EVIDENCE = join(leafTempDir, 'evidence', `${encodeURIComponent(name)}-${run}`);
     const log: string = join(runRoot, 'out.log');
     const { path: owner, kind }: { path: string; kind: 'holder' | 'issue' } = await captureOwner(target, repo);
     const slice: string = runSlice(slug === 'checkout' ? 'akrogon.slice' : leafSlice(repo, slug, homePath()));
@@ -451,7 +452,6 @@ export async function checkedRun(
             });
             unlinkSync(captureOut);
             unlinkSync(captureErr);
-            keepRunRoot = result.code !== 0;
             return { code: result.code, log: kept, stderr_final_nl: result.stderr.endsWith('\n') };
           } finally {
             closeSync(capFd);
@@ -463,11 +463,6 @@ export async function checkedRun(
       },
     );
   } finally {
-    if (!refused) {
-      // A red run's root stays where the command printed it: the marker stops
-      // reconcile sweeping it, and the leaf temp release removes it.
-      if (keepRunRoot && existsSync(runRoot)) writeFileSync(join(runRoot, '.akrogon-kept'), '');
-      else rmSync(runRoot, { recursive: true, force: true });
-    }
+    if (!refused) rmSync(runRoot, { recursive: true, force: true });
   }
 }

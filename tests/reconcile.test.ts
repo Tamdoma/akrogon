@@ -297,14 +297,13 @@ test('run root with a dead owner pid is removed, live owner kept', async () => {
   }
 });
 
-// A marked run root (.akrogon-kept) is never swept and never reported: it
-// lives until the leaf temp goes with the tab, even when its .owner still
-// names a live pid.
-test('a marked run root stays silently while its leaf lives and goes with the leaf temp release', async () => {
+// A run root an older release marked .akrogon-kept gets no special case: a
+// dead owner drops it and a live owner keeps it as a run in progress.
+test('a run root an older release marked .akrogon-kept follows the owner rules', async () => {
   const f: DispatchFixture = await dispatchFixture();
   f.env = { ...f.env, ...fakeSystemctl(f).env };
   try {
-    const path: string = await dispatchLeaf(f, 'marked-leaf');
+    await dispatchLeaf(f, 'marked-leaf');
     const scratch: string = scratchFor(f, 'marked-leaf');
     const boot: string = readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim();
     const deadMarked: string = mkdtempSync(resolve(scratch, 'run-'));
@@ -317,17 +316,9 @@ test('a marked run root stays silently while its leaf lives and goes with the le
     writeFileSync(resolve(liveMarked, '.owner'), ownerRecord(process.pid));
     writeFileSync(resolve(liveMarked, '.akrogon-kept'), '');
     expect((await next(f, ['--all'])).code).toBe(0);
-    expect(existsSync(deadMarked)).toBe(true);
+    expect(existsSync(deadMarked)).toBe(false);
     expect(existsSync(liveMarked)).toBe(true);
-    const kept: { path: string; reason: string }[] = keptReport(f);
-    expect(kept.some((entry) => entry.path === deadMarked || entry.path === liveMarked)).toBe(false);
-    expect((await status(f, 'marked-leaf')).stdout).not.toContain(basename(deadMarked));
-    expect((await cli(f, ['leftovers'], f.root, f.env)).stdout).not.toContain(basename(deadMarked));
-    await closeTab(f, readState(path).tab!);
-    // A targeted dispatch of another leaf runs the reconcile pass without
-    // reopening marked-leaf's tab, which --all would re-dispatch.
-    await dispatchLeaf(f, 'release-trigger');
-    expect(existsSync(scratch)).toBe(false);
+    expect(keptReport(f).find((entry) => entry.path === liveMarked)?.reason).toBe('run in progress');
   } finally {
     await f.clean();
   }

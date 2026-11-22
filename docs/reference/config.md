@@ -31,6 +31,7 @@ Akrogon looks for `config.yaml` in its home folder. The home folder is `$AKROGON
 | `repos` | Maps a repo name to its checkout folder. A relative path is read from the akrogon home folder, and `~` means your home folder. Default empty. |
 | `prefixes` | Maps a registered repo name to its prefix of two lowercase letters. Optional. No command reads it yet. |
 | `paid_budget` | The optional paid-session ceiling `akrogon run-check --sessions <n>` reserves against. `sessions_per_day` and `session_minutes` are positive whole numbers; `approved.date` and `approved.answer` hold the operator's approval words. Written only by the operator, never by akrogon. |
+| `run_root` | Optional. An absolute path of at most 40 bytes, not equal to or inside the leaf temp root (`/var/tmp/akr-<uid>`) or the retired temp root (`/tmp/akr-<uid>`). Accepted and not read yet. |
 
 ```yaml
 max_active: 3
@@ -84,7 +85,7 @@ Each registered checkout has `issues/config.yaml`. The [init-akrogon skill](../.
 
 Checks run on every leaf, while merge checks run only when a leaf lands.
 
-Environment variable names in `env` and `pass_env` use capital letters, digits and `_`. A few names akrogon sets itself, such as `TMPDIR`, `AKROGON_BASE`, `AKROGON_SESSIONS` and `AKROGON_SESSION_MINUTES`, are refused.
+Environment variable names in `env` and `pass_env` use capital letters, digits and `_`. A few names akrogon sets itself, such as `TMPDIR`, `AKROGON_BASE`, `AKROGON_EVIDENCE`, `AKROGON_SESSIONS` and `AKROGON_SESSION_MINUTES`, are refused.
 
 ```yaml
 remote: origin

@@ -328,8 +328,6 @@ function ownerKeeps(path: string): KeptEntry[] {
   const stat: Stats | undefined = lstatSync(path, { throwIfNoEntry: false });
   if (stat === undefined || stat.isSymbolicLink()) return [];
   const name: string = basename(path);
-  // A marked red-run root keeps no owner judgement and is not recursed into.
-  if (stat.isDirectory() && name.startsWith('run-') && existsSync(resolve(path, '.akrogon-kept'))) return [];
   const ownerFile: string | undefined = /^batch-.*\.owner$/.test(name)
     ? path
     : stat.isDirectory() && name.startsWith('batch-')
@@ -1171,9 +1169,6 @@ export async function reconcile(
             keep(runRoot, reason, 'resolve the recorded publish refusal before removing the run');
             continue;
           }
-          // A red run's root holds .akrogon-kept: left alone silently, it goes
-          // with the leaf temp's own release, never a kept entry.
-          if (existsSync(resolve(runRoot, '.akrogon-kept'))) continue;
           const ownerFile: string = resolve(runRoot, '.owner');
           if (!existsSync(ownerFile)) {
             // mkdtemp precedes the .owner write; birthtime measures that
