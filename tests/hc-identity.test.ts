@@ -1,7 +1,7 @@
 // Criteria 6 and 12 (state half): the repo's space by name across running hc sessions,
 // refusals, prefixes, the pinned hc schema, the first-switch inventory and "state predates hc".
 import { test, expect } from 'bun:test';
-import { lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { connect } from 'node:net';
 import { resolve } from 'node:path';
@@ -125,7 +125,16 @@ test('no session, several sessions and an unreadable session refuse with todayâ€
     // A core killed without cleanup leaves its socket; discovery skips it as stopped and starts nothing.
     stale = await hcCore(f, { repo: 'another' });
     const status = await stale.hc(['server', 'status', '--json']);
-    process.kill(z.object({ pid: z.number() }).parse(JSON.parse(status.stdout)).pid, 'SIGKILL');
+    const pid: number = z.object({ pid: z.number() }).parse(JSON.parse(status.stdout)).pid;
+    process.kill(pid, 'SIGKILL');
+    // SIGKILL lands asynchronously: the socket accepts until the core is gone, or a zombie the
+    // suite's subreaper has not reaped, its sockets closed.
+    const stat: string = `/proc/${pid}/stat`;
+    const begun: number = Date.now();
+    while (existsSync(stat) && readFileSync(stat, 'utf8').split(') ')[1][0] !== 'Z') {
+      if (Date.now() - begun > 10_000) throw new Error(`core ${pid} outlived SIGKILL`);
+      await Bun.sleep(50);
+    }
     none.link(stale);
     expect(await listening(stale.socket)).toBe(false);
     const skipped = await cli(f, ['next', 'hi-refuse'], f.root, none.env);
