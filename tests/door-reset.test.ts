@@ -7,8 +7,10 @@ import { randomUUID } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { fixture, WAIT_MS, type Fixture } from './helpers';
-import { hcCore, type HcCore } from './hc-fixture';
+import { hcCore, type HcCore, stopCoresAfterFile } from './hc-fixture';
 import { spawnCaptured, type SpawnResult } from '../src/shell';
+
+stopCoresAfterFile();
 
 const agent: string = resolve(import.meta.dir, 'door-agent.ts');
 const helper: string = resolve(import.meta.dir, '../skills/chart-issues/scripts/door-reset.ts');

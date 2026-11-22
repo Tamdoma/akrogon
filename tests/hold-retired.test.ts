@@ -3,10 +3,12 @@ import { z } from 'zod';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { cli, fixture, leaf, leafTempRoot, storeDir, yaml, type Fixture } from './helpers';
-import { delivered, hcFixture, type HcFixture } from './hc-fixture';
+import { delivered, hcFixture, type HcFixture, stopCoresAfterFile } from './hc-fixture';
 import { readState } from '../src/state';
 import { attemptRecordSchema } from '../src/attempts';
 import { command, type Result } from '../src/shell';
+
+stopCoresAfterFile();
 
 const originalTempRoot: string | undefined = process.env.AKROGON_LEAF_TEMP_ROOT;
 const originalHome: string | undefined = process.env.HOME;

@@ -10,7 +10,9 @@ import { z } from 'zod';
 import { command, spawnCaptured, type Result, type SpawnResult } from '../src/shell';
 import { withLock } from '../src/state';
 import { cli, leaf, leafTempRoot, WAIT_MS } from './helpers';
-import { hcCore, hcFixture, type HcCore, type HcFixture } from './hc-fixture';
+import { hcCore, hcFixture, type HcCore, type HcFixture, stopCoresAfterFile } from './hc-fixture';
+
+stopCoresAfterFile();
 
 const skilldir: string = resolve(import.meta.dir, '../skills/watch-issues');
 const agent: string = resolve(import.meta.dir, 'fixtures/watch-agent.sh');

@@ -16,7 +16,10 @@ import {
   type HcCore,
   type HcFixture,
   type Terminal,
+  stopCoresAfterFile,
 } from './hc-fixture';
+
+stopCoresAfterFile();
 
 type DispatchFixture = Fixture & ProcFixture;
 async function dispatchFixture(): Promise<DispatchFixture> {

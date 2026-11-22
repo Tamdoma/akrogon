@@ -1,8 +1,10 @@
 import { test, expect } from 'bun:test';
 import { fixture, cli, leaf, type Fixture } from './helpers';
-import { delivered, hcFixture, type HcFixture } from './hc-fixture';
+import { delivered, hcFixture, type HcFixture, stopCoresAfterFile } from './hc-fixture';
 import { readState, saveState, type State } from '../src/state';
 import type { Result } from '../src/shell';
+
+stopCoresAfterFile();
 
 const columns: string[] = ['LEAF', 'PHASE', 'TIME', 'BLOCKED BY', 'NOTE', 'TURN'];
 function cell(output: string, row: string, name: string): string {

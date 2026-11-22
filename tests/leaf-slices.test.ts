@@ -16,11 +16,13 @@ import {
   WAIT_MS,
   type Fixture,
 } from './helpers';
-import { hcCore, hcFixture, setPrefixes, type HcCore, type HcFixture } from './hc-fixture';
+import { hcCore, hcFixture, setPrefixes, type HcCore, type HcFixture, stopCoresAfterFile } from './hc-fixture';
 import { finishCaptured, spawnFiles, type Result, type SpawnResult } from '../src/shell';
 import { leafSlice } from '../src/scope';
 import { globalSchema, readRepo, leafTemp, type GlobalConfig } from '../src/config';
 import { readState, saveState, type State } from '../src/state';
+
+stopCoresAfterFile();
 
 type SliceFixture = HcFixture;
 type Cap = { proc: Bun.Subprocess; result: Promise<SpawnResult> };

@@ -5,11 +5,21 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, wa
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { cli, entry, fixture, leaf, leafTempRoot, killTree, unitBin, yaml, WAIT_MS, type Fixture } from './helpers';
-import { coreBin, hcCore, setSeat, shortStartProof, type HcCore, type Terminal } from './hc-fixture';
+import {
+  coreBin,
+  hcCore,
+  setSeat,
+  shortStartProof,
+  type HcCore,
+  type Terminal,
+  stopCoresAfterFile,
+} from './hc-fixture';
 import { readState } from '../src/state';
 import { leafSlice } from '../src/scope';
 import { readTimings, type TimingEvent } from '../src/timing';
 import { finishCaptured, spawnCaptured, spawnFiles, type Result, type SpawnResult } from '../src/shell';
+
+stopCoresAfterFile();
 
 async function setup(slug: string, harness: 'fake' | 'agy', mode: string) {
   const f: Fixture = await fixture();

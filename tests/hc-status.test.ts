@@ -3,7 +3,9 @@ import { test, expect } from 'bun:test';
 import { writeFileSync } from 'node:fs';
 import { z } from 'zod';
 import { cli, fakeSystemctl, fixture, type Fixture } from './helpers';
-import { hcCore, type HcCore } from './hc-fixture';
+import { hcCore, type HcCore, stopCoresAfterFile } from './hc-fixture';
+
+stopCoresAfterFile();
 
 test('status reports the listener live or down without changing its exit or attention', async () => {
   const f: Fixture = await fixture();

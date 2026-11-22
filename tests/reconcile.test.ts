@@ -31,7 +31,9 @@ import { readState, saveState } from '../src/state';
 import { leafTemp, readRepo } from '../src/config';
 import { command, run, spawnCaptured, type Result, type SpawnResult } from '../src/shell';
 import { z } from 'zod';
-import { hcFixture, type HcFixture } from './hc-fixture';
+import { hcFixture, type HcFixture, stopCoresAfterFile } from './hc-fixture';
+
+stopCoresAfterFile();
 
 type DispatchFixture = HcFixture;
 async function dispatchFixture(): Promise<DispatchFixture> {

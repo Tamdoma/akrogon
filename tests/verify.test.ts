@@ -34,8 +34,10 @@ import { requireGreenReceipt, verifyCommands, verifyRunSchema, type VerifyRun } 
 import { bootId, writePassRecord } from '../src/verify-pass';
 import { readTimings, type TimingEvent } from '../src/timing';
 import { flakyLines } from '../src/flaky';
-import { blockNotices, hcCore, noticeFiles, noticeFolder, type HcCore } from './hc-fixture';
+import { blockNotices, hcCore, noticeFiles, noticeFolder, type HcCore, stopCoresAfterFile } from './hc-fixture';
 import { noticeId } from '../src/notice';
+
+stopCoresAfterFile();
 
 function records(f: Fixture): VerifyRun[] {
   const file: string = resolve(f.root, 'issues/verify-runs.jsonl');

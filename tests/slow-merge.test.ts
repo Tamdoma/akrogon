@@ -17,8 +17,18 @@ import {
 import { command, quote, type Result } from '../src/shell';
 import { readRepo } from '../src/config';
 import { requireGreenReceipt, verifyRunSchema, type VerifyRun } from '../src/verify';
-import { blockNotices, hcCore, noticeFiles, noticeFolder, type HcCore, type NoticeFile } from './hc-fixture';
+import {
+  blockNotices,
+  hcCore,
+  noticeFiles,
+  noticeFolder,
+  type HcCore,
+  type NoticeFile,
+  stopCoresAfterFile,
+} from './hc-fixture';
 import { noticeId } from '../src/notice';
+
+stopCoresAfterFile();
 
 const LEDGER: string = 'issues/verify-runs.jsonl';
 

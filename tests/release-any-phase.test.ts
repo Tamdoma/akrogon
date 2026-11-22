@@ -4,11 +4,13 @@ import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { cli, leaf, holding, leafTempRoot, procRoot, WAIT_MS, type Fixture } from './helpers';
-import { hcFixture, type HcFixture, type Terminal } from './hc-fixture';
+import { hcFixture, type HcFixture, type Terminal, stopCoresAfterFile } from './hc-fixture';
 import { command, writeYaml, type Result } from '../src/shell';
 import { leafSlice } from '../src/scope';
 import { readRepo, type Repo } from '../src/config';
 import { readState } from '../src/state';
+
+stopCoresAfterFile();
 
 type F = HcFixture;
 

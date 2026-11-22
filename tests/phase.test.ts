@@ -28,8 +28,19 @@ import { readState, saveState, type Batch, type Failure, type State } from '../s
 import { command, run, type Result } from '../src/shell';
 import type { GhStep } from './fake-gh';
 import { z } from 'zod';
-import { blockNotices, hcCore, hcFixture, noticeFiles, noticeFolder, type HcCore, type HcFixture } from './hc-fixture';
+import {
+  blockNotices,
+  hcCore,
+  hcFixture,
+  noticeFiles,
+  noticeFolder,
+  type HcCore,
+  type HcFixture,
+  stopCoresAfterFile,
+} from './hc-fixture';
 import { noticeId } from '../src/notice';
+
+stopCoresAfterFile();
 
 function bytes(path: string): string {
   return readFileSync(resolve(path, 'state.yaml'), 'utf8');

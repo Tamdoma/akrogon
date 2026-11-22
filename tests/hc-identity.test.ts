@@ -7,11 +7,21 @@ import { connect } from 'node:net';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { cli, fixture, leaf, yaml, WAIT_MS, type Fixture } from './helpers';
-import { hcCore, pinnedSchema, setPrefixes, setSeat, type HcCore, type Terminal } from './hc-fixture';
+import {
+  hcCore,
+  pinnedSchema,
+  setPrefixes,
+  setSeat,
+  type HcCore,
+  type Terminal,
+  stopCoresAfterFile,
+} from './hc-fixture';
 import { leafSlice } from '../src/scope';
 import { command, spawnCaptured, type SpawnResult } from '../src/shell';
 import { GONE_CODES, sessions } from '../src/hc';
 import { readState } from '../src/state';
+
+stopCoresAfterFile();
 
 async function setup(prefixes?: Record<string, string>) {
   const f: Fixture = await fixture();

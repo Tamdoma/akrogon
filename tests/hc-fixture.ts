@@ -5,13 +5,13 @@
 // own scratch runtime under it, so the operator's listener never sees test cores, and with no systemd
 // link there hc starts no units for a test core; `systemd-run` on the core's PATH reaches the user
 // manager for seat scopes.
-import { afterAll } from 'bun:test';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { connect } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { spawnCaptured, type SpawnResult } from '../src/shell';
 import { fixture, procRoot, WAIT_MS, type Fixture, type SystemctlFixture } from './helpers';
+import { afterAll } from 'bun:test';
 import './isolation';
 
 const uid: number = process.getuid!();
@@ -21,12 +21,16 @@ export const coreBin: string = resolve(import.meta.dir, 'core-bin');
 const realHc: string | null = Bun.which('hc');
 let serial: number = 0;
 
-// A core detaches from the test process, so the suite's subreaper never sees it: every core this
-// file started is stopped after its tests, and cores left by a worker that died are stopped here.
+// A core detaches from the test process, so the suite's subreaper never sees it: every file that starts
+// cores calls this at its top level, so the cores it started are stopped after its tests, and cores left
+// by a worker that died are stopped here. A worker runs its files one after another and keeps its own
+// set, so a file's cleanup stops only that file's cores.
 const started: Set<HcCore> = new Set();
-afterAll(async () => {
-  for (const core of [...started]) await core.stop();
-});
+export function stopCoresAfterFile(): void {
+  afterAll(async () => {
+    for (const core of [...started]) await core.stop();
+  });
+}
 
 function alive(pid: number): boolean {
   try {

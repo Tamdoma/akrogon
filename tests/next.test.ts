@@ -50,8 +50,11 @@ import {
   type HcCore,
   type HcFixture,
   type Terminal,
+  stopCoresAfterFile,
 } from './hc-fixture';
 import { z } from 'zod';
+
+stopCoresAfterFile();
 
 async function next(
   f: Fixture & { env: NodeJS.ProcessEnv },

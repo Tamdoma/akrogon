@@ -3,9 +3,11 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { fixture, cli, leaf, yaml, storeDir, holding, type Fixture } from './helpers';
-import { hcFixture, type HcFixture, type Terminal } from './hc-fixture';
+import { hcFixture, type HcFixture, type Terminal, stopCoresAfterFile } from './hc-fixture';
 import { command, type Result } from '../src/shell';
 import { readState } from '../src/state';
+
+stopCoresAfterFile();
 
 // Every task a seat terminal of the fixture core received, finished terminals included.
 async function prompts(f: HcFixture): Promise<string[]> {

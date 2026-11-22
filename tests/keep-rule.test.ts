@@ -2,10 +2,12 @@ import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { cli, leaf, storeDir } from './helpers';
-import { hcFixture, type HcFixture, type Terminal } from './hc-fixture';
+import { hcFixture, type HcFixture, type Terminal, stopCoresAfterFile } from './hc-fixture';
 import { readState, saveState } from '../src/state';
 import { command, type Result } from '../src/shell';
 import { z } from 'zod';
+
+stopCoresAfterFile();
 
 async function next(f: HcFixture, args: string[], env: NodeJS.ProcessEnv = {}, cwd: string = f.root): Promise<Result> {
   return cli(f, ['next', ...args], cwd, { ...f.env, ...env });

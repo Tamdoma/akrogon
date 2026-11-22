@@ -4,7 +4,9 @@ import { resolve } from 'node:path';
 import { cli, fakeAkrogon, leaf, storeDir, yaml, type Fixture, verified } from './helpers';
 import { readState, saveState, type State } from '../src/state';
 import { command, quote, type Result } from '../src/shell';
-import { delivered, hcFixture, type HcFixture } from './hc-fixture';
+import { delivered, hcFixture, type HcFixture, stopCoresAfterFile } from './hc-fixture';
+
+stopCoresAfterFile();
 
 type Event = { kind: string; slug?: string; [key: string]: unknown };
 

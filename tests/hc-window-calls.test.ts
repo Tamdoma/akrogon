@@ -2,11 +2,13 @@
 // calls, with the session's app home; the live window behavior is the attended window tier.
 import { test, expect } from 'bun:test';
 import { cli, fixture, leaf, type Fixture } from './helpers';
-import { adopt, hcCore, setSeat, type HcCore, type Terminal } from './hc-fixture';
+import { adopt, hcCore, setSeat, type HcCore, type Terminal, stopCoresAfterFile } from './hc-fixture';
 import { readState, saveState } from '../src/state';
 import { leafSlice } from '../src/scope';
 import { spawnCaptured } from '../src/shell';
 import { z } from 'zod';
+
+stopCoresAfterFile();
 
 async function setup(slug: string, window: 'open' | 'closed') {
   const f: Fixture = await fixture();

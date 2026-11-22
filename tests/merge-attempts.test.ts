@@ -17,13 +17,15 @@ import {
   verified,
   unitBin,
 } from './helpers';
-import { hcFixture, type HcFixture } from './hc-fixture';
+import { hcFixture, type HcFixture, stopCoresAfterFile } from './hc-fixture';
 import { readRepo, type Repo } from '../src/config';
 import { readState, saveState, type Batch, type Leaf, type State, type Tool } from '../src/state';
 import { attemptRecordSchema } from '../src/attempts';
 import { logSchema } from '../src/log';
 import { command, spawnCaptured, type Result } from '../src/shell';
 import { applyTop, buildStack } from '../src/batch';
+
+stopCoresAfterFile();
 
 const originalTempRoot: string | undefined = process.env.AKROGON_LEAF_TEMP_ROOT;
 const originalHome: string | undefined = process.env.HOME;

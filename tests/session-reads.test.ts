@@ -14,7 +14,10 @@ import {
   type HcCore,
   type HcFixture,
   type Terminal,
+  stopCoresAfterFile,
 } from './hc-fixture';
+
+stopCoresAfterFile();
 
 async function dispatchFixture(opts: { mode?: string; window?: 'open' | 'closed' } = {}): Promise<HcFixture> {
   const f: HcFixture = await hcFixture(opts);

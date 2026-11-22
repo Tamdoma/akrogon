@@ -7,8 +7,10 @@ import { chmodSync, existsSync, readFileSync, watch, writeFileSync } from 'node:
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { cli, fixture, WAIT_MS, type Fixture } from './helpers';
-import { hcCore, type HcCore, type Terminal } from './hc-fixture';
+import { hcCore, type HcCore, type Terminal, stopCoresAfterFile } from './hc-fixture';
 import { spawnCaptured, type SpawnResult } from '../src/shell';
+
+stopCoresAfterFile();
 
 // Each consultant's task names a key; its hook holds on the fifo go-<key> until the test opens it,
 // then does the scripted thing. `hold-<key>` is never written, so a holding consultant keeps working.

@@ -5,10 +5,12 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { cli, fixture, leaf, storeDir, type Fixture } from './helpers';
-import { hcCore, setSeat, type HcCore, type Terminal } from './hc-fixture';
+import { hcCore, setSeat, type HcCore, type Terminal, stopCoresAfterFile } from './hc-fixture';
 import { readState, saveState } from '../src/state';
 import { leafSlice } from '../src/scope';
 import { spawnCaptured } from '../src/shell';
+
+stopCoresAfterFile();
 
 async function setup(slug: string, window: 'open' | 'closed' = 'closed') {
   const f: Fixture = await fixture();

@@ -7,8 +7,10 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { cli, fixture, type Fixture } from './helpers';
-import { hcCore, type HcCore, type Terminal } from './hc-fixture';
+import { hcCore, type HcCore, type Terminal, stopCoresAfterFile } from './hc-fixture';
 import type { Result } from '../src/shell';
+
+stopCoresAfterFile();
 
 // Writes or removes the machine slots.consultant recipe; the stand-in harness template for the
 // chosen harness name is kept in harnesses so the recipe resolves.

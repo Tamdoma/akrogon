@@ -6,7 +6,9 @@ import { command, type Result } from '../src/shell';
 import { leafSlice } from '../src/scope';
 import { readState, saveState, type State } from '../src/state';
 import { cli, leaf, yaml } from './helpers';
-import { delivered, hcFixture, type HcFixture, type Terminal } from './hc-fixture';
+import { delivered, hcFixture, type HcFixture, type Terminal, stopCoresAfterFile } from './hc-fixture';
+
+stopCoresAfterFile();
 
 type StopFixture = HcFixture & { systemctlLog: string };
 

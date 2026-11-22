@@ -2,7 +2,7 @@ import { test, expect } from 'bun:test';
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { cli, fakeSystemctl, leaf, leafTempRoot, editOnSecondStatus, verified } from './helpers';
-import { adopt, hcFixture, noticeFiles, type HcFixture } from './hc-fixture';
+import { adopt, hcFixture, noticeFiles, type HcFixture, stopCoresAfterFile } from './hc-fixture';
 import { readState, saveState, type State } from '../src/state';
 import { command, run, type Result } from '../src/shell';
 import { z } from 'zod';
@@ -11,6 +11,8 @@ import { commitMove } from '../src/phase';
 import { appendAttempt } from '../src/attempts';
 import { readRemoved } from '../src/reconcile';
 import { readRepo } from '../src/config';
+
+stopCoresAfterFile();
 
 type DispatchFixture = HcFixture;
 // akrogon's slice stops go to the fake systemctl: a leaf slice is named by repo and slug, so a real

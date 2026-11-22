@@ -6,8 +6,10 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, watch, writeFil
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { entry, fixture, killTree, unitBin, WAIT_MS, type Fixture } from './helpers';
-import { hcCore, type HcCore, type Terminal } from './hc-fixture';
+import { hcCore, type HcCore, type Terminal, stopCoresAfterFile } from './hc-fixture';
 import { deployFixture, deployRecord, pushSeed, type DeployFixture } from './deploy-fixture';
+
+stopCoresAfterFile();
 
 type Shim = { log: string; holds: string; bin: string };
 

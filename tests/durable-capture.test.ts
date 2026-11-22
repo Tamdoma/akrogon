@@ -13,7 +13,9 @@ import { join, resolve } from 'node:path';
 import { command, spawnFiles, finishCaptured, type Result, type SpawnResult } from '../src/shell';
 import { fixture, cli, entry, leaf, yaml, procFixture, leafTempRoot, holding, WAIT_MS, type Fixture } from './helpers';
 import type { Captured } from '../src/shell';
-import { hcFixture, type HcFixture } from './hc-fixture';
+import { hcFixture, type HcFixture, stopCoresAfterFile } from './hc-fixture';
+
+stopCoresAfterFile();
 
 type Live = { proc: Bun.Subprocess; captured: Captured; result: Promise<SpawnResult> };
 

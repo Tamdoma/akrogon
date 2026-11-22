@@ -9,8 +9,10 @@ import { chmodSync, copyFileSync, mkdirSync, rmSync, writeFileSync } from 'node:
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { entry, fixture, leaf, WAIT_MS, type Fixture } from './helpers';
-import { hcCore, recordedDoc, type HcCore, type Terminal } from './hc-fixture';
+import { hcCore, recordedDoc, type HcCore, type Terminal, stopCoresAfterFile } from './hc-fixture';
 import { spawnCaptured, type SpawnResult } from '../src/shell';
+
+stopCoresAfterFile();
 
 const scripts: string = resolve(import.meta.dir, '../skills/watch-issues/scripts');
 const working: string[] = ['sh', '-c', 'printf "\\033]7501;state=working\\007"; exec sleep 600'];

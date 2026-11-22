@@ -5,10 +5,12 @@ import { randomUUID } from 'node:crypto';
 import { finishCaptured, quote, spawnFiles, type Result, type SpawnResult } from '../src/shell';
 import type { Captured } from '../src/shell';
 import { cli, entry, procFixture, fixture, leaf, leafTempRoot, verified, yaml, WAIT_MS, type Fixture } from './helpers';
-import { hcCore, type HcCore } from './hc-fixture';
+import { hcCore, type HcCore, stopCoresAfterFile } from './hc-fixture';
 import { command } from '../src/shell';
 import { readState } from '../src/state';
 import { z } from 'zod';
+
+stopCoresAfterFile();
 
 type Live = { proc: Bun.Subprocess; captured: Captured; result: Promise<SpawnResult> };
 

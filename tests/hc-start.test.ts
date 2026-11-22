@@ -5,10 +5,12 @@ import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { cli, fixture, leaf, leafTempRoot, storeDir, type Fixture } from './helpers';
-import { hcCore, setSeat, shortStartProof, type HcCore, type Terminal } from './hc-fixture';
+import { hcCore, setSeat, shortStartProof, type HcCore, type Terminal, stopCoresAfterFile } from './hc-fixture';
 import { readState } from '../src/state';
 import { leafSlice } from '../src/scope';
 import { spawnCaptured } from '../src/shell';
+
+stopCoresAfterFile();
 
 const markers: string[] = [
   'CLAUDECODE',

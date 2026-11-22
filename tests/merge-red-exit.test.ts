@@ -14,10 +14,12 @@ import {
   type Fixture,
   type SystemctlFixture,
 } from './helpers';
-import { hcFixture, type HcFixture } from './hc-fixture';
+import { hcFixture, type HcFixture, stopCoresAfterFile } from './hc-fixture';
 import { readState, saveState, type State } from '../src/state';
 import { command, quote, type Result } from '../src/shell';
 import { leafSlice } from '../src/scope';
+
+stopCoresAfterFile();
 
 type GreenFixture = HcFixture & { launches: string; systemctl: SystemctlFixture };
 

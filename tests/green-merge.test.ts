@@ -3,10 +3,12 @@ import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, write
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { cli, fakeSystemctl, fixture, leaf, seedRun, yaml, type Fixture, type SystemctlFixture } from './helpers';
-import { hcFixture, type HcFixture } from './hc-fixture';
+import { hcFixture, type HcFixture, stopCoresAfterFile } from './hc-fixture';
 import { readState, saveState, type State } from '../src/state';
 import { command, type Result } from '../src/shell';
 import { leafSlice } from '../src/scope';
+
+stopCoresAfterFile();
 type GreenFixture = HcFixture & { launches: string; systemctl: SystemctlFixture };
 
 async function greenFrom(f: HcFixture, checks: Record<string, string>): Promise<GreenFixture> {

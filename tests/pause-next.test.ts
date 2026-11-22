@@ -17,7 +17,9 @@ import {
   type SystemctlFixture,
 } from './helpers';
 import { leafSlice } from '../src/scope';
-import { delivered, hcFixture, setPrefixes, type HcFixture } from './hc-fixture';
+import { delivered, hcFixture, setPrefixes, type HcFixture, stopCoresAfterFile } from './hc-fixture';
+
+stopCoresAfterFile();
 
 type DispatchFixture = HcFixture;
 

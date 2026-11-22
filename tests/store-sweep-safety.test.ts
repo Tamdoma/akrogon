@@ -15,13 +15,15 @@ import {
   procRoot,
   type Fixture,
 } from './helpers';
-import { hcFixture, type HcFixture } from './hc-fixture';
+import { hcFixture, type HcFixture, stopCoresAfterFile } from './hc-fixture';
 import { suiteRoot } from './isolation';
 import { z } from 'zod';
 import { command, spawnCaptured, type SpawnResult } from '../src/shell';
 import type { Seen } from '../src/hc';
 import type { Reconciled } from '../src/reconcile';
 import { leafSlice } from '../src/scope';
+
+stopCoresAfterFile();
 
 test('F7 test environments isolate the retired temp root', async () => {
   expect(retiredLeafTempRoot().startsWith(suiteRoot + '/')).toBe(true);

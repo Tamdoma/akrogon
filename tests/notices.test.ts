@@ -3,9 +3,11 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { cli, fixture, WAIT_MS, type Fixture } from './helpers';
-import { hcCore, noticeFiles, type HcCore } from './hc-fixture';
+import { hcCore, noticeFiles, type HcCore, stopCoresAfterFile } from './hc-fixture';
 import { noticeId, writeNotice } from '../src/notice';
 import type { Result } from '../src/shell';
+
+stopCoresAfterFile();
 
 // herdr-setup's handler reads every name ending in `.json` as a whole notice, so a notice is
 // written under another name and renamed: the folder never holds a partial `<id>.json`.
