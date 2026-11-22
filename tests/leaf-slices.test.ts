@@ -173,6 +173,7 @@ test('a shell run waits while another slice stops, then protects its own slice',
         const result: Result = await pass;
         expect(result.code, result.stderr).toBe(0);
         expect(readFileSync(log, 'utf8')).not.toContain(`stop ${protectedSlice}`);
+        expect(readdirSync(resolve(f.home, 'runs/locks')).filter((name) => !name.startsWith('line-'))).toEqual([]);
       } finally {
         writeFileSync(gate, '');
         writeFileSync(release, '');
@@ -673,6 +674,9 @@ test('the host step removes retired leftovers and keeps unprovable items', async
     const locks: string = resolve(f.home, '.akrogon');
     writeFileSync(resolve(locks, 'run.lock'), '');
     writeFileSync(resolve(locks, 'framework-tests.lock'), '');
+    mkdirSync(resolve(runs, 'locks'), { recursive: true });
+    writeFileSync(resolve(runs, 'locks', 'akrogon-lX.slice'), '');
+    writeFileSync(resolve(runs, 'locks', `line-${f.repo}`), '');
     const heldLock: string = resolve(f.root, '.git/akrogon-base-runs.lock');
     writeFileSync(heldLock, '');
     writeFileSync(resolve(f.root, 'issues/.lock'), '');
@@ -713,6 +717,7 @@ test('the host step removes retired leftovers and keeps unprovable items', async
     expect(existsSync(resolve(runs, `y.${child.pid}.tmp`))).toBe(true);
     expect(existsSync(resolve(locks, 'run.lock'))).toBe(false);
     expect(existsSync(resolve(locks, 'framework-tests.lock'))).toBe(false);
+    expect(readdirSync(resolve(runs, 'locks'))).toEqual([`line-${f.repo}`]);
     expect(existsSync(heldLock)).toBe(true);
     expect(existsSync(resolve(f.root, 'issues/.lock'))).toBe(false);
     expect(existsSync(resolve(f.root, '.git/akrogon-install.lock'))).toBe(true);

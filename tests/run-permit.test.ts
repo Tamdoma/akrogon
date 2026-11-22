@@ -18,6 +18,7 @@ import {
   WAIT_MS,
   type Fixture,
 } from './helpers';
+import { liveStartTime } from '../src/admission';
 import { command, type Result } from '../src/shell';
 import { withLock } from '../src/state';
 
@@ -908,35 +909,51 @@ test("a listed run of the holding attempt starts ahead of the line's earlier wai
   }
 });
 
-test('a listed run that started while the land waited on its slice lock stays ahead of the land', async () => {
+test('a listed run that started while the land waited on its line lock stays ahead of the land', async () => {
   const f: Fixture = await fixture();
   const caps: Cap[] = [];
   let releaseLock: () => void = () => {};
   try {
     const dir: string = marks(f);
     yaml(resolve(f.root, 'issues/config.yaml'), FULL_CONFIG);
-    const other: string = await leafWorktree(f, 'leaf-one');
     const landing: string = await attemptWorktree(f, 'landing', 'att-1');
-    const lockPath: string = resolve(f.home, 'runs', 'locks', 'akrogon.slice');
-    mkdirSync(resolve(f.home, 'runs', 'locks'), { recursive: true });
+    const runsDir: string = resolve(f.home, 'runs');
     let unlock: () => void = () => {};
     const gate: Promise<void> = new Promise((done) => (unlock = done));
     let taken: () => void = () => {};
     const locked: Promise<void> = new Promise((done) => (taken = done));
-    const lock: Promise<void> = withLock(lockPath, async () => {
+    const lock: Promise<void> = withLock(resolve(runsDir, 'locks', `line-${f.repo}`), async () => {
       taken();
       await gate;
     });
     releaseLock = unlock;
     await locked;
-    // The land takes its arrival time, then blocks on its slice lock.
+    // The land takes its arrival time, then blocks on its line lock.
     const held: Cap = landHold(f, dir, 'landing', f.repo, 'att-1', 'release2');
     caps.push(held);
     await Bun.sleep(1500);
-    // A later listed run starts through another slice while the land is blocked.
-    const leafRun: Cap = run(f, ['run-check', '--name', 'test', '--', ...hold(dir, 'leaf')], other);
-    caps.push(leafRun);
-    await waitFor(resolve(dir, 'leaf.held'));
+    // A later listed run goes live while the land is blocked.
+    const leafHash: string = createHash('sha256').update(randomUUID()).digest('hex');
+    const leafRecord: string = resolve(runsDir, `${leafHash}.yaml`);
+    writeFileSync(
+      leafRecord,
+      Bun.YAML.stringify({
+        token_hash: leafHash,
+        pid: process.pid,
+        start_time: liveStartTime(process.pid),
+        boot_id: readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim(),
+        repo: f.repo,
+        leaf: 'leaf-one',
+        check: 'test',
+        state: 'live',
+        run: 'leaf-run',
+        slice: 'akrogon.slice',
+        scope: '',
+        unit: 'leaf-run.scope',
+        full: true,
+        since: new Date().toISOString(),
+      }),
+    );
     unlock();
     await lock;
     await waitFor(resolve(dir, 'landing.held'));
@@ -944,8 +961,7 @@ test('a listed run that started while the land waited on its slice lock stays ah
     caps.push(own);
     await waitForText(own, new RegExp(`waiting for ${f.repo}/leaf-one test`));
     expect(existsSync(resolve(dir, 'own'))).toBe(false);
-    writeFileSync(resolve(dir, 'release'), '');
-    expect(await leafRun.proc.exited).toBe(0);
+    rmSync(leafRecord);
     expect(await own.proc.exited).toBe(0);
     expect(existsSync(resolve(dir, 'own'))).toBe(true);
     writeFileSync(resolve(dir, 'release2'), '');

@@ -222,13 +222,11 @@ function sliceKeepReason(
 }
 
 async function stopSlice(slice: string): Promise<string | null> {
-  return withLock(resolve(globalHome(), 'admission.lock'), () =>
-    withLock(resolve(globalHome(), 'runs', 'locks', slice), async (): Promise<string | null> => {
-      if (liveRuns().some((record) => record.slice === slice)) return 'live run record';
-      const result: Result = await systemctl('stop', slice);
-      return result.code === 0 ? null : result.stderr || `systemctl stop exited ${result.code}`;
-    }),
-  );
+  return withLock(resolve(globalHome(), 'admission.lock'), async (): Promise<string | null> => {
+    if (liveRuns().some((record) => record.slice === slice)) return 'live run record';
+    const result: Result = await systemctl('stop', slice);
+    return result.code === 0 ? null : result.stderr || `systemctl stop exited ${result.code}`;
+  });
 }
 
 const finished = (leaf: Leaf): boolean => leaf.state.phase === 'merged' || leaf.state.phase === 'failed';
@@ -1510,9 +1508,19 @@ export async function reconcileHost(
       await dropPath(dir, true);
     }
 
-  // Retired locks by exact name: held open by no live process means free.
+  // Retired locks: two exact names and every runs/locks entry but the line
+  // locks. Held open by no live process means free.
   const retiredLockDir: string = resolve(homedir(), '.akrogon');
-  for (const lock of [resolve(retiredLockDir, 'run.lock'), resolve(retiredLockDir, 'framework-tests.lock')]) {
+  const runLocks: string = resolve(home, 'runs/locks');
+  for (const lock of [
+    resolve(retiredLockDir, 'run.lock'),
+    resolve(retiredLockDir, 'framework-tests.lock'),
+    ...(existsSync(runLocks)
+      ? readdirSync(runLocks)
+          .filter((name) => !name.startsWith('line-'))
+          .map((name) => resolve(runLocks, name))
+      : []),
+  ]) {
     if (!existsSync(lock)) continue;
     const inside: number[] = pidsInside(targets(), lock);
     if (inside.length > 0)

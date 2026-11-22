@@ -347,10 +347,12 @@ test('an already-running command that admits a nested checked run defers cutover
     rmSync(seed, { force: true });
   }
   // After the old-code command ends, cutover proceeds and every remaining
-  // state file (the slice locks its admission used) moves to the state home.
+  // state file (the line lock its admission used) moves to the state home.
   const moved: SpawnResult = await cli(root, home, ['config']);
   expect(moved.stderr).toContain('moved state home');
-  expect(readdirSync(resolve(home, '.akrogon/runs/locks')).length).toBeGreaterThan(0);
+  const locks: string[] = readdirSync(resolve(home, '.akrogon/runs/locks'));
+  expect(locks.length).toBeGreaterThan(0);
+  expect(locks.filter((name) => !name.startsWith('line-'))).toEqual([]);
   // Nothing writes the tool root after cutover.
   const marker: string = resolve(home, 'marker');
   writeFileSync(marker, 'x');
@@ -425,7 +427,7 @@ test('an admission waits while the state-home move holds admission.lock', async 
   try {
     expect((await reader.read()).done).toBe(false);
     let admitted: boolean = false;
-    const pending: Promise<void> = withAdmissionLock('akrogon.slice', async (): Promise<void> => {
+    const pending: Promise<void> = withAdmissionLock(async (): Promise<void> => {
       admitted = true;
     });
     await Bun.sleep(300);

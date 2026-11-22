@@ -48,13 +48,8 @@ const bootId = (): string => readFileSync('/proc/sys/kernel/random/boot_id', 'ut
 
 // The state-home move takes the home's admission.lock exclusively, so no
 // admission straddles it: each one lands wholly in the old home or the new.
-export async function withAdmissionLock<T>(slice: string, action: () => Promise<T>): Promise<T> {
-  mkdirSync(resolve(runsDir(), 'locks'), { recursive: true });
-  return withLock(
-    resolve(globalHome(), 'admission.lock'),
-    () => withLock(resolve(runsDir(), 'locks', slice), action),
-    'shared',
-  );
+export async function withAdmissionLock<T>(action: () => Promise<T>): Promise<T> {
+  return withLock(resolve(globalHome(), 'admission.lock'), action, 'shared');
 }
 
 // Field 22 of /proc/<pid>/stat. The command name in field 2 may hold spaces, so split after the last ')'.
@@ -171,7 +166,7 @@ const POLL_MS: number = 1000;
 async function awaitTurn(record: RunRecord): Promise<void> {
   let shown: string = '';
   for (;;) {
-    const started: boolean = await withAdmissionLock(record.slice, () =>
+    const started: boolean = await withAdmissionLock(() =>
       withLock(lineLock(record.repo), async (): Promise<boolean> => {
         const mine: RunRecord | undefined = readRecord(recordPath(record.token_hash));
         if (mine === undefined) writeRecord(record);
@@ -208,7 +203,7 @@ async function awaitTurn(record: RunRecord): Promise<void> {
 // serialize. 'gone' covers a vanished record and one already cancelled; 'live'
 // means a promotion won and the caller should stop the run's units instead.
 export async function cancelWaitingRun(record: RunRecord): Promise<'cancelled' | 'gone' | 'live'> {
-  return withAdmissionLock(record.slice, () =>
+  return withAdmissionLock(() =>
     withLock(lineLock(record.repo), async (): Promise<'cancelled' | 'gone' | 'live'> => {
       const current: RunRecord | undefined = readRecord(recordPath(record.token_hash));
       if (current === undefined || current.state === 'cancelled') return 'gone';
