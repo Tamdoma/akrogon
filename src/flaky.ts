@@ -69,6 +69,7 @@ export async function failedTests(repo: Repo, recorded: string): Promise<string[
 // per failed test. On a merge head the same pairing also counts across trees inside one leaf's
 // consecutive sequence when the run's recorded patch id proves the leaf's own commits unchanged and
 // no completed run failed the test between: neither a base run (compares) nor a run on landed main.
+// A row whose rerun passed a first-run failure is one flip for that test.
 type Pending = { item: Red; run: VerifyRun };
 
 // Nameless names say nothing about which unit failed, so only real titles flip across trees.
@@ -123,9 +124,12 @@ export async function flips(repo: Repo, runs: VerifyRun[]): Promise<Flip[]> {
     }
     return out;
   };
-  const pair = async (prior: Pending, green: Pending): Promise<void> => {
+  // `counted` names recoveries the green row's own rerun already counted.
+  const pair = async (prior: Pending, green: Pending, counted: string[]): Promise<void> => {
     const item: Red = prior.item;
-    const tests: string[] = item.failures ?? (await failedTests(repo, item.log));
+    const tests: string[] = (item.failures ?? (await failedTests(repo, item.log))).filter(
+      (test) => !counted.includes(test),
+    );
     if (prior.run.tree === green.run.tree) {
       for (const test of tests) out.push({ name: item.name, command: item.command, test, end: green.run.end! });
       return;
@@ -150,6 +154,9 @@ export async function flips(repo: Repo, runs: VerifyRun[]): Promise<Flip[]> {
   for (const run of completed)
     for (const item of run.commands) {
       if (item.reused !== undefined || item.blocked !== undefined) continue;
+      const still: string[] = item.exit === 0 ? [] : (item.failures ?? []);
+      const counted: string[] = (item.rerun?.failures ?? []).filter((test) => !still.includes(test));
+      for (const test of counted) out.push({ name: item.name, command: item.command, test, end: run.end! });
       const entry: Pending = { item, run };
       const key: string = `${run.tree}\0${item.command}`;
       const mergeKey: string = `${run.leaf}\0${item.name}\0${item.command}`;
@@ -161,12 +168,12 @@ export async function flips(repo: Repo, runs: VerifyRun[]): Promise<Flip[]> {
       const prior: Pending | undefined = red.get(key);
       if (prior !== undefined) {
         red.delete(key);
-        await pair(prior, entry);
+        await pair(prior, entry, counted);
       }
       if (run.scope === 'merge' && run.compares === undefined) {
         const pending: Pending | undefined = mergeRed.get(mergeKey);
         mergeRed.delete(mergeKey);
-        if (pending !== undefined && pending.run.tree !== run.tree) await pair(pending, entry);
+        if (pending !== undefined && pending.run.tree !== run.tree) await pair(pending, entry, counted);
       }
     }
   return out;

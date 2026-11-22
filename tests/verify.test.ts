@@ -2650,3 +2650,150 @@ test('a receipt command row may carry the first run of a rerun', () => {
     failures: ['a > flips'],
   });
 });
+
+const mergeLeaf = (attempt: string): object => ({
+  phase: 'merge',
+  batch: { attempt, built_on: 'x', holder: { base: 'x', head: 'x' }, applied: true },
+});
+
+test('a red merge check with a rerun entry reruns its named failures once and a saved check blocks nothing', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const names: string = resolve(f.home, 'names');
+    const fullMarker: string = resolve(f.home, 'full.ran');
+    config(f, {
+      checks: { unit: 'echo "(fail) alpha"; echo "(fail) beta"; exit 1', whole: `touch ${fullMarker}` },
+      full: ['whole'],
+      merge_checks: { member: 'echo "(fail) gamma"; exit 1' },
+      rerun: {
+        unit: `cp "$AKROGON_RERUN_NAMES" ${names}; echo "names at $AKROGON_RERUN_NAMES"`,
+        member: 'echo member rerun',
+      },
+    });
+    const { worktree } = await callerWorktree(f, 'caller', mergeLeaf('att-rerun'));
+    await commitIn(worktree, 'code.ts');
+    expect((await verify(f, ['--attempt', 'att-rerun'], worktree)).code).toBe(0);
+    const run: VerifyRun = records(f).at(-1)!;
+    const unit: VerifyRun['commands'][number] = run.commands.find((item) => item.name === 'unit')!;
+    expect(unit).toMatchObject({ exit: 0, rerun: { exit: 1, failures: ['alpha', 'beta'] } });
+    expect(unit).not.toHaveProperty('failures');
+    expect(readFileSync(unit.rerun!.log, 'utf8')).toContain('(fail) alpha');
+    expect(readFileSync(unit.log, 'utf8')).toContain(`/verify-passes/${run.run}/`);
+    expect(readFileSync(names, 'utf8')).toBe('alpha\nbeta\n');
+    expect(existsSync(fullMarker)).toBe(true);
+    const member: VerifyRun['commands'][number] = run.commands.find((item) => item.name === 'member')!;
+    expect(member).toMatchObject({ exit: 0, rerun: { exit: 1, failures: ['gamma'] } });
+    expect(readFileSync(member.log, 'utf8')).toContain('member rerun');
+    expect(run.commands.every((item) => item.blocked === undefined)).toBe(true);
+  } finally {
+    f.clean();
+  }
+});
+
+test('a red rerun fails the first-run names it reports again, or all of them when it names none', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const checks = { unit: 'echo "(fail) alpha"; echo "(fail) beta"; exit 1', whole: 'echo whole' };
+    config(f, {
+      checks,
+      full: ['whole'],
+      merge_checks: { member: 'echo member' },
+      rerun: { unit: 'echo "(fail) beta"; exit 1' },
+    });
+    const { worktree } = await callerWorktree(f, 'caller', mergeLeaf('att-red'));
+    await commitIn(worktree, 'code.ts');
+    expect((await verify(f, ['--attempt', 'att-red'], worktree)).code).toBe(1);
+    const run: VerifyRun = records(f).at(-1)!;
+    expect(run.commands.find((item) => item.name === 'unit')).toMatchObject({
+      exit: 1,
+      failures: ['beta'],
+      rerun: { exit: 1, failures: ['alpha', 'beta'] },
+    });
+    expect(run.commands.find((item) => item.name === 'whole')).toMatchObject({ blocked: 'unit' });
+    expect(run.commands.find((item) => item.name === 'member')).toMatchObject({ blocked: 'unit' });
+    config(f, { checks, full: ['whole'], merge_checks: { member: 'echo member' }, rerun: { unit: 'exit 1' } });
+    await commitIn(worktree, 'other.ts');
+    expect((await verify(f, ['--attempt', 'att-red'], worktree)).code).toBe(1);
+    expect(
+      records(f)
+        .at(-1)!
+        .commands.find((item) => item.name === 'unit'),
+    ).toMatchObject({
+      exit: 1,
+      failures: ['alpha', 'beta'],
+      rerun: { exit: 1, failures: ['alpha', 'beta'] },
+    });
+  } finally {
+    f.clean();
+  }
+});
+
+test('no rerun runs for more than 3 names, a nameless red, a leaf verify or a base pass', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const calls: string = resolve(f.home, 'rerun-calls');
+    const rerun = { unit: `echo "$AKROGON_RERUN_NAMES" >> ${calls}; echo "(fail) alpha"; exit 1` };
+    const env: NodeJS.ProcessEnv = { ...noticeEnv(f), ...fakeAkrogon(f).env };
+    const { worktree } = await callerWorktree(f, 'caller', mergeLeaf('att-none'));
+    for (const unit of ['for n in a b c d; do echo "(fail) $n"; done; exit 1', 'echo boom; exit 1']) {
+      config(f, { checks: { unit }, rerun });
+      await commitIn(worktree, `${records(f).length}.ts`);
+      expect((await cli(f, ['verify', '--attempt', 'att-none'], worktree, env)).code).toBe(1);
+      expect(records(f).at(-1)!.commands[0]).not.toHaveProperty('rerun');
+    }
+    config(f, { checks: { unit: 'echo "(fail) alpha"; exit 1' }, rerun });
+    const { worktree: plain } = await callerWorktree(f, 'plain');
+    await commitIn(plain, 'plain.ts');
+    expect((await cli(f, ['verify'], plain, env)).code).toBe(1);
+    expect(records(f).at(-1)!.commands[0]).not.toHaveProperty('rerun');
+    expect(existsSync(calls)).toBe(false);
+    await commitIn(worktree, 'known.ts');
+    expect((await cli(f, ['verify', '--attempt', 'att-none', '--known-red'], worktree, env)).code).toBe(0);
+    const head: VerifyRun = records(f).findLast((run) => run.compares === undefined)!;
+    const base: VerifyRun = baseRecord(f, head);
+    expect(head.commands[0]).toMatchObject({ failures: ['alpha'], rerun: { failures: ['alpha'] } });
+    expect(base.commands[0]).not.toHaveProperty('rerun');
+    const lines: string[] = readFileSync(calls, 'utf8').trim().split('\n');
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain(`/verify-passes/${head.run}/`);
+  } finally {
+    f.clean();
+  }
+});
+
+test('a landed row that saved a unit by rerun does not resolve its main red', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { worktree } = await callerWorktree(f);
+    const head: string = await commitIn(worktree, 'code.ts');
+    const tree: string = await command(['git', 'rev-parse', 'HEAD^{tree}'], worktree);
+    const mergeBase: string = await command(['git', 'merge-base', 'HEAD', 'origin/main'], worktree);
+    const baseTree: string = await command(['git', 'rev-parse', `${mergeBase}^{tree}`], f.root);
+    const after: string = await commitIn(f.root, 'later.ts');
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    const afterTree: string = await command(['git', 'rev-parse', `${after}^{tree}`], f.root);
+    const repo: Repo = readRepo(f.repo, f.root);
+    const cmds: { name: string; command: string }[] = verifyCommands(repo.config, 'merge');
+    const log: string = resolve(f.home, 'x.log');
+    const red = { exit: 7, log, failures: ['alpha'] };
+    seedRun(f, { sha: head, tree, scope: 'merge', commands: cmds.map((item) => ({ ...item, ...red })) });
+    seedRun(f, {
+      sha: mergeBase,
+      tree: baseTree,
+      scope: 'merge',
+      compares: 'older-head',
+      commands: cmds.map((item) => ({ ...item, ...red })),
+    });
+    seedRun(f, {
+      sha: after,
+      tree: afterTree,
+      scope: 'merge',
+      start: '2999-01-01T00:00:00.000Z',
+      end: '2999-01-01T00:00:00.000Z',
+      commands: cmds.map((item) => ({ ...item, exit: 0, log, rerun: red })),
+    });
+    await requireGreenReceipt(repo, head, 'merge');
+  } finally {
+    f.clean();
+  }
+});

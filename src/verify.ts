@@ -223,7 +223,7 @@ function slowEligible(run: VerifyRun): boolean {
   return (
     slowChecked(run) &&
     run.setup === 0 &&
-    run.commands.every((item) => item.reused === undefined && item.blocked === undefined)
+    run.commands.every((item) => item.reused === undefined && item.blocked === undefined && item.rerun === undefined)
   );
 }
 
@@ -331,6 +331,7 @@ async function resolvedOnMain(
     if (landed.end! <= red.end!) continue;
     const hit = matching(landed, unit);
     if (hit === undefined || hit.reused !== undefined) continue;
+    if (hit.rerun?.failures?.includes(unit.test)) continue;
     if (!(await onMain(landed.sha))) continue;
     if (!(await before(red.sha, landed.sha))) continue;
     if (hit.exit === 0) return true;
@@ -647,6 +648,49 @@ async function verifyCaller(
   };
 }
 
+type CommandRow = VerifyRun['commands'][number];
+
+// A red merge command with a rerun entry and at most 3 named failures runs its rerun command once,
+// with the names in a file inside the pass folder. The row takes the rerun's exit and log, keeps the
+// first run in `rerun`, and fails only the first-run names the rerun reports again, or all of them
+// when it reports none by name.
+async function commandRow(
+  repo: Repo,
+  record: PassRecord,
+  caller: LeafTarget,
+  target: string,
+  item: NamedCommand,
+  first: { code: number; log: string },
+): Promise<CommandRow> {
+  const names: string[] | undefined = first.code === 0 ? undefined : await failedTests(repo, first.log);
+  const failures: string[] | undefined = names === undefined || names.includes('(log gone)') ? undefined : names;
+  const rerun: string | undefined =
+    record.scope === 'merge' && record.compares === undefined ? repo.config.rerun?.[item.name] : undefined;
+  if (rerun === undefined || failures === undefined || failures.includes('(no test name)') || failures.length > 3)
+    return { ...item, exit: first.code, log: first.log, ...(failures === undefined ? {} : { failures }) };
+  const file: string = resolve(passesRoot(), record.run, `rerun-${encodeURIComponent(item.name)}.txt`);
+  writeFileSync(file, failures.map((name) => `${name}\n`).join(''));
+  const second: { code: number; log: string } = await checkedRun(
+    repo,
+    caller,
+    record.akrogon_base,
+    item.name,
+    ['sh', '-c', rerun],
+    target,
+    undefined,
+    file,
+  );
+  const again: string[] = second.code === 0 ? [] : await failedTests(repo, second.log);
+  const still: string[] = failures.filter((name) => again.includes(name));
+  return {
+    ...item,
+    exit: second.code,
+    log: second.log,
+    ...(second.code === 0 ? {} : { failures: still.length > 0 ? still : failures }),
+    rerun: { exit: first.code, log: first.log, failures },
+  };
+}
+
 // The body of one pass, run inside the akrogon-verify-<id> service. Every
 // resolved input arrives through the record the caller wrote, so a service
 // checkout repeats the caller's exact decision surface.
@@ -714,23 +758,17 @@ async function runOnce(repo: Repo, record: PassRecord): Promise<VerifyRun> {
         );
         continue;
       }
-      const { code, log }: { code: number; log: string } = await checkedRun(
+      const row: CommandRow = await commandRow(
         repo,
+        record,
         caller,
-        akrogonBase,
-        item.name,
-        ['sh', '-c', item.command],
         target,
+        item,
+        await checkedRun(repo, caller, akrogonBase, item.name, ['sh', '-c', item.command], target),
       );
-      const names: string[] | undefined = code === 0 ? undefined : await failedTests(repo, log);
-      ran.push({
-        ...item,
-        exit: code,
-        log,
-        ...(names === undefined || names.includes('(log gone)') ? {} : { failures: names }),
-      });
-      process.stdout.write(`verify ${item.name}: ${code} ${log}\n`);
-      if (code !== 0 && !isFull) blockedBy ??= { name: item.name, exit: code, log };
+      ran.push(row);
+      process.stdout.write(`verify ${item.name}: ${row.exit} ${row.log}\n`);
+      if (row.exit !== 0 && !isFull) blockedBy ??= { name: item.name, exit: row.exit, log: row.log };
     }
     // A red sequential stage blocks the members: each is recorded with the blocker's exit and log.
     const blocker: { name: string; exit: number; log: string } | undefined =
@@ -750,15 +788,9 @@ async function runOnce(repo: Repo, record: PassRecord): Promise<VerifyRun> {
           first ??= result.reason;
           continue;
         }
-        const { code, log } = result.value;
-        const names: string[] | undefined = code === 0 ? undefined : await failedTests(repo, log);
-        ran.push({
-          ...members[index],
-          exit: code,
-          log,
-          ...(names === undefined || names.includes('(log gone)') ? {} : { failures: names }),
-        });
-        process.stdout.write(`verify ${members[index].name}: ${code} ${log}\n`);
+        const row: CommandRow = await commandRow(repo, record, caller, target, members[index], result.value);
+        ran.push(row);
+        process.stdout.write(`verify ${members[index].name}: ${row.exit} ${row.log}\n`);
       }
       if (first !== undefined) throw first;
     }

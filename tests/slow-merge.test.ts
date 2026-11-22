@@ -974,3 +974,28 @@ test('a stored normal applies before five eligible rows', async () => {
     f.clean();
   }
 });
+
+test('a row whose command was rerun stays out of the normal', async () => {
+  const f: Fixture = await fixture();
+  const core: HcCore = await hcCore(f);
+  try {
+    const env: NodeJS.ProcessEnv = coreEnv(f, core);
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      setup: 'mkdir -p node_modules',
+      checks: { unit: 'echo unit' },
+      grounding: 'none',
+    });
+    const { direct, holder } = await mergeCaller(f);
+    for (const ms of [240000, 300000, 360000, 420000]) seedMerge(f, ms);
+    const log: string = resolve(f.home, 'seeded.log');
+    writeFileSync(log, 'x\n');
+    seedMerge(f, 5500, {
+      commands: [{ name: 'unit', command: 'echo unit', exit: 0, log, rerun: { exit: 1, log, failures: ['alpha'] } }],
+    });
+    expect((await cli(f, ['verify', '--holder', holder], direct, env)).code).toBe(0);
+    expect(records(f).at(-1)!.slow).toBeUndefined();
+  } finally {
+    await core.stop();
+    f.clean();
+  }
+});

@@ -302,6 +302,7 @@ export async function checkedRun(
   argv: string[],
   cwd: string,
   sessions?: string,
+  rerunNames?: string,
 ): Promise<{ code: number; log: string; stderr_final_nl: boolean }> {
   const early: string | undefined = await ownerRefusal(target, repo, false);
   if (early !== undefined) throw new PublishRefusedError(early);
@@ -336,6 +337,7 @@ export async function checkedRun(
       env.AKROGON_SESSION_MINUTES = String(reserved.minutes);
     }
     env.AKROGON_BASE = akrogonBase;
+    if (rerunNames !== undefined) env.AKROGON_RERUN_NAMES = rerunNames;
     const log: string = join(runRoot, 'out.log');
     const { path: owner, kind }: { path: string; kind: 'holder' | 'issue' } = await captureOwner(target, repo);
     const slice: string = runSlice(slug === 'checkout' ? 'akrogon.slice' : leafSlice(repo, slug, homePath()));

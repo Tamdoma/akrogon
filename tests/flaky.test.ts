@@ -15,6 +15,7 @@ type Step = {
   setup?: number;
   reused?: string;
   failures?: string[];
+  rerun?: { exit: number; log: string; failures?: string[] };
 };
 
 function run(f: Fixture, step: Step, index: number): VerifyRun {
@@ -37,6 +38,7 @@ function run(f: Fixture, step: Step, index: number): VerifyRun {
         log: step.log,
         ...(step.reused === undefined ? {} : { reused: step.reused }),
         ...(step.failures === undefined ? {} : { failures: step.failures }),
+        ...(step.rerun === undefined ? {} : { rerun: step.rerun }),
       },
     ],
     start: '2026-10-14T00:00:00.000Z',
@@ -419,6 +421,73 @@ test('a reused green entry adds no flip, while a real later green still records 
         steps.map((step, index) => run(f, step, index)),
       ),
     ).toEqual([{ name: 'test', test: 'alpha', count: 1, last: '2026-10-14T03:00:00.000Z' }]);
+  } finally {
+    f.clean();
+  }
+});
+
+test('a rerun that saves a red tree counts its recovery once and keeps the earlier red names', async (): Promise<void> => {
+  const f: Fixture = await fixture();
+  try {
+    const repo: Repo = readRepo(f.repo, f.root);
+    const first = { exit: 1, log: '/gone/first.log', failures: ['alpha', 'beta'] };
+    const second = { exit: 1, log: '/gone/second.log', failures: ['alpha'] };
+    const steps: Step[] = [
+      {
+        tree: 'A',
+        command: 'bun test',
+        exit: 1,
+        log: '/gone/a.log',
+        end: '2026-10-14T01:00:00.000Z',
+        failures: ['alpha', 'beta'],
+        rerun: first,
+      },
+      { tree: 'A', command: 'bun test', exit: 0, log: '/gone/b.log', end: '2026-10-14T02:00:00.000Z', rerun: second },
+    ];
+    expect(
+      (
+        await flakyLines(
+          repo,
+          steps.map((step, index) => run(f, step, index)),
+        )
+      ).sort((a, b) => a.test.localeCompare(b.test)),
+    ).toEqual([
+      { name: 'test', test: 'alpha', count: 1, last: '2026-10-14T02:00:00.000Z' },
+      { name: 'test', test: 'beta', count: 1, last: '2026-10-14T02:00:00.000Z' },
+    ]);
+  } finally {
+    f.clean();
+  }
+});
+
+test('a rerun row counts each first-run failure its rerun passed as one flip', async (): Promise<void> => {
+  const f: Fixture = await fixture();
+  try {
+    const repo: Repo = readRepo(f.repo, f.root);
+    const rerun = { exit: 1, log: '/gone/first.log', failures: ['alpha', 'beta'] };
+    const steps: Step[] = [
+      { tree: 'A', command: 'bun test', exit: 0, log: '/gone/a.log', end: '2026-10-14T01:00:00.000Z', rerun },
+      {
+        tree: 'B',
+        command: 'bun test',
+        exit: 1,
+        log: '/gone/b.log',
+        end: '2026-10-14T02:00:00.000Z',
+        failures: ['beta'],
+        rerun,
+      },
+    ];
+    expect(
+      (
+        await flakyLines(
+          repo,
+          steps.map((step, index) => run(f, step, index)),
+        )
+      ).sort((a, b) => a.test.localeCompare(b.test)),
+    ).toEqual([
+      { name: 'test', test: 'alpha', count: 2, last: '2026-10-14T02:00:00.000Z' },
+      { name: 'test', test: 'beta', count: 1, last: '2026-10-14T01:00:00.000Z' },
+    ]);
   } finally {
     f.clean();
   }
