@@ -1082,6 +1082,34 @@ test.serial('dues queued during an idle timer gap coalesce when the watcher work
   }
 });
 
+// Boundaries that pass after the timer's last busy poll but before it sees the head due's turn
+// done belong to the same backlog: the next send is the latest due (brief C4). Source: verify run
+// 1795335431683 under host load sent due 5 while due 6 was already queued.
+test.serial('boundaries missed while the head due finishes coalesce to the latest', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    const rig: Rig = await watchUp(f);
+    rig.timer = await started(rig);
+    const timer: Term = await get(f.core, rig.timer);
+    const pid: number = z.number().parse(timer.foreground?.pid ?? timer.pid);
+    await waitTick(rig, 1);
+    // The timer misses its polls while the watcher finishes due 1 and four boundaries pass.
+    process.kill(pid, 'SIGSTOP');
+    try {
+      await Bun.sleep(9000);
+    } finally {
+      process.kill(pid, 'SIGCONT');
+    }
+    for (let n: number = 0; n < 80 && tickLines(rig).length < 2; n += 1) await Bun.sleep(200);
+    const delivered: number[] = tickLines(rig).map((line: string) => Number(/due=(\d+)/.exec(line)?.[1]));
+    expect(delivered[0]).toBe(1);
+    expect(delivered[1]).toBeGreaterThanOrEqual(5);
+    await waitLabel(rig, delivered[1]);
+  } finally {
+    await f.clean();
+  }
+});
+
 // A consultant terminal for the consult tests: named <prefix>-watch-consult, labelled like
 // a startWatchConsult launch and parented to the watcher. `repo` labels a foreign repo's
 // consultant (a same-named terminal whose label does not name this repo).
