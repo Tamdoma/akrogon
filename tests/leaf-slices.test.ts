@@ -107,7 +107,7 @@ const realBus: string = `unix:path=${realRuntime}/bus`;
 // Real systemd slices are host-wide: a per-process slug suffix keeps concurrent copies of this file apart.
 const unique = (slug: string): string => `${slug}-${process.pid}`;
 
-test('a shell run admitted while another slice stops protects its own slice', async () => {
+test('a shell run waits while another slice stops, then protects its own slice', async () => {
   const f: SliceFixture = await slicesFixture();
   const gate: string = resolve(f.home, 'continue-stop');
   const release: string = resolve(f.home, 'release-run');
@@ -164,8 +164,10 @@ test('a shell run admitted while another slice stops protects its own slice', as
         WAIT_MS,
       );
       try {
-        await waitFor(async () => existsSync(held));
+        await Bun.sleep(1000);
+        expect(existsSync(held)).toBe(false);
         writeFileSync(gate, '');
+        await waitFor(async () => existsSync(held));
         const result: Result = await pass;
         expect(result.code, result.stderr).toBe(0);
         expect(readFileSync(log, 'utf8')).not.toContain(`stop ${protectedSlice}`);

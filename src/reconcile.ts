@@ -43,7 +43,7 @@ import {
   worktreeLock,
 } from './state';
 import { cgroupRoot, leafSlice, ownSlices, procRoot, sessionBusAddress } from './scope';
-import { liveRuns, liveStartTime, withAdmissionLock } from './admission';
+import { liveRuns, liveStartTime } from './admission';
 import { CommandError, command, run, spawnCaptured, type Result } from './shell';
 import { closeTab, end, HcError, repoSpace, terminals, windowOpen, type Seen, type SpaceResolution } from './hc';
 
@@ -222,11 +222,13 @@ function sliceKeepReason(
 }
 
 async function stopSlice(slice: string): Promise<string | null> {
-  return withAdmissionLock(slice, async (): Promise<string | null> => {
-    if (liveRuns().some((record) => record.slice === slice)) return 'live run record';
-    const result: Result = await systemctl('stop', slice);
-    return result.code === 0 ? null : result.stderr || `systemctl stop exited ${result.code}`;
-  });
+  return withLock(resolve(globalHome(), 'admission.lock'), () =>
+    withLock(resolve(globalHome(), 'runs', 'locks', slice), async (): Promise<string | null> => {
+      if (liveRuns().some((record) => record.slice === slice)) return 'live run record';
+      const result: Result = await systemctl('stop', slice);
+      return result.code === 0 ? null : result.stderr || `systemctl stop exited ${result.code}`;
+    }),
+  );
 }
 
 const finished = (leaf: Leaf): boolean => leaf.state.phase === 'merged' || leaf.state.phase === 'failed';
