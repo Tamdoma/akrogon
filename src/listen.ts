@@ -7,7 +7,7 @@
 import { dirname, resolve } from 'node:path';
 import { lstatSync, mkdirSync, realpathSync, watch, type FSWatcher } from 'node:fs';
 import { z } from 'zod';
-import { follow, sessions, type HcLine } from './hc';
+import { follow, listening, sessions, type HcLine } from './hc';
 
 type Pass = 'pull --all' | 'next --resume' | 'next --wake';
 
@@ -18,6 +18,8 @@ const PASS_DEADLINE_MS: number = msSchema.parse(process.env.AKROGON_PASS_DEADLIN
 // hc sends a subscription's snapshot first; one that sends none by then is stopped and retried, so a
 // silent session cannot hold startup or the scans behind it.
 const SNAPSHOT_MS: number = msSchema.parse(process.env.AKROGON_SNAPSHOT_MS) ?? 30_000;
+// How often a socket an event named, still refusing, is probed until it accepts or SNAPSHOT_MS passes.
+const PROBE_MS: number = 50;
 
 const statusSchema = z.object({ status: z.object({ state: z.string() }).nullable() });
 
@@ -122,10 +124,13 @@ export async function listenCommand(): Promise<void> {
   };
 
   // A socket linked from elsewhere (a symlink) is replaced in its real directory, so that directory is
-  // watched too.
+  // watched too. An event names the file it changed, so the scan it wakes knows which socket was created.
   const watchDir = (dir: string): void => {
     if (watched.has(dir)) return;
-    const watcher: FSWatcher = watch(dir, () => void scan());
+    const watcher: FSWatcher = watch(
+      dir,
+      (_event, file: string | null) => void scan(/^([^.]+)\.sock$/.exec(file ?? '')?.[1]),
+    );
     watcher.on('error', fail);
     watched.add(dir);
   };
@@ -134,12 +139,39 @@ export async function listenCommand(): Promise<void> {
     if (lstatSync(socket).isSymbolicLink()) watchDir(dirname(realpathSync(socket)));
   };
 
+  // hc creates a socket's file at bind, before it listens, and nothing in the folder changes at listen,
+  // so the scan a creation woke can find that socket refusing. Such a socket is probed, never followed:
+  // following runs an hc client, which starts a core on a stopped socket. Once it accepts, a scan
+  // follows it; one that never accepts (a stale socket whose mode changed) stays unfollowed.
+  const awaiting: Set<string> = new Set();
+  const awaitListen = async (session: string): Promise<void> => {
+    if (awaiting.has(session)) return;
+    awaiting.add(session);
+    const socket: string = resolve(socketDir, `${session}.sock`);
+    const deadline: number = Date.now() + SNAPSHOT_MS;
+    try {
+      let accepted: boolean = await listening(socket);
+      while (!accepted && Date.now() < deadline) {
+        await Bun.sleep(PROBE_MS);
+        accepted = await listening(socket);
+      }
+      if (accepted) await scan();
+    } finally {
+      awaiting.delete(session);
+    }
+  };
+
   // Scans run one after another, so a session is never subscribed twice; each resolves once the
   // snapshots of the sessions it subscribed arrived.
   let scans: Promise<void> = Promise.resolve();
-  const scan = (): Promise<void> => {
+  const scan = (named?: string): Promise<void> => {
     const scanned: Promise<void> = scans.then(async (): Promise<void> => {
-      const fresh: string[] = (await sessions()).live.filter((session: string) => !subscribed.has(session));
+      const found: { live: string[]; stopped: string[] } = await sessions();
+      if (named !== undefined && found.stopped.includes(named))
+        void awaitListen(named).catch((error: unknown) =>
+          retry('next --resume', { listen: 'socket probe failed', session: named, error: String(error) }),
+        );
+      const fresh: string[] = found.live.filter((session: string) => !subscribed.has(session));
       await Promise.all(fresh.map((session: string) => subscribe(session)));
     });
     scans = scanned.catch((error: unknown) => retry('next --resume', { listen: 'scan failed', error: String(error) }));
