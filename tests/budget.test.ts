@@ -339,7 +339,9 @@ test('an unreadable ledger refuses naming the file and leaves its bytes intact',
     expect(result.stderr).toContain('Cannot read');
     expect(existsSync(marker)).toBe(false);
     chmodSync(ledger(f), 0o600);
-    expect(rows(f)).toEqual([{ at: expect.any(String), repo: f.repo, slug: 'earlier', run: 'seeded-run', sessions: 1 }]);
+    expect(rows(f)).toEqual([
+      { at: expect.any(String), repo: f.repo, slug: 'earlier', run: 'seeded-run', sessions: 1 },
+    ]);
   } finally {
     f.clean();
   }
