@@ -1,0 +1,8 @@
+{
+  "inbound": [
+    "turn-1-consultant.md"
+  ],
+  "outbound": [
+    "turn-1-watch.md"
+  ]
+}

@@ -1,0 +1,10 @@
+opened: '2026-11-22T17:54:08Z'
+seats:
+  - seat: A
+    address: t126
+    name: null
+    recipe:
+      harness: claude
+    session: /home/ivan/.claude/projects/-home-ivan-Work-infra-akrogon/5d8542a8-366c-477b-b80b-1a7c0cdf14df.jsonl
+spans:
+  - from: '2026-11-22T17:54:08Z'

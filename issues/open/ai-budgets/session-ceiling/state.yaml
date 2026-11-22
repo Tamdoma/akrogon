@@ -1,0 +1,39 @@
+slug: session-ceiling
+phase: merged
+created: 2026-11-22
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: ak03fcb0a48dcf6082f9c7cd3fee0573
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t32d
+  B:
+    session: infra
+    address: t32j
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-22T16:44:48.135Z
+frozen:
+  tests/budget.test.ts: 76f18cc64983fdc9d92553118b358ffbf4f803f0
+  tests/command-reference.test.ts: d8b73e415c2ada573af12a1614b06ec4b2ffc201
+  tests/config.test.ts: ee324abb1aa5ce2622b400779a3b3a9118f16371
+  tests/state-home.test.ts: 4e5f4b6680d2d58120e764236af12240c528c409
+frozen_cited: []

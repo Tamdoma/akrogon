@@ -1,0 +1,22 @@
+# review-A.md — check.review slot A
+
+Leaf: merge-red-exit. Base: 852ddb91. Reviewed head: 28479b75.
+Evidence: full diff read src/land.ts, src/phase.ts, src/next.ts, src/state.ts, src/routing.ts, src/reconcile.ts, src/status.ts, src/stop.ts, src/timing-report.ts, src/akrogon.ts; new tests/merge-red-exit.test.ts and all rewritten suites; skills + docs diff. `akrogon verify` on head 28479b75 is green (leaf log check-test-1795302102322). Docs/AREA.md spot-checked against live paths; every cited file exists.
+
+## Fixes
+
+- F1 — `src/reconcile.ts` carries committed debug scaffolding: `if (true)` guards wrap the `loadedSlices` skip and the `reason !== null` keep/stopSlice branch (lines 573-575). Realistic source: the leaf's own commit — debug instrumentation introduced during implementation and never removed before commit. Consequence today: the control flow lies to the reader (the keep branch reads as if it were under a feature flag or a disabled condition), and the next editor can misread which clause is dead. Criterion: maintainability defect in the reviewed diff; the leaf's own coding rules delete iteration helpers before commit.
+
+- F2 — `skills/check-issue/SKILL.md` `## check.repair` merge-exit paragraph omits the `failed` ending Taken 3 requires: "a red B judges main-caused that the main-red cover does not reach (nameless, or no base pass found it) takes the existing operator-only `failed` stop naming the main red, never `check.fix`." The text gives a `red` exit only two endings — `merge --slot B` or `check.fix --slot B` — so a repair seat judging a main-caused red with an untouched diff has no documented path except requeue or A. Realistic source: a real check.repair pass on a red-exited leaf. Consequence today: a main-caused red misroutes to `check.fix`, which is the token-cost path the design rejected ("straight to check.fix: A wakes on every flake") and the opposite of the brief's criterion 10 wording. Criterion: brief done-criterion 10 (skill text must state the main-caused `failed` ending).
+
+- F3 — `src/land.ts` `taken8Trigger` counts overlap on any shared failure, covered or not: `overlap` is set when a current failure name also appears in the previous run's failures, without checking that the failure is one `mainRedCover` misses. Brief criterion 9 and design Taken 8 require "at least one *uncovered* failing unit also failed on that previous red run." Scenario that fires wrongly: previous red run failed `flaky-a` (covered on main) and `real-b`; the leaf returns unedited and the new run fails `flaky-a` (still covered) plus uncovered `new-c` which did not fail before — trigger holds on `flaky-a`'s overlap, one full base pass runs inside the line, and the exit names a `base_verdict` for a case the design says "a run whose failing units are all already covered gets no base pass" should not reach. Realistic source: a real second red land run on a returning leaf (the exact case Taken 8 governs). Consequence today: an unearned base suite inside the merge line and a red exit that names a base verdict the criterion says should not exist. Criterion: brief done-criterion 9.
+
+## Nits
+
+- N1 — `skills/merge-issue/SKILL.md` "Any seat or the operator can still stop the leaf with `akrogon phase <slug> failed`": a merge leaf refuses every `--slot` call, so no seat call can stop it — only the slot-less operator call works. Deferred: the operator-facing meaning survives. Evidence to promote: a seat actually needing to stop a merge leaf.
+- N2 — `docs/reference/checks.md` and `skills/merge-issue/SKILL.md` claim "a `phase` call on a merge leaf carrying `--slot` or `--attempt` is refused": true for `merged`/`check.fix`/any `transition` move via the `required.length === 0` check, but `phase <slug> failed --attempt <id>` and `phase <slug> check.repair --attempt <id>` are not refused (the attempt check only runs in the merged/check.fix branch). Deferred: `failed` is a recovery path and the stray flag is ignored. Evidence to promote: a caller harmed by the accepted flag.
+- N3 — `implementation/report.md` claims "D1–D14 implemented as planned" but does not record plan D13/verification's per-criterion deliberate-break red evidence (only "18/18 … was 18 red before the product code landed"). Deferred: the discriminating power of the new tests is still verifiable by re-breaking, and the tests do pass on head. Evidence to promote: a later review needing the per-break mapping.
+
+## Verdict
+
+fix

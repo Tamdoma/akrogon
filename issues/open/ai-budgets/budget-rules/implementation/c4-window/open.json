@@ -1,0 +1,78 @@
+{
+  "version": 8,
+  "value": {
+    "spaces": [
+      {
+        "id": "spakre2e",
+        "name": "akre2e",
+        "tabs": [
+          {
+            "id": "akac8982079479143fa00eea34430f3b",
+            "name": "e2e-failed failed",
+            "root": {
+              "children": [
+                {
+                  "content": {
+                    "terminal": "t2"
+                  },
+                  "id": "p45548bc186aa4c090e08b7dc3e4606b2",
+                  "type": "block"
+                }
+              ],
+              "id": "akac8982079479143fa00eea34430f3b",
+              "type": "row"
+            }
+          },
+          {
+            "id": "ak880b6e717a0a57be4f26e90f7bdd81",
+            "name": "e2e-closed",
+            "root": {
+              "children": [
+                {
+                  "content": {
+                    "terminal": "t1"
+                  },
+                  "id": "p6fc364b9e2b5d0c9b4f8d4859122a3ce",
+                  "type": "block"
+                }
+              ],
+              "id": "ak880b6e717a0a57be4f26e90f7bdd81",
+              "type": "row"
+            }
+          },
+          {
+            "id": "ak88a8734001bb37b5730a6ae1fc5479",
+            "name": "e2e-open",
+            "root": {
+              "children": [
+                {
+                  "content": {
+                    "terminal": "t3"
+                  },
+                  "id": "p1040ce250fc1079e2c10460d740e5cd9",
+                  "size": {
+                    "weight": 0.5
+                  },
+                  "type": "block"
+                },
+                {
+                  "content": {
+                    "terminal": "t4"
+                  },
+                  "id": "pa17e6bd95ca0494f28121bc9fe8203b0",
+                  "size": {
+                    "weight": 0.5
+                  },
+                  "type": "block"
+                }
+              ],
+              "id": "ak88a8734001bb37b5730a6ae1fc5479",
+              "type": "row"
+            }
+          }
+        ],
+        "folder": "/var/tmp/akr-c4f-1LhA6e/akr-e2e-engine-window-root"
+      }
+    ]
+  }
+}

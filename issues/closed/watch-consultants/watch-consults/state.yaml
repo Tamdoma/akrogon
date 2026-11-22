@@ -1,0 +1,52 @@
+slug: watch-consults
+phase: merged
+created: 2026-11-21
+repo: akrogon
+blocked-by:
+  - consultant-seat
+  - failed-merge-resume
+sources:
+  - "Tamdoma/akrogon#146"
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 2
+verdict: {}
+tab: akfcbef8d97a2215f55a996d06741f41
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t309
+  B:
+    session: infra
+    address: t30x
+prompted:
+  B:
+    turn: 5
+    address: t30x
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-22T08:28:42.654Z
+broadcast:
+  kind: issue
+  name: watch-consultants
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/watch-consultants
+  pushed: fdc5acdd4ea42ca49fd5b5e3b8c04829cc6aeea8
+  sources:
+    - "Tamdoma/akrogon#146"
+frozen:
+  skills/watch-issues/scripts/consults.test.ts: 71509059c039d90eb774acc580b127cd343d3a49
+  tests/e2e/watch-consults.e2e.ts: f91928404f25338c9535d90eaf023c0db7555b6a
+  tests/e2e/watch-tier.ts: fca6a5c37bbbe0332bef7f50081128e96d0c095a
+  tests/watch-timer.test.ts: 3eb1e524eb6891b00731323ad450cc55cee5281a
+frozen_cited: []

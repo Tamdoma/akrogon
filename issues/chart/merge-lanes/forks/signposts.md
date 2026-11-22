@@ -1,0 +1,30 @@
+# Signposts: merge-lanes
+
+Original, held in issues/chart/merge-lanes. Session: door t2z2, opened 2026-11-21T17:21:10Z, mode autopilot (operator answers signposts, A answers forks).
+
+The consultant angles exchange did not run: both consultant starts failed with `name_taken` (ak-slot-b and ak-slot-c are held by idle consultants t2z0 and t2z1 of door t126's open chart watch-consultants).
+
+## Question
+
+Revised after the consultant angles exchange (slots/signposts-B.md, slots/signposts-C.md) before the operator saw it. Draft Q5 (full run before the line) dropped: it reopens three operator noes (merge-throughput forks/first-package.md 2026-10-09, merge-stacks forks/stack-fate.md 2026-10-19, verify-waste forks/receipts.md 2026-10-24). Draft Q6 (proof bar) dropped: settled by stack-fate.md 4a measured trigger. Draft Q7 (change size) dropped: settled 2026-10-18 "Always better to remove redundancies and complicated code first" (stack-fate.md Carries).
+
+1. What wins when goals clash? 1a fastest merge, counted from a leaf's first entry into merge to landed, failed rounds included; hard limits: no leaf adds a new test failure to main, the PC stays inside its limits, token cost does not grow (recommended) · 1b a calm PC first · 1c speed first, main may break briefly with an automatic undo. Steers: every design's ranking and which designs are allowed.
+2. How many full suites may run at once? 2a measure: two at once allowed only if neither is more than 1.25x slower and no new test fails, else 1 (operator's 2026-10-19 trigger; recommended) · 2b keep 1 per repo · 2c as many as akrogon.slice's existing cap allows. Steers: testing the next leaf early.
+3. May several leaves share one test run? 3a no, each leaf tested alone (removed twice: 6640ab5f, 6e7a33ff; 72 of 77 stacks went red; recommended) · 3b reopen batching. Steers: batching designs.
+4. What may this session change? 4a akrogon only · 4b akrogon plus a framework chart taken first, to bring the suite back toward 5 min (recommended) · 4c akrogon plus settings framework can opt into. Steers: chart list and the biggest lever.
+5. What happens when a merge fails its tests? 5a the leaf leaves the line at once, the next leaf starts, the retest or repair happens off the line (recommended) · 5b rerun only the failed tests once in the line, then leave · 5c today. Steers: line time lost to failures (44% of merge run time, B F2).
+6. Should leaves waiting to merge take seats from other repos? 6a no, waiting merge leaves stop counting against the 12-seat limit (recommended) · 6b a per-repo cap · 6c today. Steers: cross-repo stalls.
+
+## Taken
+
+Operator, 2026-11-21T17:48Z, door t2z2, verbatim: "1a | 2a - test it but it was slower before, I don't think it's worth it | 3a | 4b | 5a | 6a | What did Fable and Neon come up with?"
+
+Account: the session ranks merge speed first, counted from a leaf's first entry into merge to landed with failed rounds included, under three hard limits: no leaf adds a new test failure to main, the PC stays inside its limits, token cost does not grow. Each leaf is still tested alone (no batching). A framework chart that brings the merge suite back toward its early-November ~5 min is taken first (4b, the operator's yes to that chart), then merge-lanes. In merge-lanes a failed merge leaves the line at once and is retested or repaired off the line (5a), and leaves waiting to merge stop counting against max_active (6a). Two suites at once is measured with the N2 probe after the suite fix lands, and is allowed only if neither run is more than 1.25x slower and no new test fails; the operator expects it not to pay off. Given up: batching, red-then-revert landing, any extra PC load without a passing measurement.
+
+Order: 1. suite-regrowth (framework, /home/ivan/Work/infra/tamdoma/framework/issues/chart/suite-regrowth), 2. merge-lanes (akrogon). Nothing dropped.
+
+## Needs
+
+- N1 (supplied 2026-11-21T17:34:34Z: operator said use random names; B t2z4, C t2z3 started): consultants B (claude claude-fable-5-2 high) and C (agy neon xhigh) cannot start while t2z0 (ak-slot-b) and t2z1 (ak-slot-c) of door t126 hold the names. Operator frees them (ends those two consultants or door t126's chart) and says "retry", and the door starts B and C once more; or says "no consultants". Consumers: every map, fork exchange and leaf review in merge-lanes. Done: both seats start and report.
+- N2 (supplied 2026-11-21T17:48Z, operator "2a - test it"; run after suite-regrowth lands): approval for a load probe on this PC at charting: one extra `bun run framework:verify` on a detached checkout of framework's current main, run while the live merge line runs its own verify, so two full suites run at once; at most 3 probe runs, each ending within 45 min; no push, no framework state or config change; the checkout is removed after. Purpose: answers signpost 2a. Consumers: the merge-lanes design. Done: wall times and failures of both runs recorded in the fork.
+- N3 (supplied 2026-11-21T20:03Z, operator verbatim: "ok, I confirm the merge-red-exit question, get moving"; late 2026-11-21, found at red-exit's final check, slots/red-exit-final-check-2-B.md Y4, and at leaf review, slots/leaves-review-B.md L1): operator decision whether a red leaf may hold the merge line for one more suite (about 12 min), once per new main-red unit, so the land run can run the base pass that lets every later leaf land without extra runs (forks/red-exit.md Taken 8). It holds the whole leaf merge-red-exit: once no seat works in merge, that base pass is the only maker of merge-scope base runs, so without it a named main red stops each queued leaf in `failed` where today they land. Yes: the door adds Taken 8 to merge-red-exit (drafts in issues/chart/merge-lanes/drafts/merge-red-exit) and writes it. No: the door re-takes red-exit Taken 3 and 8 before writing merge-red-exit. Consumers: merge-red-exit. Done: the operator's yes or no recorded here. Status: late, notice /home/ivan/.config/herdr-app-sessions/infra/akrogon-notices/akrogon.notice.e8d77e3e-3f50-420c-b6b1-dbf75b4d6250.json

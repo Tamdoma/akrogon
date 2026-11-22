@@ -1,0 +1,35 @@
+slug: paid-red-stop
+phase: merged
+created: 2026-11-20
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak5fb375a9faeae4c95c0a3fa1aa206a
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t2rd
+  B:
+    session: infra
+    address: t2rf
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-20T18:42:14.892Z
+frozen: {}
+frozen_cited: []

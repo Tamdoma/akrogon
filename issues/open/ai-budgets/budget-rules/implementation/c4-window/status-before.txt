@@ -1,0 +1,13 @@
+{
+  "zoom": 1.0,
+  "font_size": 18.67,
+  "ui_font_size": 13.0,
+  "space": "spakre2e",
+  "tab": "akac8982079479143fa00eea34430f3b",
+  "focused_pane": "p45548bc186aa4c090e08b7dc3e4606b2",
+  "layout": "flat",
+  "agent": "t2",
+  "floats": {},
+  "overlays": [],
+  "errors": []
+}

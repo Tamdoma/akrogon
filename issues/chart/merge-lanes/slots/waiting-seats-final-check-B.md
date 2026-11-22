@@ -1,0 +1,7 @@
+# Waiting seats final shape: slot B check
+
+2026-11-21. Code at akrogon `4f5e3fd2`. Three points. Items 1 and 2 are fine and my positions are stated correctly.
+
+- Z1. Item 5 cannot test "a live land run" inside `sliceKeepReason` as written. That function is synchronous (`src/reconcile.ts:200-218`, called at `:572` and `:1325`), and `landAlive` is an async `systemctl is-active` call (`src/land.ts:50-55`). The batch record gives the same answer with a plain state read: keep the slice while the leaf is in `merge` and `state.batch` is set. Only the holder has a batch, and red-exit clears it on every exit. That also covers "holds the turn" with no `mergeQueue` read.
+- Z2. Item 3's two figures are still not one unit. M1 is hours with 12 or more seated leaves, whether or not any leaf was refused. The after figure is hours with at least one refused leaf. So M1 is an upper bound on the before figure, on top of its overcount. The pending step should say so, or a drop will be read as larger than it is.
+- Z3. Item 4's memory trigger fires at the limit, not before it. A `memory.events` high count means `akrogon.slice` already reached `MemoryHigh` and was throttled once. The lock in `## Taken` is that the PC stays inside its limits. The same pending step can read `MemoryPeak` (47.7 GB today against 64 GB) at no extra cost, so the approach is seen before the first throttle. No code either way.

@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: agy loads a skill linked into ~/.gemini/config/skills
+    command: temporary link ~/.gemini/config/skills/watch-issues -> ~/.akrogon/current/skills/watch-issues, then one agy session (neon high, --mode auto) in /home/ivan/Work/infra/herdr-setup asked to run the skill
+    identity: operator's logged-in agy account (Google AI Ultra) on this host
+    target: agy CLI
+    version: agy installed via mise antigravity-cli latest, 2026-11-20
+    date: '2026-11-20'
+    result: agy explored watch-issues/SKILL.md from a cwd without a repo copy
+    cleanup: link removed; folder listing back to its 8 prior entries
+    limits: one session; a symlinked skill folder, not a copied one
+    record: issues/chart/watch-any-harness/forks/timer-design.md

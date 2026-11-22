@@ -1,0 +1,121 @@
+
+ The akrogon status command is failing because a verify-runs.jsonl record contains patch_id/patch_base keys not recognized by the current binary. This seems to be an environment issue, as a different
+ akrogon build likely created those keys. I can't edit the issues/ directory to fix this. The leaf itself failed, but resuming is blocked by an "Empty leaf branch" error, and the resume rules don't
+ apply here.
+
+ I'm seeing a new failure cause: the akrogon status command itself errors due to malformed verify-runs.jsonl records. A previous akrogon build wrote keys that this build's akrogon status can't parse.
+ This seems like a bug in the current akrogon build, not something I can fix directly.
+
+ The leaf remains failed with a blocked status, even though its prerequisite (green main) is now met. The resume path failed with a command error, and the rule is to observe and report. Retrying the
+ same command that failed deterministically is pointless. The phase refusal might be a different cause, as the leaf is empty, lacking commits. This differs from the original base-red failure. The
+ leaf branch has never had its own commits; its failure record came from a merge verify.
+
+ The phase command's refusal of empty branches is structural, preventing resume for empty leaves. I'm exploring if akrogon next on a failed leaf or assigning a seat could work, but next only assigns
+ seats when phase is waiting, not failed. Alternatively, this might be a new case: the leaf is still failed, the blocker is gone, but resume is structurally impossible due to the empty diff. However,
+ I just re-checked the signature gate logic: the signature did change because the base and leaf heads changed, and this change does affect the blocker (BROKEN removed). This resolves the current
+ case, and a new one may open if a new trigger exists.
+
+ The leaf is still failed because the prerequisite is met, but the resume path failed deterministically. The phase command doesn't have a rule for permanent refusal, and retrying the same command is
+ pointless. However, I need to re-evaluate the target for the phase command, as the rule for setting the target seems to have changed or I've misread it.
+
+ My previous attempt to resume failed because I targeted check.review when the rule dictates check.fix when failure.phase is check.review. The rule states that check.review is never a direct target.
+ I suspect check.fix would also fail with an "Empty leaf branch" error, as that guard checks for changes against origin/main, which is likely still absent.
+
+ I'm questioning if the leaf worktree is truly empty, as ls previously showed BROKEN and issues. If the leaf has no changes, the failure might cascade because it can't produce a diff. However, this
+ is an e2e test of consult machinery, and the expected resume target is check.fix. I need to check if requireNonEmpty is called during the transition to check.fix by examining the phase.ts source.
+
+ The malformed record is from the consultant's verify run (patch_id/patch_base keys this akrogon build can't parse). issues/ is read-only for me — reporting it. Now checking whether my resume target
+ was wrong: the rule maps failure.phase=check.review to target check.fix, not check.review. Reading akrogon source to see if check.fix also hits the empty-branch guard.
+
+
+ $ sed -n 420,480p /home/ivan/.akrogon/worktrees/akrogon/watch-consults/src/phase.ts && sed -n 640,670p /home/ivan/.akrogon/worktrees/akrogon/watch-consults/src/phase.ts
+
+ throw new Error(
+       `Illegal move ${state.phase} -> ${requested}; from ${state.phase} the legal moves are ${routing[state.phase].next.join(', ')}`,
+ … 86 more lines (ctrl+o)
+     throw new CommandError(['git', 'rev-parse', `refs/heads/${state.slug}`], repo.root, ref);
+   return record.top;
+ }
+
+ Done · 93 lines · 0.0s
+
+
+ Wait, the requireNonEmpty check only runs when entering check.review. This means phase watch-consult-leaf check.fix will skip it, running moveGuards and commitMove without the check. I need to
+ confirm moveGuards's own restrictions on moves from the failed state to ensure check.fix is still valid.
+
+
+ $ grep -n "routing\|check.fix\|legal moves\|failed" /home/ivan/.akrogon/worktrees/akrogon/watch-consults/src/phase.ts | head -40
+
+ 25:  routing,
+ 30:} from './routing';
+ … 32 more lines (ctrl+o)
+ 930:    if (leaf.state.phase === 'merge' && (requested === 'merged' || requested === 'check.fix')) {
+ 942:    if (leaf.state.phase === 'merge' && record !== undefined && (requested === 'merged' || requested === 'check.fix')) {
+ 965:      throw new Error(`Push failed: git push exited ${finished.result.code}: ${finished.result.stderr}`);
+
+ Done · 38 lines · 0.0s
+
+
+
+ $ grep -n "failed\|next:" /home/ivan/.akrogon/worktrees/akrogon/watch-consults/src/routing.ts | head -30
+
+ 10:  'failed',
+ 32:type Route = { skill: string | null; slots: readonly Slot[]; next: readonly Phase[] };
+ … 6 more lines (ctrl+o)
+ 41:  merged: { skill: null, slots: [], next: [] },
+ 42:  failed: {
+ 45:    next: ['plan.synthesis', 'implement', 'check.review', 'check.repair', 'check.fix', 'merge'],
+
+ Done · 12 lines · 0.0s
+
+
+ The transition from 'failed' to 'check.fix' seems legal, but 'check.fix' requires a slot, which 'failed' doesn't provide. This is because seat resumption is prevented in the 'failed' state. The
+ operator recovery, which omits the slot, might be the issue here. I'm examining the transition logic and the routing definition for 'failed' to confirm this.
+
+
+ $ sed -n 42,50p /home/ivan/.akrogon/worktrees/akrogon/watch-consults/src/routing.ts; sed -n 385,415p /home/ivan/.akrogon/worktrees/akrogon/watch-consults/src/phase.ts
+
+ failed: {
+     skill: null,
+ … 35 more lines (ctrl+o)
+   if (checkOnly && requested === 'failed') throw new Error('--check cannot move to failed');
+   if (state.phase === 'merged') throw new Error(`Merged is terminal: ${state.slug}`);
+   if (state.phase === 'failed' && explicitSlot !== undefined)
+
+ Done · 41 lines · 0.0s
+
+
+ The failed -> check.fix move is legal, and requireNonEmpty only applies to check.review. This means check.fix should succeed. My earlier command error was a mistake, so I'll retry it correctly. I'm
+ checking the leaf worktree's status because ls showed both BROKEN and issues were present.
+
+ failed -> check.fix is legal and skips the empty-branch guard. Last fire I targeted the wrong phase (check.review). Retrying resume with the correct target.
+
+
+ $ cd /var/tmp/akr-1000/wc2-e2e/akr-e2e-watch-consults && git -C /var/tmp/akr-1000/wc2-e2e/akr-e2e-watch-consults-wtr/watch-consult-leaf status --porcelain | head; git -C /var/tmp/akr-1000/wc2-e2e/a…
+
+ ebf8d7d14ae993f993c9beb428f084e63eb97adf
+
+ Done · 2 lines · 0.0s
+
+
+ The worktree is clean, with HEAD at the old base ebf8d7d and BROKEN still committed there, matching origin/main at d51ce97. Since check.fix requires a clean worktree, I'm proceeding with phase
+ watch-consult-leaf check.fix and next watch-consult-leaf.
+
+
+ $ cd /var/tmp/akr-1000/wc2-e2e/akr-e2e-watch-consults && akrogon phase watch-consult-leaf check.fix && akrogon next watch-consult-leaf
+
+ moved check.fix
+ t4
+ deployed ebf8d7d14ae9..d51ce97c30b3
+ {"repo":"akre2e","path":"/var/tmp/akr-1000/wc2-e2e/akr-e2e-watch-consults","error":"[\n  {\n    \"code\": \"unrecognized_keys\",\n    \"keys\": [\n      \"patch_id\",\n      \"patch_base\"\n    ],\n
+ \"path\": [],\n    \"message\": \"Unrecognized keys: \\\"patch_id\\\", \\\"patch_base\\\"\"\n  }\n]"}
+
+ Failed (exit 1) · 5 lines · 1.3s · full output saved
+
+
+ Parent — Working · task: watch-issues tick timer=t2 pid=1997365 due=1 /var/tmp/akr-1000/wc2-e2e/akr-e2e-watch-consults · action: thinking · elapsed: 34s · idle: 2s
+── ● Working ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ PI │ 11.9% │ $0.000 │ swe-2-max │ akr-e2e-watch-consults │ main
+[hc] only its screen: it is working; read again once it stops for its history

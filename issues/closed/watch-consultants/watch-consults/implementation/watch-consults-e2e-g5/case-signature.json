@@ -1,0 +1,10 @@
+{
+  "anchor": "watch-consult-leaf",
+  "cause": "blocked",
+  "phase": "check.review",
+  "command": "sh -c 'test ! -f BROKEN'",
+  "base": "508a0e2f63542d643f981a40712c5c2c2f02983a",
+  "heads": {
+    "watch-consult-leaf": "508a0e2f63542d643f981a40712c5c2c2f02983a"
+  }
+}

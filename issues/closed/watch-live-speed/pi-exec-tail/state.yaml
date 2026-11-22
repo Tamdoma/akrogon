@@ -1,0 +1,46 @@
+slug: pi-exec-tail
+phase: merged
+created: 2026-11-20
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: akae6861830c47b5fa89f768dc345da9
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t2rc
+  B:
+    session: infra
+    address: t2rs
+prompted:
+  B:
+    turn: 4
+    address: t2rs
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-20T19:19:28.274Z
+broadcast:
+  kind: issue
+  name: watch-live-speed
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/watch-live-speed
+  pushed: ceb444fa08d15c8f39ccbbe1bcf5edea0bae2b40
+  sources: []
+frozen:
+  skills/watch-issues/scripts/fixtures/pi-exec-u1-excerpt.jsonl: 400f904d36fc860c71a51f92309b4556b5948a05
+  skills/watch-issues/scripts/log-tail.test.ts: 0079f5b837d6297e0a20ef0974922334924bfc67
+frozen_cited: []

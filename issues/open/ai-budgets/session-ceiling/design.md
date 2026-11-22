@@ -1,0 +1,58 @@
+# Design: session-ceiling
+
+## Binding decisions, verbatim
+
+### From forks/signposts.md
+
+#### Taken
+
+A's picks under full autopilot, 2026-11-22 (signposts: A), never operator words:
+
+- S1 O1 (B,C). Reason: the four watch-consults approvals differ only in the session count; the authority text was copied unchanged four times.
+- S2 O1 (B,C). Reason: every stop in the intake was a paid session count; O1 cannot cause a loss its cleanup does not undo.
+- S3 O1 (B,C). Reason: subscriptions have no per-call price, so sessions and minutes are the unit; O2 keeps one stop per session; O3 leaves nothing to guard. The numbers are the operator's (Needs N2); A proposes a default only.
+- S4 O1 (B). Reason: below the ceiling a raise needs nobody; the ceiling is the single operator stop left and it guards "not blowing any of the budgets".
+- S5 O1 (B,C). Reason: standing-design already makes sufficiency the model's choice; the floor stops "failed on budget" from covering a real red. The operator's "If something failed, but there is enough proof already that it will pass, and it only failed because of the budget restraint, then just make it pass" is the case it serves. A wording-only finding never needs a fresh run (operator, watch-consults, 2026-11-22).
+- S6 O1 (B,C). Reason: the operator asked to lean toward removing redundancies; O2 keeps every rule that caused the stops.
+- Ranking taken as proposed.
+
+Gives up: per-leaf operator review of each paid count, and fixed run counts as proof. Prioritizes: one standing ceiling, seat judgment on recorded evidence, fewer rules.
+
+Session charts: [ai-budgets] only; no drop.
+
+### From forks/budget-shape.md
+
+#### Taken
+
+A's pick under full autopilot, 2026-11-22, decided by S1, S3, S4, S5, S6 and the ranking (no budget blown first, fewer rules third).
+
+1. Ceiling: one optional machine key in `~/.akrogon/config.yaml` (`globalSchema`), `paid_budget: {sessions_per_day, session_minutes, approved: {date, answer}}`, `answer` holding the operator's N1/N2 words verbatim, shown by `akrogon config`; written only by the operator, never a seat or the door. The standing scope (paid launches on the logged-in `harnesses` accounts, local writes cleaned after, no other account, provider or outside write) is written once in `skills/lifecycle-rules.md`. (A,B,C; scope placement B, answer text C.) Rejected: per-repo key, separate file, scope fields in config.
+2. Counting: `akrogon run-check --sessions <n>` reserves n before the command starts, under one exclusive host lock `<globalHome>/budget.lock` taken before and released before `withAdmission` (never nested in `admission.lock`), appending `{at, repo, slug, run, sessions}` to `<globalHome>/budget.jsonl`; a reservation counts whatever the outcome; refusal when the window total plus n passes `sessions_per_day`, starting no command; the reader and writer fail closed (an unreadable or malformed ledger or a failed append refuses). No field is added to the timing row; review joins on `run`. (A,C; B withdrew the timing row.) Rejected: timing rows (git-tracked, `readTimings` returns [] on error, `appendTiming` only warns), `withAdmissionLock` (shared, per slice), seat count lines.
+3. Window: rolling 24 hours. (B,C)
+4. Grants: schema unchanged. A leaf whose live proof uses paid launches still carries one grant entry for its targets, fixtures, cleanup, effects and stop line (abandoned-capture recovery and check-issue read `fixtures[].cleanup` and `absence_check`), with `approved.by: standing`, `approved.answer` naming `~/.akrogon/config.yaml paid_budget` and its date, and `bounds` holding no session count. It never claims operator words for this leaf, so no forged approval (C's concern) and no schema change (B's). Outside live changes, destructive, public, billing, DNS, new identity or target keep an operator `approved` entry as today. Old entries stay valid; no migration. (A's synthesis of B and C; standing dissent: C preferred a discriminated schema, B quoting N1.)
+5. Absent key: `--sessions` refuses naming `paid_budget` in `~/.akrogon/config.yaml`; no fallback to per-leaf counts. (A,B,C)
+6. No per-leaf cap; each launch states n and its reason in the seat's record file; the red-launch paragraph of `## Grant reuse and count lines` stays the brake. run-check exports `AKROGON_SESSIONS=<n>` and `AKROGON_SESSION_MINUTES=<m>` to the reserved command and never kills it on time; the live test enforces and reports the minutes. (B,C)
+7. Ceiling stop: the seat stops `failed` with the existing one notice per stopped leaf, reason naming the ceiling; no dedupe state. (A,B; C wanted a per-window dedupe.)
+8. Sufficiency: the fresh-call trigger moves from standing-design's recorded-output line into `skills/lifecycle-rules.md` beside the red-launch rule, with S5's floor, so every seat reads one file for the whole decision; standing-design keeps a one-line pointer. Floor: a fresh paid run is needed only when no recorded green on the current model-facing inputs covers the property, or the seat records why the change can reach it; a red caused by product behavior never passes; a run cut short by the ceiling or time limit is judged on the evidence already recorded; a wording-only change the seat judges cannot reach the proven property needs no fresh run, reason recorded. check-issue asks a fresh run only by naming a behavior no recorded run on current inputs shows, as a Fix for repair, never under `Operator actions`. (C home; B's condition of moving the trigger too, adopted.)
+9. A live test that launches paid sessions refuses to start without `AKROGON_SESSIONS`, so an unreserved paid run cannot happen. (B)
+
+Split: L1 `session-ceiling` (code: config key, `--sessions`, ledger, lock, refusal, env exports, `akrogon config` output) then L2 `budget-rules` (prose and the live tests' env refusal) blocked-by L1, which consumes the flag and key L1 lands.
+
+Corrections after the final check (B P1-P9, C 1-4), adopted as A's pick, 2026-11-22:
+8'. Floor wording (C1, B P1): a fresh paid run is needed only when no recorded green on the current model-facing inputs covers the property and the change can reach it, or the seat cannot show why it cannot; a run cut short by the ceiling or time limit passes only when the floor is met. Every reference moving with the trigger is repointed: check-issue `## check.repair` ("standing-design's recorded-output fresh-call rule and its grant", "standing-design's recorded-output rule"), implement-issue `## implement`, plan-issue `## plan.synthesis`, standing-design's chain-trigger and slow-run lines; the replay half stays in standing-design, the trigger half names lifecycle-rules (B P2). chart-issues gets a fifth `lifecycle-rules.md` symlink so the door reads the trigger for shapes `## Preflight and validation`; tests/docs-links.test.ts reads the link set rather than a fixed four (B P3).
+2'. Order and failure (B P4-P6, C2): the reservation runs inside `checkedRun` after `refuse()`, the `merge_checks` refusal, `ownerRefusal` and the first `failedRefusal`, with `--sessions` parsed as a positive integer; a later refusal keeps its row. A ledger refusal prints the file and the bad row and the operator repairs it; a ceiling refusal prints the window total, the ceiling and when the next session frees. `budget.jsonl` joins `src/state-home.ts` `copiedEntries`.
+4'. Standing grant fields (C3, B P8): `approved: {by: standing, date: <paid_budget.approved.date>, answer: "~/.akrogon/config.yaml paid_budget"}`; `bounds` holds non-count limits, or "sessions under paid_budget" when none. shapes `## Preflight and validation` and autopilot.md state that a `by: standing` entry is the door's to write and claims no operator approval; every other approval stays operator-only. A leaf with paid launches and an outside live change carries two entries, one standing and one operator. A session count in an old entry is information only. Handoff never waits on `paid_budget`; a door charting probe refused for a missing or exhausted ceiling waits on Needs N1/N2 like any pending row.
+5'. Activation (B P7): the operator adds `paid_budget` only once session-ceiling is the installed build (`~/.akrogon/current`), because `globalSchema` is strict.
+9'. Guard scope (B P9, C2, C4): `AKROGON_SESSIONS` and `AKROGON_SESSION_MINUTES` join the `constructed` set in `src/config.ts` `repoSchema` (a repo cannot pass them) and are never added to run-check's `copied` list (a nested run does not inherit them). The paid entry points that refuse without `AKROGON_SESSIONS`, and refuse when their planned sessions exceed it: tests/e2e/kinds.e2e.ts, watch-stop.e2e.ts, watch-consults.e2e.ts and watch-live.e2e.ts for claude, codex, pi and agy; the `standin` cell, window.e2e.ts and notices.e2e.ts stay free. The guard catches omission only; check-issue keeps reading paid activity against ledger rows as the catch for the rest.
+These narrow or define items already checked; 2', 8' (fifth symlink) and 9' add small mechanisms, re-checked in the leaf-writing review.
+
+/home/ivan/.akrogon/current/skills/chart-issues/assets/standing-design.md, applied here: every criterion is mechanical with one right answer (the operator's ceiling number is the bound's named source); proofs are own tests at the CLI boundary under a temp `AKROGON_HOME` with stub commands, no paid call, no machinery (the repo's test runner and temp-dir helpers only); each criterion shows one deliberate break turning its test red. Signposts S2, S5, S6 and budget-shape items 4, 7, 8, 9 are excluded here: they belong to budget-rules (prose, live tests), which is blocked by this leaf.
+
+## Leaf architecture
+
+- Owned: `src/config.ts` (`globalSchema` optional `paid_budget` strictObject with positive-integer `sessions_per_day`, `session_minutes` and nonblank `approved.date`, `approved.answer`; `repoSchema` `constructed` set gains `AKROGON_SESSIONS`, `AKROGON_SESSION_MINUTES`; `effectiveConfig` or the config printer shows the key), `src/run-check.ts` (`checkedRun` reserves after the early refusals; `constructedEnv` adds the two variables only for a reserved run, never via `copied`), `src/akrogon.ts` `run-check` case, `src/usage.ts` (`VERB_OPTIONS['run-check']`, `RUN_CHECK_USAGE`) and `tests/command-reference.test.ts` (`contracts['run-check']`) for `--sessions`, a new `src/budget.ts` (ledger read/append, window sum, lock) if no existing module fits, `src/state-home.ts` `copiedEntries`, tests, `docs/reference/commands.md` and `docs/reference/config.md` entries for the flag and key.
+- Lock: one exclusive flock on `<globalHome>/budget.lock`, taken and released around read-sum-append, before `withAdmission` and never nested inside `admission.lock` (`withAdmissionLock` is shared and per slice; `withAdmission` takes no lock for a nested run).
+- Ledger: strict reader (any malformed line refuses, never `[]`), strict append (failure refuses); rows `{at: ISO, repo, slug, run, sessions}`; `slug` is `caller.slug` from `leafTarget` (the leaf slug, or `checkout` for `--holder`), the same value timing rows record. No field is added to timing rows.
+- Consumers: `skills/lifecycle-rules.md` and the e2e paid entry points (budget-rules) read the flag and variables; nothing else reads the ledger.
+- Excluded: `akrogon verify` (src/verify.ts also calls `checkedRun`) never reserves and passes neither variable, so a paid entry point refuses under it. Any skill or docs rule text beyond the two reference entries (budget-rules); the operator's config value (Pending step, after this leaf is the installed build).
+- `akrogon config` already prints through `effectiveConfig`, which spreads the global config, so `paid_budget` shows with no new printer.

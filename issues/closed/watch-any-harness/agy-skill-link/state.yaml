@@ -1,0 +1,39 @@
+slug: agy-skill-link
+phase: merged
+created: 2026-11-20
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak757ce25aea36d2f65b4625fdc2f6e0
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t2p4
+  B:
+    session: infra
+    address: t2p8
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-20T14:03:15.134Z
+frozen:
+  docs/start/install.md: 0cbb0e53e215cafa18d2261946dccf6c0561e948
+  src/install.ts: 2351e92f47e0b4b66084a92e37011083e76fb143
+  tests/deploy-fixture.ts: d5fa290bd8b42bc62db15611e4f9834e86e848a9
+  tests/install.test.ts: 6332215fb8bd62bc5555b867512d4db6c1822538
+frozen_cited: []

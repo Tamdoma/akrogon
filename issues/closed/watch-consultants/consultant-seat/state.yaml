@@ -1,0 +1,41 @@
+slug: consultant-seat
+phase: merged
+created: 2026-11-21
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#146"
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 2
+verdict: {}
+tab: ak39cc155e17616a2c186ebafefd1b51
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t2z9
+  B:
+    session: infra
+    address: t2zc
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-21T18:44:51.537Z
+frozen:
+  docs/reference/commands.md: c5b2f25958d6950046c4c8f31f187546cb112d9f
+  docs/reference/config.md: f2f206479239aa6451d45b11098d8d6fa3299f20
+  tests/command-reference.test.ts: 95578cfd12f53174df9d94203d54be150163cbd2
+  tests/config.test.ts: 0482ac7d197c927a62c1caae710eb42defe61ffc
+  tests/watch-consult.test.ts: 0e0df9ee120a93ee74869b2c349886bce4a777a7
+frozen_cited: []

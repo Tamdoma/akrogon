@@ -1,0 +1,36 @@
+slug: slow-alarm-baseline
+phase: merged
+created: 2026-11-21
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: akd15a1bfc72c1da0a6391f14297bb64
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t307
+  B:
+    session: infra
+    address: t30g
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-21T21:56:40.858Z
+frozen:
+  tests/slow-merge.test.ts: 372e9c9675cd96759116e77d29c7f9266c12405a
+frozen_cited: []

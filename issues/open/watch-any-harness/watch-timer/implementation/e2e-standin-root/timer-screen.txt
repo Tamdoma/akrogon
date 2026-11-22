@@ -1,5 +1,0 @@
-[watch-timer] due=1 sent (attempt 1, turn=2)
-[watch-timer] due=2 sent (attempt 1, turn=3)
-[watch-timer] hold due=2: watcher working
-[watch-timer] due=3 sent (attempt 1, turn=4)
-[watch-timer] hold due=3: watcher working

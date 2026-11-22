@@ -1,0 +1,8 @@
+# Proposed final shape 4: timer-design (delta on final shapes 2 and 3, 2026-11-20)
+
+Changes marked [C4], from final-check-3 B F2 and B F4 (accepted; both now removed by mechanism instead of stated as limits).
+
+4. [C4] Stated limits return to S2a's exact words plus the reset limits of shape 2 item 4: "a tick hc holds behind the operator's unfinished draft may land in the shell left behind when the operator exits a shell-hosted agent in that window". The operator-prompt merge limit is removed (see 5).
+7. [C4] Tick text: `watch-issues tick timer=<address> pid=<pinned pid> due=<n> <root>`. Before any check or first-prompt stop the skill (a) verifies the timer as in shape 3 item 6 with this terminal as parent, and (b) identifies its own harness process from its tool shell by the same rule start uses and requires it to equal `pid`; a mismatch means a program other than the watch's agent received the tick: it kills and removes the verified timer (stop) and runs no check (B F2). A tick failing (a) reports no watch and runs nothing.
+5. [C4] Receipt: when the skill starts a check for a valid tick it sets `akrogon.watch-due=<n>` on the timer terminal with `hc label`. The timer counts due n delivered only when, after the watcher's turn advanced and it is idle or done again, its own label shows `akrogon.watch-due=<n>`; otherwise it sends due n again at the next readiness (B F4). Dues are numbered from 1 per timer; start's immediate check is not a due.
+Charting proof (A, 2026-11-20, free): `hc label <t> akrogon.watch-check=3` then `hc get --json <t>` showed the label; `hc label <t> akrogon.watch-check=` removed it.

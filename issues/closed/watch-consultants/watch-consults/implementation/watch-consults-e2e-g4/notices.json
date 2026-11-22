@@ -1,0 +1,12 @@
+[
+  {
+    "title": "watch-consult-leaf-1: leaf resumed",
+    "body": "watch-consult-leaf moved failed -> check.fix after base fix; seat t4 started on new base 339024f.",
+    "attention": false
+  },
+  {
+    "title": "watch-consult-leaf-1: pushed fix to main",
+    "body": "Case /var/tmp/akr-1000/wc5-e2e/akr-e2e-watch-consults-home/watch/akre2e/consults/watch-consult-leaf-1: consultant removed BROKEN marker, pushed 339024f fast-forward to origin/main, verify green.",
+    "attention": false
+  }
+]

@@ -1,0 +1,38 @@
+slug: main-red-cover
+phase: merged
+created: 2026-11-21
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak7ae348bcfd1bbff9aea96b99e9a2e2
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t2zz
+  B:
+    session: infra
+    address: t304
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-21T21:22:43.553Z
+frozen:
+  tests/green-merge.test.ts: e8277cfe0266472d9ad68f98460fe7c0f45ac5cf
+  tests/receipt-gates.test.ts: 87c044b35bcdcf2083e97a26627391003f9ed6bd
+  tests/verify.test.ts: 53493e18dd90085105dea21ddbc5dba365378cb2
+frozen_cited: []

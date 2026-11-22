@@ -1,1 +1,0 @@
-watch-issues /var/tmp/akr-e2e-yKQFxo/akr-e2e-watch-standin-root

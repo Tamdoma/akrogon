@@ -1,0 +1,38 @@
+slug: merge-seat-cap
+phase: merged
+created: 2026-11-21
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: akb42fe1052ea34e9153bb1c760eb4cc
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t303
+  B:
+    session: infra
+    address: t308
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-21T21:10:46.403Z
+frozen:
+  tests/next.test.ts: cee9d4cea63ebbda0656de172c40dd0459348ebc
+  tests/timing-report.test.ts: ad0f529e3650ae2d94c7ba62beeb6aff2d353e1a
+  tests/timing.test.ts: 157d0366ca5c58e2d15a8f3f64d4142881bac22b
+frozen_cited: []

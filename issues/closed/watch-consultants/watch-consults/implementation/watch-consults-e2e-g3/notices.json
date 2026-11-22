@@ -1,0 +1,12 @@
+[
+  {
+    "title": "watch-consult-leaf-1: watch-consult-leaf resumed at check.fix",
+    "body": "Case /var/tmp/akr-1000/wc4-e2e/akr-e2e-watch-consults-home/watch/akre2e/consults/watch-consult-leaf-1. Leaf moved failed -> check.fix after verified base fix; seat A deployed at t4 on c5e8f43.",
+    "attention": false
+  },
+  {
+    "title": "watch-consult-leaf-1: base fix pushed to main",
+    "body": "Case /var/tmp/akr-1000/wc4-e2e/akr-e2e-watch-consults-home/watch/akre2e/consults/watch-consult-leaf-1. Consultant deleted BROKEN marker on main, verified akrogon verify green, pushed 0fdfa3a..c5e8f43 fast-forward.",
+    "attention": false
+  }
+]

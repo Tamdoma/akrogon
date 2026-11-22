@@ -1,0 +1,27 @@
+opened: '2026-11-20T11:04:04Z'
+seats:
+  - seat: A
+    address: t126
+    name: null
+    recipe:
+      harness: claude
+    session: /home/ivan/.claude/projects/-home-ivan-Work-infra-akrogon/f58162f1-a6f4-456b-8869-93a49d525c3c.jsonl
+  - seat: B
+    address: t2kq
+    name: ak-slot-b
+    recipe:
+      harness: claude
+      model: claude-fable-5-2
+      effort: medium
+    session: /home/ivan/.claude/projects/-home-ivan-Work-infra-akrogon/3768615e-7099-4119-bdbc-263529418721.jsonl
+  - seat: C
+    address: t2kr
+    name: ak-slot-c
+    recipe:
+      harness: agy
+      model: neon
+      effort: high
+    session: /home/ivan/.gemini/antigravity-cli/conversations/5a0d1025-41d7-4307-8bfa-e6074cbc98ee.db
+spans:
+  - from: '2026-11-20T11:04:04Z'
+    to: '2026-11-20T11:20:31Z'

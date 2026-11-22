@@ -1,0 +1,45 @@
+slug: merge-red-exit
+phase: merged
+created: 2026-11-21
+repo: akrogon
+blocked-by:
+  - main-red-cover
+sources: []
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 2
+verdict: {}
+tab: ak2d97704366f1963150d19a4e03cb84
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t30h
+  B:
+    session: infra
+    address: t30n
+prompted:
+  B:
+    turn: 5
+    address: t30n
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-21T23:42:20.410Z
+broadcast:
+  kind: issue
+  name: merge-lanes
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/merge-lanes
+  pushed: b9c5907662b79d7d3808fcc901af8ab20ff83861
+  sources: []
+frozen: {}
+frozen_cited: []

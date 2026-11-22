@@ -1,0 +1,45 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: start a door-created consultant with akrogon seat --slot through startConsultant's start proof (codex and agy harnesses)
+    command: akrogon seat --slot b --harness codex --model gpt-6.2-astra --effort high --task ...; akrogon seat --slot c --harness agy --model neon --effort high --task ...
+    identity: chart door A in hc terminal t126
+    target: hc 0.1.21 session infra, codex CLI, agy CLI
+    version: akrogon release 1502fbdf
+    date: '2026-11-21'
+    result: both started as children of t126 named ak-slot-b and ak-slot-c and confirmed their first task (seats.yaml)
+    cleanup: none yet, the seats are the chart's consultants
+    limits: the --slot form only; the watch form and the agy neon recipe from config are not run
+    record: issues/chart/watch-consultants/seats.yaml
+  - operation: a consultant's hc send waking a claude watcher inside its own hc wait turn
+    command: 'hc wait --children any --timeout 600 --json in A''s turn, consultants ran hc send t126 "done X: <path>"'
+    identity: chart door A (claude) and consultants t2z0 (codex), t2z1 (agy)
+    target: hc 0.1.21 session infra
+    version: hc 0.1.21
+    date: '2026-11-21'
+    result: each wake returned reason message with the sender in from, inside the same turn; the text arrived later as input
+    cleanup: none
+    limits: a claude watcher only; codex, pi and agy watchers unobserved
+    record: issues/chart/watch-consultants/forks/fix-and-config.md
+  - operation: hc name uniqueness, child wake, parent exit ending its child
+    command: hc run --bg --name akp-watch-consult twice; hc kill then hc run again; child hc send to a shell parent; hc kill parent
+    identity: chart door A
+    target: hc 0.1.21 throwaway session akr-probe-wc
+    version: hc 0.1.21
+    date: '2026-11-21'
+    result: second live name refused name_taken; free after kill; parent woke with reason children; child finished signal 1 after parent kill
+    cleanup: every terminal killed and removed, core stopped, folder removed
+    limits: shell parent, no harness; outlive flag not set explicitly
+    record: issues/chart/watch-consultants/forks/fix-and-config.md
+  - operation: fast-forward push from a detached worktree after the remote moved
+    command: git push origin HEAD:refs/heads/main; git fetch; git rebase origin/main; git push; git worktree remove
+    identity: chart door A
+    target: local bare remote in the scratchpad
+    version: git on this host
+    date: '2026-11-21'
+    result: first push refused (fetch first); after rebase the push landed fast-forward; worktree removed
+    cleanup: scratch folder removed
+    limits: a local bare remote, not GitHub
+    record: issues/chart/watch-consultants/forks/fix-and-config.md

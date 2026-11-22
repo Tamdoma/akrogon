@@ -1,0 +1,7 @@
+signature.json
+brief.md
+case.md
+status
+verify-logs
+turn-1-consultant.md
+consultant-screen.txt

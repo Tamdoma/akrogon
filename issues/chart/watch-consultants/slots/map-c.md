@@ -1,0 +1,54 @@
+# Territory map — slot C
+
+## Forks (each changes later picks)
+
+1. **Config shape, CLI entry, and absent-recipe behavior (`src/config.ts` `globalSchema`, `repoSchema`, `seats`, `effectiveConfig`; `src/akrogon.ts` `seat` case):**
+   - Options: (a) optional `slots.consultant` in `globalSchema` (validated against `harnesses`), optionally overridable in `repoSchema.slots` and surfaced in `effectiveConfig`, launched via a dedicated watch flag/role on `akrogon seat` (leaving `chart-issues` `--slot <letter>` explicit flags untouched); (b) make `akrogon seat --slot <x>` read a config default shared with `chart-issues`; (c) separate top-level `consultant:` key.
+   - Absent recipe: (i) fall back to notify-only with a one-line gap note (safe for existing configs/tests), vs (ii) refuse `watch-issues` start.
+2. **Consultant naming, labelling, and cleanup (`src/hc.ts` `consultantName`; `src/seat.ts` `startConsultant`; `skills/watch-issues/scripts/stop.ts` `main`):**
+   - Options: (a) dedicated name `<prefix>-watch-consultant` + label `akrogon.watch-consultant=<repo>` (never `<prefix>-slot-<x>`, avoiding `name_taken` against an open chart door), closed by watch (`hc kill` + `hc rm`) after each consult and swept by `stop.ts` on `watch-issues stop`; (b) numbered names `<prefix>-watch-c<n>` with the same label. Watcher exit already kills children via `outlive: false`, whereas `stop.ts` kills only the timer and leaves the watcher alive.
+3. **Root-cause grouping and loop termination (`skills/watch-issues/SKILL.md` `## Observe`, `## Judge`; `skills/watch-issues/scripts/observe.ts` `formatLeaf`):**
+   - Options: (a) cluster same-tick failures sharing a root cause (same `failure.phase` + shared error/check/owner signature, skipping leaves whose `blocked=` prerequisite is failed) into one consult; (b) consult the unblocked or merge-queue-head failure first, then re-observe before deciding whether remaining failures need another consult.
+   - Stop rule (Lock 2 has no total cap): if the same failure signature recurs after a consult with no new base/worktree progress, stop consulting and notify the operator instead of looping forever.
+4. **Wait model, queued ticks, and silent-stop handling (`skills/watch-issues/scripts/timer.ts` `poll`; `skills/watch-issues/scripts/tick.ts` `main`; `skills/chart-issues/assets/questions.md` `## Blind peer exchange`; `hc --skill`):**
+   - Options: (a) stay in the tick turn looping `hc wait --children any --timeout 180 --json`, paired with a scratch return file outside git so the watcher reads the answer on `reason: message` without ending its turn; (b) end the turn after launch/send so `<hc from="...">` replies arrive as standalone watcher turns (`SKILL.md` `## Invocations` adds consultant-reply handling) while ticks check silent/blocked consultants.
+   - Queued ticks: (i) coalesce missed boundaries in `timer.ts` `poll` into one pending due while watcher is `working`, vs (ii) keep current queue-every-due behavior.
+   - Silent/blocked/dead consultant: nudge once on silent `idle`/`done` (never call `hc get` between waits—it marks child news seen); on a second silent stop, `blocked`, `error`, or `finished`, `hc kill`+`hc rm` and either restart once or notify.
+5. **What the consultant receives, returns, and peer deadlock resolution (`src/seat.ts` `startConsultant`; `skills/watch-issues/SKILL.md` `## Judge`):**
+   - Options: (a) short `hc send` task pointing at exact leaf paths (`state.yaml`, `brief.md`, `design.md`, worktree, `review-B.md`, verify log), S3 stop rules, and the resolved literal watcher address (never `$HC_TERMINAL_ID`); consultant replies over `hc send` (or scratch path + `hc send`) with root cause, commits/pushes made, and recommended watch move; (b) inline full context in `hc send`.
+   - Peer disagreement (Lock 2: watch and consultant are peers): (i) bounded back-and-forth (e.g. 2 turns) then `akrogon notice` leaving the leaf untouched, vs (ii) watch defers on non-S3 fixes and stops only on S3 boundaries.
+6. **How a consultant fix reaches `main` and how leaves resume (`src/phase.ts` `transition`, `moveGuards`, `commitMove`, `batchPush`; `skills/merge-issue/SKILL.md` `## merge`):**
+   - Base-fix workspace: (a) disposable clean worktree on `<remote>/<default_branch>` outside git, verify affected checks, fast-forward push (`git push <remote> HEAD:refs/heads/<default_branch>`)—never editing `repo.root` directly; (b) edit `repo.root` only if clean on default branch.
+   - Leaf resumption: (i) recover via `akrogon phase <slug> <failure.phase>` (or earlier work phase such as `implement`/`check.fix`) then `akrogon next <slug>` once required seats are idle/absent, letting normal review/merge gates verify; (ii) allow `failed -> check.review` or `failed -> merge` directly when the consultant left a clean commit satisfying `Test-Change:`/`frozen` trailers and a green receipt (`moveGuards`, `requireGreenReceipt`).
+7. **Changes to `Never`, `Answer a seat`, and `Judge` triggers (`skills/watch-issues/SKILL.md` `## Judge`, `## Never`):**
+   - Options: (a) narrow `Never` exceptions only for killing/removing the watch's own verified consultant and exchanging `hc send` with it (keeping leaf-seat `blocked` dialogs, `--force`, `phase failed`, `.env`, and direct edits to `state.yaml`/`issues/` forbidden for watch; consultant may edit worktrees/push base fixes but never hand-edit `state.yaml`/`.env`/force-push); (b) also allow the consultant to advise on non-permission leaf-seat blocks.
+   - S3 pre-filter: (i) skip consult and notify immediately when `failure.reason` unambiguously hits S3 (credentials, budget, lock), vs (ii) consult once to verify whether an S3-free workaround exists.
+8. **Audit record for operator review (`src/log.ts` `readLog`, `logSchema`; `src/akrogon.ts` `notice` case):**
+   - Options: (a) watch appends one JSONL entry per consult to a dedicated file outside git (e.g. `~/.akrogon/watch-consults/<repo>.jsonl`) with leaves, root cause, recipe, commits/pushes, phase moves, and S3 stops; (b) non-attention `akrogon notice` summary; (c) both durable log and non-attention notice when pushing to `main`. Never append consult rows to `issues/log.jsonl` (`src/log.ts` `readLog` parses every line with `logSchema.parse`).
+
+## Practitioner questions
+
+- **Stale `batch` on `failed -> merge`:** `src/phase.ts` `commitMove` keeps `recorded.batch` (clearing only `notified`) when leaving `failed`. After a base fix lands on `main`, does `akrogon next` cleanly restack/re-attempt a recovered `merge` leaf or trip over stale `batch.owner`/`built_on`?
+- **Base red bouncing through `check.fix`:** Under `skills/merge-issue/SKILL.md` `### Shared endings`, a red verify moves to `check.fix`, not `failed`. Should the watch consult only once it lands in `failed` (or hits `blocked`), or detect repeated merge-to-`check.fix` base reds earlier?
+- **`agy` start-proof failure:** Default recipe is `agy neon high` (Lock 2 N2). `src/seat.ts` `agyTask` answers one permission prompt (`enter`) then sends the task; if `firstTask` prints `unconfirmed` or `failed`, does the watch retry once or notify?
+- **`watch-issues stop` mid-consult:** `<prefix>-watch` is also a child of the watcher (`skills/watch-issues/scripts/tick.ts` `main`). When `stop.ts` kills the timer and consultant, `hc wait --children any` wakes on exit; the watcher must recognize the stop and exit cleanly without notifying an error.
+
+## Lifetime pitfalls
+
+- **Infinite consult loop:** Lock 2 removes the total cap; without a per-root-cause unchanged-failure stop, an unfixable failure spawns consultants forever.
+- **`hc wait` message-delivery trap:** `hc --skill` states `reason: message` arrives as the parent's *next input*, not in `hc wait` stdout; a same-turn wait loop using inline `hc send` text can miss the reply until the turn ends unless verified or paired with a file.
+- **`issues/log.jsonl` schema crash:** Appending non-move lines into `issues/log.jsonl` breaks `src/log.ts` `readLog` across `phase`, `status`, `timing`, and watch cycle counts.
+- **Dirtying `repo.root` or leaking `issues/`:** `src/seat.ts` `startConsultant` runs in `repo.root`; editing directly there risks committing `issues/` or clobbering operator work, and `requireNoIssueFiles` (`src/phase.ts`) blocks leaf branches touching `issues/`.
+- **`moveGuards` refusals after consultant edits:** Uncommitted work, missing `Test-Change:` trailers, touched `frozen` files, or absent green receipts cause `akrogon phase` to refuse (`src/phase.ts` `moveGuards`, `transition`).
+- **Name collisions and orphan terminals:** Reusing `src/hc.ts` `consultantName` (`<prefix>-slot-<x>`) collides with open chart doors; skipping `hc rm` after `hc kill` holds the name; `stop.ts` ignoring consultants leaks them while the watcher stays live.
+- **Tick bursts after long consults:** `skills/watch-issues/scripts/timer.ts` `poll` queues every missed 20-minute boundary in `dues[]`, firing redundant checks back-to-back after a long consult.
+- **`hc get` consuming child news:** Reading a child consultant with `hc get` between `hc wait --children any` calls marks news seen so the next wait sleeps until timeout (`skills/chart-issues/assets/questions.md` `## Blind peer exchange`).
+- **Strict schema breakage / invisible config:** Making the consultant key required in `src/config.ts` `globalSchema` breaks existing installs; omitting it in `effectiveConfig` hides it from `akrogon config`.
+
+## External operations needing real observation before handoff
+
+1. **`agy neon high` consultant launch & start proof:** Real launch via `akrogon seat` (`src/seat.ts` `startConsultant`, `agyTask`, `firstTask`) from a watching terminal beside a live `<prefix>-watch` timer, verifying non-colliding name/labels and `confirmed` task delivery.
+2. **`hc send` + `hc wait --children any` delivery semantics:** Real observation of whether a consultant's `hc send <watcher>` text is readable inside an active `hc wait` turn or only as the next turn's input across harnesses (`claude`, `codex`, `pi`, `agy`), plus wake behavior on silent stop, `blocked`, `error`, exit, and `watch-issues stop`.
+3. **Timer behavior during multi-interval consults:** Real run with short `WATCH_TICK_SECONDS` verifying `timer.ts` `poll` due holding/coalescing, `tick.ts` receipting, and no spurious `transcriptFor` drift when spawning/killing a child consultant.
+4. **End-to-end paid throwaway-repo run (Lock 2 S6 / N1):** Staged hard failure (base red or worktree blocker) -> watch starts real `agy neon high` consultant -> `hc send` exchange -> consultant commits/pushes fix -> watch resumes leaf via `akrogon phase` + `akrogon next` -> green/merged -> clean `hc kill`+`hc rm` and `watch-issues stop`.
+5. **Merge-phase recovery with existing `batch` record:** Real `akrogon phase <slug> merge` + `akrogon next` after a base fix lands on `main` while the failed leaf still holds a prior `state.batch`.

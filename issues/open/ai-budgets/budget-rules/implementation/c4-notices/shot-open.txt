@@ -1,0 +1,1 @@
+{"code":0,"signalCode":null,"killed":true,"stdout":"/home/ivan/Work/infra/akrogon/issues/open/ai-budgets/budget-rules/implementation/c4-notices/open.png\n","stderr":""}

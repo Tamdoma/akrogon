@@ -1,0 +1,8 @@
+
+akr-e2e-watch-claude-shell sp main ? ❯ sh '/var/tmp/akr-e2e-V0tSiQ/launch-claude-shell.sh'
+
+
+Resume this session with:
+claude --resume f5364480-1647-43f0-9cae-e9bac9918b22
+
+akr-e2e-watch-claude-shell sp main ? ✗

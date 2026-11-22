@@ -1,0 +1,36 @@
+slug: flaky-merge-flips
+phase: merged
+created: 2026-11-21
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 2
+verdict: {}
+tab: akcaad1f9d6d8ecdf3f5fc897fd5b1f0
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t300
+  B:
+    session: infra
+    address: t301
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-21T21:16:52.151Z
+frozen:
+  tests/flaky-merge.test.ts: 3b8c750520828ce62930695e69c10518d3f787d2
+frozen_cited: []

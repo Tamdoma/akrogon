@@ -1,0 +1,75 @@
+# Design: merge-red-exit
+
+## Binding decisions, verbatim
+
+### forks/signposts.md `## Taken` (issues/chart/merge-lanes)
+
+Operator, 2026-11-21T17:48Z, door t2z2, verbatim: "1a | 2a - test it but it was slower before, I don't think it's worth it | 3a | 4b | 5a | 6a | What did Fable and Neon come up with?"
+
+Account: the session ranks merge speed first, counted from a leaf's first entry into merge to landed with failed rounds included, under three hard limits: no leaf adds a new test failure to main, the PC stays inside its limits, token cost does not grow. Each leaf is still tested alone (no batching). A framework chart that brings the merge suite back toward its early-November ~5 min is taken first (4b, the operator's yes to that chart), then merge-lanes. In merge-lanes a failed merge leaves the line at once and is retested or repaired off the line (5a), and leaves waiting to merge stop counting against max_active (6a). Two suites at once is measured with the N2 probe after the suite fix lands, and is allowed only if neither run is more than 1.25x slower and no new test fails; the operator expects it not to pay off. Given up: batching, red-then-revert landing, any extra PC load without a passing measurement.
+
+Order: 1. suite-regrowth (framework, /home/ivan/Work/infra/tamdoma/framework/issues/chart/suite-regrowth), 2. merge-lanes (akrogon). Nothing dropped.
+
+### forks/red-exit.md `## Taken` (issues/chart/merge-lanes)
+
+A's pick under autopilot, 2026-11-21 (signposts 1a speed from first entry, 5a, 2a, and the operator's values simplicity and removing over adding decided it):
+
+1. A red verify, a gate refusal, a rebase conflict or a dirty worktree in the merge turn moves the leaf `merge -> check.repair` by the command, clears the batch, records the attempt and stores a small exit record (reason; red run id, refusal text or base; the evicted top) carried in the check.repair prompt and cleared on leaving `check.repair`. The next leaf's turn starts in the same pass. No seat is prompted for a leaf in `merge`; the seat-owned merge path (solo turn, seat `merged` in merge, `wake=` prompts) is removed, which removes defects D1 (seat push racing a wake) and D2 (line stalled on a lost seat). Reason: `check.repair` already exists with the right exits, so no new state; signpost 5a. Rejected: a mark inside `merge` (every merge consumer branches on it); straight to `check.fix` (A wakes on every flake, token cost grows).
+
+2. Push: a non-fast-forward refusal is restacked by the command as today; a second refusal clears the batch and leaves the leaf in `merge` at its place. Any other push error (fetch worked, push failed, candidate not on main) moves the leaf to `failed` with git's stderr. Reason: B cannot fix a write refusal, and `failed` frees the line with the existing notice. Rejected: `check.repair` (a B prompt that cannot help); holder keeps the turn (blocks every leaf on a leaf-specific hook refusal). Standing dissent (B): keep the holder and send a notice, because an auth or branch-rule error fails each queued leaf after one suite; no ledger records push errors, so neither side can size it.
+
+3. In `check.repair` B judges the red from the kept log and the leaf's diff and may run the narrowest failing command through `akrogon run-check`; never a full suite (routing already makes `akrogon verify` leaf scope there and `--attempt` refuse). An untouched-diff red B judges not the leaf's fault returns to `merge` unchanged. A red B judges main-caused that the cover does not reach (nameless, or no base pass found it) takes the existing operator-only `failed` stop naming the main red, never `check.fix`. A second red on the same unit goes to `check.fix` by today's rule, except that when item 8's trigger holds, only after its base pass found that unit green on main. merge-issue, lifecycle-rules, check-issue and watch-issues text change in the same leaf as the command. Rejected: a full off-line suite (breaks 2a; stale once main moves); seatless requeue for listed flakes (a list match standing in for a model's judgment; 11 of 43 caught, 3 real reds requeued).
+
+4. `check.repair -> merge` after a red exit skips the leaf receipt when HEAD equals the exit record's top; with edits it still needs one. Reason: repos with the full suite in `checks` would otherwise run it off the line for a no-edit return (C).
+
+6. Return place: a leaf's first return to `merge` after its first entry keeps its first `merge_stamp`, whatever the path; from the second return on it gets a new stamp; counted from `log.jsonl` moves into `merge`, no new field. Reason: signpost 1a counts from first entry; second entries are not worse bets (60% vs 54% first-run green); one rule. This is A's pick against an earlier operator answer: merge-turn forks/turn-release.md Q3 "3a" (2026-10-05, new stamp on every move, foreclosed keeping the first stamp), whose stated reason (never insert into a recorded batch) lapsed when batches were removed in 6e7a33ff. Rejected: back of the queue (a red costs queue depth times 22 min); unbounded kept place (a repeat failer alternates at the head); kept place only for `check.repair` returns with a counter (new state, no support in the data).
+
+9. Not taken, recorded under Off route: framework `full: [verify]` to close `verify --holder` beside the line (B,C); a leaf receipt limited to non-`full` checks for edited returns (B); showing active covers in `akrogon status` (C); gates before verify (B).
+
+- Excluded here: forks/red-exit.md Taken 5, owned by leaf flaky-merge-flips.
+- Excluded here: forks/red-exit.md Taken 7, owned by leaf main-red-cover.
+- Operator, 2026-11-21, door t2z2, answering needs row N3 (forks/signposts.md `## Needs`), verbatim: "ok, I confirm the merge-red-exit question, get moving". Taken 8 below is therefore granted as the named exception to lock 5a.
+
+8. First observation (waits on operator row N3 in forks/signposts.md `## Needs`): when the returning leaf's new batch `holder.head` equals the `sha` of its previous red merge run in `verify-runs.jsonl` (no edit), every failing unit on this run is a named title, and at least one uncovered failing unit also failed on that previous red run, the land run runs one base pass in that turn through the existing known-red branch of `verify`, one suite at a time. This holds the line for one more suite with a red leaf, once per main-red unit, an exception to lock 5a that only the operator can grant. If N3 is no, item 8 is cut: a new main red reaches item 3's `failed` stop for each leaf until a base run exists or main is repaired. Standing dissent (C): also trigger when two consecutive distinct leaves fail the same uncovered named title.
+
+
+### forks/waiting-seats.md `## Taken` (issues/chart/merge-lanes)
+
+A's pick under autopilot, 2026-11-21 (signpost 6a, hard limits PC inside its limits and token cost does not grow, and the operator's values simplicity and no new parts decided it). Peers agreed on every item; no standing dissent.
+
+5. Carried to the red-exit leaf: `sliceKeepReason` gains a reason that keeps a leaf slice while the leaf is in `merge` and `state.batch` is set (only the holder has a batch, and red-exit clears it on every exit). A plain state read, since `sliceKeepReason` is synchronous and `landAlive` is not (B Z1).
+
+- Excluded here: forks/waiting-seats.md Taken 1, owned by leaf merge-seat-cap.
+- Excluded here: forks/waiting-seats.md Taken 2, owned by no code.
+- Excluded here: forks/waiting-seats.md Taken 3, owned by leaf merge-seat-cap.
+- Excluded here: forks/waiting-seats.md Taken 4, owned by the door, a pending step.
+
+### forks/extras.md `## Taken` (issues/chart/merge-lanes)
+
+A's pick under autopilot, 2026-11-21 (signpost 1a speed from first entry, hard limits, and the operator's values simplicity and removing over adding decided it):
+
+1. D1 and D2 need no work of their own; red-exit Taken 1 removes them. Two criteria in the red-exit leaf: a wake between a refused push and the command's restack starts no new attempt; with the red leaf's B dead or missing, the next holder starts in the same pass, and that B is restarted when A is live or the cap has room. No `reconcileBatch` crash-window change. Recorded: if the land unit dies between a refused push and the restack, `mergeTurn` overwrites the batch with no `appendAttempt`, so that attempt leaves no `merge-attempts.jsonl` row (B E2); not taken, the window is one fetch and one rebase long.
+
+3. Guards before verify: not taken, stays in red-exit Taken 9 (A,B,C).
+
+- Excluded here: forks/extras.md Taken 2, owned by leaf slow-alarm-baseline.
+- Excluded here: forks/extras.md Taken 4, owned by CHART.md Off route.
+
+
+/home/ivan/.akrogon/releases/4f5e3fd2ae13439c7fd8d8507c18ec524c0f9444/skills/chart-issues/assets/standing-design.md
+
+How it applies here: every done-criterion is mechanical command behavior, proven by the cheapest sufficient own test at the command boundary in `bun test` (the repo's `checks.test`), using the existing temporary-repo and local bare-remote helpers in `tests/`; no new machinery. D1 and D2 are proven bugs, so criterion 4's tests are shown failing on the base before the fix and passing after. Each other new behavior shows one deliberate break turning its test red. B's judgment in `check.repair` is a model choice: the skill text states it, B records its verdict and reason in its existing check-issue output, and no count, flaky-list match or text match stands in for it (criterion 10 is read by the reviewing seat, not tested). Red-exit Taken 3's exception applies with Taken 8: when Taken 8's trigger holds, a second red on the same unit goes to `check.fix` only after the base pass found that unit green on main; otherwise by today's rule. The base pass is a full suite in the line, one at a time, so lock 2a holds.
+
+## Held disagreements
+
+- Not a decision, the decision stands. Against forks/red-exit.md Taken 2 (other push errors go to `failed`). Fact: `finishPush` returns `error` only for a write refusal (auth, branch rule, hook), and an auth or branch-rule refusal hits every leaf. Consequence: each queued leaf fails after one suite and needs a hand recovery. Raised by slot B (slots/red-exit-rebuttal-B.md R2). State: unanswered by the operator.
+- Not a decision, the decision stands. Against forks/red-exit.md Taken 8 (only a returning leaf's repeat triggers the base pass). Fact: in a busy queue the second distinct leaf failing the same uncovered named title is already strong evidence of a main red (12 of 17 consecutive overlaps in framework 2026-11-14..21 were `skills-typecheck-switch`). Consequence: leaves between the first failure and the first leaf's return each exit and return once more. Raised by slot C (slots/red-exit-rebuttal-C.md). State: unanswered by the operator.
+
+## Leaf architecture
+
+- Owned surfaces: `src/land.ts` `land` and `handOff`; `src/phase.ts` `landClaim` (its stale-run message reads `owner`) and `phaseCommand` (refuse a slot-run `merged` or `check.fix` for a leaf in `merge`) (every seat hand-off becomes a command move; push-error branch to `failed`); `src/routing.ts` `routing` (`merge` gains `check.repair` in `next`; the `merge` route's seat and skill as the plan settles below); `src/next.ts` `mergeTurn` (the seat-owned batch branch and `owner` handling removed; next holder started in the same pass) and the dispatch of merge-phase prompts; `src/phase.ts` `commitMove` (`merge_stamp` first-return rule), the `check.repair -> merge` guard that calls `requireGreenReceipt` (receipt skip), `batchPush`/`finishPush` seat path; `src/state.ts` state schema (the exit record); `src/attempts.ts` `appendAttempt` (the red exit row); `src/reconcile.ts` `sliceKeepReason` (keep while in `merge` with `state.batch` set); the check.repair prompt text that carries the exit record; `src/timing-report.ts` `visitsOf` (a command exit from `merge` with no slot counts as seatless, not an incomplete prompt); skills merge-issue, lifecycle-rules.md, check-issue `## check.review` and `## check.repair`, implement-issue (its merge-issue solo rule and repair-from-merge lines), watch-issues; `src/AREA.md`; docs `docs/use/merge-and-announce.md`, `docs/reference/state-and-phases.md`, `docs/reference/checks.md`, `docs/reference/skills.md`.
+- Base pass (Taken 8): runs inside the land run through the existing known-red branch of `verify` (`src/verify.ts` `verify` with `--known-red` semantics: base at the head's merge-base, skipped when that tree already holds a whole-green row); `verify` reuses the recorded red head run (`redRun`), so the turn holds at most one extra suite, and none when main's tree at the merge-base already holds a whole-green row. The returning leaf lands by the existing `knownRedReceipt` two-log rule (base `compares` the head run, `sha` is the merge-base, same names fail); the red base row opens leaf main-red-cover's cover for later leaves.
+- Literal interfaces: the exit record holds reason (`red`, `gate`, `conflict`, `dirty`), the red run id or refusal text or base, and the evicted top, and, when Taken 8's trigger held, the base verdict (the base run id or the whole-green row that stood in for it), in a field named apart from the conflict base; it is set only by the merge-turn exit and cleared on leaving `check.repair`. The push error reason on `failed` carries git's stderr.
+- Consumers of changed state: `src/turn.ts` `mergeQueue` (reads `merge_stamp` and `batch`; first-return order); `src/status.ts` merge lines and the `merge job stopped` flag (a cleared batch and the removed seat owner); `src/next.ts` `reconcileBatch` (no seat-owned record exists any more); `src/timing.ts` waits (`merge_turn`); watch-issues reads `failed` reasons; leaf flaky-merge-flips reads the red run and the next merge run of the same leaf; `src/state.ts` `failureSchema` (requires a `slot`) and `src/phase.ts` `refuseEnclosingCompletion` and the `requiredSlots(phase, fix_rounds)[0]` reads, which a slot-less `merge` route would break; `src/status.ts` `waits_on`, which reports a merge leaf's required seats; leaf main-red-cover's covered-head branch in `land`, which this leaf's red hand-off follows (`blocked-by`).
+- Exclusions: the main-red cover (leaf main-red-cover); flaky flips (leaf flaky-merge-flips); the seat cap (leaf merge-seat-cap); the slow alarm (leaf slow-alarm-baseline); guards before verify (not taken).
+- Open for the plan: the exit record's field name and schema, and how state files written before it parse; how existing states holding `batch.owner: seat` or a `wake` field parse and recover; whether the `merge` route keeps a seat or skill at all once no seat works in `merge`, settled together with `failureSchema`, `refuseEnclosingCompletion` and `waits_on` (broadcast dispatch in `merged` is unchanged); whether the operator's slot-less `akrogon phase <leaf> merged` (and `--check`) in `merge` stays; where the check.repair prompt is built and how it shows the exit record; how `log.jsonl` moves into `merge` are counted to tell a first return from a later one.

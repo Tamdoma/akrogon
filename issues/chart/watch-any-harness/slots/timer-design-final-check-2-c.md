@@ -1,0 +1,5 @@
+# Final-shape check 2: timer-design (slot C)
+
+1. **Item 6 `[C2]` makes "several [verified timers] are reported untouched" unreachable and misses anomalous duplicates:**
+   - Evidence: `hc run --help` and A's charting probe enforce `--name` uniqueness among live terminals (`name_taken`), so at most one live terminal in a session can hold `<prefix>-watch`. Item 6 defines a verified timer as requiring `name`, `label`, and `argv` to match, then branches on `zero verified` vs `several` verified timers.
+   - Consequence: The "several" branch can never trigger or be tested as written; if a second live terminal carries `akrogon.watch-timer=<repo>` under a different name, `stop` sees only one verified timer, kills `<prefix>-watch`, and leaves the second labelled timer running instead of reporting several untouched. Fix: count live terminals by label `akrogon.watch-timer=<repo>` first (`> 1` reports all untouched, `0` reports already stopped), and verify `name` + top-level `argv` (from `hc get --json` / `terminal.list`, not `src/hc.ts` `Seen.foreground.argv`) on the single match before killing.

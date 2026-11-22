@@ -1,0 +1,49 @@
+slug: keep-red-run-temp
+phase: merged
+created: 2026-11-20
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#145"
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: akcdec1a061915f3d9527b1be905aef8
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t2ky
+  B:
+    session: infra
+    address: t2m5
+prompted:
+  B:
+    turn: 3
+    address: t2m5
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-20T11:41:23.137Z
+broadcast:
+  kind: issue
+  name: run-check-kept-evidence
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/run-check-kept-evidence
+  pushed: 4defba1e7d8ef20df3b2ce6b039fd598b33ea0fc
+  sources:
+    - "Tamdoma/akrogon#145"
+frozen:
+  tests/reconcile.test.ts: 7ec15f7fabffc35b3b0f18d86d8805a1715ede19
+  tests/run-check.test.ts: c04d75eaa5dabffdec7d79463ce06ca3c1652c16
+  tests/verify.test.ts: dcf18e7c2b056ea73ca9aad5a950e9c715dcb9d2
+frozen_cited: []

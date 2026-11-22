@@ -1,0 +1,25 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: 'akrogon run-check red exit removes the run root (pre-existing behavior the fix changes)'
+    command: "akrogon run-check --name repro145 --holder <scratchpad>/holder -- sh -c 'mkdir -p \"$TMPDIR/evidence\" && echo kept > \"$TMPDIR/evidence/f\" && echo \"kept at $TMPDIR/evidence\"; exit 3'; ls <printed run root>"
+    identity: 'operator user ivan, local CLI, no credentials'
+    target: 'akrogon registered repo, leaf temp root /var/tmp/akr-1000'
+    version: 'akrogon release 5daa962e'
+    date: '2026-11-20'
+    result: 'exit 3; printed kept path under run-JFqlar; ls right after: No such file or directory'
+    cleanup: 'scratchpad holder folder only; no other state'
+    limits: 'holder run, not a leaf run; does not observe reconcile, verify or a killed wrapper'
+    record: issues/chart/run-check-kept-evidence/forks/kept-run-root.md
+  - operation: 'pre-existing run-root, leaf temp release and dead-owner cleanup behavior the criteria build on'
+    command: 'bun test --timeout=30000 tests/run-check.test.ts tests/reconcile.test.ts tests/verify.test.ts -t "fresh run root under the leaf temp|unfinished leaf temp is removed once its tab is gone|run root with a dead owner pid|verify removes each command TMPDIR"'
+    identity: 'operator user ivan, local CLI, no credentials'
+    target: 'akrogon main checkout at 5daa962e, isolated test fixtures'
+    version: 'akrogon 5daa962e, bun 1.4.5'
+    date: '2026-11-20'
+    result: '4 pass, 0 fail: leaf run roots live under the leaf temp; a leaf temp is removed once its tab is gone; a dead-owner run root is removed; verify removes red and green TMPDIRs today'
+    cleanup: 'test fixtures clean themselves; no state outside them'
+    limits: 'observes today, not the marked-root behavior the leaf adds'
+    record: issues/chart/run-check-kept-evidence/forks/kept-run-root.md

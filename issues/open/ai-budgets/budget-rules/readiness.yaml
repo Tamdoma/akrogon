@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: akrogon run-check from the registered root with --holder
+    command: akrogon run-check --name ai-budgets-probe --holder issues/chart/ai-budgets -- sh -c 'echo AKROGON_RUN=${AKROGON_RUN:+set} AKROGON_SESSIONS=${AKROGON_SESSIONS:-unset}'
+    identity: chart door A in hc terminal t126
+    target: akrogon release fdc5acdd on this host
+    version: akrogon release fdc5acdd
+    date: '2026-11-22'
+    result: run id printed, AKROGON_RUN set, AKROGON_SESSIONS unset, check exit 0, capture pair removed on success
+    cleanup: none needed; capture pair removed by run-check
+    limits: no --sessions flag exists yet; session-ceiling builds it
+    record: issues/chart/ai-budgets/forks/budget-shape.md

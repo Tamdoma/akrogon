@@ -1,0 +1,157 @@
+inputs: []
+produces: []
+grants:
+  - approved:
+      by: operator
+      date: '2026-11-21'
+      answer: '"n1 yes" then "o1 - allow those writes, but then clean it up after the tests are done." (issues/chart/watch-consultants/forks/signposts.md Needs N1 and N1a: at most 6 sessions for the leaf, each ending within 15 minutes, existing logged-in accounts; harness session records, folder-trust entries and hc core state may be written outside the throwaway repo and are removed after the tests)'
+    principal: the leaf's implementing seat running the live run through akrogon run-check
+    account: operator's logged-in harness accounts on this host (claude, codex, pi devin, agy Google AI Ultra)
+    credential:
+      name: existing harness logins in the operator's home (no repo env key)
+      holder: operator home
+    targets: [claude CLI, codex CLI, pi CLI, agy CLI]
+    fixtures:
+      - account: local host
+        purpose: throwaway watch tier and repo for the live consult run
+        marker: hc session akr-e2e-watch; registered roots under the leaf temp named akr-e2e-watch-<kind>-*
+        naming: akr-e2e-watch-<kind>-<run>
+        count: 6
+        cleanup:
+          - step: stopWatchTier kills and removes every terminal of akr-e2e-watch, stops its core, removes its state and every recorded folder, the case folders under the run's AKROGON_HOME included
+            identity: the leaf's implementing seat
+          - step: remove the folder-trust entries the runs saved for their roots (codex ~/.codex/config.toml [projects."<root>"], agy ~/.gemini/antigravity-cli/settings.json trustedWorkspaces, claude ~/.claude.json projects entry)
+            identity: the leaf's implementing seat
+          - step: remove the session records the runs' harness sessions wrote in the operator's home (claude projects session files, codex sessions rollouts, pi sessions, agy conversations), each found by the run's root or start time and named in the implementation report before removal
+            identity: the leaf's implementing seat
+        absence_check: watch-tier absent() returns no paths (no hc call after stop); no trust entry names an akr-e2e root; no session record the report named remains
+    operations: [launch watcher and consultant harness sessions in akr-e2e-watch, hc send, hc wait, hc keys, hc read, hc get, hc label, hc kill, hc rm, git push to the run's local bare remote, the checkout's akrogon through the tier shim]
+    effects: paid model usage on the operator's accounts; local files under the leaf temp, the trust entries above, the hc core state under ~/.local/state/herdr-core/akr-e2e-watch, and the session records each harness writes in the operator's home on every launch, all removed after the tests; no push, GitHub or other outside write (the registered roots push to a local bare remote)
+    bounds: at most 6 harness sessions that receive a prompt, watchers and consultants each counted, whatever their outcome; each session ends within 15 minutes of its launch
+    stop_line: no write outside the leaf temp, the akr-e2e-watch session, the trust entries, core state and session records the runs created, each removed after the tests; no session on another account or model provider than the logged-in ones
+  - approved:
+      by: operator
+      date: '2026-11-21'
+      answer: '"q2 o1", then "you choose the number" (A chose 4: two tries of watcher plus consultant once the stand-in covers slots a/b) (door t126, 2026-11-21T21:01:47Z; O1 as presented: 4 more prompted sessions, two tries, each under 15 minutes, after the consultant closes before akrogon next, slots a/b use the tier stand-in, and the session records left by the first 11 sessions are removed). Earlier: "n1 yes" then "o1 - allow those writes, but then clean it up after the tests are done." (issues/chart/watch-consultants/forks/signposts.md Needs N1 and N1a: at most 6 sessions for the leaf, each ending within 15 minutes, existing logged-in accounts; harness session records, folder-trust entries and hc core state may be written outside the throwaway repo and are removed after the tests)'
+    principal: the leaf's implementing seat running the live run through akrogon run-check, only after the session records the first 11 sessions left in ~/.pi/agent, ~/.gemini and ~/.codex/sessions are removed and named in the report
+    account: operator's logged-in harness accounts on this host (claude, codex, pi devin, agy Google AI Ultra)
+    credential:
+      name: existing harness logins in the operator's home (no repo env key)
+      holder: operator home
+    targets: [claude CLI, codex CLI, pi CLI, agy CLI]
+    fixtures:
+      - account: local host
+        purpose: throwaway watch tier and repo for the live consult run
+        marker: hc session akr-e2e-watch; registered roots under the leaf temp named akr-e2e-watch-<kind>-*
+        naming: akr-e2e-watch-<kind>-<run>
+        count: 6
+        cleanup:
+          - step: stopWatchTier kills and removes every terminal of akr-e2e-watch, stops its core, removes its state and every recorded folder, the case folders under the run's AKROGON_HOME included
+            identity: the leaf's implementing seat
+          - step: remove the folder-trust entries the runs saved for their roots (codex ~/.codex/config.toml [projects."<root>"], agy ~/.gemini/antigravity-cli/settings.json trustedWorkspaces, claude ~/.claude.json projects entry)
+            identity: the leaf's implementing seat
+          - step: remove the session records the runs' harness sessions wrote in the operator's home (claude projects session files, codex sessions rollouts, pi sessions, agy conversations), each found by the run's root or start time and named in the implementation report before removal
+            identity: the leaf's implementing seat
+        absence_check: watch-tier absent() returns no paths (no hc call after stop); no trust entry names an akr-e2e root; no session record the report named remains
+    operations: [launch watcher and consultant harness sessions in akr-e2e-watch, hc send, hc wait, hc keys, hc read, hc get, hc label, hc kill, hc rm, git push to the run's local bare remote, the checkout's akrogon through the tier shim]
+    effects: paid model usage on the operator's accounts; local files under the leaf temp, the trust entries above, the hc core state under ~/.local/state/herdr-core/akr-e2e-watch, and the session records each harness writes in the operator's home on every launch, all removed after the tests; no push, GitHub or other outside write (the registered roots push to a local bare remote)
+    bounds: at most 4 harness sessions that receive a prompt, counted from this approval, watchers and consultants each counted, whatever their outcome; the 11 sessions under the first approval are spent and none remain under it; each session ends within 15 minutes of its launch
+    stop_line: no write outside the leaf temp, the akr-e2e-watch session, the trust entries, core state and session records the runs created, each removed after the tests; no session on another account or model provider than the logged-in ones
+  - approved:
+      by: operator
+      date: '2026-11-21'
+      answer: '"approved all sessions" (door t126, 2026-11-21T23:17:08Z; A''s reading: Q3 as asked, 2 more prompted sessions, one try, a pi watcher and an agy consultant, each under 15 minutes, same cleanup; the sessions already spent past grants[0] and grants[1] are acknowledged, not reopened)'
+    principal: the leaf's implementing seat running the live run through akrogon run-check
+    account: operator's logged-in harness accounts on this host (claude, codex, pi devin, agy Google AI Ultra)
+    credential:
+      name: existing harness logins in the operator's home (no repo env key)
+      holder: operator home
+    targets: [claude CLI, codex CLI, pi CLI, agy CLI]
+    fixtures:
+      - account: local host
+        purpose: throwaway watch tier and repo for the live consult run
+        marker: hc session akr-e2e-watch; registered roots under the leaf temp named akr-e2e-watch-<kind>-*
+        naming: akr-e2e-watch-<kind>-<run>
+        count: 6
+        cleanup:
+          - step: stopWatchTier kills and removes every terminal of akr-e2e-watch, stops its core, removes its state and every recorded folder, the case folders under the run's AKROGON_HOME included
+            identity: the leaf's implementing seat
+          - step: remove the folder-trust entries the runs saved for their roots (codex ~/.codex/config.toml [projects."<root>"], agy ~/.gemini/antigravity-cli/settings.json trustedWorkspaces, claude ~/.claude.json projects entry)
+            identity: the leaf's implementing seat
+          - step: remove the session records the runs' harness sessions wrote in the operator's home (claude projects session files, codex sessions rollouts, pi sessions, agy conversations), each found by the run's root or start time and named in the implementation report before removal
+            identity: the leaf's implementing seat
+        absence_check: watch-tier absent() returns no paths (no hc call after stop); no trust entry names an akr-e2e root; no session record the report named remains
+    operations: [launch watcher and consultant harness sessions in akr-e2e-watch, hc send, hc wait, hc keys, hc read, hc get, hc label, hc kill, hc rm, git push to the run's local bare remote, the checkout's akrogon through the tier shim]
+    effects: paid model usage on the operator's accounts; local files under the leaf temp, the trust entries above, the hc core state under ~/.local/state/herdr-core/akr-e2e-watch, and the session records each harness writes in the operator's home on every launch, all removed after the tests; no push, GitHub or other outside write (the registered roots push to a local bare remote)
+    bounds: at most 2 harness sessions that receive a prompt, counted from this approval, watchers and consultants each counted, whatever their outcome; each session ends within 15 minutes of its launch; grants[0] and grants[1] are spent
+    stop_line: no write outside the leaf temp, the akr-e2e-watch session, the trust entries, core state and session records the runs created, each removed after the tests; no session on another account or model provider than the logged-in ones
+  - approved:
+      by: operator
+      date: '2026-11-22'
+      answer: '"I approve it, please make them pass and not get stuck in the cerermony, this is not feasible for me to be guessing how many runs they have. When it''s good enough, it''s good enoug. Don''t make the prose stop the merge!" (door t126, 2026-11-22, answering the fresh C1 run review-B A1 asks for on head bebe2a90; the operator left the count to A, A chose at most 3 tries of a pi watcher plus an agy consultant; a finding about prose or wording alone never needs a new run)'
+    principal: the leaf's implementing seat running the live run through akrogon run-check
+    account: operator's logged-in harness accounts on this host (claude, codex, pi devin, agy Google AI Ultra)
+    credential:
+      name: existing harness logins in the operator's home (no repo env key)
+      holder: operator home
+    targets: [claude CLI, codex CLI, pi CLI, agy CLI]
+    fixtures:
+      - account: local host
+        purpose: throwaway watch tier and repo for the live consult run
+        marker: hc session akr-e2e-watch; registered roots under the leaf temp named akr-e2e-watch-<kind>-*
+        naming: akr-e2e-watch-<kind>-<run>
+        count: 6
+        cleanup:
+          - step: stopWatchTier kills and removes every terminal of akr-e2e-watch, stops its core, removes its state and every recorded folder, the case folders under the run's AKROGON_HOME included
+            identity: the leaf's implementing seat
+          - step: remove the folder-trust entries the runs saved for their roots (codex ~/.codex/config.toml [projects."<root>"], agy ~/.gemini/antigravity-cli/settings.json trustedWorkspaces, claude ~/.claude.json projects entry)
+            identity: the leaf's implementing seat
+          - step: remove the session records the runs' harness sessions wrote in the operator's home (claude projects session files, codex sessions rollouts, pi sessions, agy conversations), each found by the run's root or start time and named in the implementation report before removal
+            identity: the leaf's implementing seat
+        absence_check: watch-tier absent() returns no paths (no hc call after stop); no trust entry names an akr-e2e root; no session record the report named remains
+    operations: [launch watcher and consultant harness sessions in akr-e2e-watch, hc send, hc wait, hc keys, hc read, hc get, hc label, hc kill, hc rm, git push to the run's local bare remote, the checkout's akrogon through the tier shim]
+    effects: paid model usage on the operator's accounts; local files under the leaf temp, the trust entries above, the hc core state under ~/.local/state/herdr-core/akr-e2e-watch, and the session records each harness writes in the operator's home on every launch, all removed after the tests; no push, GitHub or other outside write (the registered roots push to a local bare remote)
+    bounds: at most 6 harness sessions that receive a prompt (3 tries), counted from this approval, watchers and consultants each counted, whatever their outcome; each session ends within 15 minutes of its launch; a try stops once C1 is green; grants[0], grants[1] and grants[2] are spent
+    stop_line: no write outside the leaf temp, the akr-e2e-watch session, the trust entries, core state and session records the runs created, each removed after the tests; no session on another account or model provider than the logged-in ones
+retained: []
+proofs:
+  - operation: start a door-created consultant with akrogon seat --slot through startConsultant's start proof (codex and agy harnesses)
+    command: akrogon seat --slot b --harness codex --model gpt-6.2-astra --effort high --task ...; akrogon seat --slot c --harness agy --model neon --effort high --task ...
+    identity: chart door A in hc terminal t126
+    target: hc 0.1.21 session infra, codex CLI, agy CLI
+    version: akrogon release 1502fbdf
+    date: '2026-11-21'
+    result: both started as children of t126 named ak-slot-b and ak-slot-c and confirmed their first task (seats.yaml)
+    cleanup: none yet, the seats are the chart's consultants
+    limits: the --slot form only; the watch form and the agy neon recipe from config are not run
+    record: issues/chart/watch-consultants/seats.yaml
+  - operation: a consultant's hc send waking a claude watcher inside its own hc wait turn
+    command: 'hc wait --children any --timeout 600 --json in A''s turn, consultants ran hc send t126 "done X: <path>"'
+    identity: chart door A (claude) and consultants t2z0 (codex), t2z1 (agy)
+    target: hc 0.1.21 session infra
+    version: hc 0.1.21
+    date: '2026-11-21'
+    result: each wake returned reason message with the sender in from, inside the same turn; the text arrived later as input
+    cleanup: none
+    limits: a claude watcher only; codex, pi and agy watchers unobserved
+    record: issues/chart/watch-consultants/forks/fix-and-config.md
+  - operation: hc name uniqueness, child wake, parent exit ending its child
+    command: hc run --bg --name akp-watch-consult twice; hc kill then hc run again; child hc send to a shell parent; hc kill parent
+    identity: chart door A
+    target: hc 0.1.21 throwaway session akr-probe-wc
+    version: hc 0.1.21
+    date: '2026-11-21'
+    result: second live name refused name_taken; free after kill; parent woke with reason children; child finished signal 1 after parent kill
+    cleanup: every terminal killed and removed, core stopped, folder removed
+    limits: shell parent, no harness; outlive flag not set explicitly
+    record: issues/chart/watch-consultants/forks/fix-and-config.md
+  - operation: fast-forward push from a detached worktree after the remote moved
+    command: git push origin HEAD:refs/heads/main; git fetch; git rebase origin/main; git push; git worktree remove
+    identity: chart door A
+    target: local bare remote in the scratchpad
+    version: git on this host
+    date: '2026-11-21'
+    result: first push refused (fetch first); after rebase the push landed fast-forward; worktree removed
+    cleanup: scratch folder removed
+    limits: a local bare remote, not GitHub
+    record: issues/chart/watch-consultants/forks/fix-and-config.md

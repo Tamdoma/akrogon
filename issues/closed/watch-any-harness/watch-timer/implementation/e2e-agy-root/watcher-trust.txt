@@ -1,0 +1,14 @@
+Accessing workspace:
+
+/var/tmp/akr-e2e-ACk1pO/akr-e2e-watch-agy-root
+
+Do you trust the contents of this project?
+
+Antigravity CLI requires permission to read, edit, and execute files here.
+
+> Yes, I trust this folder
+  No, exit
+
+  ↑/↓ Navigate · enter Confirm
+
+keys: enter

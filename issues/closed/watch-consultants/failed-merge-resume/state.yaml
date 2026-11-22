@@ -1,0 +1,37 @@
+slug: failed-merge-resume
+phase: merged
+created: 2026-11-21
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#146"
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: ak5861bc73471352afcdd9b59e725a9c
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t2zb
+  B:
+    session: infra
+    address: t2zj
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-21T19:00:13.569Z
+frozen:
+  tests/batch-dispatch.test.ts: 72c9b00140785bb6318c9694f7d042d66d85f7f4
+frozen_cited: []

@@ -1,0 +1,42 @@
+slug: budget-rules
+phase: check.repair
+created: 2026-11-22
+repo: akrogon
+blocked-by:
+  - session-ceiling
+sources: []
+busy_since:
+  B: 2026-11-22T17:54:38.118Z
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak967030fa3be5cb1f56e9a596736194
+worktree: /home/ivan/.akrogon/worktrees/akrogon/budget-rules
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t34n
+  B:
+    session: infra
+    address: t34w
+prompted:
+  B:
+    turn: 1
+    address: t34w
+prompted_at: {}
+delivery_error: {}
+frozen:
+  tests/chart-shapes.test.ts: c5ad6a6656f1f23b63f9a130812193f04d0ec31d
+  tests/docs-links.test.ts: 2eb7c70331b06cf63921df6f80694db9d27dd2fc
+frozen_cited: []

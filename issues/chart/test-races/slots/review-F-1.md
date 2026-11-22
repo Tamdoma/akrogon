@@ -1,0 +1,15 @@
+# Slot F review
+
+Verdict `fix` for `436b5179bc15987f78e8ef64aab99eecc4774867..c691dde2aa30271a8d61e90f87741c7e90bb1490`.
+
+## Findings
+
+- **F1** `src/state.ts:372` gives each linked checkout a separate lock. I initialized the main checkout and a linked checkout of one scratch Git repository with `initialize` in two separate `AKROGON_HOME`s. Both resolved as registered roots. `worktreeLock` returned `.git/akrogon-worktree.lock` for the main checkout and `.git/worktrees/linked/akrogon-worktree.lock` for the linked checkout. A nonblocking exclusive flock on the linked path succeeded while the main path was held. Thus an Akrogon verify add from one registration can race a verify or reconcile remove from the other against the same `.git/worktrees` directory. Self-update uses its registered `repo.root` and has the same split if that root is linked. Resolve the lock once against Git's common directory, which was `.git` for both roots.
+- **F2** `tests/own-slices-systemctl.ts:16`–`:18` converts signal termination into success. I ran the real failed-unit listing through a delegate that sent itself `SIGKILL` after writing the real systemctl JSON. The direct command exited by signal 9 and the wrapper returned 0 with the JSON. Bun supplies `null` as the synchronous child's exit code for a signal, and `process.exit(null)` exits 0. In the failed-run cleanup case at `tests/leaf-slices.test.ts:882`, `loadedUnits` can therefore accept a signaled listing and clear the unit, letting the case pass even though the direct command would have left it listed. A signaled leaf-slice listing can also pass unfiltered rows through the same branch. Propagate signal termination as a nonzero exit.
+
+## Verification
+
+- Every executable Git worktree add, remove and prune call in `src/` takes the new lock around one command. No call path nests that lock. Self-update resolves it from the same root that it passes to Git.
+- The verify notice explanation fits the code. `src/verify.ts:843`–`:850` writes the receipt and notice before cleanup, so a Git fatal during remove can produce exit 1 after those writes. A's plain-Git reproduction supports the mechanism. My independent stress run produced no fatal with either lock layout. F1 was reproduced directly by acquiring both locks at once.
+- The stale-socket test waits for the killed PID to disappear or become a zombie before checking the socket. The slice test wrapper leaves the cases' assertions and their own slice rows in place. The fake flock in `next.test.ts` delegates the worktree lock and still fails state lock finalization after one task dispatches. The three changed-test trailers match those changes.
+- `slot-f-focused` passed 27 tests, including the concurrent verify, stale socket, state-lock finalization and wake-after-tab-loss cases. `slot-f-worktree-paths` passed 4 tests for self-update replay, batch creation and cleanup, reconcile removal and failed-unit cleanup. `git diff --check` passed. Logs are `direct/check-slot-f-focused-1795368756669-156675.log` and `direct/check-slot-f-worktree-paths-1795368844220-388352.log` in this chart.
