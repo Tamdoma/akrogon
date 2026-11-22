@@ -2621,3 +2621,32 @@ test('verify joining a live pass on a failed leaf starts no child', async () => 
     f.clean();
   }
 });
+
+test('a receipt command row may carry the first run of a rerun', () => {
+  const row = {
+    run: 'r',
+    repo: 'repo',
+    leaf: 'leaf',
+    sha: 'sha',
+    tree: 'tree',
+    scope: 'merge',
+    path: '/w',
+    pid: 1,
+    boot_id: 'b',
+    start: 's',
+    commands: [
+      {
+        name: 'suite',
+        command: 'true',
+        exit: 0,
+        log: '/second.log',
+        rerun: { exit: 1, log: '/first.log', failures: ['a > flips'] },
+      },
+    ],
+  };
+  expect(verifyRunSchema.parse(row).commands[0].rerun).toEqual({
+    exit: 1,
+    log: '/first.log',
+    failures: ['a > flips'],
+  });
+});

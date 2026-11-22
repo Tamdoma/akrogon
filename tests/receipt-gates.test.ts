@@ -128,14 +128,18 @@ test('a qualifying linked pair satisfies the merge gates and a non-qualifying pa
     const baseTree: string = await command(['git', 'rev-parse', `${builtOn}^{tree}`], f.root);
     const cmds: { name: string; command: string }[] = verifyCommands(readRepo(f.repo, f.root).config, 'merge');
     mkdirSync(resolve(path, 'implementation'), { recursive: true });
-    const pair = (baseLog: string): void => {
+    const pair = (baseLog: string, rerun?: { log: string; failures: string[] }): void => {
       const headLog: string = resolve(path, 'implementation/check-test-head.log');
       writeFileSync(headLog, '(fail) alpha\n');
       const headRun: VerifyRun = seedRun(f, {
         sha: head,
         tree,
         scope: 'merge',
-        commands: cmds.map((item) => ({ ...item, exit: 1, log: headLog })),
+        commands: cmds.map((item) =>
+          rerun === undefined
+            ? { ...item, exit: 1, log: headLog }
+            : { ...item, exit: 1, log: rerun.log, failures: rerun.failures, rerun: { exit: 1, log: headLog } },
+        ),
       });
       seedRun(f, {
         sha: builtOn,
@@ -164,6 +168,9 @@ test('a qualifying linked pair satisfies the merge gates and a non-qualifying pa
     expect(refused1.stderr).toContain(`No green merge verify receipt for ${head}`);
     expect(readState(path).batch?.tested_top).toBeUndefined();
     expect((await guards()).code).not.toBe(0);
+    // A rerun row's log names only the rerun's reds; its stored failures decide the cover.
+    pair(headOnly, { log: headOnly, failures: ['alpha'] });
+    expect((await gateRun(f, 'landing')).code).not.toBe(0);
     const same: string = resolve(path, 'implementation/check-test-base-same.log');
     writeFileSync(same, '(fail) alpha\n');
     pair(same);

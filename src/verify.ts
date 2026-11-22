@@ -50,6 +50,11 @@ const verifyScopeSchema = z.enum(['leaf', 'merge']);
 
 export type VerifyScope = z.infer<typeof verifyScopeSchema>;
 
+const failuresSchema = z
+  .array(z.string())
+  .min(1)
+  .refine((list) => new Set(list).size === list.length);
+
 export const verifyRunSchema = z.strictObject({
   run: z.string(),
   repo: z.string(),
@@ -73,10 +78,9 @@ export const verifyRunSchema = z.strictObject({
       log: z.string(),
       reused: z.string().optional(),
       blocked: z.string().optional(),
-      failures: z
-        .array(z.string())
-        .min(1)
-        .refine((list) => new Set(list).size === list.length)
+      failures: failuresSchema.optional(),
+      rerun: z
+        .strictObject({ exit: z.number().int(), log: z.string(), failures: failuresSchema.optional() })
         .optional(),
     }),
   ),
@@ -252,8 +256,10 @@ async function knownRedReceipt(repo: Repo, sha: string, scope: VerifyScope): Pro
       for (const entry of head.commands) {
         if (entry.exit === 0 || entry.blocked !== undefined) continue;
         red += 1;
-        const names: string[] = await failedTests(repo, entry.log);
-        if (names.includes('(log gone)')) return false;
+        const logNames: string[] = await failedTests(repo, entry.log);
+        if (logNames.includes('(log gone)')) return false;
+        // A rerun row's final failures are stored; its log holds only the rerun's own names.
+        const names: string[] = entry.failures ?? logNames;
         const onCoveredBase = async (): Promise<boolean> => {
           for (const baseRun of runs.filter(
             (run) => run.compares === head.run && run.sha === mergeBase && completed(run),

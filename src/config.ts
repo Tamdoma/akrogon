@@ -67,6 +67,7 @@ export const repoSchema = z
     checks: z.record(text, text).default({}),
     merge_checks: z.record(text, text).default({}),
     merge_covers: z.array(text).default([]),
+    rerun: z.record(text, text).optional(),
     full: z.array(text).default([]),
     advisory: z.array(text).default([]),
     env: z.array(text).default([]),
@@ -88,6 +89,7 @@ export const repoSchema = z
     const constructed: Set<string> = new Set([
       'TMPDIR',
       'AKROGON_BASE',
+      'AKROGON_RERUN_NAMES',
       'AKROGON_RUN',
       'NODE_PATH',
       'BUN_OPTIONS',
@@ -118,6 +120,10 @@ export const repoSchema = z
           path: ['merge_covers'],
           message: `Unknown checks name in merge_covers: ${name}`,
         });
+    }
+    for (const name of Object.keys(config.rerun ?? {})) {
+      if (!Object.hasOwn(config.checks, name) && !Object.hasOwn(config.merge_checks, name))
+        ctx.addIssue({ code: 'custom', path: ['rerun'], message: `Unknown check name in rerun: ${name}` });
     }
     for (const name of config.full) {
       if (!Object.hasOwn(config.checks, name) && !Object.hasOwn(config.merge_checks, name))

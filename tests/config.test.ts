@@ -1096,3 +1096,20 @@ test('machine config accepts a prefixes map without changing commands and refuse
     f.clean();
   }
 });
+
+test('repoSchema accepts rerun keys naming a checks or merge_checks entry and reserves AKROGON_RERUN_NAMES', () => {
+  const base = { grounding: 'none', checks: { unit: 'true' }, merge_checks: { suite: 'true' } };
+  expect(repoSchema.parse({ ...base, rerun: { unit: 'rerun-unit', suite: 'rerun-suite' } }).rerun).toEqual({
+    unit: 'rerun-unit',
+    suite: 'rerun-suite',
+  });
+  expect(repoSchema.parse(base).rerun).toBeUndefined();
+  const unknown = repoSchema.safeParse({ ...base, rerun: { nope: 'x' } });
+  expect(unknown.success).toBe(false);
+  expect(unknown.error?.message).toContain('Unknown check name in rerun: nope');
+  for (const field of ['env', 'pass_env']) {
+    const reserved = repoSchema.safeParse({ ...base, [field]: ['AKROGON_RERUN_NAMES'] });
+    expect(reserved.success, field).toBe(false);
+    expect(reserved.error?.message, field).toContain('Reserved');
+  }
+});
