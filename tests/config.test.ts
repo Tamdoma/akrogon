@@ -971,6 +971,42 @@ test('config refuses DBUS_SESSION_BUS_ADDRESS in pass_env', async () => {
   }
 });
 
+test('config refuses AKROGON_SESSIONS and AKROGON_SESSION_MINUTES in env and pass_env', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const path: string = resolve(f.root, 'issues/config.yaml');
+    for (const field of ['env', 'pass_env']) {
+      for (const name of ['AKROGON_SESSIONS', 'AKROGON_SESSION_MINUTES']) {
+        yaml(path, { grounding: 'none', [field]: [name] });
+        const reserved = await cli(f, ['config']);
+        expect(reserved.code, `${field} ${name}`).not.toBe(0);
+        expect(reserved.stderr, `${field} ${name}`).toContain(field);
+        expect(reserved.stderr, `${field} ${name}`).toContain(name);
+      }
+    }
+  } finally {
+    f.clean();
+  }
+});
+
+test('config prints paid_budget from the machine config', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const globalPath: string = resolve(f.home, 'config.yaml');
+    const paid_budget = {
+      sessions_per_day: 8,
+      session_minutes: 45,
+      approved: { date: '2026-11-22', answer: 'eight a day is fine' },
+    };
+    yaml(globalPath, { ...(Bun.YAML.parse(readFileSync(globalPath, 'utf8')) as object), paid_budget });
+    const printed = await cli(f, ['config']);
+    expect(printed.code, printed.stderr).toBe(0);
+    expect(Bun.YAML.parse(printed.stdout)).toMatchObject({ paid_budget });
+  } finally {
+    f.clean();
+  }
+});
+
 test('ensureLeafTemp creates every level private and refuses a symlinked root', () => {
   const previous: string | undefined = process.env.AKROGON_LEAF_TEMP_ROOT;
   const dir: string = mkdtempSync(resolve(tmpdir(), 'leaf-temp-'));

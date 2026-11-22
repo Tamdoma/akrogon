@@ -112,6 +112,25 @@ test('unmigrated state in the tool root moves to ~/.akrogon on the first command
   expect(existsSync(resolve(home, '.akrogon/runs/locks'))).toBe(true);
 });
 
+test('the session budget ledger moves with the state home', async () => {
+  const home: string = temp();
+  const root: string = toolCopy(home, globalConfig);
+  writeFileSync(
+    resolve(root, 'budget.jsonl'),
+    JSON.stringify({
+      at: '2026-11-22T00:00:00.000Z',
+      repo: 'akrogon',
+      slug: 'earlier-leaf',
+      run: 'run-0',
+      sessions: 2,
+    }) + '\n',
+  );
+  const first: SpawnResult = await cli(root, home, ['config']);
+  expect(first.code).toBe(0);
+  expect(first.stderr).toContain('moved state home');
+  expect(readFileSync(resolve(home, '.akrogon/budget.jsonl'), 'utf8')).toContain('earlier-leaf');
+});
+
 test('with AKROGON_HOME unset, commands read and write state only under ~/.akrogon after cutover', async () => {
   const home: string = temp();
   const root: string = toolCopy(home, globalConfig);
