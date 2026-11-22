@@ -849,13 +849,14 @@ async function resumeRepos(
       isAutomatic,
     );
   }
-  await refill(global, repos, invocation);
+  await refill(global, invocation);
 }
 
-// A freed slot goes to the leaf that has waited longest on capacity, across repos; a leaf
-// whose repo is at its own cap stays waiting and the next one is tried.
-async function refill(global: GlobalConfig, repos: Repo[], invocation: Invocation): Promise<void> {
-  const waiting: { repo: Repo; leaf: Leaf; since: string }[] = repos
+// A freed slot goes to the leaf that has waited longest on capacity, across every unpaused repo;
+// a leaf whose repo is at its own cap stays waiting and the next one is tried.
+async function refill(global: GlobalConfig, invocation: Invocation): Promise<void> {
+  const waiting: { repo: Repo; leaf: Leaf; since: string }[] = registeredRepos(global, invocation)
+    .repos.filter((repo) => !isPaused(repo.name))
     .flatMap((repo) => {
       const events: TimingEvent[] = readTimings(repo.root);
       const closedRoot: string = resolve(repo.root, 'issues/closed');
@@ -1254,6 +1255,8 @@ export async function seatCommand(slug: string, slot: Slot, task: string | undef
   await withLock(resolve(globalHome(), '.lock'), async () => {
     const leaf: Leaf = findLeaf(repo, slug);
     const allocated: Allocation | null = await allocate(global, repo, leaf, invocation);
+    // A refusal with the leaf's own phase task queues it for the refill like a pass refusal.
+    if (allocated === null && task === undefined) recordWait(repo, slug, 'capacity');
     if (allocated === null)
       throw new Error(
         `No free seat capacity: ${await capRefusal(global, repo, invocation)} (leaves waiting in merge are not counted)`,

@@ -51,7 +51,7 @@ A pass visits merged leaves first. Then it visits leaves that more unmerged leav
 
 `max_active` in your machine config limits how many leaves run at once across all registered repositories. At the limit no new leaf starts, but leaves that already have a tab keep working. Leaves waiting in the merge phase do not count toward the limit. Each leaf has two seats, so this is not a count of agent processes. A repository can set its own lower `max_active` in `issues/config.yaml`; a leaf starts only when both limits have room. See [config.md](../reference/config.md).
 
-A leaf a `next` pass refuses at a limit waits on `capacity`; a refused `akrogon seat` only fails. Each automatic pass (`akrogon next --wake` or `--resume`, run after every turn) starts the capacity waiters that fit, longest-waiting first across repositories; a waiter whose repository is at its own limit stays waiting and the next one is tried. A leaf that was never refused is not started by this.
+A leaf refused at a limit by a `next` pass or by `akrogon seat` without `--task` waits on `capacity`; a refused `akrogon seat --task` only fails. Each automatic pass (`akrogon next --wake` or `--resume`, run after every turn) starts the capacity waiters that fit, longest-waiting first across repositories; a waiter whose repository is at its own limit stays waiting and the next one is tried. A leaf that was never refused is not started by this.
 
 Leaves in the `merge` phase take turns. Each repository has one merge turn. The leaf holding it is rebased, verified and pushed by the command's land run; a red verify or a refused gate exits it to `check.repair`. The rest wait until the turn frees.
 

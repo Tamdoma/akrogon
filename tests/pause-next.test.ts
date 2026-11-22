@@ -759,3 +759,47 @@ test('the older capacity waiter wins even in the repo visited later', async () =
     await f.clean();
   }
 }, 60000);
+
+test("unpause gives a freed slot to another repo's older waiter", async () => {
+  const f: DispatchFixture = await hcFixture({ occupiedPrefix: 'yp' });
+  try {
+    capMachine(f, 1);
+    const xRun: string = leaf(f, 'xrun', 'plan.synthesis');
+    expect((await next(f, ['xrun'])).code).toBe(0);
+    const yRoot: string = await secondRepo(f, 'y');
+    setPrefixes(f, { [f.repo]: f.prefix, y: 'yp' });
+    await addSpace(f, 'y', yRoot);
+    const yWait: string = leafIn(yRoot, 'y', 'ywait', 'plan.synthesis');
+    await next(f, ['ywait'], {}, yRoot);
+    await Bun.sleep(20);
+    const xWait: string = leaf(f, 'xwait', 'plan.synthesis');
+    await next(f, ['xwait']);
+    expect((await cli(f, ['pause'], f.root, f.env)).code).toBe(0);
+    toMerge(xRun);
+    expect((await cli(f, ['unpause'], f.root, f.env)).code).toBe(0);
+    expect(readState(yWait).tab).toBeDefined();
+    expect(readState(xWait).tab).toBeUndefined();
+  } finally {
+    await f.clean();
+  }
+}, 60000);
+
+test('a seat refused at a cap without --task waits for the refill', async () => {
+  const f: DispatchFixture = await hcFixture();
+  try {
+    capMachine(f, 1);
+    const running: string = leaf(f, 'running', 'plan.synthesis');
+    expect((await next(f, ['running'])).code).toBe(0);
+    const waiter: string = leaf(f, 'waiter', 'plan.synthesis');
+    const refused: Result = await cli(f, ['seat', 'waiter', 'A'], f.root, f.env);
+    expect(refused.code).not.toBe(0);
+    const tasked: string = leaf(f, 'tasked', 'plan.synthesis');
+    expect((await cli(f, ['seat', 'tasked', 'A', '--task', 'own task'], f.root, f.env)).code).not.toBe(0);
+    toMerge(running);
+    expect((await next(f, ['--wake'])).code).toBe(0);
+    expect(readState(waiter).tab).toBeDefined();
+    expect(readState(tasked).tab).toBeUndefined();
+  } finally {
+    await f.clean();
+  }
+}, 60000);
