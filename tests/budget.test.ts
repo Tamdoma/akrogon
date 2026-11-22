@@ -260,7 +260,7 @@ test('a non-integer or non-positive --sessions refuses and writes nothing', asyn
     budget(f, 10, 30);
     const { worktree } = await leafWorktree(f, 'bad-count');
     const marker: string = resolve(f.home, 'bad-ran');
-    for (const value of ['0', '1.5', 'abc']) {
+    for (const value of ['0', '1.5', '0.99999999999999999', 'abc']) {
       const result: Result = await cli(
         f,
         ['run-check', '--sessions', value, '--', 'touch', marker],
