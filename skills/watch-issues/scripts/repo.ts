@@ -65,7 +65,7 @@ export async function resolveRepoKey(root: string, bin: string): Promise<RepoKey
 
 export type WatchTarget = { repo: string; prefix: string; session: string };
 
-export function withConsultantLock<T>(target: WatchTarget, action: () => Promise<T>): Promise<T> {
+export function withConsultantLock<T>(target: Pick<WatchTarget, 'repo'>, action: () => Promise<T>): Promise<T> {
   return withLock(resolve(globalHome(), 'watch', target.repo, '.consultant.lock'), action);
 }
 

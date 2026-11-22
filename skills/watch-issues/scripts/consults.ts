@@ -4,9 +4,21 @@
 // allocates the next <anchor>-<seq> folder and records signature.json (anchor,
 // cause@phase, failing command, base SHA at <remote>/<default_branch>, each named
 // leaf's worktree HEAD, '-' when the leaf has none); `match` recomputes the same
-// signature and reports the newest identical case: open / closed / clear.
-import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync, type Dirent } from 'node:fs';
-import { basename, resolve } from 'node:path';
+// signature and reports the newest identical case: open / closed / clear; `close` ends a
+// case: it removes the case's git worktrees, trims the folder to its record and writes `closed`.
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+  type Dirent,
+} from 'node:fs';
+import { basename, dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { globalHome, within } from '../../../src/config';
 import { getTerm, isVerifiedTimer, timerWatcher } from './hc';
@@ -28,8 +40,13 @@ type Config = { repo: string; remote: string; branch: string };
 function usage(): never {
   console.error('Usage: consults.ts dir <root>');
   console.error('       consults.ts start <root> <timer> <task>');
-  console.error('       consults.ts new <root> --anchor <slug|unknown> --cause <cause|unknown> --phase <phase|unknown> --command <text|-> [--leaf <slug>]...');
-  console.error('       consults.ts match <root> --anchor <slug|unknown> --cause <cause|unknown> --phase <phase|unknown> --command <text|-> [--leaf <slug>]...');
+  console.error(
+    '       consults.ts new <root> --anchor <slug|unknown> --cause <cause|unknown> --phase <phase|unknown> --command <text|-> [--leaf <slug>]...',
+  );
+  console.error('       consults.ts close <root> <case-dir>');
+  console.error(
+    '       consults.ts match <root> --anchor <slug|unknown> --cause <cause|unknown> --phase <phase|unknown> --command <text|-> [--leaf <slug>]...',
+  );
   process.exit(1);
 }
 
@@ -47,12 +64,23 @@ function parseFlags(argv: string[]): Flags {
     const value: string | undefined = argv[++i];
     if (value === undefined) throw new Error(`missing value for ${name}`);
     switch (name) {
-      case '--anchor': anchor = value; break;
-      case '--cause': cause = value; break;
-      case '--phase': phase = value; break;
-      case '--command': command = value; break;
-      case '--leaf': leaves.push(value); break;
-      default: throw new Error(`unknown flag ${name}`);
+      case '--anchor':
+        anchor = value;
+        break;
+      case '--cause':
+        cause = value;
+        break;
+      case '--phase':
+        phase = value;
+        break;
+      case '--command':
+        command = value;
+        break;
+      case '--leaf':
+        leaves.push(value);
+        break;
+      default:
+        throw new Error(`unknown flag ${name}`);
     }
   }
   return {
@@ -100,8 +128,7 @@ function consultsRoot(root: string, repo: string): string {
 async function leafWorktrees(root: string): Promise<Map<string, string>> {
   const found: Map<string, string> = new Map();
   const listed: RunResult = await run(['git', 'worktree', 'list', '--porcelain'], root);
-  if (listed.code !== 0)
-    throw new Error(`git worktree list failed: exit ${listed.code} ${listed.stderr}`.trim());
+  if (listed.code !== 0) throw new Error(`git worktree list failed: exit ${listed.code} ${listed.stderr}`.trim());
   for (const line of listed.stdout.split('\n')) {
     if (!line.startsWith('worktree ')) continue;
     const path: string = line.slice('worktree '.length);
@@ -209,6 +236,53 @@ function verbMatch(consults: string, current: Signature): void {
   }
 }
 
+const RECORD_FILES: RegExp = /^(case\.md|signature\.json|status|turn-\d+-(watch|consultant)\.md)$/;
+
+// Ends a case under the consultant lock so it cannot overlap a consultant start. Git's own
+// refusal (modified or untracked files) stops the verb before anything else is deleted, and
+// the status stays `open`.
+async function verbClose(root: string, caseArg: string): Promise<void> {
+  const key: { repo: string; prefix: string | null } = await resolveRepoKey(
+    root,
+    process.env.WATCH_AKROGON ?? 'akrogon',
+  );
+  const consults: string = consultsRoot(root, key.repo);
+  const dir: string = resolve(caseArg);
+  if (
+    !existsSync(consults) ||
+    !existsSync(dir) ||
+    lstatSync(dir).isSymbolicLink() ||
+    dirname(realpathSync(dir)) !== realpathSync(consults)
+  )
+    throw new Error(`${dir} is not a case folder under ${consults}`);
+  const caseDir: string = realpathSync(dir);
+  await withConsultantLock({ repo: key.repo }, async (): Promise<void> => {
+    const linked: string | undefined = readdirSync(caseDir).find(
+      (entry) => RECORD_FILES.test(entry) && lstatSync(resolve(caseDir, entry)).isSymbolicLink(),
+    );
+    if (linked !== undefined)
+      throw new Error(`${resolve(caseDir, linked)} is a symlink: close writes only real record files`);
+    const listed: RunResult = await run(['git', 'worktree', 'list', '--porcelain'], root);
+    if (listed.code !== 0) throw new Error(`git worktree list failed: exit ${listed.code} ${listed.stderr}`.trim());
+    const worktrees: string[] = listed.stdout
+      .split('\n')
+      .filter((line) => line.startsWith('worktree '))
+      .map((line) => line.slice('worktree '.length))
+      .filter((path) => path !== caseDir && within(path, caseDir));
+    for (const path of worktrees) {
+      const removed: RunResult = await run(['git', 'worktree', 'remove', path], root);
+      if (removed.code !== 0)
+        throw new Error(`git worktree remove ${path} failed: exit ${removed.code} ${removed.stderr}`.trim());
+    }
+    for (const entry of readdirSync(caseDir))
+      if (!RECORD_FILES.test(entry)) rmSync(resolve(caseDir, entry), { recursive: true, force: true });
+    // A temp file renamed over `status` gives it a new inode, so a hard link to the old one is untouched.
+    const pending: string = resolve(caseDir, '.status.tmp');
+    writeFileSync(pending, 'closed\n');
+    renameSync(pending, resolve(caseDir, 'status'));
+  });
+}
+
 async function startConsultant(root: string, address: string, task: string): Promise<void> {
   const caller: string | undefined = process.env.HC_TERMINAL_ID;
   if (!caller) throw new Error('consultant launch requires HC_TERMINAL_ID');
@@ -248,6 +322,11 @@ async function main(): Promise<void> {
     );
     process.stdout.write(consultsRoot(root, repo));
     return;
+  }
+  if (verb === 'close') {
+    const caseDir: string | undefined = process.argv[4];
+    if (process.argv.length !== 5 || !caseDir) usage();
+    return verbClose(root, caseDir);
   }
   if (verb !== 'new' && verb !== 'match') usage();
   const flags: Flags = parseFlags(process.argv.slice(4));

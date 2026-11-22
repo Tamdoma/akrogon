@@ -4,7 +4,18 @@
 // case, `open` for a matching still-open one, `clear` otherwise. No test consults a model:
 // the signature read and compare is the whole mechanical surface this criterion names.
 import { expect, test } from 'bun:test';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  linkSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
@@ -51,10 +62,7 @@ async function rig(): Promise<Rig> {
     resolve(root, 'issues/config.yaml'),
     Bun.YAML.stringify({ grounding: 'none', worktree_root: worktrees }),
   );
-  writeFileSync(
-    resolve(bin, 'akrogon'),
-    `#!/bin/sh\nprintf 'repo: ${REPO}\\nprefixes: {${REPO}: ct}\\n'\n`,
-  );
+  writeFileSync(resolve(bin, 'akrogon'), `#!/bin/sh\nprintf 'repo: ${REPO}\\nprefixes: {${REPO}: ct}\\n'\n`);
   chmodSync(resolve(bin, 'akrogon'), 0o755);
   const baseSha: string = await command(['git', 'rev-parse', 'origin/main'], root);
 
@@ -129,14 +137,8 @@ test('new writes the signature with anchor, command, base SHA and leaf HEADs', a
     '--leaf',
     'leaf-two',
   ]);
-  const headOne: string = await command(
-    ['git', 'rev-parse', 'HEAD'],
-    resolve(r.home, 'worktrees/leaf-one'),
-  );
-  const headTwo: string = await command(
-    ['git', 'rev-parse', 'HEAD'],
-    resolve(r.home, 'worktrees/leaf-two'),
-  );
+  const headOne: string = await command(['git', 'rev-parse', 'HEAD'], resolve(r.home, 'worktrees/leaf-one'));
+  const headTwo: string = await command(['git', 'rev-parse', 'HEAD'], resolve(r.home, 'worktrees/leaf-two'));
   expect(signature.anchor).toBe('leaf-one');
   expect(signature.cause).toBe('blocked');
   expect(signature.phase).toBe('check.review');
@@ -277,4 +279,88 @@ test('the case root refuses to resolve inside the watched repo', async () => {
   });
   expect(inside.code).toBe(1);
   expect(`${inside.stderr}${inside.stdout}`).toContain('inside the watched repo');
+});
+
+// A case with the consultant's detached worktree registered under it, the record files and the
+// evidence a close must trim.
+async function caseWithWorktree(r: Rig): Promise<string> {
+  const { dir }: NewCase = await newCase(r, ['--anchor', 'leaf-one']);
+  statusOf(dir, 'open');
+  await command(['git', 'worktree', 'add', '--detach', resolve(dir, 'worktree'), 'main'], r.root);
+  for (const name of ['case.md', 'brief.md', 'turn-1-watch.md', 'turn-1-consultant.md', 'verify.log'])
+    writeFileSync(resolve(dir, name), `${name}\n`);
+  mkdirSync(resolve(dir, 'evidence'));
+  writeFileSync(resolve(dir, 'evidence/shot.png'), 'png');
+  return dir;
+}
+
+test('close removes the case worktree, trims the folder to its record and writes closed', async () => {
+  const r: Rig = await rig();
+  const dir: string = await caseWithWorktree(r);
+  const closed: SpawnResult = await r.run(['close', r.root, dir]);
+  expect(closed.code).toBe(0);
+  expect(readdirSync(dir).sort()).toEqual([
+    'case.md',
+    'signature.json',
+    'status',
+    'turn-1-consultant.md',
+    'turn-1-watch.md',
+  ]);
+  expect(readFileSync(resolve(dir, 'status'), 'utf8').trim()).toBe('closed');
+  expect(await command(['git', 'worktree', 'list', '--porcelain'], r.root)).not.toContain(dir);
+  const matched: SpawnResult = await r.run(['match', r.root, '--anchor', 'leaf-one']);
+  expect(matched.stdout).toBe(`closed ${dir}`);
+});
+
+test('close exits non-zero and leaves the case open when the worktree holds an untracked file', async () => {
+  const r: Rig = await rig();
+  const dir: string = await caseWithWorktree(r);
+  writeFileSync(resolve(dir, 'worktree/scratch.txt'), 'unsaved\n');
+  const refused: SpawnResult = await r.run(['close', r.root, dir]);
+  expect(refused.code).not.toBe(0);
+  expect(refused.stderr).toContain('git worktree remove');
+  expect(readFileSync(resolve(dir, 'status'), 'utf8').trim()).toBe('open');
+  expect(existsSync(resolve(dir, 'worktree/scratch.txt'))).toBe(true);
+  expect(existsSync(resolve(dir, 'brief.md'))).toBe(true);
+  expect(existsSync(resolve(dir, 'evidence/shot.png'))).toBe(true);
+});
+
+test('close refuses a symlinked case that points outside the consults root and deletes nothing', async () => {
+  const r: Rig = await rig();
+  const { dir }: NewCase = await newCase(r, ['--anchor', 'leaf-one']);
+  const outside: string = resolve(r.home, 'archive');
+  mkdirSync(outside);
+  writeFileSync(resolve(outside, 'evidence.txt'), 'keep\n');
+  const link: string = resolve(dirname(dir), 'linked-1');
+  symlinkSync(outside, link);
+  const refused: SpawnResult = await r.run(['close', r.root, link]);
+  expect(refused.code).not.toBe(0);
+  expect(readdirSync(outside)).toEqual(['evidence.txt']);
+  expect(readFileSync(resolve(outside, 'evidence.txt'), 'utf8')).toBe('keep\n');
+});
+
+test('close refuses a case whose status is a symlink to an outside file and deletes nothing', async () => {
+  const r: Rig = await rig();
+  const dir: string = await caseWithWorktree(r);
+  const outside: string = resolve(r.home, 'outside-status');
+  writeFileSync(outside, 'keep\n');
+  rmSync(resolve(dir, 'status'));
+  symlinkSync(outside, resolve(dir, 'status'));
+  const refused: SpawnResult = await r.run(['close', r.root, dir]);
+  expect(refused.code).not.toBe(0);
+  expect(readFileSync(outside, 'utf8')).toBe('keep\n');
+  expect(existsSync(resolve(dir, 'worktree'))).toBe(true);
+  expect(existsSync(resolve(dir, 'brief.md'))).toBe(true);
+});
+
+test('close replaces a hard-linked status instead of writing through it', async () => {
+  const r: Rig = await rig();
+  const dir: string = await caseWithWorktree(r);
+  const backup: string = resolve(r.home, 'status-backup');
+  linkSync(resolve(dir, 'status'), backup);
+  const closed: SpawnResult = await r.run(['close', r.root, dir]);
+  expect(closed.code).toBe(0);
+  expect(readFileSync(resolve(dir, 'status'), 'utf8').trim()).toBe('closed');
+  expect(readFileSync(backup, 'utf8').trim()).toBe('open');
+  expect(readdirSync(dir)).not.toContain('.status.tmp');
 });
