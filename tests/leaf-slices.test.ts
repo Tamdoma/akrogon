@@ -636,9 +636,9 @@ function hostKept(f: Fixture): { path: string; reason: string }[] {
 }
 
 // store-sweep criterion 2: the host step removes retired akrogon leftovers —
-// the retired temp root, unregistered worktree-store dirs, leaf-temp dirs of
-// unregistered repos, runs/last-start, dead-pid tmp files and retired locks —
-// and keeps what it cannot prove safe.
+// the retired temp root, runs/last-start, dead-pid tmp files and retired locks —
+// and keeps what it cannot prove safe, including names another home may own:
+// unregistered worktree-store dirs and leaf-temp dirs of unregistered repos.
 test('the host step removes retired leftovers and keeps unprovable items', async () => {
   const f: SliceFixture = await slicesFixture();
   const child: Bun.Subprocess = Bun.spawn(['sleep', '300']);
@@ -697,10 +697,10 @@ test('the host step removes retired leftovers and keeps unprovable items', async
     });
     expect(result.code).toBe(0);
     expect(existsSync(retired)).toBe(false);
-    expect(existsSync(resolve(worktrees, 'oldname'))).toBe(false);
+    expect(existsSync(resolve(worktrees, 'oldname'))).toBe(true);
     expect(existsSync(resolve(worktrees, 'gone-repo'))).toBe(true);
     expect(existsSync(resolve(worktrees, 'keeper'))).toBe(true);
-    expect(existsSync(resolve(tempRoot, 'aaaa'))).toBe(false);
+    expect(existsSync(resolve(tempRoot, 'aaaa'))).toBe(true);
     expect(existsSync(resolve(runs, 'last-start'))).toBe(false);
     expect(existsSync(resolve(f.home, 'x.4194303.tmp'))).toBe(false);
     expect(existsSync(resolve(f.home, 'z.4194303.tmp'))).toBe(false);
@@ -713,6 +713,9 @@ test('the host step removes retired leftovers and keeps unprovable items', async
     expect(existsSync(resolve(f.root, '.git/akrogon-install.lock'))).toBe(true);
     const host: { path: string; reason: string }[] = hostKept(f);
     expect(host.some((entry) => entry.path === resolve(f.home, 'gone'))).toBe(false);
+    expect(host.map((entry) => entry.path)).toEqual(
+      expect.arrayContaining([resolve(worktrees, 'oldname'), resolve(tempRoot, 'aaaa')]),
+    );
     const repoKept = z
       .object({ kept: z.array(z.object({ path: z.string(), reason: z.string() })) })
       .parse(JSON.parse(readFileSync(resolve(f.home, 'reconcile', `${f.repo}.json`), 'utf8'))).kept;

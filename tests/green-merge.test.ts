@@ -138,6 +138,7 @@ test('a green top lands with no seat', async () => {
     expect(landLaunches(f)).toHaveLength(1);
     expect(landLaunches(f)[0]).toContain(`--unit=akrogon-land-${attempt}`);
     expect(landLaunches(f)[0]).toContain(`land aa --attempt ${attempt}`);
+    expect(landLaunches(f)[0]).toContain('--setenv=AKROGON_LEAF_TEMP_ROOT=');
     expect(landLaunches(f)[0]).not.toContain('HERDR_PANE_ID');
     expect(landLaunches(f)[0]).toContain('--setenv=NODE_DISABLE_COMPILE_CACHE=1');
     expect(prompts(f, 'merge-issue')).toEqual([]);

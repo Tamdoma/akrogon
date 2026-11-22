@@ -1379,29 +1379,20 @@ export async function reconcileHost(
   const retired: string = retiredLeafTempRoot();
   if (lstatSync(retired, { throwIfNoEntry: false }) !== undefined) await dropPath(retired, true);
 
-  // ~/.akrogon/worktrees/<name> for an unregistered name is a store dir with
-  // no repo behind it: dropped unless a child still holds a .git worktree.
+  // ~/.akrogon/worktrees/<name> for an unregistered name may belong to another
+  // home sharing this store, so it is reported, never deleted.
   const home: string = globalHome();
   const repoNames: Set<string> = new Set(repos.map((repo) => repo.name));
   const storeRoot: string = resolve(homedir(), '.akrogon/worktrees');
   if (existsSync(storeRoot))
     for (const entry of readdirSync(storeRoot)) {
       if (repoNames.has(entry)) continue;
-      const dir: string = resolve(storeRoot, entry);
-      const stat: Stats | undefined = lstatSync(dir, { throwIfNoEntry: false });
-      if (stat === undefined || !stat.isDirectory()) {
-        await dropPath(dir, false);
-        continue;
-      }
-      const hasWorktree: boolean = readdirSync(dir, { withFileTypes: true }).some(
-        (child) => child.isDirectory() && existsSync(resolve(dir, child.name, '.git')),
-      );
-      if (hasWorktree) keep(dir, 'unregistered repo', 'removed once its last worktree goes');
-      else await dropPath(dir, true);
+      keep(resolve(storeRoot, entry), 'unregistered repo', 'register the repo or remove this path by hand');
     }
 
-  // Strays directly under the leaf temp root; repo-hash dirs of registered
-  // repos are skipped because the repo pass owns them.
+  // Entries directly under the leaf temp root; repo-hash dirs of registered
+  // repos are skipped because the repo pass owns them. Any other name may be
+  // another home's repo dir on this shared root, so it is reported, never deleted.
   const hex = (text: string): string => createHash('sha256').update(text).digest('hex');
   const repoHashes: Set<string> = new Set(repos.map((repo) => hex(repo.root).slice(0, 4)));
   const root: string = leafTempRoot();
@@ -1416,7 +1407,7 @@ export async function reconcileHost(
       const stat: Stats | undefined = lstatSync(dir, { throwIfNoEntry: false });
       if (stat === undefined) continue;
       if (stat.isDirectory() && repoHashes.has(entry)) continue;
-      await dropPath(dir, stat.isDirectory());
+      keep(dir, 'not a registered repo of this home', 'register the repo or remove this path by hand');
     }
 
   // <file>.<pid>.tmp under globalHome, runs/ and reconcile/ with a dead pid.

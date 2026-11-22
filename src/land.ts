@@ -42,7 +42,10 @@ export async function launchLand(repo: Repo, slug: string, attempt: string): Pro
     `--setenv=XDG_RUNTIME_DIR=${process.env.XDG_RUNTIME_DIR ?? ''}`,
     `--setenv=DBUS_SESSION_BUS_ADDRESS=${sessionBusAddress()}`,
     '--setenv=NODE_DISABLE_COMPILE_CACHE=1',
-    ...(process.env.AKROGON_HOME === undefined ? [] : [`--setenv=AKROGON_HOME=${process.env.AKROGON_HOME}`]),
+    ...['AKROGON_HOME', 'AKROGON_LEAF_TEMP_ROOT', 'AKROGON_RETIRED_TEMP_ROOT'].flatMap((name: string): string[] => {
+      const value: string | undefined = process.env[name];
+      return value === undefined ? [] : [`--setenv=${name}=${value}`];
+    }),
     '--',
     process.execPath,
     resolve(toolRoot, 'src/akrogon.ts'),

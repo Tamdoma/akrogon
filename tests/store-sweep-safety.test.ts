@@ -36,7 +36,7 @@ test('F7 test environments isolate the retired temp root', async () => {
   }
 });
 
-test('F1 dangling entries are removed from stores and the host temp root', async () => {
+test('F1 dangling entries are removed from stores and kept at the host temp root', async () => {
   const f: HcFixture = await hcFixture();
   try {
     const roots: string[] = [storeDir(f), resolve(f.root, 'issues/worktrees'), leafTempRoot(f)];
@@ -45,7 +45,10 @@ test('F1 dangling entries are removed from stores and the host temp root', async
       symlinkSync(resolve(f.home, 'missing'), resolve(root, 'dangling'));
     }
     expect((await cli(f, ['next', '--all'], f.root, f.env)).code).toBe(0);
-    for (const root of roots) expect(lstatSync(resolve(root, 'dangling'), { throwIfNoEntry: false })).toBeUndefined();
+    for (const root of roots.slice(0, 2))
+      expect(lstatSync(resolve(root, 'dangling'), { throwIfNoEntry: false })).toBeUndefined();
+    // An unknown name at the shared host temp root may be another home's: kept, never deleted.
+    expect(lstatSync(resolve(leafTempRoot(f), 'dangling'), { throwIfNoEntry: false })).toBeDefined();
   } finally {
     await f.clean();
   }
@@ -118,7 +121,9 @@ test('F3 live owner records protect recursively deleted parents and batch record
     child.kill('SIGKILL');
     await child.exited;
     expect((await cli(f, ['next', '--all'], f.root, f.env)).code).toBe(0);
-    for (const path of [retired, oldRepo, verify, batch, batch + '.owner']) expect(existsSync(path)).toBe(false);
+    for (const path of [retired, verify, batch, batch + '.owner']) expect(existsSync(path)).toBe(false);
+    // An unregistered repo dir at the shared host temp root may be another home's: kept.
+    expect(existsSync(oldRepo)).toBe(true);
   } finally {
     if (child.exitCode === null) child.kill('SIGKILL');
     await child.exited;
