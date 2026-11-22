@@ -153,21 +153,25 @@ async function poll(): Promise<'exit' | 'stay'> {
     return 'stay';
   }
   const status: string | null = watcher.status?.state ?? null;
-  // While the watcher works (plan D6), a crossed boundary moves the queue's unsent due to the
-  // latest number instead of queueing another; an idle watcher keeps one entry per due.
   const busy: boolean = status !== 'idle' && status !== 'done';
-  // Several boundaries can fall inside one poll gap; each re-finds the unsent due.
+  // One idle poll can queue several elapsed dues. Once the watcher works, keep the sent head
+  // and only the newest unsent due, even if this poll crosses no new boundary.
+  if (busy) {
+    const firstUnsent: number = dues[0]?.sent ? 1 : 0;
+    const obsolete: number = dues.length - firstUnsent - 1;
+    if (obsolete > 0) dues.splice(firstUnsent, obsolete);
+  }
   while (nextBoundary <= now) {
     dueCount += 1;
-    const pending: Due | undefined = busy ? dues.findLast((due: Due) => due.sent === null) : undefined;
-    if (pending !== undefined) pending.n = dueCount;
+    const pending: Due | undefined = busy ? dues.at(-1) : undefined;
+    if (pending?.sent === null) pending.n = dueCount;
     else dues.push({ n: dueCount, attempts: 0, sent: null });
     nextBoundary += intervalMs;
   }
 
   const oldest: Due | undefined = dues[0];
   if (oldest === undefined) return 'stay';
-  if (status !== 'idle' && status !== 'done') {
+  if (busy) {
     note(`hold due=${oldest.n}: watcher ${status ?? 'has no reported status'}`);
     return 'stay';
   }
