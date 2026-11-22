@@ -18,7 +18,7 @@ In the chart door's own pane, say it in plain words. Name autopilot, the work yo
 
 You can also switch it on later in the same door, naming a chart. Answers you already gave in that chart stay yours. If the session has no signposts yet, the signposts round runs first, before A answers anything.
 
-The door's first reply repeats the mode, the handed work and the consultants. With the signposts round it asks one needs sheet for the session: every key, login, file, account, permission and approval — including live-change grants and `paid_budget` for paid charting probes — the charting will require, each with purpose and destination. You answer the rows. Charting proceeds while they are pending. The budget row affects paid probes by the door and adds no handoff requirement.
+The door's first reply repeats the mode, the handed work and the consultants. With the signposts round it asks one needs sheet for the session: every key, login, file, account, permission and approval — including live-change grants and `paid_budget` for paid charting probes — the charting will require, each with purpose and destination. You answer the rows. Charting proceeds while they are pending. A pending need holds the proofs and handoffs that depend on it. The budget row applies only to paid probes by the door.
 
 ## What the door does
 
