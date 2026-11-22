@@ -325,6 +325,26 @@ test('ledger row boundaries survive append and expose a trailing blank row', asy
   }
 });
 
+test('an unreadable ledger refuses naming the file and leaves its bytes intact', async () => {
+  const f: Fixture = await fixture();
+  try {
+    budget(f, 10, 30);
+    const { worktree } = await leafWorktree(f, 'unreadable');
+    seedRows(f, [row(f.repo, 'earlier', 1, 1)]);
+    chmodSync(ledger(f), 0o000);
+    const marker: string = resolve(f.home, 'unreadable-ran');
+    const result: Result = await cli(f, ['run-check', '--sessions', '1', '--', 'touch', marker], worktree, baseEnv(f));
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain(ledger(f));
+    expect(result.stderr).toContain('Cannot read');
+    expect(existsSync(marker)).toBe(false);
+    chmodSync(ledger(f), 0o600);
+    expect(rows(f)).toEqual([{ at: expect.any(String), repo: f.repo, slug: 'earlier', run: 'seeded-run', sessions: 1 }]);
+  } finally {
+    f.clean();
+  }
+});
+
 test('a failed ledger append refuses and starts no command', async () => {
   const f: Fixture = await fixture();
   try {
@@ -467,13 +487,15 @@ test('refusals before the reservation write no ledger row', async () => {
     const owner: string = resolve(leafPath, '..');
     mkdirSync(resolve(f.root, 'issues/closed'), { recursive: true });
     renameSync(owner, resolve(f.root, 'issues/closed/issue'));
+    const closedLeaf: string = resolve(f.root, 'issues/closed/issue/reserve-order');
     const closedRefused: Result = await cli(
       f,
-      ['run-check', '--leaf', leafPath, '--sessions', '1', '--', 'touch', marker],
+      ['run-check', '--leaf', closedLeaf, '--sessions', '1', '--', 'touch', marker],
       worktree,
       baseEnv(f),
     );
     expect(closedRefused.code).not.toBe(0);
+    expect(closedRefused.stderr).toContain('owner closed');
     renameSync(resolve(f.root, 'issues/closed/issue'), owner);
     failLeaf(leafPath, 'operator asked');
     const failedRefused: Result = await cli(
