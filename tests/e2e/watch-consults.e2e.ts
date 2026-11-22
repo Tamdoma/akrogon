@@ -155,6 +155,7 @@ test.serial(
     const minutes: number = z.coerce.number().positive().parse(process.env.AKROGON_SESSION_MINUTES);
     const deadline: number = Date.now() + minutes * 60_000;
     console.log(`session deadline: ${new Date(deadline).toISOString()} (AKROGON_SESSION_MINUTES=${minutes})`);
+    const watcherBinary: string = z.string().parse(Bun.which('pi'));
     const name: string = 'akr-e2e-watch-consults';
     const tier: WatchTier = await startWatchTier(
       name,
@@ -220,7 +221,7 @@ test.serial(
         '--',
         '/usr/bin/env',
         ...watcherEnv,
-        'pi',
+        watcherBinary,
         '--model',
         'devin/swe-2-max',
         '--thinking',
