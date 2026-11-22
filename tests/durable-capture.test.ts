@@ -301,14 +301,16 @@ test('a pack started during a live capture waits for writers and publication, th
       ['run-check', '--leaf', leafPath, '--name', 'pk', '--', 'sh', '-c', blocking(f, 'pk')],
       f.root,
     );
-    let phaseDone: boolean = false;
-    const phase = cli(f, ['phase', 'packw', 'merged']).then((result) => {
-      phaseDone = true;
-      return result;
-    });
     try {
       await waitFor(() => existsSync(`${f.home}/ready-pk`), 'ready file');
       await waitFor(() => captures(impl).length === 1, 'capture files');
+      // The pack starts only once the capture is live: a phase that wins the
+      // race moves the owner first and the run-check refuses it as gone.
+      let phaseDone: boolean = false;
+      const phase = cli(f, ['phase', 'packw', 'merged']).then((result) => {
+        phaseDone = true;
+        return result;
+      });
       // The command cannot exit until released: a finished phase here proves
       // pack did not wait for the capture writers.
       for (let i = 0; i < 30; i++) {
@@ -338,7 +340,6 @@ test('a pack started during a live capture waits for writers and publication, th
       writeFileSync(`${f.home}/release-pk`, '');
       if (cap.proc.exitCode === null) cap.proc.kill('SIGKILL');
       void cap.result;
-      void phase;
     }
   } finally {
     f.clean();
