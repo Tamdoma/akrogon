@@ -47,11 +47,9 @@ export async function reserve(
   sessionsText: string,
 ): Promise<{ sessions: number; minutes: number }> {
   const n: number = Number(sessionsText);
-  if (!Number.isInteger(n) || n <= 0)
-    throw new Error(`Invalid --sessions ${sessionsText}: a positive integer`);
+  if (!Number.isInteger(n) || n <= 0) throw new Error(`Invalid --sessions ${sessionsText}: a positive integer`);
   const paidBudget = readGlobal().paid_budget;
-  if (paidBudget === undefined)
-    throw new Error(`Missing paid_budget in ${resolve(globalHome(), 'config.yaml')}`);
+  if (paidBudget === undefined) throw new Error(`Missing paid_budget in ${resolve(globalHome(), 'config.yaml')}`);
   const ledger: string = resolve(globalHome(), 'budget.jsonl');
   return withLock(resolve(globalHome(), 'budget.lock'), async (): Promise<{ sessions: number; minutes: number }> => {
     const cap: number = paidBudget.sessions_per_day;

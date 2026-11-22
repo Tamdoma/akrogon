@@ -10,16 +10,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import {
-  fixture,
-  cli,
-  entry,
-  leaf,
-  yaml,
-  fakeAkrogon,
-  leafTempRoot,
-  type Fixture,
-} from './helpers';
+import { fixture, cli, entry, leaf, yaml, fakeAkrogon, leafTempRoot, type Fixture } from './helpers';
 import { command, finishCaptured, spawnFiles, type Result, type SpawnResult } from '../src/shell';
 import { readState, saveState } from '../src/state';
 import type { Phase } from '../src/routing';
@@ -131,7 +122,9 @@ test('a reserved run exports AKROGON_SESSIONS and AKROGON_SESSION_MINUTES and re
         '--sessions',
         '3',
         '--',
-        ...sh('printf %s:%s:%s "$AKROGON_SESSIONS" "$AKROGON_SESSION_MINUTES" "$(wc -l < "$AKROGON_HOME/budget.jsonl")"'),
+        ...sh(
+          'printf %s:%s:%s "$AKROGON_SESSIONS" "$AKROGON_SESSION_MINUTES" "$(wc -l < "$AKROGON_HOME/budget.jsonl")"',
+        ),
       ],
       worktree,
       baseEnv(f),
@@ -173,11 +166,7 @@ test('an unreserved run exports neither AKROGON_SESSIONS nor AKROGON_SESSION_MIN
     const { worktree } = await leafWorktree(f, 'unreserved');
     const result: Result = await cli(
       f,
-      [
-        'run-check',
-        '--',
-        ...sh('printf %s:%s "${AKROGON_SESSIONS:-unset}" "${AKROGON_SESSION_MINUTES:-unset}"'),
-      ],
+      ['run-check', '--', ...sh('printf %s:%s "${AKROGON_SESSIONS:-unset}" "${AKROGON_SESSION_MINUTES:-unset}"')],
       worktree,
       baseEnv(f, { AKROGON_SESSIONS: '9', AKROGON_SESSION_MINUTES: '9' }),
     );
@@ -199,12 +188,7 @@ test('a reservation over the rolling 24-hour ceiling is refused naming the total
     const second: Row = row(f.repo, 'recent', 1, 1);
     seedRows(f, [stale, first, second]);
     const marker: string = resolve(f.home, 'over-ran');
-    const result: Result = await cli(
-      f,
-      ['run-check', '--sessions', '1', '--', 'touch', marker],
-      worktree,
-      baseEnv(f),
-    );
+    const result: Result = await cli(f, ['run-check', '--sessions', '1', '--', 'touch', marker], worktree, baseEnv(f));
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain('paid session budget');
     expect(result.stderr).toContain('24-hour total 3 of 3');
@@ -225,12 +209,7 @@ test('a request larger than the ceiling never fits', async () => {
     budget(f, 3, 30);
     const { worktree } = await leafWorktree(f, 'too-big');
     const marker: string = resolve(f.home, 'big-ran');
-    const result: Result = await cli(
-      f,
-      ['run-check', '--sessions', '4', '--', 'touch', marker],
-      worktree,
-      baseEnv(f),
-    );
+    const result: Result = await cli(f, ['run-check', '--sessions', '4', '--', 'touch', marker], worktree, baseEnv(f));
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain('never fits');
     expect(existsSync(marker)).toBe(false);
@@ -264,12 +243,7 @@ test('--sessions without paid_budget refuses naming the key and the config file'
   try {
     const { worktree } = await leafWorktree(f, 'no-budget');
     const marker: string = resolve(f.home, 'key-ran');
-    const result: Result = await cli(
-      f,
-      ['run-check', '--sessions', '2', '--', 'touch', marker],
-      worktree,
-      baseEnv(f),
-    );
+    const result: Result = await cli(f, ['run-check', '--sessions', '2', '--', 'touch', marker], worktree, baseEnv(f));
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain('paid_budget');
     expect(result.stderr).toContain('config.yaml');
@@ -311,12 +285,7 @@ test('a malformed ledger row refuses naming the file and the bad row', async () 
     const { worktree } = await leafWorktree(f, 'bad-ledger');
     writeFileSync(ledger(f), '{"at":"2026-11-22T00:00:00Z","repo":"r","slug":"s","run":"x","sessions":1}\nnot-json\n');
     const marker: string = resolve(f.home, 'malformed-ran');
-    const result: Result = await cli(
-      f,
-      ['run-check', '--sessions', '1', '--', 'touch', marker],
-      worktree,
-      baseEnv(f),
-    );
+    const result: Result = await cli(f, ['run-check', '--sessions', '1', '--', 'touch', marker], worktree, baseEnv(f));
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain(ledger(f));
     expect(result.stderr).toContain('not-json');
@@ -335,12 +304,7 @@ test('a failed ledger append refuses and starts no command', async () => {
     seedRows(f, [row(f.repo, 'earlier', 1, 1)]);
     chmodSync(ledger(f), 0o444);
     const marker: string = resolve(f.home, 'append-ran');
-    const result: Result = await cli(
-      f,
-      ['run-check', '--sessions', '1', '--', 'touch', marker],
-      worktree,
-      baseEnv(f),
-    );
+    const result: Result = await cli(f, ['run-check', '--sessions', '1', '--', 'touch', marker], worktree, baseEnv(f));
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain(ledger(f));
     expect(existsSync(marker)).toBe(false);
@@ -363,10 +327,12 @@ test('a reserved run waits behind the budget lock, then writes its row and runs'
     const reader: ReadableStreamDefaultReader<Uint8Array> = holder.stdout.getReader();
     try {
       expect((await reader.read()).done).toBe(false);
-      const waiting = spawnFiles(
-        [process.execPath, entry, 'run-check', '--sessions', '1', '--', 'touch', marker],
-        { cwd: worktree, env: runEnv(f), timeout: 60000, killSignal: 'SIGKILL' },
-      );
+      const waiting = spawnFiles([process.execPath, entry, 'run-check', '--sessions', '1', '--', 'touch', marker], {
+        cwd: worktree,
+        env: runEnv(f),
+        timeout: 60000,
+        killSignal: 'SIGKILL',
+      });
       try {
         const deadline: number = Date.now() + 1500;
         while (Date.now() < deadline) {
