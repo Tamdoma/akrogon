@@ -66,14 +66,14 @@ export function constructedEnv(repo: Repo, runRoot: string): Record<string, stri
     if (value !== undefined) env[key] = value;
   }
   env.TMPDIR = runRoot;
-  // Node's compile cache writes hundreds of MB into each run's TMPDIR and is never reused.
-  env.NODE_DISABLE_COMPILE_CACHE = '1';
   env.LANG = 'C.UTF-8';
   for (const key of [...repo.config.env, ...repo.config.pass_env]) {
     const value: string | undefined = process.env[key];
     if (value !== undefined) env[key] = value;
   }
   env.DBUS_SESSION_BUS_ADDRESS = 'unix:path=/nonexistent';
+  // Node's compile cache writes hundreds of MB into each run's TMPDIR and is never reused.
+  env.NODE_DISABLE_COMPILE_CACHE = '1';
   return env;
 }
 

@@ -221,6 +221,19 @@ test('run-check disables the Node compile cache even when the caller does not', 
     );
     expect(result.code).toBe(0);
     expect(result.stdout).toContain('cache=1');
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      pass_env: ['NODE_DISABLE_COMPILE_CACHE'],
+      checks: {},
+      grounding: 'none',
+    });
+    const passed: Result = await cli(
+      f,
+      ['run-check', '--', ...sh('printf "cache=%s\\n" "$NODE_DISABLE_COMPILE_CACHE"')],
+      worktree,
+      baseEnv(f, { NODE_DISABLE_COMPILE_CACHE: '0' }),
+    );
+    expect(passed.code).toBe(0);
+    expect(passed.stdout).toContain('cache=1');
   } finally {
     f.clean();
   }
