@@ -263,22 +263,29 @@ test.serial(
       tier.record('consultant.json', consultant);
 
       // The fix lands: the leaf resumes out of failed, and the case end already closed the
-      // consultant (hc kill + rm) before the resume commands ran: its terminal is gone.
+      // consultant (hc kill + rm) before the resume commands ran: no consultant terminal is left,
+      // a replacement started under liveness included.
       const resumed: string[] = ['check.fix', 'check.review', 'check.repair'];
       // The sends are read off the screens while the case runs: `hc read` returns only pi's last
-      // screenful, so a send seen once is kept. The consultant's sends land on the watcher's
-      // screen inside `<hc from="<consultant> ...">` and its own screen shows its `hc send`; the
-      // watcher's go out as `hc send` commands on its screen.
+      // screenful, so a send seen once is kept. A consultant's sends land on the watcher's screen
+      // inside `<hc from="<address> aw-watch-consult">` and its own screen shows its `hc send`;
+      // the watcher's go out as `hc send` commands on its screen.
       const named = (l: string): string[] => [...l.matchAll(/turn-\d+-(?:watch|consultant)\.md/g)].map((m) => m[0]);
       const inbound: Set<string> = new Set();
       const outbound: Set<string> = new Set();
+      const consultants = async (): Promise<Term[]> =>
+        z
+          .object({ terminals: z.array(termSchema) })
+          .parse(await tier.rpc('terminal.list', { all: true, labels: { 'akrogon.watch-consult': 'akre2e' } }))
+          .terminals;
       const sample = async (): Promise<void> => {
         for (const l of (await screen(tier, watcher, 200)).split('\n')) {
-          if (l.includes(`<hc from="${consultant!.address} `)) for (const f of named(l)) inbound.add(f);
+          if (/<hc from="\S+ aw-watch-consult">/.test(l)) for (const f of named(l)) inbound.add(f);
           else if (/\bhc send\b/.test(l)) for (const f of named(l)) outbound.add(f);
         }
-        for (const l of (await screen(tier, consultant!.address, 200)).split('\n'))
-          if (/\bhc send\b/.test(l)) for (const f of named(l)) inbound.add(f);
+        for (const c of await consultants())
+          for (const l of (await screen(tier, c.address, 200)).split('\n'))
+            if (/\bhc send\b/.test(l)) for (const f of named(l)) inbound.add(f);
       };
       while (!resumed.includes(statePhase(tier.root, SLUG)) && Date.now() < deadline) {
         await sample();
@@ -286,11 +293,14 @@ test.serial(
       }
       await sample();
       const phase: string = statePhase(tier.root, SLUG);
-      const removed: boolean = await gone(tier, consultant!.address);
+      const lingering: Term[] = await consultants();
       tier.record('watcher-screen.txt', await screen(tier, watcher, 200));
       tier.record('watcher-transcript.txt', (await transcriptFor({ session, address: watcher })) ?? 'none');
       expect(resumed).toContain(phase);
-      expect(removed, `consultant ${consultant!.address} not removed\n${await screen(tier, watcher, 60)}`).toBe(true);
+      expect(
+        lingering.map((t) => t.address),
+        `consultant not removed\n${await screen(tier, watcher, 60)}`,
+      ).toEqual([]);
 
       // The leaf's seat A (the tier stand-in) starts on the resumed phase: akrogon next dispatched it.
       const seat: Term | null = await waitLabelled(
