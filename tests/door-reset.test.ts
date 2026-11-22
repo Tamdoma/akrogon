@@ -28,7 +28,8 @@ type Step = {
   reason?: string;
 };
 type Received = { input: string; busy: boolean; label: string | null };
-type Run = { f: Fixture; core: HcCore; a: string; out: string; log: string };
+// left() is the time to the test's one deadline, set when A starts: every wait after it shares that budget.
+type Run = { f: Fixture; core: HcCore; a: string; out: string; log: string; left: () => number };
 
 const stepSchema = z
   .object({
@@ -64,7 +65,7 @@ function inputs(run: Run): Received[] {
 }
 
 // The transcript the turn for `input` wrote, once that turn has ended (woken by the folder's change events).
-function turnOf(run: Run, input: string, ms: number = WAIT_MS): Promise<string> {
+function turnOf(run: Run, input: string): Promise<string> {
   return new Promise<string>((done, fail) => {
     const check = (): void => {
       const all = agentLines(run);
@@ -79,7 +80,7 @@ function turnOf(run: Run, input: string, ms: number = WAIT_MS): Promise<string> 
     const timer = setTimeout(() => {
       watcher.close();
       fail(new Error(`A never ended a turn for ${input}: ${JSON.stringify(agentLines(run))}`));
-    }, ms);
+    }, run.left());
     check();
   });
 }
@@ -113,7 +114,7 @@ async function lookup(run: Run, own: Record<string, string> | null): Promise<str
 }
 
 // Resolves when the helper's log holds `step`, woken by the folder's change events; the timer only bounds it.
-function logged(log: string, step: string, ms: number = WAIT_MS): Promise<Step> {
+function logged(log: string, step: string, ms: number): Promise<Step> {
   return new Promise<Step>((done, fail) => {
     const check = (): boolean => {
       const found: Step | undefined = steps(log).find((s: Step) => s.step === step);
@@ -133,6 +134,8 @@ function logged(log: string, step: string, ms: number = WAIT_MS): Promise<Step> 
 }
 
 async function startA(kind: Kind, mode: 'switch' | 'noswitch'): Promise<Run> {
+  const end: number = Date.now() + WAIT_MS;
+  const left = (): number => end - Date.now();
   const f: Fixture = await fixture();
   const core: HcCore = await hcCore(f);
   const out: string = resolve(f.home, `door-${kind}`);
@@ -161,8 +164,8 @@ async function startA(kind: Kind, mode: 'switch' | 'noswitch'): Promise<Run> {
   ]);
   expect(started.code).toBe(0);
   const a: string = z.object({ address: z.string() }).parse(JSON.parse(started.stdout)).address;
-  await core.waitFor(a, (t) => t.status?.state === 'working');
-  return { f, core, a, out, log: resolve(out, 'handover.log') };
+  await core.waitFor(a, (t) => t.status?.state === 'working', left());
+  return { f, core, a, out, log: resolve(out, 'handover.log'), left };
 }
 
 // Starts the helper the way A's last action does (its output appended to the log) and returns its terminal.
@@ -206,7 +209,13 @@ async function reset(run: Run, start: string, env: Record<string, string> = {}):
 // wait's JSON carries exit_code even though --rm then removes the terminal; null when the terminal was
 // already gone at attach.
 async function exited(run: Run, address: string): Promise<number | null> {
-  const waited: SpawnResult = await run.core.hc(['wait', '--json', '--timeout', '15', address]);
+  const waited: SpawnResult = await run.core.hc([
+    'wait',
+    '--json',
+    '--timeout',
+    String(Math.ceil(run.left() / 1000)),
+    address,
+  ]);
   const left = (await run.core.terminals({}, true)).find((t) => t.address === address);
   // --rm removes the terminal at exit; a helper done before wait attaches answers 3 for a gone address.
   expect(waited.code === 0 || waited.code === 3).toBe(true);
@@ -265,7 +274,7 @@ test.each([
     try {
       const start: string = `/chart-issues continue handover 2026-11-08T03:00:00Z door ${run.a} next /charts/next`;
       const address: string = await reset(run, start);
-      const began: Step = await logged(run.log, 'started');
+      const began: Step = await logged(run.log, 'started', run.left());
       await release(run);
       await exited(run, address);
       const log: Step[] = steps(run.log);
@@ -305,7 +314,7 @@ test('claude: a label naming a transcript that is gone gives way to the conversa
     const left: string = resolve(run.f.home, '.claude/projects/left-conversation.jsonl');
     expect((await run.core.hc(['label', run.a, `akrogon.transcript=${left}`])).code).toBe(0);
     const address: string = await reset(run, '/chart-issues continue handover t door x next /charts/next');
-    const began: Step = await logged(run.log, 'started');
+    const began: Step = await logged(run.log, 'started', run.left());
     await release(run);
     await exited(run, address);
     expect(steps(run.log).map((s: Step) => s.step)).toEqual(STAGES);
@@ -420,7 +429,7 @@ test('an operator input record in A transcript after the helper started cancels 
     // A named tab alone would send a rename: the cancel must stop before the name stage too (criterion 5).
     await addTab(run, 'c-akrogon');
     const address: string = await reset(run, '/chart-issues continue handover t door x next /charts/next');
-    const began: Step = await logged(run.log, 'started');
+    const began: Step = await logged(run.log, 'started', run.left());
     appendFileSync(
       z.string().parse(began.pre),
       `${JSON.stringify({ type: 'user', origin: { kind: 'human' }, message: { role: 'user', content: 'wait' } })}\n`,
@@ -462,7 +471,7 @@ test('a reset that leaves A on the same transcript lands the start prompt there,
   try {
     const start: string = '/chart-issues continue handover t door x next /charts/next';
     const address: string = await reset(run, start);
-    const began: Step = await logged(run.log, 'started');
+    const began: Step = await logged(run.log, 'started', run.left());
     await release(run);
     await exited(run, address);
     expect(steps(run.log).map((s: Step) => s.step)).toEqual(STAGES);
