@@ -904,6 +904,48 @@ test("a listed run of the holding attempt starts ahead of the line's earlier wai
   }
 }, 75000);
 
+test('a listed run that started while the land waited on its slice lock stays ahead of the land', async () => {
+  const f: Fixture = await fixture();
+  const caps: Cap[] = [];
+  try {
+    const dir: string = marks(f);
+    yaml(resolve(f.root, 'issues/config.yaml'), FULL_CONFIG);
+    const other: string = await leafWorktree(f, 'leaf-one');
+    const landing: string = await attemptWorktree(f, 'landing', 'att-1');
+    const lockPath: string = resolve(f.home, 'runs', 'locks', 'akrogon.slice');
+    mkdirSync(resolve(f.home, 'runs', 'locks'), { recursive: true });
+    const lock: Proc = Bun.spawn(
+      ['flock', '-x', lockPath, 'sh', '-c', `touch ${dir}/locked; while [ ! -e ${dir}/unlock ]; do sleep 0.05; done`],
+      { stdin: 'ignore', stdout: 'ignore', stderr: 'ignore' },
+    );
+    await waitFor(resolve(dir, 'locked'));
+    // The land takes its arrival time, then blocks on its slice lock.
+    const held: Cap = landHold(f, dir, 'landing', f.repo, 'att-1', 'release2');
+    caps.push(held);
+    await Bun.sleep(1500);
+    // A later listed run starts through another slice while the land is blocked.
+    const leafRun: Cap = run(f, ['run-check', '--name', 'test', '--', ...hold(dir, 'leaf')], other);
+    caps.push(leafRun);
+    await waitFor(resolve(dir, 'leaf.held'));
+    writeFileSync(resolve(dir, 'unlock'), '');
+    expect(await lock.exited).toBe(0);
+    await waitFor(resolve(dir, 'landing.held'));
+    const own: Cap = run(f, ['run-check', '--name', 'test', '--', ...touch(dir, 'own')], landing);
+    caps.push(own);
+    await waitForText(own, new RegExp(`waiting for ${f.repo}/leaf-one test`));
+    expect(existsSync(resolve(dir, 'own'))).toBe(false);
+    writeFileSync(resolve(dir, 'release'), '');
+    expect(await leafRun.proc.exited).toBe(0);
+    expect(await own.proc.exited).toBe(0);
+    expect(existsSync(resolve(dir, 'own'))).toBe(true);
+    writeFileSync(resolve(dir, 'release2'), '');
+    expect(await held.proc.exited).toBe(0);
+  } finally {
+    stop(caps);
+    f.clean();
+  }
+}, 75000);
+
 test('a listed run nested under a run of a land attempt starts at once', async () => {
   const f: Fixture = await fixture();
   const caps: Cap[] = [];
