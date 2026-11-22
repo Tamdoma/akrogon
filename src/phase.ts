@@ -1,7 +1,16 @@
-import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 import { z } from 'zod';
-import { readGlobal, requireRepo, target, globalHome, type GlobalConfig, type Repo, within } from './config';
+import {
+  readGlobal,
+  requireRepo,
+  target,
+  globalHome,
+  worktreeStore,
+  type GlobalConfig,
+  type Repo,
+  within,
+} from './config';
 import {
   allLeaves,
   readState,
@@ -38,6 +47,7 @@ import { appendAttempt, readPressure, type PressureSnapshot } from './attempts';
 import { mergeQueue } from './turn';
 import { closeSources } from './pull';
 import { testFile } from './test-files';
+import { registeredWorktrees } from './reconcile';
 import { trackingRef } from './preflight';
 import { retiredLessonsPresent } from './lessons';
 import { applyTop, buildStack, isAncestor } from './batch';
@@ -410,6 +420,33 @@ export async function moveGuards(repo: Repo, leaf: Leaf, state: State, requested
     await requireFrozenCitations(repo, state.worktree, state.frozen, state.frozen_cited, from);
 }
 
+// Lives outside moveGuards and skips merge: a land's move to merged runs after its push and must never refuse on a leftover worker copy.
+// An open leaf's recorded worktree is that leaf's own checkout, never a worker, whatever its name; git lists real paths.
+async function refuseWorkerWorktrees(repo: Repo, slug: string): Promise<void> {
+  const store: string = worktreeStore(repo);
+  if (!existsSync(store)) return;
+  const real: string = realpathSync(store);
+  const openRoot: string = resolve(repo.root, 'issues/open');
+  const primaries: Set<string> = new Set(
+    allLeaves(repo).flatMap((leaf) =>
+      leaf.state.worktree !== undefined && within(leaf.path, openRoot) && existsSync(leaf.state.worktree)
+        ? [realpathSync(leaf.state.worktree)]
+        : [],
+    ),
+  );
+  const workers: string[] = [...(await registeredWorktrees(repo.root)).keys()].filter(
+    (path) =>
+      dirname(path) === real &&
+      !primaries.has(path) &&
+      basename(path).startsWith(slug) &&
+      /^-u\d+$/.test(basename(path).slice(slug.length)),
+  );
+  if (workers.length > 0)
+    throw new Error(
+      `Worker worktrees remain for ${slug}: ${workers.join(', ')}; remove each with git worktree remove <path> before the move`,
+    );
+}
+
 export async function transition(
   repo: Repo,
   leaf: Leaf,
@@ -458,6 +495,7 @@ export async function transition(
     );
     return;
   }
+  if (state.phase !== 'failed' && state.phase !== 'merge') await refuseWorkerWorktrees(repo, state.slug);
   await moveGuards(repo, leaf, state, requested, from);
   if (requested === 'check.review' && state.worktree !== undefined) {
     await requireNonEmpty(repo, state.worktree);

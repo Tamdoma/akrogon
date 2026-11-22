@@ -273,6 +273,93 @@ test('handoff to review refuses a dirty worktree at every move and issue files o
   }
 });
 
+test('a move refuses while a registered worker worktree remains and passes once it is removed, while failed recovery and plain dirs never block', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const store: string = resolve(f.home, '.akrogon/worktrees', f.repo);
+    const worktree: string = resolve(f.home, 'wt');
+    await command(['git', 'worktree', 'add', '-b', 'workers', worktree], f.root);
+    const path: string = leaf(f, 'workers', 'implement', { worktree });
+    writeFileSync(resolve(worktree, 'work'), 'done\n');
+    await command(['git', 'add', 'work'], worktree);
+    await command(['git', 'commit', '-m', 'work'], worktree);
+    await verified(f, 'workers', 'leaf');
+    const worker: string = resolve(store, 'workers-u1');
+    await command(['git', 'worktree', 'add', '--detach', worker], worktree);
+    mkdirSync(resolve(store, 'workers-u2'), { recursive: true });
+    const refused: Result = await cli(f, ['phase', 'workers', 'check.review', '--slot', 'A']);
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain(worker);
+    expect(refused.stderr).toContain('git worktree remove');
+    expect(refused.stderr).not.toContain('workers-u2');
+    expect(readState(path).phase).toBe('implement');
+    await command(['git', 'worktree', 'remove', worker], f.root);
+    expect((await cli(f, ['phase', 'workers', 'check.review', '--slot', 'A'])).code).toBe(0);
+    expect(readState(path).phase).toBe('check.review');
+    const peerWorktree: string = resolve(store, 'workers-u1');
+    await command(['git', 'worktree', 'add', '-b', 'workers-u1', peerWorktree], f.root);
+    leaf(f, 'workers-u1', 'implement', { worktree: peerWorktree });
+    const peer: Result = await cli(f, ['phase', 'workers', 'merge', '--slot', 'B', '--verdict', 'ready']);
+    expect(peer.code).toBe(0);
+    expect(readState(path).done).toContain('B');
+    const closedStore: string = resolve(f.root, 'issues/closed/issue');
+    mkdirSync(closedStore, { recursive: true });
+    const peerPath: string = resolve(f.root, 'issues/open/issue/workers-u1');
+    await command(['git', 'worktree', 'remove', peerWorktree], f.root);
+    await command(['mv', peerPath, resolve(closedStore, 'workers-u1')]);
+    await command(['git', 'worktree', 'add', '--detach', peerWorktree], f.root);
+    const shadowed: Result = await cli(f, [
+      'phase',
+      'workers',
+      'merge',
+      '--slot',
+      'A',
+      '--verdict',
+      'ready',
+      '--check',
+    ]);
+    expect(shadowed.code).not.toBe(0);
+    expect(shadowed.stderr).toContain(peerWorktree);
+    await command(['git', 'worktree', 'remove', peerWorktree], f.root);
+    const failedPath: string = leaf(f, 'stuck', 'failed', {
+      failure: { cause: 'blocked', phase: 'implement', slot: 'A', reason: 'x' },
+    });
+    await command(['git', 'worktree', 'add', '--detach', resolve(store, 'stuck-u1')], f.root);
+    const recovered: Result = await cli(f, ['phase', 'stuck', 'implement']);
+    expect(recovered.code).toBe(0);
+    expect(readState(failedPath).phase).toBe('implement');
+  } finally {
+    f.clean();
+  }
+});
+
+test('an open peer checkout recorded through a symlinked worktree store is not taken for a worker', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const real: string = resolve(f.home, 'real-store');
+    mkdirSync(real);
+    mkdirSync(resolve(f.home, '.akrogon/worktrees'), { recursive: true });
+    const store: string = resolve(f.home, '.akrogon/worktrees', f.repo);
+    symlinkSync(real, store);
+    const worktree: string = resolve(store, 'linked');
+    await command(['git', 'worktree', 'add', '-b', 'linked', worktree], f.root);
+    const path: string = leaf(f, 'linked', 'implement', { worktree });
+    writeFileSync(resolve(worktree, 'work'), 'done\n');
+    await command(['git', 'add', 'work'], worktree);
+    await command(['git', 'commit', '-m', 'work'], worktree);
+    await verified(f, 'linked', 'leaf');
+    const peerWorktree: string = resolve(store, 'linked-u1');
+    await command(['git', 'worktree', 'add', '-b', 'linked-u1', peerWorktree], f.root);
+    leaf(f, 'linked-u1', 'implement', { worktree: peerWorktree });
+    const moved: Result = await cli(f, ['phase', 'linked', 'check.review', '--slot', 'A']);
+    expect(moved.stderr).not.toContain('Worker worktrees remain');
+    expect(moved.code).toBe(0);
+    expect(readState(path).phase).toBe('check.review');
+  } finally {
+    f.clean();
+  }
+});
+
 test('completion prints only when the owner finishes, stays silent on inner issues and retries', async () => {
   const f: Fixture = await fixture();
   try {

@@ -508,22 +508,9 @@ export async function reconcileNeedsPanes(repo: Repo, leaves: Leaf[]): Promise<b
   return candidates.some((leaf) => loaded.has(leafSlice(repo, leaf.state.slug)));
 }
 
-export async function reconcile(
-  repo: Repo,
-  leaves: Leaf[],
-  live: Seen[] | null,
-  union?: Seen[] | null,
-  failures?: { ownedNames: ReadonlySet<string>; incomplete: boolean },
-): Promise<Reconciled> {
-  const removed: string[] = [];
-  const removedWorktrees: RemovedRecord[] = [];
-  const kept: KeptEntry[] = [];
-  const keep = (path: string, reason: string, clears: string): void => {
-    kept.push({ path, reason, clears });
-  };
-
-  const listed: string = await command(['git', 'worktree', 'list', '--porcelain'], repo.root);
-  const registered: Map<string, WorktreeRow> = new Map(
+export async function registeredWorktrees(root: string): Promise<Map<string, WorktreeRow>> {
+  const listed: string = await command(['git', 'worktree', 'list', '--porcelain'], root);
+  return new Map(
     listed
       .split('\n\n')
       .filter((stanza) => stanza.startsWith('worktree '))
@@ -541,6 +528,23 @@ export async function reconcile(
         ];
       }),
   );
+}
+
+export async function reconcile(
+  repo: Repo,
+  leaves: Leaf[],
+  live: Seen[] | null,
+  union?: Seen[] | null,
+  failures?: { ownedNames: ReadonlySet<string>; incomplete: boolean },
+): Promise<Reconciled> {
+  const removed: string[] = [];
+  const removedWorktrees: RemovedRecord[] = [];
+  const kept: KeptEntry[] = [];
+  const keep = (path: string, reason: string, clears: string): void => {
+    kept.push({ path, reason, clears });
+  };
+
+  const registered: Map<string, WorktreeRow> = await registeredWorktrees(repo.root);
 
   const keepLocked = (path: string, locked: string): void =>
     keep(
