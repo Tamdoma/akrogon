@@ -72,15 +72,7 @@ import { isPaused, readPaused } from './pause';
 import { isStopped } from './stop';
 import { selfUpdate } from './self-update';
 import { blockDetail, dependentCounts, mergeQueue, twinConflict, type DepDetail, type QueueEntry } from './turn';
-import {
-  appendTiming,
-  capacitySince,
-  currentVisit,
-  readTimings,
-  recordWait,
-  type TimingEvent,
-  type WaitReason,
-} from './timing';
+import { appendTiming, capacityWaits, currentVisit, readTimings, recordWait, type WaitReason } from './timing';
 import { closeMergedTab, leafSeats, reconcile, reconcileHost, reconcileNeedsPanes, type Seats } from './reconcile';
 
 type Invocation = { skipped: Set<string>; dispatched: Set<string>; sessionRefusals: Set<string> };
@@ -826,47 +818,52 @@ async function sweepAll(global: GlobalConfig, invocation: Invocation, isAutomati
       );
 }
 
+// An unpaused repo with its capacity waiters (slug to wait start), read once per pass.
+type RepoWaits = { repo: Repo; waiting: Map<string, string> };
+
 // The automatic pass: seated and merged leaves resume, then capacity waiters refill free slots
 // in wait order; a seated waiter (a restarted stop) is left to the refill so it keeps its place.
+// Each unpaused repo's timings are read once per pass.
 async function resumeRepos(
   global: GlobalConfig,
   repos: Repo[],
   invocation: Invocation,
   isAutomatic: boolean,
 ): Promise<void> {
-  for (const repo of repos) {
-    const events: TimingEvent[] = readTimings(repo.root);
+  const swept: Set<string> = new Set(repos.map((repo) => repo.name));
+  const unpaused: RepoWaits[] = registeredRepos(global, invocation)
+    .repos.filter((repo) => !isPaused(repo.name))
+    .map((repo) => ({ repo, waiting: capacityWaits(readTimings(repo.root)) }));
+  for (const { repo, waiting } of unpaused.filter((entry) => swept.has(entry.repo.name))) {
     await sweep(
       global,
       repo,
       discover(repo, invocation).leaves.filter(
         (leaf) =>
           (leaf.state.phase === 'merged' || leaf.state.tab !== undefined || leaf.state.worktree !== undefined) &&
-          capacitySince(events, leaf.state.slug) === undefined,
+          !waiting.has(leaf.state.slug),
       ),
       invocation,
       false,
       isAutomatic,
     );
   }
-  await refill(global, invocation);
+  await refill(global, unpaused, invocation);
 }
 
 // A freed slot goes to the leaf that has waited longest on capacity, across every unpaused repo;
 // a leaf whose repo is at its own cap stays waiting and the next one is tried.
-async function refill(global: GlobalConfig, invocation: Invocation): Promise<void> {
-  const waiting: { repo: Repo; leaf: Leaf; since: string }[] = registeredRepos(global, invocation)
-    .repos.filter((repo) => !isPaused(repo.name))
-    .flatMap((repo) => {
-      const events: TimingEvent[] = readTimings(repo.root);
+async function refill(global: GlobalConfig, repos: RepoWaits[], invocation: Invocation): Promise<void> {
+  const queue: { repo: Repo; leaf: Leaf; since: string }[] = repos
+    .flatMap(({ repo, waiting }) => {
       const closedRoot: string = resolve(repo.root, 'issues/closed');
       return discover(repo, invocation).leaves.flatMap((leaf) => {
-        const since: string | undefined = capacitySince(events, leaf.state.slug);
-        return since === undefined || within(leaf.path, closedRoot) ? [] : [{ repo, leaf, since }];
+        const at: string | undefined = waiting.get(leaf.state.slug);
+        return at === undefined || within(leaf.path, closedRoot) ? [] : [{ repo, leaf, since: at }];
       });
     })
     .sort((a, b) => a.since.localeCompare(b.since));
-  for (const { repo, leaf } of waiting) await dispatchLeaf(global, repo, leaf, false, invocation, true);
+  for (const { repo, leaf } of queue) await dispatchLeaf(global, repo, leaf, false, invocation, true);
 }
 
 async function sweep(
