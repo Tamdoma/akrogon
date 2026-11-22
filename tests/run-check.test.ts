@@ -209,6 +209,23 @@ test('run-check cuts the session bus even when the caller has one', async () => 
   }
 });
 
+test('run-check disables the Node compile cache even when the caller does not', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { worktree } = await leafWorktree(f, 'compile-cache');
+    const result: Result = await cli(
+      f,
+      ['run-check', '--', ...sh('printf "cache=%s\\n" "$NODE_DISABLE_COMPILE_CACHE"')],
+      worktree,
+      baseEnv(f),
+    );
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('cache=1');
+  } finally {
+    f.clean();
+  }
+});
+
 test('run-check gives the command LANG=C.UTF-8 unless the repo declares LANG in env or pass_env', async () => {
   const f: Fixture = await fixture();
   try {

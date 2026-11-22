@@ -42,7 +42,6 @@ const copied: readonly string[] = [
   'HOME',
   'PATH',
   'XDG_CACHE_HOME',
-  'NODE_DISABLE_COMPILE_CACHE',
   'FAKE_SYSTEMD_RUN_LOG',
   // An akrogon invocation inside a checked command shares the caller's state
   // home; without it a nested call resolves HOME/.akrogon and can re-cutover.
@@ -67,6 +66,8 @@ export function constructedEnv(repo: Repo, runRoot: string): Record<string, stri
     if (value !== undefined) env[key] = value;
   }
   env.TMPDIR = runRoot;
+  // Node's compile cache writes hundreds of MB into each run's TMPDIR and is never reused.
+  env.NODE_DISABLE_COMPILE_CACHE = '1';
   env.LANG = 'C.UTF-8';
   for (const key of [...repo.config.env, ...repo.config.pass_env]) {
     const value: string | undefined = process.env[key];
