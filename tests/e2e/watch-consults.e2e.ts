@@ -19,7 +19,7 @@ import { z } from 'zod';
 import { waitFor, type Seen } from '../../src/hc';
 import { command, spawnCaptured, type SpawnResult } from '../../src/shell';
 import { transcriptFor } from '../../src/transcript';
-import { realHome, required } from './tier';
+import { realHome, required, reservedSessions } from './tier';
 import { observeReady, session, startWatchTier, stopWatchTier, type WatchTier } from './watch-tier';
 
 const skill: string = resolve(import.meta.dir, '../../skills/watch-issues');
@@ -150,8 +150,11 @@ test.serial(
   async () => {
     expect(required('AKROGON_E2E')).toBe('watch-consults');
     // The session budget (grant bound): each paid session is ended by teardown; the run
-    // itself must finish inside 15 minutes per session.
-    const deadline: number = Date.now() + 14 * 60_000;
+    // itself must finish inside AKROGON_SESSION_MINUTES per session.
+    const minutes: number = z.coerce.number().positive().parse(process.env.AKROGON_SESSION_MINUTES);
+    const deadline: number = Date.now() + minutes * 60_000;
+    console.log(`session deadline: ${new Date(deadline).toISOString()} (AKROGON_SESSION_MINUTES=${minutes})`);
+    reservedSessions(2);
     const name: string = 'akr-e2e-watch-consults';
     const tier: WatchTier = await startWatchTier(
       name,

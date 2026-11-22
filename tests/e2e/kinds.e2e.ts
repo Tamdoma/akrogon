@@ -8,7 +8,17 @@ import { existsSync, mkdirSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { readState } from '../../src/state';
-import { answerTrust, engine, realHome, required, startTier, stopTier, trustedWorkspaces, type Tier } from './tier';
+import {
+  answerTrust,
+  engine,
+  realHome,
+  required,
+  reservedSessions,
+  startTier,
+  stopTier,
+  trustedWorkspaces,
+  type Tier,
+} from './tier';
 
 const homedir = (): string => realHome;
 
@@ -78,6 +88,7 @@ async function turnEnded(tier: Tier, address: string, turn: number): Promise<voi
 test('kinds tier: first task, later send, report by hc send, transcript label, agy trust and outside write', async () => {
   expect(required('AKROGON_E2E')).toBe('kinds');
   const root: string = required('AKROGON_E2E_ROOT');
+  reservedSessions(8);
   const harnesses: Record<string, string> = Object.fromEntries(Object.entries(kinds).map(([k, v]) => [k, v.line]));
   const tier: Tier = await startTier(engine, 'kinds', harnesses, {
     a: { harness: 'claude', model: kinds.claude.model, effort: 'low' },

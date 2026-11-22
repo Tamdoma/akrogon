@@ -11,7 +11,7 @@ import { mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { type SpawnResult } from '../../src/shell';
-import { answerTrust, required } from './tier';
+import { answerTrust, required, reservedSessions } from './tier';
 import { observeReady, session, startWatchTier, stopWatchTier, type WatchTier } from './watch-tier';
 
 // command: the long shell command the seat runs. agy refuses `sleep 600` as a shell timer (B-R1), so it
@@ -107,6 +107,7 @@ test('watch stop: a working seat stops on its stop key, ends idle and takes one 
   const spec = kinds[kind];
   const slug: string = `akr-e2e-watch-${kind}`;
   const cwd: string = resolve(required('AKROGON_E2E_ROOT'), slug);
+  reservedSessions(4);
   const tier: WatchTier = await startWatchTier(
     `akr-e2e-watch-${kind}-root`,
     {

@@ -37,7 +37,7 @@ import { join, resolve } from 'node:path';
 import { z } from 'zod';
 import { waitFor, type Seen } from '../../src/hc';
 import { spawnCaptured, type SpawnResult } from '../../src/shell';
-import { answerTrust, realHome, required } from './tier';
+import { answerTrust, realHome, required, reservedSessions } from './tier';
 import { observeReady, session, startWatchTier, stopWatchTier, type WatchTier } from './watch-tier';
 
 const skill: string = resolve(import.meta.dir, '../../skills/watch-issues');
@@ -929,6 +929,7 @@ test.serial(
     expect(kindRaw).not.toBe('standin');
     const kind = z.enum(['claude', 'codex', 'pi', 'agy']).parse(kindRaw);
     const shape = z.enum(['root', 'shell']).parse(required('AKROGON_E2E_SHAPE'));
+    reservedSessions(shape === 'root' ? 2 : 1);
     tmpdirGuard();
     const cell: Cell = await setupCell(kind, shape);
     const { tier, callLog } = cell;
