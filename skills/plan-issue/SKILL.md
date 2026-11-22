@@ -28,7 +28,7 @@ A missing resource is reported as a gap, not invented content; lessons describe 
 
 This seat puts no questions to anyone and pauses for no reply: it plans from the brief, the design, and live surfaces only. When a step physically requires the operator (a permission this seat cannot grant, an env value it cannot obtain), the seat writes the blocker and the exact operator action into its current pass artifact recording the name or ID, attempted operation, identity reference, error, owner and next action, never a value, runs `akrogon phase <slug> failed --reason "<blocker plus artifact>" --slot <its seat from the dispatch prompt>`, and ends the pass.
 
-The rules this seat shares with the other lifecycle seats — grant reuse and count lines, `.env` handling and the producer key save, kept command output and the red-check judgment — live in [lifecycle-rules.md](lifecycle-rules.md). This seat's record file for grant count lines and kept output is `plan.md`, its known-red command form is `akrogon verify --known-red`, and its operator-blocker stop is the `failed` stop the Shared context seat-stop rule states.
+The rules this seat shares with the other lifecycle seats — grant reuse and paid sessions, `.env` handling and the producer key save, kept command output and the red-check judgment — live in [lifecycle-rules.md](lifecycle-rules.md). This seat's record file for kept output and launch reservations is `plan.md`, its known-red command form is `akrogon verify --known-red`, and its operator-blocker stop is the `failed` stop the Shared context seat-stop rule states.
 
 When the brief and the locked design disagree, the design wins: the conflict is written into the plan as a note for review, and planning continues.
 
