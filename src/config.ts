@@ -32,7 +32,10 @@ export const globalSchema = z
       .strictObject({
         sessions_per_day: z.number().int().positive(),
         session_minutes: z.number().int().positive(),
-        approved: z.strictObject({ date: z.string().trim().min(1), answer: z.string().trim().min(1) }),
+        approved: z.strictObject({
+          date: z.string().trim().min(1),
+          answer: z.string().refine((answer: string): boolean => answer.trim().length > 0, 'Must not be blank'),
+        }),
       })
       .optional(),
   })
