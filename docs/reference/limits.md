@@ -8,7 +8,7 @@ This page lists what Akrogon does not do for you, and the work that stays yours.
 - It does not rank leaves. There is no priority field. A pass tries merged leaves first, then leaves with more dependents. Use `blocked-by` for real prerequisites and parking to keep work out of the queue.
 - It does not follow dependency chains for you. `blocked-by` names single leaves. To wait for several leaves, list each one.
 - It does not stop a seat that is already working when you change a dependency. Dependencies are checked again on each pass before a seat is started.
-- It does not run more than `max_active` leaves at once. The limit counts live leaves across every registered repository, not per repository. Leaves waiting in the merge phase do not count toward the limit. A leaf that already has a tab keeps working at the limit.
+- It does not run more than `max_active` leaves at once. The limit counts live leaves across every registered repository. A repository's own `max_active` in `issues/config.yaml` limits its leaves further and never raises the total. Leaves waiting in the merge phase do not count toward the limit. A leaf that already has a tab keeps working at the limit.
 - It does not reserve capacity for a target. `akrogon next <folder or slug>` only limits that one pass. Later passes can pick any open leaf.
 - It does not restart a failed leaf. A seat cannot move a leaf out of failed. Automatic passes skip it. See [src/phase.ts](../../src/phase.ts).
 - It does not dispatch a leaf with a missing input. `akrogon next` refuses it until the need is supplied.

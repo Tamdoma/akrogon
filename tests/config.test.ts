@@ -83,7 +83,7 @@ test('config combines defaults and repo values, reports none, and recalculates w
     expect(Bun.YAML.parse((await cli(f, ['config'], worktree)).stdout)).toMatchObject({ AKROGON_BASE: second });
     yaml(resolve(f.root, 'issues/config.yaml'), { fix_rounds: 0, grounding: 'none' });
     expect((await cli(f, ['config'])).code).not.toBe(0);
-    yaml(resolve(f.root, 'issues/config.yaml'), { max_active: 2, grounding: 'none' });
+    yaml(resolve(f.root, 'issues/config.yaml'), { max_active: 0, grounding: 'none' });
     const badRepo = await cli(f, ['config']);
     expect(badRepo.code).not.toBe(0);
     expect(badRepo.stderr).toContain('max_active');

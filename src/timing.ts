@@ -113,15 +113,25 @@ export function currentVisit(log: LogRecord[], slug: string, phase: Phase): numb
   return Math.max(0, visitOf(log, slug, phase) - 1);
 }
 
+function lastWaitOrPrompt(events: readonly TimingEvent[], slug: string, at: number): TimingEvent | undefined {
+  return events.findLast(
+    (event) => (event.kind === 'wait' || event.kind === 'prompt') && event.slug === slug && Date.parse(event.ts) <= at,
+  );
+}
+
 export function waitReasonAt(
   events: readonly TimingEvent[],
   slug: string,
   at: number = Number.POSITIVE_INFINITY,
 ): WaitReason {
-  const last: TimingEvent | undefined = events.findLast(
-    (event) => (event.kind === 'wait' || event.kind === 'prompt') && event.slug === slug && Date.parse(event.ts) <= at,
-  );
+  const last: TimingEvent | undefined = lastWaitOrPrompt(events, slug, at);
   return last?.kind === 'wait' ? last.reason : 'none';
+}
+
+// When the leaf's current capacity wait began, or undefined when it does not wait on capacity.
+export function capacitySince(events: readonly TimingEvent[], slug: string): string | undefined {
+  const last: TimingEvent | undefined = lastWaitOrPrompt(events, slug, Number.POSITIVE_INFINITY);
+  return last?.kind === 'wait' && last.reason === 'capacity' ? last.ts : undefined;
 }
 
 export function recordWait(repo: Repo, slug: string, reason: WaitReason, blocking?: string): void {

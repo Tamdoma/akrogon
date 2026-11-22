@@ -2,7 +2,7 @@ import { test, expect } from 'bun:test';
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { command, finishCaptured, spawnFiles, type Captured, type Result } from '../src/shell';
-import { readState, type State } from '../src/state';
+import { readState, saveState, type State } from '../src/state';
 import { z } from 'zod';
 import { cli, entry, fakeSystemctl, killTree, leaf, leafTempRoot, yaml, type Fixture } from './helpers';
 import { delivered, hcFixture, setPrefixes, type HcFixture } from './hc-fixture';
@@ -573,3 +573,96 @@ test('race B: pause waits for a held launch lock, later automatic work is suppre
     await f.clean();
   }
 });
+
+function capMachine(f: Fixture, value: number): void {
+  const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
+  yaml(resolve(f.home, 'config.yaml'), { ...global, max_active: value });
+}
+function capRepo(root: string, value: number): void {
+  const config = Bun.YAML.parse(readFileSync(resolve(root, 'issues/config.yaml'), 'utf8')) as object;
+  yaml(resolve(root, 'issues/config.yaml'), { ...config, max_active: value });
+}
+function toMerge(path: string): void {
+  saveState(path, { ...readState(path), phase: 'merge', merge_stamp: '2026-10-19T00:00:00.000Z' });
+}
+
+test("a repo's max_active refuses a new leaf under the machine cap and the start verb names it", async () => {
+  const f: DispatchFixture = await hcFixture();
+  try {
+    capMachine(f, 9);
+    capRepo(f.root, 1);
+    const first: string = leaf(f, 'first', 'plan.synthesis');
+    const second: string = leaf(f, 'second', 'plan.synthesis');
+    expect((await next(f, ['first'])).code).toBe(0);
+    expect(readState(first).tab).toBeDefined();
+    await next(f, ['second']);
+    expect(readState(second).tab).toBeUndefined();
+    const refused: Result = await cli(f, ['seat', 'second', 'A'], f.root, f.env);
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain(`No free seat capacity: ${f.repo} max_active 1 reached`);
+    const config: Record<string, unknown> = Bun.YAML.parse((await cli(f, ['config'], f.root, f.env)).stdout) as Record<
+      string,
+      unknown
+    >;
+    expect(config).toMatchObject({ max_active: 9, repo_max_active: 1 });
+  } finally {
+    await f.clean();
+  }
+});
+
+test('a freed slot starts the longest capacity waiter across repos, skipping one at its repo cap', async () => {
+  const f: DispatchFixture = await hcFixture({ occupiedPrefix: 'yp' });
+  try {
+    capMachine(f, 2);
+    capRepo(f.root, 1);
+    const xRun: string = leaf(f, 'xrun', 'plan.synthesis');
+    expect((await next(f, ['xrun'])).code).toBe(0);
+    const yRoot: string = await secondRepo(f, 'y');
+    setPrefixes(f, { [f.repo]: f.prefix, y: 'yp' });
+    await addSpace(f, 'y', yRoot);
+    const yRun: string = leafIn(yRoot, 'y', 'yrun', 'plan.synthesis');
+    expect((await next(f, ['yrun'], {}, yRoot)).code).toBe(0);
+    expect(readState(yRun).tab).toBeDefined();
+    // Both refused at the machine cap; xwait waits longer.
+    const xWait: string = leaf(f, 'xwait', 'plan.synthesis');
+    await next(f, ['xwait']);
+    await Bun.sleep(20);
+    const yWait: string = leafIn(yRoot, 'y', 'ywait', 'plan.synthesis');
+    await next(f, ['ywait'], {}, yRoot);
+    const yLater: string = leafIn(yRoot, 'y', 'ylater', 'plan.synthesis');
+    await Bun.sleep(20);
+    await next(f, ['ylater'], {}, yRoot);
+    expect([xWait, yWait, yLater].map((path) => readState(path).tab)).toEqual([undefined, undefined, undefined]);
+    // yrun leaves the count: xwait is older but its repo is at its cap, so ywait starts.
+    toMerge(yRun);
+    expect((await next(f, ['--wake'])).code).toBe(0);
+    expect(readState(xWait).tab).toBeUndefined();
+    expect(readState(yWait).tab).toBeDefined();
+    expect(readState(yLater).tab).toBeUndefined();
+    expect(readState(xRun).tab).toBeDefined();
+  } finally {
+    await f.clean();
+  }
+}, 60000);
+
+test('a freed slot starts the leaf that has waited longest on capacity, never a leaf never refused', async () => {
+  const f: DispatchFixture = await hcFixture();
+  try {
+    capMachine(f, 1);
+    const running: string = leaf(f, 'running', 'plan.synthesis');
+    expect((await next(f, ['running'])).code).toBe(0);
+    const older: string = leaf(f, 'older', 'plan.synthesis');
+    await next(f, ['older']);
+    await Bun.sleep(20);
+    const newer: string = leaf(f, 'newer', 'plan.synthesis');
+    await next(f, ['newer']);
+    const quiet: string = leaf(f, 'quiet', 'plan.synthesis');
+    toMerge(running);
+    expect((await next(f, ['--wake'])).code).toBe(0);
+    expect(readState(older).tab).toBeDefined();
+    expect(readState(newer).tab).toBeUndefined();
+    expect(readState(quiet).tab).toBeUndefined();
+  } finally {
+    await f.clean();
+  }
+}, 60000);

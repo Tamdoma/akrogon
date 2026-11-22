@@ -36,7 +36,7 @@ akrogon unpark <issue>
 akrogon next <slug>
 ```
 
-Unpark moves the folder back to `issues/open/`. It only puts the issue back in the queue. Dependencies and the `max_active` limit still apply, and a leaf that never ran starts only when you run `akrogon next`. `akrogon unpark --all` brings back every parked issue.
+Unpark moves the folder back to `issues/open/`. It only puts the issue back in the queue. Dependencies and the `max_active` limit still apply, and a leaf that never ran starts only when you run `akrogon next`, or, once a pass has refused it for capacity, when an automatic pass finds room. `akrogon unpark --all` brings back every parked issue.
 
 ## Pause a repository
 

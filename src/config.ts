@@ -61,6 +61,7 @@ export const repoSchema = z
     default_branch: text.default('main'),
     worktree_root: text.optional(),
     fix_rounds: z.number().int().positive().default(3),
+    max_active: z.number().int().positive().optional(),
     implement: z.enum(['subagents', 'inline']).default('subagents'),
     setup: text.optional(),
     checks: z.record(text, text).default({}),
@@ -484,6 +485,9 @@ export async function effectiveConfig(cwd: string): Promise<string> {
     {
       ...global,
       ...withSetup(repoConfig),
+      // The repo key narrows the machine cap and never replaces it in this view.
+      max_active: global.max_active,
+      ...(repoConfig.max_active === undefined ? {} : { repo_max_active: repoConfig.max_active }),
       slots:
         resolved === null
           ? global.slots
