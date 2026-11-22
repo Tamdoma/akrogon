@@ -1,5 +1,5 @@
 // Criterion 11 (watch-any-harness, as replaced by the 2026-11-20 Corrections) plus criteria 12
-// and 13, run as cells in the throwaway hc session akr-e2e-watch under readiness grants[1].
+// and 13, run as cells in the throwaway hc session akr-e2e-watch. Paid cells use the standing grant.
 //
 //   AKROGON_E2E=watch-preflight AKROGON_E2E_KIND=<claude|codex|pi|agy>
 //     Free, no prompt sent: real tier, real launch flags, read the skill list and stop.
@@ -15,11 +15,12 @@
 //
 // Writes stay under AKROGON_E2E_ROOT (must resolve inside the process TMPDIR) and
 // AKROGON_E2E_OUT; no operator-home file beyond the grant-named trust entries is touched.
-// Run: akrogon run-check --name watch-live-<kind>-<shape> -- env AKROGON_E2E=watch-live
+// Paid run: akrogon run-check --name watch-live-<kind>-<shape> --sessions <n> -- env AKROGON_E2E=watch-live
 //      AKROGON_E2E_KIND=<kind> AKROGON_E2E_SHAPE=<shape> AKROGON_E2E_ROOT=<tmp>
 //      AKROGON_E2E_OUT=<leaf>/implementation/e2e-<kind>-<shape>
 //      WATCH_TICK_SECONDS=<10 standin|30 paid>
 //      bun test --timeout=30000 ./tests/e2e/watch-live.e2e.ts --test-name-pattern <pattern>
+// Use n=2 for root or n=1 for shell. For the free cells above, omit --sessions.
 // A cell runs exactly its own test: preflight cells use the first, stand-in the second, paid
 // the third (patterns 'preflight', 'standin', 'real harness').
 import { test, expect } from 'bun:test';

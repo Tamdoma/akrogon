@@ -1,8 +1,8 @@
-// Criterion 3 (watcher-on-hc), attended paid run under readiness grants[0] (at most 4 harness sessions
-// in all, at most 4 prompts per stop-check session): one real seat of AKROGON_E2E_KIND (codex or agy)
+// Criterion 3 (watcher-on-hc), attended paid run under its standing grant (reserve 4 harness sessions,
+// at most 4 prompts per stop-check session): one real seat of AKROGON_E2E_KIND (codex or agy)
 // works on a long shell command; the watcher's busy-rule stop is applied and its outcome, screens,
 // transcript label and corrective send are recorded under AKROGON_E2E_OUT for the skill's stop keys.
-// Run: akrogon run-check --name watch-stop-<kind> -- env AKROGON_E2E=watch-stop AKROGON_E2E_KIND=<kind>
+// Run: akrogon run-check --name watch-stop-<kind> --sessions 4 -- env AKROGON_E2E=watch-stop AKROGON_E2E_KIND=<kind>
 //      AKROGON_E2E_ROOT=<leaf temp> AKROGON_E2E_OUT=<leaf>/implementation/watch-e2e
 //      bun test --timeout=30000 ./tests/e2e/watch-stop.e2e.ts
 // Prompts per session: the first task (argv, or agy's first send) and one corrective send.

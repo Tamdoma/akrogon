@@ -7,8 +7,8 @@
 // the case record and its signature, notices the push and the move non-attention, and closes
 // the consultant before the resume.
 // Count the watcher (pi), initial consultant (agy neon high) and each replacement that receives
-// a task. Reconcile the tier evidence before counting a retry. The resumed leaf uses a stand-in.
-// Run: akrogon run-check --name watch-consults -- env AKROGON_E2E=watch-consults
+// a task. Reserve at least 2 sessions. Reconcile the tier evidence before counting a retry. The resumed leaf uses a stand-in.
+// Run: akrogon run-check --name watch-consults --sessions <n> -- env AKROGON_E2E=watch-consults
 //      AKROGON_E2E_ROOT=<leaf temp> AKROGON_E2E_OUT=<leaf>/implementation/watch-consults-e2e
 //      WATCH_TICK_SECONDS=15
 //      bun test --timeout=720000 ./tests/e2e/watch-consults.e2e.ts
