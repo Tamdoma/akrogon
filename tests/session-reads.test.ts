@@ -85,7 +85,7 @@ test('capacity counts an unreadable session before any leaf has a seat', async (
     await opaque.stop();
     await f.clean();
   }
-}, 30000);
+});
 
 // Criterion 2: the cross-session terminal union vetoes worktree removal; a same-id tab in a foreign
 // session is no veto; a session whose terminal list cannot be read keeps everything its liveness
@@ -141,7 +141,7 @@ test('foreign-session panes and unreadable sessions veto reconcile removal', asy
     await other.stop();
     await f.clean();
   }
-}, 45000);
+});
 
 test('foreign-session panes with colliding tab ids keep merged and failed worktrees', async () => {
   const f: HcFixture = await dispatchFixture({ window: 'open' });
@@ -169,7 +169,7 @@ test('foreign-session panes with colliding tab ids keep merged and failed worktr
     await other.stop();
     await f.clean();
   }
-}, 30000);
+});
 
 // Criterion 3: within one pass the inventory reflects launches already made;
 // a leaf whose recorded tab no terminal holds counts nothing and gets a seat.
@@ -201,7 +201,7 @@ test('a fresh pane read sees the seat created earlier in the pass and ignores a 
   } finally {
     await f.clean();
   }
-}, 30000);
+});
 
 // Criterion 6: a manual run takes scope from the target or cwd; an inherited
 // HC_TERMINAL_ID never selects, attributes or acts on a leaf.
@@ -232,7 +232,7 @@ test('a manual next ignores an inherited HC_TERMINAL_ID', async () => {
   } finally {
     await f.clean();
   }
-}, 30000);
+});
 
 // Criterion 7: a move without a slot records session:null even when
 // HC_TERMINAL_ID names a live seat; a slotted move attributes through the
@@ -280,4 +280,4 @@ test('log session is null without a slot and comes from the slot seat otherwise'
   } finally {
     await f.clean();
   }
-}, 30000);
+});

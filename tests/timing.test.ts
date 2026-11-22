@@ -120,7 +120,7 @@ test('visit events: a leaf driven to merged records every visit, prompt, seat_do
   } finally {
     await f.clean();
   }
-}, 60000);
+});
 
 test('check events: scope, ordering, exit and duration; killed and worker and verify runs', async () => {
   const f: HcFixture = await hcFixture();
@@ -169,7 +169,7 @@ test('check events: scope, ordering, exit and duration; killed and worker and ve
   } finally {
     await f.clean();
   }
-}, 60000);
+});
 
 test('check events carry the merge attempt id inside a merge attempt', async () => {
   const f: HcFixture = await hcFixture();
@@ -200,7 +200,7 @@ test('check events carry the merge attempt id inside a merge attempt', async () 
   } finally {
     await f.clean();
   }
-}, 30000);
+});
 
 test('waits: pause writes repo_pause on and off; parked, prerequisite and merge waits open and close once', async () => {
   const f: HcFixture = await hcFixture();
@@ -263,7 +263,7 @@ test('waits: pause writes repo_pause on and off; parked, prerequisite and merge 
   } finally {
     await f.clean();
   }
-}, 60000);
+});
 
 test('unwritable timings: prompts, checks and moves complete with one warning per append', async () => {
   const f: HcFixture = await hcFixture();
@@ -296,7 +296,7 @@ test('unwritable timings: prompts, checks and moves complete with one warning pe
   } finally {
     await f.clean();
   }
-}, 30000);
+});
 
 test('wait ends when an operator removes a prerequisite and a picked leaf has missing inputs', async () => {
   const f: HcFixture = await hcFixture();
@@ -330,7 +330,7 @@ test('wait ends when an operator removes a prerequisite and a picked leaf has mi
   } finally {
     await f.clean();
   }
-}, 30000);
+});
 
 test('repo pause event is persisted before its state lock is released', async () => {
   const f: HcFixture = await hcFixture();
@@ -352,7 +352,7 @@ test('repo pause event is persisted before its state lock is released', async ()
   } finally {
     await f.clean();
   }
-}, 30000);
+});
 
 function maxActive(f: HcFixture, value: number): void {
   const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
@@ -377,4 +377,4 @@ test('capacity waits: a refused dispatch records one capacity wait that closes o
   } finally {
     await f.clean();
   }
-}, 30000);
+});

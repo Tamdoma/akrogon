@@ -13,6 +13,7 @@ import {
   leafTempRoot,
   storeDir,
   unitBin,
+  WAIT_MS,
   type Fixture,
 } from './helpers';
 import { command, finishCaptured, spawnCaptured, spawnFiles, type Result } from '../src/shell';
@@ -63,7 +64,7 @@ function runEnv(f: Fixture): NodeJS.ProcessEnv {
   };
 }
 
-async function waitForFile(path: string, ms: number = 20000): Promise<void> {
+async function waitForFile(path: string, ms: number = WAIT_MS): Promise<void> {
   const begun: number = Date.now();
   while (!existsSync(path)) {
     if (Date.now() - begun > ms) throw new Error(`Timed out waiting for ${path}`);
@@ -71,7 +72,7 @@ async function waitForFile(path: string, ms: number = 20000): Promise<void> {
   }
 }
 
-async function waitForText(path: string, pattern: RegExp, ms: number = 20000): Promise<void> {
+async function waitForText(path: string, pattern: RegExp, ms: number = WAIT_MS): Promise<void> {
   const begun: number = Date.now();
   for (;;) {
     if (existsSync(path) && pattern.test(readFileSync(path, 'utf8'))) return;

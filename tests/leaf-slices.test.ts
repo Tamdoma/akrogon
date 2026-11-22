@@ -3,7 +3,19 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFil
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { cli, entry, fixture, leaf, holding, leafTempRoot, procRoot, storeDir, yaml, type Fixture } from './helpers';
+import {
+  cli,
+  entry,
+  fixture,
+  leaf,
+  holding,
+  leafTempRoot,
+  procRoot,
+  storeDir,
+  yaml,
+  WAIT_MS,
+  type Fixture,
+} from './helpers';
 import { hcCore, hcFixture, setPrefixes, type HcCore, type HcFixture } from './hc-fixture';
 import { finishCaptured, spawnFiles, type Result, type SpawnResult } from '../src/shell';
 import { leafSlice } from '../src/scope';
@@ -133,7 +145,7 @@ test('a shell run admitted while another slice stops protects its own slice', as
       { mode: 0o755 },
     );
     const env: NodeJS.ProcessEnv = { ...f.env, FAKE_SYSTEMCTL_DB: db, FAKE_SYSTEMCTL_LOG: log };
-    const pass: Promise<Result> = cli(f, ['next', '--all'], f.root, env, 15000);
+    const pass: Promise<Result> = cli(f, ['next', '--all'], f.root, env, WAIT_MS);
     try {
       await waitFor(async () => existsSync(stopping));
       const run: Promise<Result> = cli(
@@ -149,7 +161,7 @@ test('a shell run admitted while another slice stops protects its own slice', as
         ],
         f.root,
         env,
-        15000,
+        WAIT_MS,
       );
       try {
         await waitFor(async () => existsSync(held));
@@ -170,7 +182,7 @@ test('a shell run admitted while another slice stops protects its own slice', as
   } finally {
     await f.clean();
   }
-}, 25000);
+});
 
 async function slicesFixture(window: 'open' | 'closed' = 'closed'): Promise<SliceFixture> {
   const f: HcFixture = await hcFixture({ window });
@@ -278,7 +290,7 @@ async function listed(pattern: string): Promise<string[]> {
     .map((row) => row.unit);
 }
 
-async function waitFor(ok: () => Promise<boolean>, ms: number = 10000): Promise<void> {
+async function waitFor(ok: () => Promise<boolean>, ms: number = WAIT_MS): Promise<void> {
   const begun: number = Date.now();
   for (;;) {
     if (await ok()) return;
@@ -363,7 +375,7 @@ test('merged and failed leaf slices with gone tabs are stopped and their process
     for (const unit of units) await cleanupUnit(unit);
     await f.clean();
   }
-}, 25000);
+});
 
 test('a finished leaf with a live tab keeps its slice, and the pass fetched the pane list', async () => {
   const f: SliceFixture = await slicesFixture('open');
@@ -428,7 +440,7 @@ test('a finished leaf slice named by a live run record is not stopped', async ()
   } finally {
     await f.clean();
   }
-}, 90000);
+});
 
 test('a pass with the pane list unavailable stops no slice of a leaf that has a recorded tab', async () => {
   const f: SliceFixture = await slicesFixture();
@@ -558,7 +570,7 @@ test('a reconcile pass running inside a leaf slice does not stop that slice', as
     if (sliceName !== undefined) await cleanupUnit(sliceName);
     await f.clean();
   }
-}, 40000);
+});
 
 test('akrogon phase merged inside the leaf slice stops no slice', async () => {
   const f: SliceFixture = await slicesFixture();
@@ -598,7 +610,7 @@ test('akrogon phase merged inside the leaf slice stops no slice', async () => {
     if (sliceName !== undefined) await cleanupUnit(sliceName);
     await f.clean();
   }
-}, 40000);
+});
 
 test('the run guard unit is submitted with CollectMode=inactive-or-failed', async () => {
   const f: SliceFixture = await slicesFixture();

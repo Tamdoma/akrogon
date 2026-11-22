@@ -5,7 +5,7 @@ import { test, expect } from 'bun:test';
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, watch, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { entry, fixture, killTree, unitBin, type Fixture } from './helpers';
+import { entry, fixture, killTree, unitBin, WAIT_MS, type Fixture } from './helpers';
 import { hcCore, type HcCore, type Terminal } from './hc-fixture';
 import { deployFixture, deployRecord, pushSeed, type DeployFixture } from './deploy-fixture';
 
@@ -52,7 +52,7 @@ function passes(shim: Shim): string[] {
 // Waits on file changes (fs.watch), never a timed re-read; the timer only bounds the wait.
 // Bun can drop the event of an append that follows another within about a millisecond, so each event
 // also re-checks shortly after it, and once right after the watch starts.
-function until(path: string, check: () => boolean, ms: number = 15_000): Promise<void> {
+function until(path: string, check: () => boolean, ms: number = WAIT_MS): Promise<void> {
   return new Promise<void>((done, fail) => {
     if (check()) return done();
     let finished: boolean = false;
@@ -502,7 +502,7 @@ test('a self-update run by the listener deploys, writes its record, and only the
       FAKE_DEPLOY_RECORD: resolve(d.home, 'deploy.yaml'),
     });
     try {
-      await until(log, () => readFileSync(log, 'utf8').includes('restart --no-block akrogon-listener.service'), 30_000);
+      await until(log, () => readFileSync(log, 'utf8').includes('restart --no-block akrogon-listener.service'));
       expect(deployRecord(d)).toMatchObject({ commit: sha, ok: true });
       const calls: string[] = readFileSync(log, 'utf8').split('\n').filter(Boolean);
       const restart: string = z.string().parse(calls.find((line: string) => line.includes('restart --no-block')));

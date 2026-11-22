@@ -27,6 +27,7 @@ import {
   leafTempRoot,
   storeDir,
   registerTemp,
+  WAIT_MS,
   type GhFixture,
   type Fixture,
   verified,
@@ -252,7 +253,7 @@ test('next creates one worktree/tab under concurrent passes and starts configure
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('bare next from the repo dispatches by cwd instead of returning silently', async () => {
   const f: HcFixture = await hcFixture();
@@ -264,7 +265,7 @@ test('bare next from the repo dispatches by cwd instead of returning silently', 
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('next re-prompts an idle seat whose turn ended while the phase never moved, and never a working one', async () => {
   const f: HcFixture = await hcFixture();
@@ -284,7 +285,7 @@ test('next re-prompts an idle seat whose turn ended while the phase never moved,
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('an ended turn never re-prompts a busy or done seat', async () => {
   const f: HcFixture = await hcFixture();
@@ -307,7 +308,7 @@ test('an ended turn never re-prompts a busy or done seat', async () => {
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('next waits on a blocked agent instead of counting attempts or flipping seats', async () => {
   const f: HcFixture = await hcFixture();
@@ -327,7 +328,7 @@ test('next waits on a blocked agent instead of counting attempts or flipping sea
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('failed leaves never notify on dispatch', async () => {
   const f: HcFixture = await hcFixture();
@@ -427,7 +428,7 @@ test('busy seats persist, warn strictly after an hour, retry a failed notice and
   } finally {
     await f.clean();
   }
-}, 30000);
+});
 
 // A blocked seat gets one attention notice per episode at once: the title names seat and kind, the
 // body is the screen tail, and `blocked_notified` gates repeat passes. Nothing is typed into it.
@@ -460,7 +461,7 @@ test('a blocked leaf seat writes one attention notice per episode, sends it noth
   } finally {
     await f.clean();
   }
-}, 20000);
+});
 
 // A pass that sees the seat leave blocked removes its pending notice and clears the field, so the
 // next blocked episode gets a fresh notice.
@@ -493,7 +494,7 @@ test('an unblocked seat has its notice removed and its next blocked episode noti
   } finally {
     await f.clean();
   }
-}, 25000);
+});
 
 // A blocked seat whose terminal is gone is a new seat: the replacing pass clears the field and the
 // old pending notice, so the replacement's blocked episode gets its own notice.
@@ -524,7 +525,7 @@ test('a replaced blocked seat gets a fresh notice', async () => {
   } finally {
     await f.clean();
   }
-}, 25000);
+});
 
 // The blocked branch owns the pass and sets no busy clock: a seat blocked for over an hour holds
 // only its blocked notices, never the 60-minute busy notice.
@@ -560,7 +561,7 @@ test('a seat blocked over an hour gets a blocked notice, never a busy notice', a
   } finally {
     await f.clean();
   }
-}, 30000);
+});
 
 test('next refuses unmerged dependencies, respects capacity, and waits on a busy seat', async () => {
   const f: HcFixture = await hcFixture();
@@ -587,7 +588,7 @@ test('next refuses unmerged dependencies, respects capacity, and waits on a busy
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('a merged leaf with its tab still open does not count toward max_active', async () => {
   const f: HcFixture = await hcFixture();
@@ -607,7 +608,7 @@ test('a merged leaf with its tab still open does not count toward max_active', a
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('merged phase closes tab on typed next and starts the dependent', async () => {
   const f: HcFixture = await hcFixture();
@@ -628,7 +629,7 @@ test('merged phase closes tab on typed next and starts the dependent', async () 
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('a dependent whose seat start takes longer than 3 s is counted once', async () => {
   const f: HcFixture = await hcFixture();
@@ -647,7 +648,7 @@ test('a dependent whose seat start takes longer than 3 s is counted once', async
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('completing a leaf via targeted next starts only same-repo dependents', async () => {
   const f: HcFixture = await hcFixture();
@@ -675,7 +676,7 @@ test('completing a leaf via targeted next starts only same-repo dependents', asy
     await f.clean();
     g.clean();
   }
-}, 15000);
+});
 
 test('a dependent still blocked by an unmerged leaf stays unallocated after its first blocker merges', async () => {
   const f: HcFixture = await hcFixture();
@@ -695,7 +696,7 @@ test('a dependent still blocked by an unmerged leaf stays unallocated after its 
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('next --all inside a checkout sweeps only that repo', async () => {
   const f: HcFixture = await hcFixture();
@@ -710,7 +711,7 @@ test('next --all inside a checkout sweeps only that repo', async () => {
     await f.clean();
     g.clean();
   }
-}, 15000);
+});
 
 test('unreadable state reserves its capacity and reports its path', async () => {
   const f: HcFixture = await hcFixture();
@@ -733,7 +734,7 @@ test('unreadable state reserves its capacity and reports its path', async () => 
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('one unreadable leaf blocks all capacity at max_active 1', async () => {
   const f: HcFixture = await hcFixture();
@@ -751,7 +752,7 @@ test('one unreadable leaf blocks all capacity at max_active 1', async () => {
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('machine-wide capacity includes another registered repo and folder selection respects it', async () => {
   const f: HcFixture = await hcFixture();
@@ -769,7 +770,7 @@ test('machine-wide capacity includes another registered repo and folder selectio
     await f.clean();
     await g.clean();
   }
-}, 15000);
+});
 
 test('merged leaves do not reserve capacity for other waiting leaves', async () => {
   const f: HcFixture = await hcFixture();
@@ -798,7 +799,7 @@ test('merged leaves do not reserve capacity for other waiting leaves', async () 
     await f.clean();
     await g.clean();
   }
-}, 15000);
+});
 
 test('next recovers only merge-phase work by ancestry against a non-default remote target', async () => {
   const f: HcFixture = await hcFixture();
@@ -864,7 +865,7 @@ test('next recovers only merge-phase work by ancestry against a non-default remo
   } finally {
     await f.clean();
   }
-}, 20000);
+});
 
 test('a finished seat restarts with its task and the surviving slot keeps its terminal', async () => {
   const f: HcFixture = await hcFixture();
@@ -889,7 +890,7 @@ test('a finished seat restarts with its task and the surviving slot keeps its te
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('uncommitted work in a merge worktree exits to check.repair with the edit intact', async () => {
   const f: HcFixture = await hcFixture();
@@ -909,7 +910,7 @@ test('uncommitted work in a merge worktree exits to check.repair with the edit i
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('a worktree parked mid-rebase is still dispatched', async () => {
   const f: HcFixture = await hcFixture();
@@ -936,7 +937,7 @@ test('a worktree parked mid-rebase is still dispatched', async () => {
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('a live merge retains its completion call after pushing, including a peer retry', async () => {
   const f: HcFixture = await hcFixture();
@@ -970,7 +971,7 @@ test('a live merge retains its completion call after pushing, including a peer r
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('seat names support identical repo-local slugs and long numeric-leading slugs', async () => {
   const f: HcFixture = await hcFixture();
@@ -997,7 +998,7 @@ test('seat names support identical repo-local slugs and long numeric-leading slu
     await f.clean();
     await g.clean();
   }
-}, 15000);
+});
 
 test('next awaits sourced completion after a failed rename before removing the worktree', async () => {
   const f: HcFixture = await hcFixture();
@@ -1049,7 +1050,7 @@ test('next awaits sourced completion after a failed rename before removing the w
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('a merged sourced leaf with no recorded worktree completes on next', async () => {
   const f: HcFixture = await hcFixture();
@@ -1133,7 +1134,7 @@ for (const mode of ['startup', 'cwd'] as const) {
     } finally {
       await f.clean();
     }
-  }, 15000);
+  });
 }
 
 test('missing dependencies skip their leaf while readable unmet dependencies wait and siblings dispatch', async () => {
@@ -1184,7 +1185,7 @@ for (const capacity of [3, 4]) {
     } finally {
       await f.clean();
     }
-  }, 15000);
+  });
 }
 
 test('dirty merged worktree is kept after its tab closes, then removed once clean', async () => {
@@ -1210,7 +1211,7 @@ test('dirty merged worktree is kept after its tab closes, then removed once clea
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('bare next from inside the repo cleans up its merged leaves', async () => {
   const f: HcFixture = await hcFixture();
@@ -1227,7 +1228,7 @@ test('bare next from inside the repo cleans up its merged leaves', async () => {
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 for (const scope of ['global'] as const) {
   test(`${scope} lock acquisition failure is fatal`, async () => {
@@ -1346,7 +1347,7 @@ test('foreign leaves summarize once per repo with count and paths', async () => 
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('foreign leaves do not consume capacity while healthy leaves in both repos dispatch', async () => {
   const f: HcFixture = await hcFixture();
@@ -1376,7 +1377,7 @@ test('foreign leaves do not consume capacity while healthy leaves in both repos 
     await f.clean();
     await g.clean();
   }
-}, 15000);
+});
 
 test('foreign slugs are missing for lookup and dispatch', async () => {
   const f: HcFixture = await hcFixture();
@@ -1402,7 +1403,7 @@ test('foreign slugs are missing for lookup and dispatch', async () => {
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('unreadable leaves reserve capacity while foreign leaves summarize separately', async () => {
   const f: HcFixture = await hcFixture();
@@ -1429,7 +1430,7 @@ test('unreadable leaves reserve capacity while foreign leaves summarize separate
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('merged foreign leaves survive cleanup with worktree branch and tab intact', async () => {
   const f: HcFixture = await hcFixture({ window: 'open' });
@@ -1458,7 +1459,7 @@ test('merged foreign leaves survive cleanup with worktree branch and tab intact'
     stopAdopt();
     await f.clean();
   }
-}, 15000);
+});
 
 test('a sweep leaves closed merged leaves untouched', async () => {
   const f: HcFixture = await hcFixture();
@@ -1473,7 +1474,7 @@ test('a sweep leaves closed merged leaves untouched', async () => {
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('next --resume starts an open dependent of an already closed leaf', async () => {
   const f: HcFixture = await hcFixture();
@@ -1487,7 +1488,7 @@ test('next --resume starts an open dependent of an already closed leaf', async (
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('two repos summarize once per repo on every invocation', async () => {
   const f: HcFixture = await hcFixture();
@@ -1511,7 +1512,7 @@ test('two repos summarize once per repo on every invocation', async () => {
     await f.clean();
     g.clean();
   }
-}, 15000);
+});
 
 for (const moved of ['worktree root', 'repo root'] as const) {
   test(`changed ${moved} reports recorded and expected worktrees without creating or prompting`, async () => {
@@ -1751,7 +1752,7 @@ test('one pass reads the registered root common dir and remote url once each', a
   } finally {
     await f.clean();
   }
-}, 20000);
+});
 
 test('a blocked non-merge seat does not stall a merge leaf', async () => {
   const f: HcFixture = await hcFixture();
@@ -1775,7 +1776,7 @@ test('a blocked non-merge seat does not stall a merge leaf', async () => {
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('check.fix, check.repair and post-repair review dispatch to their swapped seats', async () => {
   const f: HcFixture = await hcFixture();
@@ -1808,7 +1809,7 @@ test('check.fix, check.repair and post-repair review dispatch to their swapped s
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 function tabCloses(f: HcFixture): string[][] {
   return f.core
@@ -1865,7 +1866,7 @@ test('startup retries closure before cleanup and retains failed owners with thei
     stopAdopt();
     await f.clean();
   }
-}, 15000);
+});
 
 for (const mode of ['--resume', '--all'] as const) {
   test(`startup retains a merged leaf's worktree and branch while closing its tab as an epic sibling stays unfinished (${mode})`, async () => {
@@ -1889,7 +1890,7 @@ for (const mode of ['--resume', '--all'] as const) {
       stopAdopt();
       await f.clean();
     }
-  }, 15000);
+  });
 }
 
 test('a merged leaf whose tab is already gone makes no tab close call', async () => {
@@ -1938,7 +1939,7 @@ test('a merged leaf whose tab is already gone makes no tab close call', async ()
     stopAdopt();
     await f.clean();
   }
-}, 15000);
+});
 
 test('next --resume re-prompts allocated idle leaves in every registered repo without allocating new work', async () => {
   const f: HcFixture = await hcFixture();
@@ -1980,7 +1981,7 @@ test('next --resume re-prompts allocated idle leaves in every registered repo wi
     await f.clean();
     await g.clean();
   }
-}, 15000);
+});
 
 test('next --resume completes and cleans a merged leaf and starts its dependent', async () => {
   const f: HcFixture = await hcFixture();
@@ -2012,7 +2013,7 @@ test('next --resume completes and cleans a merged leaf and starts its dependent'
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 for (const area of ['open', 'closed']) {
   for (const nesting of ['', 'invalid', 'epic/issue/extra/invalid']) {
@@ -2034,7 +2035,7 @@ for (const area of ['open', 'closed']) {
             ['next', input],
             f.root,
             { ...f.env, FLOCK_CALLS: resolve(f.home, 'flock-calls') },
-            3000,
+            WAIT_MS,
           );
           expect(result.code).toBe(1);
           expect(result.stderr).toContain(resolve(path, 'state.yaml'));
@@ -2051,7 +2052,7 @@ for (const area of ['open', 'closed']) {
       } finally {
         await f.clean();
       }
-    }, 10000);
+    });
   }
 }
 
@@ -2131,7 +2132,7 @@ test('spaced repo root dispatches leaf= with the complete spaced authoritative f
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('a failed leaf with its tab still open does not count toward max_active', async () => {
   const f: HcFixture = await hcFixture();
@@ -2155,7 +2156,7 @@ test('a failed leaf with its tab still open does not count toward max_active', a
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('a failed leaf does not reserve capacity in the unreadable branch', async () => {
   const f: HcFixture = await hcFixture();
@@ -2185,7 +2186,7 @@ test('a failed leaf does not reserve capacity in the unreadable branch', async (
     await f.clean();
     await g.clean();
   }
-}, 15000);
+});
 
 test('a failed leaf with a blocked seat is not seat-observed', async () => {
   const f: HcFixture = await hcFixture();
@@ -2211,7 +2212,7 @@ test('a failed leaf with a blocked seat is not seat-observed', async () => {
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('failed seat starts keep the leaf in phase, uncharged, until a start succeeds', async () => {
   const f: HcFixture = await hcFixture({ mode: 'exit' });
@@ -2244,7 +2245,7 @@ test('failed seat starts keep the leaf in phase, uncharged, until a start succee
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('next uses repo seat overrides for both seats with spaced model as one argv element', async () => {
   const f: HcFixture = await hcFixture();
@@ -2268,7 +2269,7 @@ test('next uses repo seat overrides for both seats with spaced model as one argv
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('next inherits non-overridden seat from global slots', async () => {
   const f: HcFixture = await hcFixture();
@@ -2288,7 +2289,7 @@ test('next inherits non-overridden seat from global slots', async () => {
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('next refuses unknown harness override before allocation', async () => {
   const f: HcFixture = await hcFixture();
@@ -2310,7 +2311,7 @@ test('next refuses unknown harness override before allocation', async () => {
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('next resolves seats from EPIC.md front matter and falls back per seat', async () => {
   const f: HcFixture = await hcFixture();
@@ -2334,7 +2335,7 @@ test('next resolves seats from EPIC.md front matter and falls back per seat', as
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('next prefers ISSUE.md seats over EPIC.md and applies a standalone issue block', async () => {
   const f: HcFixture = await hcFixture();
@@ -2374,7 +2375,7 @@ test('next prefers ISSUE.md seats over EPIC.md and applies a standalone issue bl
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 const malformedIndex: [string, string][] = [
   ['unparseable front matter', '---\nslots: [\n---\n# Issue\n'],
@@ -2402,7 +2403,7 @@ for (const [name, content] of malformedIndex) {
     } finally {
       await f.clean();
     }
-  }, 15000);
+  });
 }
 
 test('next refuses an ISSUE.md index whose harness has no template before any allocation', async () => {
@@ -2422,7 +2423,7 @@ test('next refuses an ISSUE.md index whose harness has no template before any al
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 type Refusal = z.infer<typeof skipSchema>;
 async function refusal(f: HcFixture, slug: string, path: string): Promise<Refusal> {
@@ -2584,7 +2585,7 @@ test('fresh allocation carries TMPDIR on both seat starts with 0700 scratch', as
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('allocation creates missing leaf temp ancestors and recreates deleted intermediate parents', async () => {
   const f: HcFixture = await hcFixture();
@@ -2607,7 +2608,7 @@ test('allocation creates missing leaf temp ancestors and recreates deleted inter
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('new tab keeps existing scratch for checks that outlive their tab, and seats disable the node compile cache', async () => {
   const f: HcFixture = await hcFixture();
@@ -2632,7 +2633,7 @@ test('new tab keeps existing scratch for checks that outlive their tab, and seat
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('allocation carries TMPDIR refuses symlink override with no seat start', async () => {
   const f: HcFixture = await hcFixture();
@@ -2651,7 +2652,7 @@ test('allocation carries TMPDIR refuses symlink override with no seat start', as
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('allocation carries TMPDIR refuses file override with no seat start', async () => {
   const f: HcFixture = await hcFixture();
@@ -2667,7 +2668,7 @@ test('allocation carries TMPDIR refuses file override with no seat start', async
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('allocation carries TMPDIR corrects permissive owned dirs to 0700', async () => {
   const f: HcFixture = await hcFixture();
@@ -2694,7 +2695,7 @@ test('allocation carries TMPDIR corrects permissive owned dirs to 0700', async (
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 test('leaf temp path stays inside the socket budget under /tmp for any slug and repo root', async () => {
   const f: Fixture = await fixture();
   try {
@@ -2743,7 +2744,7 @@ test('leaf temp path stays inside the socket budget under /tmp for any slug and 
   } finally {
     f.clean();
   }
-}, 15000);
+});
 
 test('closed tab scratch deletes merged folder and prunes inner worktree', async () => {
   const f: HcFixture = await hcFixture();
@@ -2768,7 +2769,7 @@ test('closed tab scratch deletes merged folder and prunes inner worktree', async
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('closed tab scratch sweeps a failed leaf, keeps its branch', async () => {
   const f: HcFixture = await hcFixture();
@@ -2794,7 +2795,7 @@ test('closed tab scratch sweeps a failed leaf, keeps its branch', async () => {
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 test('sweep scratch catch-up deletes open and closed folders with no live seats', async () => {
   const f: HcFixture = await hcFixture();
   try {
@@ -2833,7 +2834,7 @@ test('sweep scratch catch-up deletes open and closed folders with no live seats'
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('sweep scratch catch-up keeps sentinel with live seats then deletes on later sweep', async () => {
   const f: HcFixture = await hcFixture({ window: 'open' });
@@ -2863,7 +2864,7 @@ test('sweep scratch catch-up keeps sentinel with live seats then deletes on late
     stopAdopt();
     await f.clean();
   }
-}, 15000);
+});
 
 test('dispatch recreates missing scratch with same tab and seats', async () => {
   const f: HcFixture = await hcFixture();
@@ -2885,7 +2886,7 @@ test('dispatch recreates missing scratch with same tab and seats', async () => {
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('fixture temp root isolates every TMPDIR and envs carry override', async () => {
   const f: HcFixture = await hcFixture();
@@ -2923,7 +2924,7 @@ test('fixture temp root isolates every TMPDIR and envs carry override', async ()
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 function readinessInput(leafPath: string, input: object): void {
   yaml(resolve(leafPath, 'readiness.yaml'), { inputs: [input], produces: [], grants: [], retained: [], proofs: [] });
@@ -2967,7 +2968,7 @@ test('next refuses an env-gapped leaf in every missing .env state and dispatches
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('next refuses a leaf whose declared file input is absent or empty', async () => {
   const f: HcFixture = await hcFixture();
@@ -2988,7 +2989,7 @@ test('next refuses a leaf whose declared file input is absent or empty', async (
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('next --all leaves a gapped leaf undispatched while its ungapped sibling dispatches', async () => {
   const f: HcFixture = await hcFixture();
@@ -3004,7 +3005,7 @@ test('next --all leaves a gapped leaf undispatched while its ungapped sibling di
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('an input held by an unregistered absolute directory checks that directory .env', async () => {
   const f: HcFixture = await hcFixture();
@@ -3024,7 +3025,7 @@ test('an input held by an unregistered absolute directory checks that directory 
     rmSync(holder, { recursive: true, force: true });
     await f.clean();
   }
-}, 15000);
+});
 
 test('an invalid readiness.yaml skips the leaf and names the file path', async () => {
   const f: HcFixture = await hcFixture();
@@ -3050,7 +3051,7 @@ test('an invalid readiness.yaml skips the leaf and names the file path', async (
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('a dispatched worktree gets a real .env file with the declared subset', async () => {
   const f: HcFixture = await hcFixture();
@@ -3073,7 +3074,7 @@ test('a dispatched worktree gets a real .env file with the declared subset', asy
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('a dispatched .env file round-trips quotes and backslashes through dotenv parsing', async () => {
   const f: HcFixture = await hcFixture();
@@ -3096,7 +3097,7 @@ test('a dispatched .env file round-trips quotes and backslashes through dotenv p
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('a dispatched .env file preserves spaced assignments, multiline values and nested assignment text', async () => {
   const f: HcFixture = await hcFixture();
@@ -3130,7 +3131,7 @@ test('a dispatched .env file preserves spaced assignments, multiline values and 
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('a dispatched .env file round-trips mixed quotes, backticks and escape-looking text', async () => {
   const f: HcFixture = await hcFixture();
@@ -3183,7 +3184,7 @@ test('a dispatched .env file round-trips mixed quotes, backticks and escape-look
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('next preserves a declared value that escapes every quoting form', async () => {
   const f: HcFixture = await hcFixture();
@@ -3207,7 +3208,7 @@ test('next preserves a declared value that escapes every quoting form', async ()
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('a dispatched .env file preserves declared names matching encoding context names', async () => {
   const f: HcFixture = await hcFixture();
@@ -3227,7 +3228,7 @@ test('a dispatched .env file preserves declared names matching encoding context 
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('a live tab freezes .env while a dead tab lets the next dispatch rewrite it', async () => {
   const f: HcFixture = await hcFixture();
@@ -3256,7 +3257,7 @@ test('a live tab freezes .env while a dead tab lets the next dispatch rewrite it
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('next refuses a declared name missing from the registered .env without leaking its values', async () => {
   const f: HcFixture = await hcFixture();
@@ -3283,7 +3284,7 @@ test('next refuses a declared name missing from the registered .env without leak
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('pass_env names are not copied from the registered .env', async () => {
   const f: HcFixture = await hcFixture();
@@ -3301,7 +3302,7 @@ test('pass_env names are not copied from the registered .env', async () => {
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('dispatch recreates a deleted .env file in a reused worktree once its tab is gone', async () => {
   const f: HcFixture = await hcFixture();
@@ -3325,7 +3326,7 @@ test('dispatch recreates a deleted .env file in a reused worktree once its tab i
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('a pre-linked worktree has its .env symlink replaced by a real file on dispatch', async () => {
   const f: HcFixture = await hcFixture();
@@ -3348,7 +3349,7 @@ test('a pre-linked worktree has its .env symlink replaced by a real file on disp
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 for (const registered of [false, true]) {
   test(`an empty env list writes an empty .env file ${registered ? 'with' : 'without'} a registered .env`, async () => {
@@ -3366,7 +3367,7 @@ for (const registered of [false, true]) {
     } finally {
       await f.clean();
     }
-  }, 15000);
+  });
 }
 
 for (const kind of ['tracked file', 'unignored'] as const) {
@@ -3397,7 +3398,7 @@ for (const kind of ['tracked file', 'unignored'] as const) {
     } finally {
       await f.clean();
     }
-  }, 15000);
+  });
 }
 
 for (const kind of ['real file', 'stale link'] as const) {
@@ -3423,7 +3424,7 @@ for (const kind of ['real file', 'stale link'] as const) {
     } finally {
       await f.clean();
     }
-  }, 15000);
+  });
 }
 
 test('next refuses to write .env not ignored in the registered checkout, keeps the worktree, and reuses it after the ignore rule returns', async () => {
@@ -3454,7 +3455,7 @@ test('next refuses to write .env not ignored in the registered checkout, keeps t
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('merged leaf cleanup removes the worktree and leaves the registered .env untouched', async () => {
   const f: HcFixture = await hcFixture();
@@ -3473,7 +3474,7 @@ test('merged leaf cleanup removes the worktree and leaves the registered .env un
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 async function allocatedLeaf(f: HcFixture, slug: string): Promise<{ path: string }> {
   const path: string = leaf(f, slug, 'plan.synthesis');
@@ -3537,7 +3538,7 @@ test('only the earlier-stamped merge leaf holds the turn while the waiting leaf 
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('an ineligible merge leaf never holds the turn (blocked-by)', async () => {
   const f: HcFixture = await hcFixture();
@@ -3557,7 +3558,7 @@ test('an ineligible merge leaf never holds the turn (blocked-by)', async () => {
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 for (const exit of ['operator merged', 'operator failed'] as const) {
   test(`the ${exit} holder exit wakes the next merge leaf without a manual next`, async () => {
@@ -3577,7 +3578,7 @@ for (const exit of ['operator merged', 'operator failed'] as const) {
     } finally {
       await f.clean();
     }
-  }, 15000);
+  });
 }
 
 test('a committed merge whose log append fails still wakes the next leaf', async () => {
@@ -3601,7 +3602,7 @@ test('a committed merge whose log append fails still wakes the next leaf', async
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('a leaf re-entering merge keeps its stamp and holds the turn over later-stamped leaves', async () => {
   const f: HcFixture = await hcFixture();
@@ -3624,7 +3625,7 @@ test('a leaf re-entering merge keeps its stamp and holds the turn over later-sta
   } finally {
     await f.clean();
   }
-}, 30000);
+});
 
 test('a saved holder failure wakes the stamped queue when the log is a directory', async () => {
   const f: HcFixture = await hcFixture();
@@ -3643,7 +3644,7 @@ test('a saved holder failure wakes the stamped queue when the log is a directory
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('unstamped merge dispatch uses log order and refuses unreadable history', async () => {
   const f: HcFixture = await hcFixture();
@@ -3680,7 +3681,7 @@ test('unstamped merge dispatch uses log order and refuses unreadable history', a
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 // blocked-report
 test('blocked-report epic folder starts ready and reports dep, input, failed', async () => {
@@ -3708,7 +3709,7 @@ test('blocked-report epic folder starts ready and reports dep, input, failed', a
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('blocked-report dep detail labels parked, missing, unreadable and skips merged', async () => {
   const f: HcFixture = await hcFixture();
@@ -3749,7 +3750,7 @@ test('blocked-report dep detail labels parked, missing, unreadable and skips mer
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('blocked-report input detail names gaps without values and defers to deps', async () => {
   const f: HcFixture = await hcFixture();
@@ -3823,7 +3824,7 @@ test('blocked-report input detail names gaps without values and defers to deps',
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('blocked-report a failed dependency stays an error', async () => {
   const f: HcFixture = await hcFixture();
@@ -3837,7 +3838,7 @@ test('blocked-report a failed dependency stays an error', async () => {
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('blocked-report failed and merged share a folder without a merged line', async () => {
   const f: HcFixture = await hcFixture();
@@ -3855,7 +3856,7 @@ test('blocked-report failed and merged share a folder without a merged line', as
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('blocked-report same line by slug, leaf path, and epic path', async () => {
   const f: HcFixture = await hcFixture();
@@ -3876,7 +3877,7 @@ test('blocked-report same line by slug, leaf path, and epic path', async () => {
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('blocked-report manual forms bare, all inside, all outside match', async () => {
   const f: HcFixture = await hcFixture();
@@ -3893,7 +3894,7 @@ test('blocked-report manual forms bare, all inside, all outside match', async ()
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('blocked-report automatic silence on wake, resume, and merge wake', async () => {
   const f: HcFixture = await hcFixture();
@@ -3917,7 +3918,7 @@ test('blocked-report automatic silence on wake, resume, and merge wake', async (
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('blocked-report dependent not picked when started by completion', async () => {
   const f: HcFixture = await hcFixture();
@@ -3932,7 +3933,7 @@ test('blocked-report dependent not picked when started by completion', async () 
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('blocked-report real errors still report on automatic paths', async () => {
   const f: HcFixture = await hcFixture();
@@ -3951,7 +3952,7 @@ test('blocked-report real errors still report on automatic paths', async () => {
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('blocked-report no line for capacity waits', async () => {
   const f: HcFixture = await hcFixture();
@@ -3966,7 +3967,7 @@ test('blocked-report no line for capacity waits', async () => {
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('blocked-report no line for merge turn waits', async () => {
   const f: HcFixture = await hcFixture();
@@ -3983,7 +3984,7 @@ test('blocked-report no line for merge turn waits', async () => {
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('blocked-report no line for busy seats', async () => {
   const f: HcFixture = await hcFixture();
@@ -4005,7 +4006,7 @@ test('blocked-report no line for busy seats', async () => {
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 // The slug each seat task names, sorted: the leaves a pass dispatched.
 async function dispatchedSlugs(f: HcFixture): Promise<string[]> {
   return (await allTasks(f)).map((prompt) => prompt.text.split(' ')[1]).sort();
@@ -4079,7 +4080,7 @@ for (const owner of namedTargetOwners) {
         await named.clean();
         await pathed.clean();
       }
-    }, 15000);
+    });
   }
 }
 
@@ -4562,7 +4563,7 @@ test('a leaf waiting in merge does not count toward max_active while check.repai
   } finally {
     await f.clean();
   }
-}, 30000);
+});
 
 test('a leaf waiting in merge does not count toward max_active when its repo session is refused', async () => {
   const f: HcFixture = await hcFixture();
@@ -4593,4 +4594,4 @@ test('a leaf waiting in merge does not count toward max_active when its repo ses
     await f.clean();
     await g.clean();
   }
-}, 30000);
+});

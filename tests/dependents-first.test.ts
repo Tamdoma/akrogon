@@ -112,4 +112,4 @@ test('next --all dispatches a leaf with unmerged dependents before an earlier le
   } finally {
     await f.clean();
   }
-}, 20000);
+});

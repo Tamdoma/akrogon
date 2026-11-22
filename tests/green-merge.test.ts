@@ -171,7 +171,7 @@ test('a green top lands with no seat', async () => {
   } finally {
     await f.clean();
   }
-}, 60000);
+});
 
 // A check whose log names the failing test, plus a completed base run holding
 // that same named unit red at the leaf's merge-base, is the covered main-red
@@ -218,7 +218,7 @@ test('a red head covered by an unresolved red on main lands on its first run wit
   } finally {
     await f.clean();
   }
-}, 60000);
+});
 
 // An older covered head run on the same tree covers only its own failures: a new uncovered
 // failure on that tree exits to check.repair with the new run's id, and no cover or previous
@@ -291,7 +291,7 @@ test('beta', () => expect(existsSync(${JSON.stringify(marker)})).toBe(false));
   } finally {
     await f.clean();
   }
-}, 60000);
+});
 
 test('a clean restack is verified and pushed again with no seat', async () => {
   const f: HcFixture = await hcFixture();
@@ -316,7 +316,7 @@ test('a clean restack is verified and pushed again with no seat', async () => {
   } finally {
     await g.clean();
   }
-}, 90000);
+});
 
 test('a completing push hands off exactly one broadcast seat, also after a crash', async () => {
   const f: GreenFixture = await greenFixture({ ok: 'true' });
@@ -348,7 +348,7 @@ test('a completing push hands off exactly one broadcast seat, also after a crash
   } finally {
     await f.clean();
   }
-}, 60000);
+});
 
 test('a live land run is left alone and a dead one resumes', async () => {
   const f: GreenFixture = await greenFixture({ ok: 'true' });
@@ -374,7 +374,7 @@ test('a live land run is left alone and a dead one resumes', async () => {
   } finally {
     await f.clean();
   }
-}, 60000);
+});
 
 test('a land run that died after its push recovers to merged once', async () => {
   const f: GreenFixture = await greenFixture({ ok: 'true' });
@@ -397,7 +397,7 @@ test('a land run that died after its push recovers to merged once', async () => 
   } finally {
     await f.clean();
   }
-}, 60000);
+});
 
 test('stop --all stops a tabless command merge', async () => {
   const f: Fixture = await fixture();
@@ -456,7 +456,7 @@ test('next keeps a working broadcast seat until it finishes', async () => {
   } finally {
     await f.clean();
   }
-}, 60000);
+});
 
 test('next preserves a live command attempt while its refused push restacks', async () => {
   const f: GreenFixture = await greenFixture({ ok: 'true' });
@@ -490,7 +490,7 @@ test('next preserves a live command attempt while its refused push restacks', as
   } finally {
     await f.clean();
   }
-}, 60000);
+});
 
 test('the land service drops an inherited old herdr socket and keeps no seat identity', async () => {
   const f: GreenFixture = await greenFixture({ ok: 'true' });
@@ -507,4 +507,4 @@ test('the land service drops an inherited old herdr socket and keeps no seat ide
   } finally {
     await f.clean();
   }
-}, 60000);
+});

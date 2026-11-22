@@ -2,7 +2,7 @@ import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, watch } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { cli, fixture, type Fixture } from './helpers';
+import { cli, fixture, WAIT_MS, type Fixture } from './helpers';
 import { hcCore, noticeFiles, type HcCore } from './hc-fixture';
 import { noticeId, writeNotice } from '../src/notice';
 import type { Result } from '../src/shell';
@@ -19,7 +19,7 @@ test('a notice is published as one complete <id>.json through a temporary name, 
     const id: string = noticeId('repo', 'busy', 'leaf', 'A');
     const seen: string[] = [];
     const published: Promise<void> = new Promise<void>((done, fail) => {
-      const timer = setTimeout(() => fail(new Error(`no event for ${id}.json; saw ${JSON.stringify(seen)}`)), 5000);
+      const timer = setTimeout(() => fail(new Error(`no event for ${id}.json; saw ${JSON.stringify(seen)}`)), WAIT_MS);
       const watcher = watch(folder, (_event: string, name: string | null) => {
         if (name === null) return;
         seen.push(name);
@@ -83,7 +83,7 @@ test('akrogon notice writes one notice into the resolved session of the repo of 
     await core.stop();
     f.clean();
   }
-}, 15000);
+});
 
 test('akrogon notice fails, writing nothing, when no running session holds the repo', async () => {
   const f: Fixture = await fixture();
@@ -97,4 +97,4 @@ test('akrogon notice fails, writing nothing, when no running session holds the r
     await core.stop();
     f.clean();
   }
-}, 15000);
+});

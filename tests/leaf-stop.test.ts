@@ -159,7 +159,7 @@ test('the merge path builds no stack and starts no merge seat for a stopped leaf
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('a failed slice stop keeps the record, prints the error, exits non-zero and is retryable', async () => {
   const f: StopFixture = await stopFixture();
@@ -280,7 +280,7 @@ test('stopping the holder of an applied batch builds no second batch and prompts
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('stop --all skips merged and closed leaves that keep their tab', async () => {
   const f: StopFixture = await stopFixture();

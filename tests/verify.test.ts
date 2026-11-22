@@ -24,6 +24,7 @@ import {
   storeDir,
   unitBin,
   yaml,
+  WAIT_MS,
   type Fixture,
 } from './helpers';
 import { command, finishCaptured, spawnFiles, type Result, type SpawnResult } from '../src/shell';
@@ -282,7 +283,7 @@ test('a failure after the receipt is written exits non-zero with the receipt kep
   } finally {
     f.clean();
   }
-}, 15000);
+});
 
 test('a store target under an ancestor holding package.json is refused before allocation', async () => {
   const f: Fixture = await fixture();
@@ -1655,7 +1656,7 @@ test('a thrown member leaves the run incomplete and the worktree stands until ev
     });
     child = spawned.child;
     const captured = spawned.captured;
-    expect(await seen(`${dir}/m1.start`, 5000)).toBe(true);
+    expect(await seen(`${dir}/m1.start`, WAIT_MS)).toBe(true);
     // A concurrent m2 starts while m1 still sleeps; a sequential m2 starts only after m1 ends.
     const overlapped: boolean = await seen(`${dir}/m2.start`, 300);
     if (!overlapped && child !== undefined) killTree(child);
@@ -1666,13 +1667,13 @@ test('a thrown member leaves the run incomplete and the worktree stands until ev
     const run: VerifyRun = records(f)[0];
     expect(run.end).toBeUndefined();
     expect(existsSync(`${dir}/m1.done`)).toBe(true);
-    expect(await seen(`${dir}/m2.done`, 5000)).toBe(true);
+    expect(await seen(`${dir}/m2.done`, WAIT_MS)).toBe(true);
     expect(existsSync(run.path)).toBe(false);
   } finally {
     if (child !== undefined && child.exitCode === null) killTree(child);
     f.clean();
   }
-}, 30000);
+});
 
 test('a same-tree retry re-executes every unblocked command and writes no reused entry', async () => {
   const f: Fixture = await fixture();
@@ -2600,7 +2601,7 @@ test('verify joining a live pass on a failed leaf starts no child', async () => 
         PATH: `${unitBin(f)}:${process.env.PATH}`,
       },
     });
-    const deadline: number = Date.now() + 20000;
+    const deadline: number = Date.now() + WAIT_MS;
     while (
       !existsSync(spawned.captured.errPath) ||
       !readFileSync(spawned.captured.errPath, 'utf8').includes('run jointest')

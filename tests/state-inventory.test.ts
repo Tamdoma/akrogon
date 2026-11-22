@@ -94,7 +94,7 @@ test('one bad leaf stops only itself: next, phase, config, run-check and status 
   } finally {
     await f.clean();
   }
-}, 30000);
+});
 
 for (const variant of [
   {
@@ -123,7 +123,7 @@ for (const variant of [
     } finally {
       await f.clean();
     }
-  }, 15000);
+  });
 }
 
 test('isolation holds when the bad leaf sits under issues/closed', async () => {
@@ -148,7 +148,7 @@ test('isolation holds when the bad leaf sits under issues/closed', async () => {
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('naming the bad leaf returns its own error naming its file', async () => {
   const f: HcFixture = await hcFixture();
@@ -169,7 +169,7 @@ test('naming the bad leaf returns its own error naming its file', async () => {
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('a bad leaf is never dispatched or queued but stays owned: reconcile keeps its worktree and tab, dependents stay blocked, another owner completes', async () => {
   const f: HcFixture = await hcFixture();
@@ -226,7 +226,7 @@ test('a bad leaf is never dispatched or queued but stays owned: reconcile keeps 
   } finally {
     await f.clean();
   }
-}, 30000);
+});
 
 test('no module outside src/state.ts walks issue areas for state.yaml or parses leaf state', () => {
   const roots: string[] = [resolve(import.meta.dir, '../src'), resolve(import.meta.dir, '../skills')];
@@ -283,7 +283,7 @@ test('owner completion retains duplicate and foreign leaf failures while an inde
       await f.clean();
     }
   }
-}, 30000);
+});
 
 test('status for a missing leaf does not report a bad sibling', async () => {
   const f: Fixture = await fixture();

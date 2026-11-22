@@ -6,7 +6,7 @@ import { test, expect } from 'bun:test';
 import { chmodSync, existsSync, readFileSync, watch, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { cli, fixture, type Fixture } from './helpers';
+import { cli, fixture, WAIT_MS, type Fixture } from './helpers';
 import { hcCore, type HcCore, type Terminal } from './hc-fixture';
 import { spawnCaptured, type SpawnResult } from '../src/shell';
 
@@ -93,7 +93,7 @@ async function foreground(core: HcCore, door: Door, until: (argv: string[] | nul
     stdout: 'pipe',
     stderr: 'ignore',
   });
-  const timer = setTimeout(() => child.kill(), 15_000);
+  const timer = setTimeout(() => child.kill(), WAIT_MS);
   const fg = z.object({ argv: z.array(z.string()) }).nullable();
   let buffer: string = '';
   let reached: boolean = false;
@@ -126,7 +126,7 @@ async function foreground(core: HcCore, door: Door, until: (argv: string[] | nul
 const inWait = (argv: string[] | null): boolean => argv !== null && argv[0] === 'hc' && argv[1] === 'wait';
 
 // Resolves when `path` exists, woken by the folder's change events; the timer only bounds it.
-function appears(path: string, ms: number = 15_000): Promise<void> {
+function appears(path: string, ms: number = WAIT_MS): Promise<void> {
   return new Promise<void>((done, fail) => {
     const watcher = watch(resolve(path, '..'), () => {
       if (!existsSync(path)) return;

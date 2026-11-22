@@ -10,6 +10,7 @@ import {
   leaf,
   seedRun,
   yaml,
+  WAIT_MS,
   type Fixture,
   type SystemctlFixture,
 } from './helpers';
@@ -187,7 +188,7 @@ test('a red land run exits to check.repair and the next holder launches in the s
   } finally {
     await f.clean();
   }
-}, 60000);
+});
 
 // #147: the land run holds its repo for its attempt. A run of another leaf
 // that starts during it waits for the land and starts after it; the hold names
@@ -215,7 +216,7 @@ test('a land run holds its repo: a leaf run-check waits for it and starts after 
       ...f.env,
       FAKE_LAND_HOLDS_LOG: holdsLog,
     });
-    const deadline: number = Date.now() + 30000;
+    const deadline: number = Date.now() + WAIT_MS;
     while (!existsSync(resolve(marks, 'land.held'))) {
       if (Date.now() > deadline) throw new Error('land check never started');
       await Bun.sleep(50);
@@ -254,7 +255,7 @@ test('a land run holds its repo: a leaf run-check waits for it and starts after 
   } finally {
     await f.clean();
   }
-}, 90000);
+});
 
 // Criterion 2 (gate): a gate refusal moves the leaf to check.repair with the
 // refusal text, clears the batch and starts the next leaf's turn.
@@ -287,7 +288,7 @@ test('a gate refusal exits to check.repair with the refusal and starts the next 
   } finally {
     await f.clean();
   }
-}, 60000);
+});
 
 // Criterion 2 (restack conflict): a non-fast-forward push whose restack cannot
 // apply moves the leaf to check.repair with reason conflict and the new base.
@@ -315,7 +316,7 @@ test('a refused push whose restack conflicts exits to check.repair', async () =>
   } finally {
     await g.clean();
   }
-}, 90000);
+});
 
 test('a wake cannot replace the conflict exit of a live land restack', async () => {
   const f: HcFixture = await hcFixture();
@@ -367,7 +368,7 @@ exec ${quote(git)} "$@"
   } finally {
     await g.clean();
   }
-}, 90000);
+});
 
 // Criterion 2 (turn conflict): a holder whose branch cannot rebase at the turn's
 // start exits in the same pass with reason conflict and never launches a land run.
@@ -401,7 +402,7 @@ test('an unrebaseable holder exits to check.repair without a land run', async ()
   } finally {
     await f.clean();
   }
-}, 60000);
+});
 
 // Criterion 2 (dirty): uncommitted work in the holder's worktree exits with
 // reason dirty and the edit survives.
@@ -430,7 +431,7 @@ test('a dirty holder worktree exits to check.repair keeping the edit', async () 
   } finally {
     await f.clean();
   }
-}, 60000);
+});
 
 // Criterion 3 + 4a: one non-fast-forward refusal restacks under the same
 // attempt; a second refusal clears the batch and the leaf stays in merge; any
@@ -463,7 +464,7 @@ test('a second non-fast-forward refusal clears the batch and keeps the leaf in m
   } finally {
     await g.clean();
   }
-}, 90000);
+});
 
 test('a conflict after the second push refusal belongs to a fresh turn', async () => {
   const f: HcFixture = await hcFixture();
@@ -490,7 +491,7 @@ test('a conflict after the second push refusal belongs to a fresh turn', async (
   } finally {
     await g.clean();
   }
-}, 90000);
+});
 
 test('a push error moves the leaf to failed with git stderr and frees the line', async () => {
   const f: GreenFixture = await greenFixture({ ok: 'true' });
@@ -516,7 +517,7 @@ test('a push error moves the leaf to failed with git stderr and frees the line',
   } finally {
     await f.clean();
   }
-}, 60000);
+});
 
 // Criterion 4b: the dead seat of the exited leaf does not stall the next
 // holder, and the repair dispatch restarts that seat.
@@ -546,7 +547,7 @@ test('a dead B seat of the exited leaf does not stall the next holder', async ()
   } finally {
     await f.clean();
   }
-}, 60000);
+});
 
 // Criterion 4c: with no live seat of its own the repair dispatch obeys
 // max_active — the dead B is restarted only when the cap has room.
@@ -594,7 +595,7 @@ test('a dead B seat restarts only when capacity has room', async () => {
     release();
     await f.clean();
   }
-}, 60000);
+});
 
 // Criterion 5: the receipt skip only for the recorded red exit's top.
 test('check.repair to merge skips the leaf receipt only for the recorded red top', async () => {
@@ -680,7 +681,7 @@ test('the first merge return keeps its stamp and heads the queue, the second min
   } finally {
     f.clean();
   }
-}, 30000);
+});
 
 // Criterion 7: a merge leaf holding a batch keeps its leaf slice when both
 // seats are gone.
@@ -706,7 +707,7 @@ test('a merge leaf holding a batch keeps its slice with both seats gone', async 
   } finally {
     await f.clean();
   }
-}, 30000);
+});
 
 // Criterion 8: a slot-run merged or check.fix on a merge leaf is refused; the
 // operator's slot-less merged still lands, and --check is refused outright.
@@ -765,7 +766,7 @@ test('an unchanged red leaf gets a base pass when main and the merge top stay pu
   } finally {
     await f.clean();
   }
-}, 60000);
+});
 
 test('a covered repeat and a new uncovered failure do not trigger a base pass', async () => {
   const f: GreenFixture = await greenFixture({ test: 'sh check.sh' });
@@ -800,7 +801,7 @@ test('a covered repeat and a new uncovered failure do not trigger a base pass', 
   } finally {
     await f.clean();
   }
-}, 60000);
+});
 
 test('a base verdict names the green leaf receipt reused when main landed', async () => {
   const f: GreenFixture = await greenFixture({ test: 'sh check.sh' });
@@ -840,7 +841,7 @@ test('a base verdict names the green leaf receipt reused when main landed', asyn
   } finally {
     await f.clean();
   }
-}, 60000);
+});
 
 test('a green row at the merge-base skips the base pass and exits with its run as the verdict', async () => {
   const f: GreenFixture = await greenFixture({ ok: 'true' });
@@ -898,7 +899,7 @@ test('a green row at the merge-base skips the base pass and exits with its run a
   } finally {
     await f.clean();
   }
-}, 60000);
+});
 
 test('a base pass red on every failing unit covers the head and lands the leaf', async () => {
   const f: GreenFixture = await greenFixture({ ok: 'true' });
@@ -941,7 +942,7 @@ test('a base pass red on every failing unit covers the head and lands the leaf',
   } finally {
     await f.clean();
   }
-}, 90000);
+});
 
 test('a base pass green on a failing unit exits to check.repair naming the base run', async () => {
   const f: GreenFixture = await greenFixture({ ok: 'true' });
@@ -980,7 +981,7 @@ test('a base pass green on a failing unit exits to check.repair naming the base 
   } finally {
     await f.clean();
   }
-}, 90000);
+});
 
 test('a changed head or a nameless previous failure runs no base pass', async () => {
   const f: GreenFixture = await greenFixture({ ok: 'true' });
@@ -1020,7 +1021,7 @@ test('a changed head or a nameless previous failure runs no base pass', async ()
   } finally {
     await f.clean();
   }
-}, 90000);
+});
 
 test('a previous run that names no real test runs no base pass', async () => {
   const f: GreenFixture = await greenFixture({ ok: 'true' });
@@ -1064,7 +1065,7 @@ test('a previous run that names no real test runs no base pass', async () => {
   } finally {
     await f.clean();
   }
-}, 90000);
+});
 
 // Sweep: no seat-owned merge surface remains in src.
 test('no seat-owned merge path remains in src', () => {

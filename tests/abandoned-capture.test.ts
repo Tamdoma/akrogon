@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { finishCaptured, quote, spawnFiles, type Result, type SpawnResult } from '../src/shell';
 import type { Captured } from '../src/shell';
-import { cli, entry, procFixture, fixture, leaf, leafTempRoot, verified, yaml, type Fixture } from './helpers';
+import { cli, entry, procFixture, fixture, leaf, leafTempRoot, verified, yaml, WAIT_MS, type Fixture } from './helpers';
 import { hcCore, type HcCore } from './hc-fixture';
 import { command } from '../src/shell';
 import { readState } from '../src/state';
@@ -37,7 +37,7 @@ function captures(dir: string): { out: string; err: string }[] {
     .map((name) => ({ out: join(dir, name), err: join(dir, name.replace(/-out\.log$/, '-err.log')) }));
 }
 
-async function waitFor(check: () => boolean, label: string, ms: number = 15000): Promise<void> {
+async function waitFor(check: () => boolean, label: string, ms: number = WAIT_MS): Promise<void> {
   const begun: number = Date.now();
   while (!check()) {
     if (Date.now() - begun > ms) throw new Error(`Timed out waiting for ${label}`);
@@ -118,7 +118,7 @@ exec ${quote(flock)} "$@"
   } finally {
     f.clean();
   }
-}, 30000);
+});
 
 test('a capture published after the probe opens it never refuses a move', async () => {
   const f: Fixture = await fixture();
@@ -169,7 +169,7 @@ exec ${quote(flock)} "$@"
   } finally {
     f.clean();
   }
-}, 30000);
+});
 
 test('an abandoned capture pair refuses non-failed moves, and a non-blank cleared-<run>.md clears it', async () => {
   const f: Fixture = await fixture();
@@ -287,7 +287,7 @@ test('an abandoned capture pair refuses non-failed moves, and a non-blank cleare
     await core.stop();
     f.clean();
   }
-}, 60000);
+});
 
 test('a live capture pair never refuses a move, nested run-check included', async () => {
   const f: Fixture = await fixture();
@@ -365,7 +365,7 @@ test('a live capture pair never refuses a move, nested run-check included', asyn
   } finally {
     f.clean();
   }
-}, 60000);
+});
 
 test('the liveness probe creates no file and a pair gone at probe time is finished', async () => {
   const f: Fixture = await fixture();
@@ -396,4 +396,4 @@ test('the liveness probe creates no file and a pair gone at probe time is finish
   } finally {
     f.clean();
   }
-}, 45000);
+});

@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync, chmodSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { cli, fixture, leaf, storeDir, yaml, type Fixture } from './helpers';
+import { cli, fixture, leaf, storeDir, yaml, WAIT_MS, type Fixture } from './helpers';
 import { hcFixture, type HcFixture } from './hc-fixture';
 import { readState } from '../src/state';
 import { command, run, spawnCaptured, type Result } from '../src/shell';
@@ -173,7 +173,7 @@ test('a sparse store leaf resolves only its own modules: foreign left-pad fails,
     expect(absent.code).not.toBe(0);
     const local: Result = await run(['bun', '-e', 'require.resolve("./vendor/local-dep")'], worktree);
     expect(local.code).toBe(0);
-    const missing: Result = await run(['bun', '-e', 'require("definitely-absent-pkg")'], worktree, 10000);
+    const missing: Result = await run(['bun', '-e', 'require("definitely-absent-pkg")'], worktree, WAIT_MS);
     expect(missing.code).not.toBe(0);
     expect(readdirSync(resolve(worktree, 'node_modules'))).toEqual([]);
   } finally {

@@ -120,7 +120,7 @@ test('refuses missing and duplicate repo spaces while naming searched and skippe
     resting.discard();
     f.clean();
   }
-}, 30000);
+});
 
 test('a refused repo reports once in --all while a healthy repo still dispatches', async () => {
   const f: Fixture = await hcSetup('sc');
@@ -166,7 +166,7 @@ test('a refused repo reports once in --all while a healthy repo still dispatches
     await core.stop();
     f.clean();
   }
-}, 30000);
+});
 
 test('skips a stopped session and a dead socket, and an unreadable session refuses', async () => {
   const f: Fixture = await hcSetup();
@@ -206,7 +206,7 @@ test('skips a stopped session and a dead socket, and an unreadable session refus
     down.discard();
     f.clean();
   }
-}, 30000);
+});
 
 test('a discovery read past the deadline refuses the repo', async () => {
   const f: HcFixture = await hcFixture();
@@ -225,7 +225,7 @@ test('a discovery read past the deadline refuses the repo', async () => {
     await slow.stop();
     await f.clean();
   }
-}, 45000);
+});
 
 test('a failed session list is reported once per invocation', async () => {
   const f: HcFixture = await hcFixture();
@@ -263,7 +263,7 @@ test('the blocked notice lands in the session holding the repo space', async () 
     await decoy.stop();
     await f.clean();
   }
-}, 30000);
+});
 
 test('the reconcile tab close goes to the session holding the repo space', async () => {
   const f: HcFixture = await hcFixture();
@@ -288,7 +288,7 @@ test('the reconcile tab close goes to the session holding the repo space', async
     await decoy.stop();
     await f.clean();
   }
-}, 20000);
+});
 
 test('the land unit carries no HERDR_SOCKET_PATH from the caller env', async () => {
   const f: DispatchFixture = await dispatchFixture();
@@ -315,7 +315,7 @@ test('the land unit carries no HERDR_SOCKET_PATH from the caller env', async () 
   } finally {
     f.clean();
   }
-}, 30000);
+});
 
 test('land wake calls reach the resolved session under a stale parent session', async () => {
   const f: HcFixture = await hcFixture();
@@ -361,7 +361,7 @@ test('land wake calls reach the resolved session under a stale parent session', 
     await decoy.stop();
     await f.clean();
   }
-}, 60000);
+});
 
 test('phase renames and the failed notice carry the resolved session', async () => {
   const f: HcFixture = await hcFixture();
@@ -397,7 +397,7 @@ test('phase renames and the failed notice carry the resolved session', async () 
     await decoy.stop();
     await f.clean();
   }
-}, 20000);
+});
 
 test('the merge notice lands in the session holding the repo space', async () => {
   const f: HcFixture = await hcFixture();
@@ -437,7 +437,7 @@ test('the merge notice lands in the session holding the repo space', async () =>
     await decoy.stop();
     await f.clean();
   }
-}, 30000);
+});
 
 test('the main-red notice lands in the running session holding the repo space', async () => {
   const f: Fixture = await fixture();
@@ -473,7 +473,7 @@ test('the main-red notice lands in the running session holding the repo space', 
     await core.stop();
     f.clean();
   }
-}, 60000);
+});
 
 test('a stopped repo session suppresses the main-red notice but keeps the receipt', async () => {
   const f: Fixture = await fixture();
@@ -512,7 +512,7 @@ test('a stopped repo session suppresses the main-red notice but keeps the receip
     down.discard();
     f.clean();
   }
-}, 60000);
+});
 
 test('terminal discovery in the resolved session refuses at the ten-second deadline', async () => {
   const f: HcFixture = await hcFixture();
@@ -528,4 +528,4 @@ test('terminal discovery in the resolved session refuses at the ten-second deadl
   } finally {
     await f.clean();
   }
-}, 30000);
+});

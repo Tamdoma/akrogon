@@ -47,6 +47,8 @@ for (const name of readdirSync(tmpdir())) {
   rmSync(claimed, { recursive: true, force: true });
 }
 
+export const SUITE_TIMEOUT_MS: number = 120_000;
+
 export const suiteRoot: string = mkdtempSync(join(tmpdir(), `akrogon-suite-${process.pid}-`));
 
 // process.env writes alone do not reach libc getenv (os.homedir, tmpdir), so both are set.

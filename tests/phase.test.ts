@@ -337,7 +337,7 @@ test('completion leaves a chart holding a same-slug draft in place and keeps the
   } finally {
     f.clean();
   }
-}, 15000);
+});
 
 test('failed log preserves committed state and failed container rename retries without replay', async () => {
   const f: Fixture = await fixture();
@@ -908,7 +908,7 @@ for (const scope of ['standalone', 'epic'] as const) {
     } finally {
       f.clean();
     }
-  }, 15000);
+  });
 }
 
 test('standalone completion closes the union of asymmetric leaf sources', async () => {
@@ -1430,7 +1430,7 @@ test('stopped-core moves retain pending notice cleanup until a later pass can re
     await core.stop();
     f.clean();
   }
-}, 30000);
+});
 
 test('failed announce writes the failed notice, renames tabs and tolerates missing tabs', async () => {
   const failedNotice = (f: HcFixture, slug: string) => ({
@@ -1525,7 +1525,7 @@ test('failed announce writes the failed notice, renames tabs and tolerates missi
       await f.clean();
     }
   }
-}, 60000);
+});
 
 for (const { slug, phase, args, failNotice, code, notices, name, delivery } of [
   {

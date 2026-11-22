@@ -15,6 +15,7 @@ import {
   storeDir,
   unitBin,
   yaml,
+  WAIT_MS,
   type Fixture,
 } from './helpers';
 import { command, type Result } from '../src/shell';
@@ -65,7 +66,7 @@ function run(f: Fixture, args: string[], cwd: string, env: NodeJS.ProcessEnv = {
   return { proc, text: async () => Buffer.concat(chunks).toString('utf8') };
 }
 
-async function waitFor(path: string, ms: number = 20000): Promise<number> {
+async function waitFor(path: string, ms: number = WAIT_MS): Promise<number> {
   const begun: number = Date.now();
   while (!existsSync(path)) {
     if (Date.now() - begun > ms) throw new Error(`Timed out waiting for ${path}`);
@@ -74,7 +75,7 @@ async function waitFor(path: string, ms: number = 20000): Promise<number> {
   return Date.now() - begun;
 }
 
-async function waitForAny(paths: string[], ms: number = 20000): Promise<number> {
+async function waitForAny(paths: string[], ms: number = WAIT_MS): Promise<number> {
   const begun: number = Date.now();
   for (;;) {
     const index: number = paths.findIndex((path) => existsSync(path));
@@ -132,7 +133,7 @@ test('two run-checks in two leaves run at the same time', async () => {
     const b: Cap = run(f, ['run-check', '--name', 'b', '--', ...touch(dir, 'b')], second);
     caps.push(b);
     // No start spacing: b starts inside the old 30 s window.
-    await waitFor(resolve(dir, 'b'), 10000);
+    await waitFor(resolve(dir, 'b'));
     expect(a.proc.exitCode).toBeNull();
     writeFileSync(resolve(dir, 'release'), '');
     expect(await a.proc.exited).toBe(0);
@@ -146,7 +147,7 @@ test('two run-checks in two leaves run at the same time', async () => {
     stop(caps);
     f.clean();
   }
-}, 75000);
+});
 
 test('a run starts at once over the old 48 GiB reading', async () => {
   const f: Fixture = await fixture();
@@ -159,8 +160,8 @@ test('a run starts at once over the old 48 GiB reading', async () => {
     const w2: Cap = run(f, ['run-check', '--name', 'w2', '--', ...hold(dir, 'w2')], worktree);
     caps.push(w1, w2);
     // The memory check is gone: both start at once above the old cap.
-    await waitFor(resolve(dir, 'w1.held'), 10000);
-    await waitFor(resolve(dir, 'w2.held'), 10000);
+    await waitFor(resolve(dir, 'w1.held'));
+    await waitFor(resolve(dir, 'w2.held'));
     expect(w1.proc.exitCode).toBeNull();
     expect(w2.proc.exitCode).toBeNull();
     writeFileSync(resolve(dir, 'release'), '');
@@ -170,7 +171,7 @@ test('a run starts at once over the old 48 GiB reading', async () => {
     stop(caps);
     f.clean();
   }
-}, 60000);
+});
 
 test('a verify starts at once over the old 48 GiB reading', async () => {
   const f: Fixture = await fixture();
@@ -187,13 +188,13 @@ test('a verify starts at once over the old 48 GiB reading', async () => {
     seedStat(f, HIGH);
     const waiter: Cap = run(f, ['verify'], worktree, shim);
     caps.push(waiter);
-    await waitFor(resolve(dir, 'base'), 15000);
+    await waitFor(resolve(dir, 'base'));
     expect(await waiter.proc.exited).toBe(0);
   } finally {
     stop(caps);
     f.clean();
   }
-}, 60000);
+});
 
 test('a run-check or verify inside an admitted run starts at once over the threshold', async () => {
   const f: Fixture = await fixture();
@@ -215,8 +216,8 @@ test('a run-check or verify inside an admitted run starts at once over the thres
       `akrogon verify`;
     const outer: Cap = run(f, ['run-check', '--name', 'outer', '--', 'sh', '-c', script], worktree, shim);
     caps.push(outer);
-    await waitFor(resolve(dir, 'inner'), 20000);
-    await waitFor(resolve(dir, 'inner-base'), 30000);
+    await waitFor(resolve(dir, 'inner'));
+    await waitFor(resolve(dir, 'inner-base'));
     expect(await outer.proc.exited).toBe(0);
     const inner: Event | undefined = timings(f).find((event) => event.kind === 'check_start' && event.name === 'inner');
     expect(inner).toBeDefined();
@@ -225,7 +226,7 @@ test('a run-check or verify inside an admitted run starts at once over the thres
     stop(caps);
     f.clean();
   }
-}, 60000);
+});
 
 test('status shows no Run lines while a run holds', async () => {
   const f: Fixture = await fixture();
@@ -236,7 +237,7 @@ test('status shows no Run lines while a run holds', async () => {
     expect((await cli(f, ['status'])).stdout).not.toMatch(/\bpermit\b/i);
     const w: Cap = run(f, ['run-check', '--name', 'blocked', '--', ...hold(dir, 'w')], worktree);
     caps.push(w);
-    await waitFor(resolve(dir, 'w.held'), 10000);
+    await waitFor(resolve(dir, 'w.held'));
     const listing: Result = await cli(f, ['status']);
     expect(listing.code).toBe(0);
     expect(listing.stdout.split('\n').filter((line) => /Run/.test(line))).toHaveLength(0);
@@ -246,13 +247,13 @@ test('status shows no Run lines while a run holds', async () => {
     stop(caps);
     f.clean();
   }
-}, 45000);
+});
 
 const FULL_CONFIG = { checks: { test: 'bun test', format: 'true' }, full: ['test'], grounding: 'none' };
 
 const record = (name: string, dir: string): string[] => ['sh', '-c', `echo ${name} >> ${dir}/order`];
 
-async function waitForText(cap: Cap, pattern: RegExp, ms: number = 20000): Promise<void> {
+async function waitForText(cap: Cap, pattern: RegExp, ms: number = WAIT_MS): Promise<void> {
   const begun: number = Date.now();
   while (!pattern.test(await cap.text())) {
     if (Date.now() - begun > ms) throw new Error(`Timed out waiting for ${pattern}: ${await cap.text()}`);
@@ -287,6 +288,8 @@ function scopedProcRoot(f: Fixture, scopeName: string): string {
 test('listed runs of one repo wait for their repo holder, print the holder, and start in arrival order', async () => {
   const f: Fixture = await fixture();
   const caps: Cap[] = [];
+  const end: number = Date.now() + WAIT_MS;
+  const left = (): number => end - Date.now();
   try {
     const dir: string = marks(f);
     yaml(resolve(f.root, 'issues/config.yaml'), FULL_CONFIG);
@@ -294,15 +297,15 @@ test('listed runs of one repo wait for their repo holder, print the holder, and 
     const second: string = await leafWorktree(f, 'leaf-two');
     const a: Cap = run(f, ['run-check', '--name', 'test', '--', ...hold(dir, 'a')], first);
     caps.push(a);
-    await waitFor(resolve(dir, 'a.held'));
+    await waitFor(resolve(dir, 'a.held'), left());
     const b: Cap = run(f, ['run-check', '--name', 'test', '--', ...touch(dir, 'b')], second);
     caps.push(b);
-    await waitForText(b, new RegExp(`waiting for ${f.repo}/leaf-one test`));
+    await waitForText(b, new RegExp(`waiting for ${f.repo}/leaf-one test`), left());
     expect(existsSync(resolve(dir, 'b'))).toBe(false);
     for (const name of ['w1', 'w2', 'w3']) {
       const waiter: Cap = run(f, ['run-check', '--name', 'test', '--', ...record(name, dir)], first);
       caps.push(waiter);
-      await waitForText(waiter, new RegExp(`waiting for ${f.repo}/(leaf-one|leaf-two) test`));
+      await waitForText(waiter, new RegExp(`waiting for ${f.repo}/(leaf-one|leaf-two) test`), left());
       expect(existsSync(resolve(dir, 'order'))).toBe(false);
     }
     writeFileSync(resolve(dir, 'release'), '');
@@ -323,7 +326,7 @@ test('listed runs of one repo wait for their repo holder, print the holder, and 
     stop(caps);
     f.clean();
   }
-}, 75000);
+});
 
 test('a listed run waits for the holder record to be removed, not just the holder to exit', async () => {
   const f: Fixture = await fixture();
@@ -354,7 +357,7 @@ test('a listed run waits for the holder record to be removed, not just the holde
     writeFileSync(resolve(dir, 'release'), '');
     // a's command is done and its record is ended, but the shim holds its unit
     // stop — and so its record removal — until flagged.
-    const deadline: number = Date.now() + 10000;
+    const deadline: number = Date.now() + WAIT_MS;
     for (;;) {
       const record: Record<string, unknown> | undefined = (await runRecords(f)).find((entry) => entry.run === aId);
       if (record !== undefined && record.state === 'ended') break;
@@ -375,7 +378,7 @@ test('a listed run waits for the holder record to be removed, not just the holde
     stop(caps);
     f.clean();
   }
-}, 60000);
+});
 
 test('a listed run of another repo and an unlisted run start at once over the line', async () => {
   const f: Fixture = await fixture();
@@ -431,7 +434,7 @@ test('a listed run of another repo and an unlisted run start at once over the li
     const script: string = `cd ${innerTree}; akrogon run-check --name test -- touch ${dir}/inner`;
     const outer: Cap = run(f, ['run-check', '--name', 'test', '--', 'sh', '-c', script], otherTree, shim);
     caps.push(outer);
-    const deadline: number = Date.now() + 20000;
+    const deadline: number = Date.now() + WAIT_MS;
     while (
       !existsSync(resolve(dir, 'inner')) &&
       !(await runRecords(f)).some((entry) => entry.leaf === 'cross-repo-inner' && entry.state === 'waiting')
@@ -450,7 +453,7 @@ test('a listed run of another repo and an unlisted run start at once over the li
     stop(caps);
     f.clean();
   }
-}, 75000);
+});
 
 test('a listed run nests under its repo holder and queues under an unlisted run', async () => {
   const f: Fixture = await fixture();
@@ -465,7 +468,7 @@ test('a listed run nests under its repo holder and queues under an unlisted run'
     const script: string = `akrogon run-check --name test -- touch ${dir}/inner; while [ ! -e ${dir}/outer-release ]; do sleep 0.05; done`;
     const outer: Cap = run(f, ['run-check', '--name', 'test', '--', 'sh', '-c', script], worktree, shim);
     caps.push(outer);
-    await waitFor(resolve(dir, 'inner'), 20000);
+    await waitFor(resolve(dir, 'inner'));
     expect(await runRecords(f)).toHaveLength(1);
     writeFileSync(resolve(dir, 'outer-release'), '');
     expect(await outer.proc.exited).toBe(0);
@@ -479,7 +482,7 @@ test('a listed run nests under its repo holder and queues under an unlisted run'
     caps.push(outer2);
     // The inner's waiting stderr is buffered in outer2's log until its command
     // exits, so the wait is observed on its record, not the stream.
-    const deadline: number = Date.now() + 20000;
+    const deadline: number = Date.now() + WAIT_MS;
     while (!(await runRecords(f)).some((entry) => entry.state === 'waiting')) {
       if (Date.now() > deadline) throw new Error('the inner listed run never waited');
       await Bun.sleep(50);
@@ -493,7 +496,7 @@ test('a listed run nests under its repo holder and queues under an unlisted run'
     stop(caps);
     f.clean();
   }
-}, 60000);
+});
 
 test('a killed holder or waiter does not block the line', async () => {
   const f: Fixture = await fixture();
@@ -521,7 +524,7 @@ test('a killed holder or waiter does not block the line', async () => {
     stop(caps);
     f.clean();
   }
-}, 75000);
+});
 
 test('stop-run cancels a waiting run and the next waiter takes its place', async () => {
   const f: Fixture = await fixture();
@@ -562,7 +565,7 @@ test('stop-run cancels a waiting run and the next waiter takes its place', async
           (entry) => entry.state === 'waiting' && entry.leaf === leafName,
         );
         if (found !== undefined) return String(found.run);
-        if (Date.now() - begun > 10000) throw new Error(`no waiting record for ${leafName}`);
+        if (Date.now() - begun > WAIT_MS) throw new Error(`no waiting record for ${leafName}`);
         await Bun.sleep(50);
       }
     };
@@ -575,7 +578,7 @@ test('stop-run cancels a waiting run and the next waiter takes its place', async
     expect(suspended.code).toBe(0);
     const begun: number = Date.now();
     while ((await runRecords(f)).find((entry) => entry.run === w3Id)?.state !== 'cancelled') {
-      if (Date.now() - begun > 10000) throw new Error('suspended run record never cancelled');
+      if (Date.now() - begun > WAIT_MS) throw new Error('suspended run record never cancelled');
       await Bun.sleep(50);
     }
     expect(w3.proc.exitCode).toBeNull();
@@ -596,7 +599,7 @@ test('stop-run cancels a waiting run and the next waiter takes its place', async
     stop(caps);
     f.clean();
   }
-}, 75000);
+});
 
 test('stop-run cancels the sole waiting run without an id', async () => {
   const f: Fixture = await fixture();
@@ -631,7 +634,7 @@ test('stop-run cancels the sole waiting run without an id', async () => {
     stop(caps);
     f.clean();
   }
-}, 30000);
+});
 
 test('config refuses a full name that is not a check', async () => {
   const f: Fixture = await fixture();
@@ -690,7 +693,7 @@ test('an AKROGON_RUN matching no live record starts its own run at once', async 
       AKROGON_RUN: token,
     });
     caps.push(unknown);
-    await waitFor(resolve(dir, 'fresh'), 10000);
+    await waitFor(resolve(dir, 'fresh'));
     expect(await unknown.proc.exited).toBe(0);
     const runsDir: string = resolve(f.home, 'runs');
     mkdirSync(runsDir, { recursive: true });
@@ -715,13 +718,13 @@ test('an AKROGON_RUN matching no live record starts its own run at once', async 
       AKROGON_RUN: deadToken,
     });
     caps.push(dead);
-    await waitFor(resolve(dir, 'dead'), 10000);
+    await waitFor(resolve(dir, 'dead'));
     expect(await dead.proc.exited).toBe(0);
   } finally {
     stop(caps);
     f.clean();
   }
-}, 45000);
+});
 
 test('no run.lock lanes, run-holder files or name exemptions remain in src, and docs describe the start check', () => {
   const root: string = resolve(import.meta.dir, '..');
@@ -828,7 +831,7 @@ test('a land holds its repo: later runs wait, earlier, own-attempt and other-rep
     stop(caps);
     f.clean();
   }
-}, 75000);
+});
 
 test('a dead land stops holding even while its own check lives, and stop-run cancels a held-back run', async () => {
   const f: Fixture = await fixture();
@@ -868,7 +871,7 @@ test('a dead land stops holding even while its own check lives, and stop-run can
     stop(caps);
     f.clean();
   }
-}, 75000);
+});
 
 test("a listed run of the holding attempt starts ahead of the line's earlier waiters", async () => {
   const f: Fixture = await fixture();
@@ -903,7 +906,7 @@ test("a listed run of the holding attempt starts ahead of the line's earlier wai
     stop(caps);
     f.clean();
   }
-}, 75000);
+});
 
 test('a listed run that started while the land waited on its slice lock stays ahead of the land', async () => {
   const f: Fixture = await fixture();
@@ -952,7 +955,7 @@ test('a listed run that started while the land waited on its slice lock stays ah
     stop(caps);
     f.clean();
   }
-}, 75000);
+});
 
 test('a listed run nested under a run of a land attempt starts at once', async () => {
   const f: Fixture = await fixture();
@@ -976,7 +979,7 @@ test('a listed run nested under a run of a land attempt starts at once', async (
     stop(caps);
     f.clean();
   }
-}, 75000);
+});
 
 test('a run that waited behind one land starts when it ends, beside a later land', async () => {
   const f: Fixture = await fixture();
@@ -1005,4 +1008,4 @@ test('a run that waited behind one land starts when it ends, beside a later land
     stop(caps);
     f.clean();
   }
-}, 75000);
+});

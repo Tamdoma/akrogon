@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync 
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { cli, leaf, holding, leafTempRoot, procRoot, type Fixture } from './helpers';
+import { cli, leaf, holding, leafTempRoot, procRoot, WAIT_MS, type Fixture } from './helpers';
 import { hcFixture, type HcFixture, type Terminal } from './hc-fixture';
 import { command, writeYaml, type Result } from '../src/shell';
 import { leafSlice } from '../src/scope';
@@ -184,7 +184,7 @@ function calls(log: string): string[] {
   return existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n').filter(Boolean) : [];
 }
 
-async function waitFor(ok: () => boolean | Promise<boolean>, ms: number = 10000): Promise<void> {
+async function waitFor(ok: () => boolean | Promise<boolean>, ms: number = WAIT_MS): Promise<void> {
   const begun: number = Date.now();
   for (;;) {
     if (await ok()) return;

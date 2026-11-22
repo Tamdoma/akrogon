@@ -10,7 +10,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { fixture, cli, entry, leaf, yaml, fakeAkrogon, leafTempRoot, type Fixture } from './helpers';
+import { fixture, cli, entry, leaf, yaml, fakeAkrogon, leafTempRoot, WAIT_MS, type Fixture } from './helpers';
 import { command, finishCaptured, quote, spawnFiles, type Result, type SpawnResult } from '../src/shell';
 import { readState, saveState } from '../src/state';
 import type { Phase } from '../src/routing';
@@ -42,7 +42,7 @@ function runEnv(f: Fixture): NodeJS.ProcessEnv {
   };
 }
 
-async function waitForFile(path: string, ms: number = 20000): Promise<void> {
+async function waitForFile(path: string, ms: number = WAIT_MS): Promise<void> {
   const begun: number = Date.now();
   while (!existsSync(path)) {
     if (Date.now() - begun > ms) throw new Error(`Timed out waiting for ${path}`);
@@ -50,7 +50,7 @@ async function waitForFile(path: string, ms: number = 20000): Promise<void> {
   }
 }
 
-async function waitForText(path: string, pattern: RegExp, ms: number = 20000): Promise<void> {
+async function waitForText(path: string, pattern: RegExp, ms: number = WAIT_MS): Promise<void> {
   const begun: number = Date.now();
   for (;;) {
     if (existsSync(path) && pattern.test(readFileSync(path, 'utf8'))) return;
@@ -381,7 +381,7 @@ test('a reserved run waits behind the budget lock, then writes its row and runs'
       const waiting = spawnFiles([process.execPath, entry, 'run-check', '--sessions', '1', '--', 'touch', marker], {
         cwd: worktree,
         env: runEnv(f),
-        timeout: 60000,
+        timeout: WAIT_MS,
         killSignal: 'SIGKILL',
       });
       try {
@@ -439,11 +439,11 @@ test('a reservation waiting on the lock uses the lowered ceiling', async () => {
       const waiting = spawnFiles([process.execPath, entry, 'run-check', '--sessions', '2', '--', 'touch', marker], {
         cwd: worktree,
         env: { ...runEnv(f), TEST_BUDGET_LOCK: lock, TEST_BUDGET_WAITING: waitingAtLock },
-        timeout: 10000,
+        timeout: WAIT_MS,
         killSignal: 'SIGKILL',
       });
       try {
-        await waitForFile(waitingAtLock, 5000);
+        await waitForFile(waitingAtLock);
         budget(f, 1);
         holder.stdin.end();
         const result: SpawnResult = await finishCaptured(waiting.child, waiting.captured);

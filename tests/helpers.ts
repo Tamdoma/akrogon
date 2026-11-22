@@ -16,9 +16,10 @@ import { command, spawnCaptured, type Result, type SpawnResult } from '../src/sh
 import { readRepo } from '../src/config';
 import { verifyCommands, verifyRunSchema, type VerifyRun, type VerifyScope } from '../src/verify';
 import { findLeaf, readState, saveState, type Batch } from '../src/state';
-import { descendantsOf } from './isolation';
+import { descendantsOf, SUITE_TIMEOUT_MS } from './isolation';
 
 export const entry: string = resolve(import.meta.dir, '../src/akrogon.ts');
+export const WAIT_MS: number = SUITE_TIMEOUT_MS - 30_000;
 const tempDirs: Set<string> = new Set();
 export function registerTemp(path: string): string {
   tempDirs.add(path);

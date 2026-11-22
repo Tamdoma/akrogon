@@ -6,7 +6,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, utimesSync, watch 
 import { randomUUID } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
-import { fixture, type Fixture } from './helpers';
+import { fixture, WAIT_MS, type Fixture } from './helpers';
 import { hcCore, type HcCore } from './hc-fixture';
 import { spawnCaptured, type SpawnResult } from '../src/shell';
 
@@ -62,7 +62,7 @@ function inputs(run: Run): Received[] {
 }
 
 // The transcript the turn for `input` wrote, once that turn has ended (woken by the folder's change events).
-function turnOf(run: Run, input: string, ms: number = 15_000): Promise<string> {
+function turnOf(run: Run, input: string, ms: number = WAIT_MS): Promise<string> {
   return new Promise<string>((done, fail) => {
     const check = (): void => {
       const all = agentLines(run);
@@ -111,7 +111,7 @@ async function lookup(run: Run, own: Record<string, string> | null): Promise<str
 }
 
 // Resolves when the helper's log holds `step`, woken by the folder's change events; the timer only bounds it.
-function logged(log: string, step: string, ms: number = 15_000): Promise<Step> {
+function logged(log: string, step: string, ms: number = WAIT_MS): Promise<Step> {
   return new Promise<Step>((done, fail) => {
     const check = (): boolean => {
       const found: Step | undefined = steps(log).find((s: Step) => s.step === step);

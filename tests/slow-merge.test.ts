@@ -2,7 +2,18 @@ import { test, expect } from 'bun:test';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { cli, fakeAkrogon, procFixture, fixture, leaf, seedRun, storeDir, yaml, type Fixture } from './helpers';
+import {
+  cli,
+  fakeAkrogon,
+  procFixture,
+  fixture,
+  leaf,
+  seedRun,
+  storeDir,
+  yaml,
+  WAIT_MS,
+  type Fixture,
+} from './helpers';
 import { command, quote, type Result } from '../src/shell';
 import { readRepo } from '../src/config';
 import { requireGreenReceipt, verifyRunSchema, type VerifyRun } from '../src/verify';
@@ -103,7 +114,7 @@ async function bump(direct: string, file: string): Promise<string> {
 // time of about `ms` without waiting. Returns the appended run's id.
 async function backdate(f: Fixture, ms: number, sha?: string): Promise<string> {
   const file: string = resolve(f.root, LEDGER);
-  const deadline: number = Date.now() + 15000;
+  const deadline: number = Date.now() + WAIT_MS;
   while (Date.now() < deadline) {
     const lines: string[] = existsSync(file)
       ? readFileSync(file, 'utf8')
@@ -173,7 +184,7 @@ test('a slow merge run is flagged, recorded, printed and notified once', async (
     await core.stop();
     f.clean();
   }
-}, 30000);
+});
 
 test('only eligible rows enter the normal and checked bounds follow the design', async () => {
   const f: Fixture = await fixture();
@@ -246,7 +257,7 @@ test('only eligible rows enter the normal and checked bounds follow the design',
     await core.stop();
     f.clean();
   }
-}, 60000);
+});
 
 test('an open episode pins the normal, cites its first run, notifies once and recovers', async () => {
   const f: Fixture = await fixture();
@@ -316,7 +327,7 @@ test('an open episode pins the normal, cites its first run, notifies once and re
     await core.stop();
     f.clean();
   }
-}, 60000);
+});
 
 // Rewrites the episode opener's (last ledger row's) slow notice value.
 function setEpisodeNotice(f: Fixture, notice: string): void {
@@ -389,7 +400,7 @@ test('a failed slow notice is retried by the next in-episode run; a pending one 
       f.clean();
     }
   }
-}, 60000);
+});
 
 test('the last 20 eligible runs inside the episode close it accepted', async () => {
   const f: Fixture = await fixture();
@@ -423,7 +434,7 @@ test('the last 20 eligible runs inside the episode close it accepted', async () 
     await core.stop();
     f.clean();
   }
-}, 30000);
+});
 
 test('the twentieth eligible episode run closes accepted', async () => {
   const f: Fixture = await fixture();
@@ -447,7 +458,7 @@ test('the twentieth eligible episode run closes accepted', async () => {
   } finally {
     f.clean();
   }
-}, 30000);
+});
 
 test('an unflagged run whose full check was blocked still closes the episode accepted', async () => {
   const f: Fixture = await fixture();
@@ -476,7 +487,7 @@ test('an unflagged run whose full check was blocked still closes the episode acc
   } finally {
     f.clean();
   }
-}, 30000);
+});
 
 test('status prints Slow merge only while that repo episode is open', async () => {
   const f: Fixture = await fixture();
@@ -503,7 +514,7 @@ test('status prints Slow merge only while that repo episode is open', async () =
     f.clean();
     g.clean();
   }
-}, 30000);
+});
 
 test('the carried normal opens an episode where the rolling median stays silent', async () => {
   const f: Fixture = await fixture();
@@ -533,7 +544,7 @@ test('the carried normal opens an episode where the rolling median stays silent'
   } finally {
     f.clean();
   }
-}, 30000);
+});
 
 test('the carried normal ratchets down to a lower rolling median', async () => {
   const f: Fixture = await fixture();
@@ -558,7 +569,7 @@ test('the carried normal ratchets down to a lower rolling median', async () => {
   } finally {
     f.clean();
   }
-}, 30000);
+});
 
 test('an episode does not recover while its own eligible median is over', async () => {
   const f: Fixture = await fixture();
@@ -584,7 +595,7 @@ test('an episode does not recover while its own eligible median is over', async 
   } finally {
     f.clean();
   }
-}, 30000);
+});
 
 test('an episode recovers once its own eligible median is back under', async () => {
   const f: Fixture = await fixture();
@@ -613,7 +624,7 @@ test('an episode recovers once its own eligible median is back under', async () 
   } finally {
     f.clean();
   }
-}, 30000);
+});
 
 test('an episode with under five eligible runs does not recover', async () => {
   const f: Fixture = await fixture();
@@ -639,7 +650,7 @@ test('an episode with under five eligible runs does not recover', async () => {
   } finally {
     f.clean();
   }
-}, 30000);
+});
 
 test('an episode median counts only its own last 20 eligible runs', async () => {
   const f: Fixture = await fixture();
@@ -667,7 +678,7 @@ test('an episode median counts only its own last 20 eligible runs', async () => 
   } finally {
     f.clean();
   }
-}, 30000);
+});
 
 test('an episode under 14 days old does not close accepted', async () => {
   const f: Fixture = await fixture();
@@ -696,7 +707,7 @@ test('an episode under 14 days old does not close accepted', async () => {
     await core.stop();
     f.clean();
   }
-}, 30000);
+});
 
 test('an accepted close sends its notice and the next run takes the window median', async () => {
   const f: Fixture = await fixture();
@@ -745,7 +756,7 @@ test('an accepted close sends its notice and the next run takes the window media
     await core.stop();
     f.clean();
   }
-}, 30000);
+});
 
 test('a failed accepted notice is retried by the next checked run', async () => {
   const f: Fixture = await fixture();
@@ -788,7 +799,7 @@ test('a failed accepted notice is retried by the next checked run', async () => 
     await core.stop();
     f.clean();
   }
-}, 30000);
+});
 
 test('an intervening leaf verify does not cause a delivered accepted notice to be resent', async () => {
   const f: Fixture = await fixture();
@@ -826,7 +837,7 @@ test('an intervening leaf verify does not cause a delivered accepted notice to b
     await core.stop();
     f.clean();
   }
-}, 30000);
+});
 
 test('an overlapping merge verify uses the median from the accepted close', async () => {
   const f: Fixture = await fixture();
@@ -877,7 +888,7 @@ test('an overlapping merge verify uses the median from the accepted close', asyn
     await core.stop();
     f.clean();
   }
-}, 30000);
+});
 
 test('an aged episode does not close accepted while a pre-episode run sits in the last 20', async () => {
   const f: Fixture = await fixture();
@@ -903,7 +914,7 @@ test('an aged episode does not close accepted while a pre-episode run sits in th
   } finally {
     f.clean();
   }
-}, 30000);
+});
 
 test('a ledger with no stored normal starts as today', async () => {
   const f: Fixture = await fixture();
@@ -928,7 +939,7 @@ test('a ledger with no stored normal starts as today', async () => {
   } finally {
     f.clean();
   }
-}, 30000);
+});
 
 test('a stored normal applies before five eligible rows', async () => {
   const f: Fixture = await fixture();
@@ -952,4 +963,4 @@ test('a stored normal applies before five eligible rows', async () => {
   } finally {
     f.clean();
   }
-}, 30000);
+});

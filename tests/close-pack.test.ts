@@ -146,7 +146,7 @@ test('nested run-check refuses packing an outer capture owner and retains both r
   } finally {
     f.clean();
   }
-}, 15000);
+});
 
 test('run-check refuses owner-root holders before running, and same-owner completion inside a capture refuses fast naming the run', async () => {
   const f: Fixture = await fixture();

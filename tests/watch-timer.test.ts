@@ -9,7 +9,7 @@ import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { command, spawnCaptured, type Result, type SpawnResult } from '../src/shell';
 import { withLock } from '../src/state';
-import { cli, leaf, leafTempRoot } from './helpers';
+import { cli, leaf, leafTempRoot, WAIT_MS } from './helpers';
 import { hcCore, hcFixture, type HcCore, type HcFixture } from './hc-fixture';
 
 const skilldir: string = resolve(import.meta.dir, '../skills/watch-issues');
@@ -72,7 +72,7 @@ const screenOf = async (core: HcCore, address: string): Promise<string> =>
   (await core.hc(['read', address, '--lines', '60'])).stdout;
 
 // The address may be live, finished or already removed: settle into a readable finished screen.
-async function waitFinished(core: HcCore, address: string, ms: number = 15_000): Promise<void> {
+async function waitFinished(core: HcCore, address: string, ms: number = WAIT_MS): Promise<void> {
   const deadline: number = Date.now() + ms;
   while (Date.now() < deadline) {
     const reply: SpawnResult = await core.hc(['get', '--json', address]);
@@ -177,7 +177,7 @@ async function watchUp(
   return rig;
 }
 
-async function started(rig: Rig, ms: number = 20_000): Promise<string> {
+async function started(rig: Rig, ms: number = WAIT_MS): Promise<string> {
   const deadline: number = Date.now() + ms;
   while (Date.now() < deadline) {
     const line: string | undefined = tasks(rig).findLast((l) => l.includes('start exit=0 started'));
@@ -194,7 +194,7 @@ async function started(rig: Rig, ms: number = 20_000): Promise<string> {
   throw new Error(`watcher did not start in ${ms}ms: tasks=${JSON.stringify(tasks(rig))}`);
 }
 
-async function waitTick(rig: Rig, due: number, ms: number = 15_000): Promise<void> {
+async function waitTick(rig: Rig, due: number, ms: number = WAIT_MS): Promise<void> {
   const deadline: number = Date.now() + ms;
   while (Date.now() < deadline) {
     if (tickLines(rig, due).length > 0) return;
@@ -205,7 +205,7 @@ async function waitTick(rig: Rig, due: number, ms: number = 15_000): Promise<voi
 
 // The receipt label is monotonic: a fast watcher stamps past dues before the first poll, so
 // due n is proven delivered by label >= n, not == n.
-async function waitLabel(rig: Rig, due: number, ms: number = 15_000): Promise<void> {
+async function waitLabel(rig: Rig, due: number, ms: number = WAIT_MS): Promise<void> {
   const deadline: number = Date.now() + ms;
   while (Date.now() < deadline) {
     const t: Term = await get(rig.core, rig.timer);
@@ -215,7 +215,7 @@ async function waitLabel(rig: Rig, due: number, ms: number = 15_000): Promise<vo
   throw new Error(`receipt due=${due} missing: ${JSON.stringify(await get(rig.core, rig.timer))}`);
 }
 
-async function waitGone(core: HcCore, address: string, ms: number = 12_000): Promise<void> {
+async function waitGone(core: HcCore, address: string, ms: number = WAIT_MS): Promise<void> {
   const deadline: number = Date.now() + ms;
   while (Date.now() < deadline) {
     if (await notFound(core, address)) return;
@@ -224,7 +224,7 @@ async function waitGone(core: HcCore, address: string, ms: number = 12_000): Pro
   throw new Error(`terminal ${address} still live`);
 }
 
-async function waitHooks(rig: Rig, match: RegExp | string, ms: number = 15_000): Promise<void> {
+async function waitHooks(rig: Rig, match: RegExp | string, ms: number = WAIT_MS): Promise<void> {
   const deadline: number = Date.now() + ms;
   const ok = (l: string): boolean => (typeof match === 'string' ? l.includes(match) : match.test(l));
   while (Date.now() < deadline) {
@@ -423,7 +423,7 @@ test.serial('each due runs one check with its receipt first; busy dues coalesce 
     expect(tickLines(rig, nextDue)).toHaveLength(1);
     expect(tickLines(rig, nextDue + 1)).toHaveLength(0);
     expect(tickLines(rig, coalesced)).toHaveLength(1);
-    await waitLabel(rig, coalesced, 25_000);
+    await waitLabel(rig, coalesced);
     // The hook writes the accept line, then the receipt it read: the coalesced due's accept
     // carries its turn, and that turn's `call status` is the check it ran.
     const receiptAt = (): number => hooks(rig).findIndex((l) => l === `receipt=${coalesced}`);
@@ -452,8 +452,8 @@ test.serial('each due runs one check with its receipt first; busy dues coalesce 
     expect(paused.code).toBe(0);
     const pauseDue: number = Math.max(...tickLines(rig).map((l) => Number(/due=(\d+)/.exec(l)?.[1]))) + 1;
     const beforeStatus: number = statusCalls(rig);
-    await waitTick(rig, pauseDue, 25_000);
-    await waitLabel(rig, pauseDue, 25_000);
+    await waitTick(rig, pauseDue);
+    await waitLabel(rig, pauseDue);
     for (let n: number = 0; n < 60 && statusCalls(rig) <= beforeStatus; n += 1) await Bun.sleep(200);
     const pTickIdx: number = hooks(rig).findLastIndex((l) => /tick exit=0 accept/.test(l));
     const pTurn: string | null = / t=(\d+)/.exec(hooks(rig)[pTickIdx] ?? '')?.[1] ?? null;
@@ -501,7 +501,7 @@ test.serial('an unreceipted due is resent once then dropped while later dues con
     for (let n: number = 0; n < 50 && statusCalls(rig) < 1; n += 1) await Bun.sleep(200);
     expect(statusCalls(rig)).toBe(1); // start's own check only
     await waitTick(rig, 1);
-    const deadline: number = Date.now() + 25_000;
+    const deadline: number = Date.now() + WAIT_MS;
     while (Date.now() < deadline && tickLines(rig, 1).length < 2) await Bun.sleep(200);
     expect(tickLines(rig, 1)).toHaveLength(2); // sent once, resent once
     await waitTick(rig, 2);
@@ -531,7 +531,7 @@ test.serial('a receipt without a watcher turn does not suppress the one resend',
     await waitTick(rig, 1);
     const receipt: SpawnResult = await f.core.hc(['label', timer, 'akrogon.watch-due=1']);
     expect(receipt.code).toBe(0);
-    await waitTick(rig, 2, 20_000);
+    await waitTick(rig, 2);
     expect((await get(f.core, rig.watcher)).turn).toBe(before);
     expect(tickLines(rig, 1)).toHaveLength(2);
   } finally {
@@ -568,7 +568,7 @@ test.serial('stop kills the verified timer; stale and forged ticks run nothing',
     await waitTick(rig, 1);
     await waitLabel(rig, 1);
     await send(rig, `watch-issues tick timer=${rig.timer} pid=${pinPid} due=1 ${f.root}`);
-    await waitHooks(rig, /tick exit=\d+ no-watch stale/, 15_000);
+    await waitHooks(rig, /tick exit=\d+ no-watch stale/);
     // Later dues keep delivering during this window, so the no-check proof is hook order:
     // a task's check writes a `status` line right after its `tick exit=0` line; a `status`
     // immediately after `no-watch` would mean the stale tick ran its check anyway.
@@ -613,7 +613,7 @@ test.serial('stop kills the verified timer; stale and forged ticks run nothing',
 
     // A tick on a root the session does not hold is refused with its reason (14).
     await send(rig, `watch-issues tick timer=${rig.timer} pid=${pinPid} due=5 /no/such/root`);
-    await waitHooks(rig, /tick exit=\d+ no-watch (?!t=)\S/, 15_000);
+    await waitHooks(rig, /tick exit=\d+ no-watch (?!t=)\S/);
 
     // pid mismatch: restart once more, forge a tick with a wrong pid → the timer is killed.
     await send(rig, `watch-issues ${f.root}`);
@@ -632,7 +632,7 @@ test.serial('stop kills the verified timer; stale and forged ticks run nothing',
     expect(await notFound(f.core, third)).toBe(false);
     const statusNow: number = statusCalls(rig);
     await send(rig, `watch-issues tick timer=${third} pid=${pinPid + 40000} due=1 ${f.root}`);
-    await waitHooks(rig, /tick exit=\d+/, 15_000);
+    await waitHooks(rig, /tick exit=\d+/);
     await waitGone(f.core, third);
     expect(statusCalls(rig)).toBeLessThanOrEqual(statusNow + 1);
   } finally {
@@ -884,7 +884,7 @@ test.serial('a foreground swap and a transcript flip each end the timer', async 
     expect(timerRun.code).toBe(0);
     const timerAddr: string = z.object({ address: z.string() }).parse(JSON.parse(timerRun.stdout)).address;
     process.kill(pin, 'SIGTSTP'); // the stand-in suspends; bash resumes the foreground
-    await waitFinished(f.core, timerAddr, 15_000);
+    await waitFinished(f.core, timerAddr);
     expect(await screenOf(f.core, timerAddr)).toContain('is not the pinned');
     process.kill(pin, 'SIGKILL');
     await f.core.hc(['rm', timerAddr]);
@@ -946,7 +946,7 @@ test.serial('a foreground swap and a transcript flip each end the timer', async 
       JSON.stringify({ sessionId: 'bbbbbbbb-0000-0000-0000-000000000002', procStart: seen.procStart }),
     );
     writeFileSync(resolve(claudeDir, 'projects', 'p', 'bbbbbbbb-0000-0000-0000-000000000002.jsonl'), '');
-    await waitFinished(f.core, rig.timer, 15_000);
+    await waitFinished(f.core, rig.timer);
     expect(await screenOf(f.core, rig.timer)).toContain('exit: transcript moved');
     await f.core.hc(['rm', rig.timer]);
   } finally {
@@ -1034,7 +1034,7 @@ test.serial('dues queued behind a busy watcher coalesce to the latest boundary',
     await waitLabel(rig, 1);
     await Bun.sleep(7500);
     // The check ends; the held dues collapse into one send carrying the newest due number.
-    const deadline: number = Date.now() + 30_000;
+    const deadline: number = Date.now() + WAIT_MS;
     while (Date.now() < deadline && tickLines(rig, 4).length === 0) await Bun.sleep(200);
     expect(tickLines(rig, 4)).toHaveLength(1);
     expect(tickLines(rig, 2)).toHaveLength(0);
@@ -1173,7 +1173,7 @@ test.serial('stop closes the watch consultant after the timer, tolerating none',
       name: `${rig.f.prefix}-watch-consult-x`,
     });
     await send(rig, `watch-issues stop ${f.root}`);
-    await waitHooks(rig, `stopped consultant ${mine}`, 20_000);
+    await waitHooks(rig, `stopped consultant ${mine}`);
     // Brief C5: `stopped <timer>` is the first line, `stopped consultant <address>` the second.
     const at: number = hooks(rig).findLastIndex((l) => l.startsWith('stop exit=0'));
     expect(hooks(rig)[at]).toBe(`stop exit=0 stopped ${rig.timer}`);
@@ -1206,12 +1206,12 @@ test.serial('stop waits for an admitted consultant launch and removes the consul
           STOP_LOCK_ATTEMPT: attempted,
           REAL_FLOCK: z.string().parse(Bun.which('flock')),
         },
-        timeout: 10_000,
+        timeout: WAIT_MS,
       }).then((result: SpawnResult): SpawnResult => {
         returned = true;
         return result;
       });
-      const deadline: number = Date.now() + 8_000;
+      const deadline: number = Date.now() + WAIT_MS;
       while (!returned && !existsSync(attempted) && Date.now() < deadline) await Bun.sleep(25);
       expect(returned || existsSync(attempted)).toBe(true);
       return { consultant: await consultTerm(rig), stopping };

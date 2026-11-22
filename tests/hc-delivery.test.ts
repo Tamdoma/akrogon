@@ -4,7 +4,7 @@ import { test, expect } from 'bun:test';
 import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, watch, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { cli, entry, fixture, leaf, leafTempRoot, killTree, unitBin, yaml, type Fixture } from './helpers';
+import { cli, entry, fixture, leaf, leafTempRoot, killTree, unitBin, yaml, WAIT_MS, type Fixture } from './helpers';
 import { coreBin, hcCore, setSeat, shortStartProof, type HcCore, type Terminal } from './hc-fixture';
 import { readState } from '../src/state';
 import { leafSlice } from '../src/scope';
@@ -168,7 +168,7 @@ function runRecords(f: Fixture): RunRecordRow[] {
   return records;
 }
 
-async function waitRunRecord(f: Fixture, state: string, ms: number = 15000): Promise<RunRecordRow> {
+async function waitRunRecord(f: Fixture, state: string, ms: number = WAIT_MS): Promise<RunRecordRow> {
   const deadline: number = Date.now() + ms;
   for (;;) {
     const found: RunRecordRow | undefined = runRecords(f).find((record) => record.state === state);
@@ -246,7 +246,7 @@ test('a live or waiting run-check record suppresses counting and redelivery unti
     expect(core.tasks(address)).toHaveLength(1);
     killTree(held.proc);
     killTree(queued.proc);
-    const deadline: number = Date.now() + 15000;
+    const deadline: number = Date.now() + WAIT_MS;
     while (liveRecords(f).length > 0) {
       if (Date.now() > deadline) throw new Error('run records never cleared');
       await Bun.sleep(50);
@@ -500,7 +500,7 @@ done
     HC_SHIM_UNAVAILABLE: unavailable,
   });
   try {
-    expect(await sent(1, 5000)).toBe(true);
+    expect(await sent(1, WAIT_MS)).toBe(true);
     expect(await sent(2, 200)).toBe(false);
     writeFileSync(gate, 'ready\n');
     expect((await starting).code).toBe(0);

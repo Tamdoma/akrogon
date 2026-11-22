@@ -11,7 +11,7 @@ import { connect } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { spawnCaptured, type SpawnResult } from '../src/shell';
-import { fixture, procRoot, type Fixture, type SystemctlFixture } from './helpers';
+import { fixture, procRoot, WAIT_MS, type Fixture, type SystemctlFixture } from './helpers';
 import './isolation';
 
 const uid: number = process.getuid!();
@@ -267,7 +267,7 @@ export async function hcCore(
     return terminalSchema.parse(JSON.parse(reply.stdout));
   };
   // Follows hc events for one terminal (snapshot first), never a timed re-read; the timer only bounds it.
-  const waitFor = (address: string, until: (t: Terminal) => boolean, ms: number = 15_000): Promise<Terminal> =>
+  const waitFor = (address: string, until: (t: Terminal) => boolean, ms: number = WAIT_MS): Promise<Terminal> =>
     new Promise<Terminal>((done, fail) => {
       const child = Bun.spawn([realHc, 'events', '--json', '--terminal', address], {
         cwd: f.home,

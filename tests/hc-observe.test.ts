@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 import { chmodSync, copyFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
-import { entry, fixture, leaf, type Fixture } from './helpers';
+import { entry, fixture, leaf, WAIT_MS, type Fixture } from './helpers';
 import { hcCore, recordedDoc, type HcCore, type Terminal } from './hc-fixture';
 import { spawnCaptured, type SpawnResult } from '../src/shell';
 
@@ -59,7 +59,7 @@ function seatLabels(f: Fixture, slug: string, letter: 'a' | 'b'): Record<string,
 }
 
 // hc ends a terminal's own event stream at loss and announces the keep shell on the session stream.
-function restarted(core: HcCore, address: string, ms: number = 15_000): { ready: Promise<void>; done: Promise<void> } {
+function restarted(core: HcCore, address: string, ms: number = WAIT_MS): { ready: Promise<void>; done: Promise<void> } {
   const child = Bun.spawn(['hc', 'events', '--json'], {
     env: { ...process.env, ...core.env, HC_SESSION: core.session },
     stdout: 'pipe',

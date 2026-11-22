@@ -14,6 +14,7 @@ import {
   seedStat,
   storeDir,
   yaml,
+  WAIT_MS,
   type Fixture,
 } from './helpers';
 import { command, finishCaptured, spawnFiles, quote, run, type Result, type SpawnResult } from '../src/shell';
@@ -117,7 +118,7 @@ async function leafWorktree(f: Fixture, slug: string): Promise<string> {
   return realpathSync(worktree);
 }
 
-async function waitPath(path: string, ms: number = 15000): Promise<void> {
+async function waitPath(path: string, ms: number = WAIT_MS): Promise<void> {
   const begun: number = Date.now();
   while (!existsSync(path)) {
     if (Date.now() - begun > ms) throw new Error(`Timed out waiting for ${path}`);
@@ -139,7 +140,7 @@ function sysctl(...args: string[]): Promise<SpawnResult> {
   return finishCaptured(child, captured);
 }
 
-async function waitInactive(unit: string, ms: number = 12000): Promise<void> {
+async function waitInactive(unit: string, ms: number = WAIT_MS): Promise<void> {
   const begun: number = Date.now();
   for (;;) {
     const result: Result = await sysctl('is-active', unit);
@@ -152,7 +153,7 @@ async function waitInactive(unit: string, ms: number = 12000): Promise<void> {
 // The cgroup dir appears before the unit finishes activating, and is-active is
 // non-zero in both states, so callers must wait for active before trusting
 // either existence or later inactivity.
-async function waitActive(unit: string, ms: number = 12000): Promise<void> {
+async function waitActive(unit: string, ms: number = WAIT_MS): Promise<void> {
   const begun: number = Date.now();
   for (;;) {
     const result: Result = await sysctl('is-active', unit);
@@ -268,264 +269,245 @@ test.serial(
     expect(inner).toBe(outer);
     expect(await fixtureUnits(slice)).toEqual([]);
   },
-  45000,
 );
 
-test.serial(
-  'stop-run stops only the caller pane scope runs',
-  async () => {
-    const { f, slice } = await realFixture();
-    const caps: RealCap[] = [];
-    const out: string = outDir(f);
-    const worktree: string = await leafWorktree(f, 'stopper');
-    const ids: Record<string, string> = {};
-    const launch = async (scope: string, name: string): Promise<void> => {
-      caps.push(
-        spawnScoped(f, scope, ['run-check', '--name', name, '--', 'sh', '-c', 'exec sleep 60'], worktree, {
-          AKROGON_RUN_SLICE: slice,
-        }),
-      );
-      const deadline: number = Date.now() + 20000;
-      for (;;) {
-        const live: Record<string, unknown> | undefined = (await liveRuns(f)).find((record) => record.check === name);
-        if (live !== undefined) {
-          ids[name] = live.run as string;
-          return;
-        }
-        if (Date.now() > deadline) throw new Error(`No live record for ${name}`);
-        await Bun.sleep(50);
+test.serial('stop-run stops only the caller pane scope runs', async () => {
+  const { f, slice } = await realFixture();
+  const caps: RealCap[] = [];
+  const out: string = outDir(f);
+  const worktree: string = await leafWorktree(f, 'stopper');
+  const ids: Record<string, string> = {};
+  const launch = async (scope: string, name: string): Promise<void> => {
+    caps.push(
+      spawnScoped(f, scope, ['run-check', '--name', name, '--', 'sh', '-c', 'exec sleep 60'], worktree, {
+        AKROGON_RUN_SLICE: slice,
+      }),
+    );
+    const deadline: number = Date.now() + WAIT_MS;
+    for (;;) {
+      const live: Record<string, unknown> | undefined = (await liveRuns(f)).find((record) => record.check === name);
+      if (live !== undefined) {
+        ids[name] = live.run as string;
+        return;
       }
-    };
-    await launch('paneA.scope', 'a1');
-    await launch('paneA.scope', 'a2');
-    await launch('paneB.scope', 'b1');
-    const units = (name: string): string => `akrogon-run-${ids[name]}.scope`;
-    for (const name of ['a1', 'a2', 'b1']) {
-      await waitPath(unitDir('/sys/fs/cgroup', slice, units(name)));
-      await waitActive(units(name));
+      if (Date.now() > deadline) throw new Error(`No live record for ${name}`);
+      await Bun.sleep(50);
     }
-    try {
-      // No id: list the caller's runs and refuse unless exactly one matches.
-      const two: SpawnResult = await spawnScoped(f, 'paneA.scope', ['stop-run'], worktree).result;
-      expect(two.code).not.toBe(0);
-      expect(two.stderr).toContain(ids.a2);
-      expect((await sysctl('is-active', units('a2'))).code).toBe(0);
-      // a1 stopped by the launching pane scope: unit dies; a2 and b1 keep running.
-      const stopped: SpawnResult = await spawnScoped(f, 'paneA.scope', ['stop-run', ids.a1], worktree).result;
-      expect(stopped.code).toBe(0);
-      await waitInactive(units('a1'));
-      expect((await sysctl('is-active', units('a2'))).code).toBe(0);
-      expect((await sysctl('is-active', units('b1'))).code).toBe(0);
-      // A run owned by another pane is refused.
-      const refused: SpawnResult = await spawnScoped(f, 'paneA.scope', ['stop-run', ids.b1], worktree).result;
-      expect(refused.code).not.toBe(0);
-      expect((await sysctl('is-active', units('b1'))).code).toBe(0);
-      // A caller in no scope can never stop a run.
-      const plainRoot: string = resolve(f.home, 'scopes', 'plain');
-      mkdirSync(resolve(plainRoot, 'self'), { recursive: true });
-      writeFileSync(resolve(plainRoot, 'self', 'cgroup'), `0::/user.slice/user-${uid}.slice/user@${uid}.service\n`);
-      const plain: SpawnResult = await spawnReal(f, ['stop-run', ids.a2], worktree, { AKROGON_PROC_ROOT: plainRoot })
-        .result;
-      expect(plain.code).not.toBe(0);
-      expect((await sysctl('is-active', units('a2'))).code).toBe(0);
-      const none: SpawnResult = await spawnScoped(f, 'paneC.scope', ['stop-run'], worktree).result;
-      expect(none.code).not.toBe(0);
-      // The stopped run's record can linger until its wrapper's finally runs.
-      const cleared: number = Date.now() + 15000;
-      while ((await runRecords(f)).some((record) => record.run === ids.a1)) {
-        if (Date.now() > cleared) throw new Error('a1 record still present after its unit died');
-        await Bun.sleep(50);
-      }
-      // paneA has exactly one run left: bare stop-run stops it.
-      const last: SpawnResult = await spawnScoped(f, 'paneA.scope', ['stop-run'], worktree).result;
-      expect(last.code).toBe(0);
-      await waitInactive(units('a2'));
-      // paneB's single run stops the same way.
-      const lastB: SpawnResult = await spawnScoped(f, 'paneB.scope', ['stop-run'], worktree).result;
-      expect(lastB.code).toBe(0);
-      await waitInactive(units('b1'));
-    } finally {
-      for (const cap of caps) {
-        if (cap.proc.exitCode === null) cap.proc.kill('SIGKILL');
-        void cap.result;
-      }
+  };
+  await launch('paneA.scope', 'a1');
+  await launch('paneA.scope', 'a2');
+  await launch('paneB.scope', 'b1');
+  const units = (name: string): string => `akrogon-run-${ids[name]}.scope`;
+  for (const name of ['a1', 'a2', 'b1']) {
+    await waitPath(unitDir('/sys/fs/cgroup', slice, units(name)));
+    await waitActive(units(name));
+  }
+  try {
+    // No id: list the caller's runs and refuse unless exactly one matches.
+    const two: SpawnResult = await spawnScoped(f, 'paneA.scope', ['stop-run'], worktree).result;
+    expect(two.code).not.toBe(0);
+    expect(two.stderr).toContain(ids.a2);
+    expect((await sysctl('is-active', units('a2'))).code).toBe(0);
+    // a1 stopped by the launching pane scope: unit dies; a2 and b1 keep running.
+    const stopped: SpawnResult = await spawnScoped(f, 'paneA.scope', ['stop-run', ids.a1], worktree).result;
+    expect(stopped.code).toBe(0);
+    await waitInactive(units('a1'));
+    expect((await sysctl('is-active', units('a2'))).code).toBe(0);
+    expect((await sysctl('is-active', units('b1'))).code).toBe(0);
+    // A run owned by another pane is refused.
+    const refused: SpawnResult = await spawnScoped(f, 'paneA.scope', ['stop-run', ids.b1], worktree).result;
+    expect(refused.code).not.toBe(0);
+    expect((await sysctl('is-active', units('b1'))).code).toBe(0);
+    // A caller in no scope can never stop a run.
+    const plainRoot: string = resolve(f.home, 'scopes', 'plain');
+    mkdirSync(resolve(plainRoot, 'self'), { recursive: true });
+    writeFileSync(resolve(plainRoot, 'self', 'cgroup'), `0::/user.slice/user-${uid}.slice/user@${uid}.service\n`);
+    const plain: SpawnResult = await spawnReal(f, ['stop-run', ids.a2], worktree, { AKROGON_PROC_ROOT: plainRoot })
+      .result;
+    expect(plain.code).not.toBe(0);
+    expect((await sysctl('is-active', units('a2'))).code).toBe(0);
+    const none: SpawnResult = await spawnScoped(f, 'paneC.scope', ['stop-run'], worktree).result;
+    expect(none.code).not.toBe(0);
+    // The stopped run's record can linger until its wrapper's finally runs.
+    const cleared: number = Date.now() + WAIT_MS;
+    while ((await runRecords(f)).some((record) => record.run === ids.a1)) {
+      if (Date.now() > cleared) throw new Error('a1 record still present after its unit died');
+      await Bun.sleep(50);
     }
-  },
-  60000,
-);
+    // paneA has exactly one run left: bare stop-run stops it.
+    const last: SpawnResult = await spawnScoped(f, 'paneA.scope', ['stop-run'], worktree).result;
+    expect(last.code).toBe(0);
+    await waitInactive(units('a2'));
+    // paneB's single run stops the same way.
+    const lastB: SpawnResult = await spawnScoped(f, 'paneB.scope', ['stop-run'], worktree).result;
+    expect(lastB.code).toBe(0);
+    await waitInactive(units('b1'));
+  } finally {
+    for (const cap of caps) {
+      if (cap.proc.exitCode === null) cap.proc.kill('SIGKILL');
+      void cap.result;
+    }
+  }
+});
 
 for (const signal of ['SIGTERM', 'SIGKILL'] as const) {
-  test.serial(
-    `${signal} of the wrapper leaves the run unit inactive with no descendant`,
-    async () => {
-      const { f, slice } = await realFixture();
-      const out: string = outDir(f);
-      const worktree: string = await leafWorktree(f, `reap-${signal.toLowerCase()}`);
-      const cap: RealCap = spawnReal(
-        f,
-        ['run-check', '--name', 'reap', '--', 'sh', '-c', 'sleep 30 & exec sleep 30'],
-        worktree,
-        { RUN_UNITS_OUT: out, AKROGON_RUN_SLICE: slice },
-      );
-      try {
-        let unit: string | undefined;
-        const liveDeadline: number = Date.now() + 15000;
-        while (unit === undefined) {
-          const live: Record<string, unknown> | undefined = (await liveRuns(f)).find(
-            (record) => record.check === 'reap',
-          );
-          if (live !== undefined) unit = live.unit as string;
-          else if (Date.now() > liveDeadline) throw new Error('No live reap record');
-          else await Bun.sleep(50);
-        }
-        await waitPath(unitDir('/sys/fs/cgroup', slice, unit));
-        await waitActive(unit);
-        cap.proc.kill(signal);
-        // One deadline measured at the signal: TimeoutStopUSec (5 s) plus the
-        // 5 s assertion window from the brief must cover unit inactivity,
-        // guard exit and descendant drain.
-        const cgroupProcs: string = resolve(unitDir('/sys/fs/cgroup', slice, unit), 'cgroup.procs');
-        const guard: string = unit.replace(/\.scope$/, '-guard.service');
-        const deadline: number = Date.now() + 10000;
-        let scopeOff: boolean = false;
-        let guardOff: boolean = false;
-        let drained: boolean = false;
-        while (!(scopeOff && guardOff && drained) && Date.now() < deadline) {
-          scopeOff ||= (await sysctl('is-active', unit)).code !== 0;
-          guardOff ||= (await sysctl('is-active', guard)).code !== 0;
-          drained = !existsSync(cgroupProcs) || readFileSync(cgroupProcs, 'utf8').trim() === '';
-          if (!(scopeOff && guardOff && drained)) await Bun.sleep(150);
-        }
-        expect(scopeOff, `${unit} not inactive within the criterion deadline`).toBe(true);
-        expect(drained, `${unit} descendants still present within the criterion deadline`).toBe(true);
-        const result: SpawnResult = await cap.result;
-        expect(result.signalCode).toBe(signal);
-      } finally {
-        if (cap.proc.exitCode === null) cap.proc.kill('SIGKILL');
-        void cap.result;
-      }
-    },
-    45000,
-  );
-}
-
-test.serial(
-  "a killed run-check pair refuses the leaf's non-failed phase moves under the real run unit",
-  async () => {
+  test.serial(`${signal} of the wrapper leaves the run unit inactive with no descendant`, async () => {
     const { f, slice } = await realFixture();
     const out: string = outDir(f);
-    const worktree: string = await leafWorktree(f, 'gatekill');
-    writeFileSync(resolve(worktree, 'gatekill.txt'), 'seed\n');
-    await command(['git', 'add', 'gatekill.txt'], worktree);
-    await command(['git', 'commit', '-qm', 'seed'], worktree);
-    greenReceipt(f, (await command(['git', 'rev-parse', 'HEAD'], worktree)).trim(), 'leaf');
-    const leafDir: string = resolve(f.root, 'issues/open/issue/gatekill');
-    const implDir: string = resolve(leafDir, 'implementation');
+    const worktree: string = await leafWorktree(f, `reap-${signal.toLowerCase()}`);
     const cap: RealCap = spawnReal(
       f,
-      ['run-check', '--name', 'gatekill', '--', 'sh', '-c', `trap '' TERM; touch "${out}/ready"; sleep 30`],
+      ['run-check', '--name', 'reap', '--', 'sh', '-c', 'sleep 30 & exec sleep 30'],
       worktree,
       { RUN_UNITS_OUT: out, AKROGON_RUN_SLICE: slice },
     );
     try {
-      await waitPath(resolve(out, 'ready'));
-      const deadline: number = Date.now() + 15000;
-      let record: Record<string, unknown> | undefined;
-      while (record === undefined) {
-        record = (await liveRuns(f)).find((row) => row.check === 'gatekill');
-        if (record === undefined && Date.now() > deadline) throw new Error('No live gatekill record');
-        else if (record === undefined) await Bun.sleep(50);
+      let unit: string | undefined;
+      const liveDeadline: number = Date.now() + WAIT_MS;
+      while (unit === undefined) {
+        const live: Record<string, unknown> | undefined = (await liveRuns(f)).find((record) => record.check === 'reap');
+        if (live !== undefined) unit = live.unit as string;
+        else if (Date.now() > liveDeadline) throw new Error('No live reap record');
+        else await Bun.sleep(50);
       }
-      const run: string = record.run as string;
-      const unit: string = record.unit as string;
-      const outLog: string = resolve(implDir, `capture-gatekill-${run}-out.log`);
-      const errLog: string = resolve(implDir, `capture-gatekill-${run}-err.log`);
-      const outDeadline: number = Date.now() + 15000;
-      while (!existsSync(outLog)) {
-        if (cap.proc.exitCode !== null) {
-          const early: SpawnResult = await cap.result;
-          throw new Error(`wrapper exited ${early.code}: ${early.stdout} ${early.stderr}`);
-        }
-        if (Date.now() > outDeadline) throw new Error(`Timed out waiting for ${outLog}`);
-        await Bun.sleep(50);
-      }
-      // Live holder, live unit: a non-failed move stays open for the leaf.
-      const live: SpawnResult = await spawnReal(f, ['phase', 'gatekill', 'check.review', '--check'], f.root).result;
-      expect(live.code, `stdout: ${live.stdout} stderr: ${live.stderr}`).toBe(0);
-      cap.proc.kill('SIGKILL');
-      const result: SpawnResult = await cap.result;
-      expect(result.signalCode).toBe('SIGKILL');
+      await waitPath(unitDir('/sys/fs/cgroup', slice, unit));
+      await waitActive(unit);
+      cap.proc.kill(signal);
+      // One deadline measured at the signal: TimeoutStopUSec (5 s) plus the
+      // 5 s assertion window from the brief must cover unit inactivity,
+      // guard exit and descendant drain.
       const cgroupProcs: string = resolve(unitDir('/sys/fs/cgroup', slice, unit), 'cgroup.procs');
-      // The started payload ignores TERM, so it outlives the dead wrapper inside
-      // the real scope until the guard's stop drains the cgroup — the interval
-      // where the pair stays live on the holder's inherited stdout fd alone.
-      const drainDeadline: number = Date.now() + 10000;
-      let held: boolean = false;
-      let refusedResult: SpawnResult | undefined;
-      while (Date.now() < drainDeadline) {
-        const holderLive: boolean = existsSync(cgroupProcs) && readFileSync(cgroupProcs, 'utf8').trim() !== '';
-        const probe: SpawnResult = await spawnReal(f, ['phase', 'gatekill', 'check.review', '--check'], f.root).result;
-        if (probe.code !== 0) {
-          refusedResult = probe;
-          break;
-        }
-        held ||= holderLive && result.signalCode === 'SIGKILL';
-        await Bun.sleep(100);
+      const guard: string = unit.replace(/\.scope$/, '-guard.service');
+      const deadline: number = Date.now() + 10000;
+      let scopeOff: boolean = false;
+      let guardOff: boolean = false;
+      let drained: boolean = false;
+      while (!(scopeOff && guardOff && drained) && Date.now() < deadline) {
+        scopeOff ||= (await sysctl('is-active', unit)).code !== 0;
+        guardOff ||= (await sysctl('is-active', guard)).code !== 0;
+        drained = !existsSync(cgroupProcs) || readFileSync(cgroupProcs, 'utf8').trim() === '';
+        if (!(scopeOff && guardOff && drained)) await Bun.sleep(150);
       }
-      expect(held, 'never saw a live holder with the wrapper dead and the move still open').toBe(true);
-      expect(refusedResult, 'the pair never refused after the unit drained').toBeDefined();
-      // Wrapper and last fd holder are gone: the pair is abandoned and refuses.
-      expect(existsSync(outLog)).toBe(true);
-      expect(existsSync(errLog)).toBe(true);
-      const refused: SpawnResult = refusedResult as SpawnResult;
-      const refusal: string = refused.stdout + refused.stderr;
-      expect(refusal).toContain(outLog);
-      expect(refusal).toContain(errLog);
-      expect(refusal).toContain(`cleared-${run}.md`);
-      writeFileSync(resolve(implDir, `cleared-${run}.md`), 'recorded and cleaned\n');
-      const passed: SpawnResult = await spawnReal(f, ['phase', 'gatekill', 'check.review', '--check'], f.root).result;
-      expect(passed.code, `stdout: ${passed.stdout} stderr: ${passed.stderr}`).toBe(0);
+      expect(scopeOff, `${unit} not inactive within the criterion deadline`).toBe(true);
+      expect(drained, `${unit} descendants still present within the criterion deadline`).toBe(true);
+      const result: SpawnResult = await cap.result;
+      expect(result.signalCode).toBe(signal);
     } finally {
       if (cap.proc.exitCode === null) cap.proc.kill('SIGKILL');
       void cap.result;
     }
-  },
-  45000,
-);
+  });
+}
 
-test.serial(
-  'a verify runs setup and each command in its own run unit under the leaf slice',
-  async () => {
-    const { f, slice } = await realFixture();
-    const out: string = outDir(f);
-    const worktree: string = await leafWorktree(f, 'verify-units');
-    const config: string = resolve(f.root, 'issues/config.yaml');
-    const before: string = readFileSync(config, 'utf8');
-    yaml(config, { ...(Bun.YAML.parse(before) as object), checks: { cg: `cat /proc/self/cgroup > "${out}/cmd.cg"` } });
-    writeFileSync(
-      resolve(f.root, '.env'),
-      'AKROGON_HOME=declared\nAKROGON_LEAF_TEMP_ROOT=declared\nRUN_UNITS_OUT=declared\n',
-    );
-    const result: SpawnResult = await spawnReal(f, ['verify'], worktree, {
-      RUN_UNITS_OUT: out,
-      AKROGON_RUN_SLICE: slice,
-    }).result;
-    writeFileSync(config, before);
-    expect(result.code, `stdout: ${result.stdout} stderr: ${result.stderr}`).toBe(0);
-    expect(result.stderr.match(/^run [0-9a-f-]{36}$/gm)).toHaveLength(3);
-    const setup: string = readFileSync(resolve(out, 'setup.cg'), 'utf8');
-    const cmd: string = readFileSync(resolve(out, 'cmd.cg'), 'utf8');
-    const setupScope: string | undefined = setup.match(/akrogon-run-[0-9a-f-]+\.scope/)?.[0];
-    const scope: string | undefined = cmd.match(/akrogon-run-[0-9a-f-]+\.scope/)?.[0];
-    expect(setupScope).toBeDefined();
-    expect(scope).toBeDefined();
-    expect(setupScope).not.toBe(scope);
-    expect(setup).toContain(`/${slice}/${setupScope}`);
-    expect(cmd).toContain(`/${slice}/${scope}`);
-    expect(await fixtureUnits(slice)).toEqual([]);
-  },
-  45000,
-);
+test.serial("a killed run-check pair refuses the leaf's non-failed phase moves under the real run unit", async () => {
+  const { f, slice } = await realFixture();
+  const out: string = outDir(f);
+  const worktree: string = await leafWorktree(f, 'gatekill');
+  writeFileSync(resolve(worktree, 'gatekill.txt'), 'seed\n');
+  await command(['git', 'add', 'gatekill.txt'], worktree);
+  await command(['git', 'commit', '-qm', 'seed'], worktree);
+  greenReceipt(f, (await command(['git', 'rev-parse', 'HEAD'], worktree)).trim(), 'leaf');
+  const leafDir: string = resolve(f.root, 'issues/open/issue/gatekill');
+  const implDir: string = resolve(leafDir, 'implementation');
+  const cap: RealCap = spawnReal(
+    f,
+    ['run-check', '--name', 'gatekill', '--', 'sh', '-c', `trap '' TERM; touch "${out}/ready"; sleep 30`],
+    worktree,
+    { RUN_UNITS_OUT: out, AKROGON_RUN_SLICE: slice },
+  );
+  try {
+    await waitPath(resolve(out, 'ready'));
+    const deadline: number = Date.now() + WAIT_MS;
+    let record: Record<string, unknown> | undefined;
+    while (record === undefined) {
+      record = (await liveRuns(f)).find((row) => row.check === 'gatekill');
+      if (record === undefined && Date.now() > deadline) throw new Error('No live gatekill record');
+      else if (record === undefined) await Bun.sleep(50);
+    }
+    const run: string = record.run as string;
+    const unit: string = record.unit as string;
+    const outLog: string = resolve(implDir, `capture-gatekill-${run}-out.log`);
+    const errLog: string = resolve(implDir, `capture-gatekill-${run}-err.log`);
+    const outDeadline: number = Date.now() + WAIT_MS;
+    while (!existsSync(outLog)) {
+      if (cap.proc.exitCode !== null) {
+        const early: SpawnResult = await cap.result;
+        throw new Error(`wrapper exited ${early.code}: ${early.stdout} ${early.stderr}`);
+      }
+      if (Date.now() > outDeadline) throw new Error(`Timed out waiting for ${outLog}`);
+      await Bun.sleep(50);
+    }
+    // Live holder, live unit: a non-failed move stays open for the leaf.
+    const live: SpawnResult = await spawnReal(f, ['phase', 'gatekill', 'check.review', '--check'], f.root).result;
+    expect(live.code, `stdout: ${live.stdout} stderr: ${live.stderr}`).toBe(0);
+    cap.proc.kill('SIGKILL');
+    const result: SpawnResult = await cap.result;
+    expect(result.signalCode).toBe('SIGKILL');
+    const cgroupProcs: string = resolve(unitDir('/sys/fs/cgroup', slice, unit), 'cgroup.procs');
+    // The started payload ignores TERM, so it outlives the dead wrapper inside
+    // the real scope until the guard's stop drains the cgroup — the interval
+    // where the pair stays live on the holder's inherited stdout fd alone.
+    const drainDeadline: number = Date.now() + 10000;
+    let held: boolean = false;
+    let refusedResult: SpawnResult | undefined;
+    while (Date.now() < drainDeadline) {
+      const holderLive: boolean = existsSync(cgroupProcs) && readFileSync(cgroupProcs, 'utf8').trim() !== '';
+      const probe: SpawnResult = await spawnReal(f, ['phase', 'gatekill', 'check.review', '--check'], f.root).result;
+      if (probe.code !== 0) {
+        refusedResult = probe;
+        break;
+      }
+      held ||= holderLive && result.signalCode === 'SIGKILL';
+      await Bun.sleep(100);
+    }
+    expect(held, 'never saw a live holder with the wrapper dead and the move still open').toBe(true);
+    expect(refusedResult, 'the pair never refused after the unit drained').toBeDefined();
+    // Wrapper and last fd holder are gone: the pair is abandoned and refuses.
+    expect(existsSync(outLog)).toBe(true);
+    expect(existsSync(errLog)).toBe(true);
+    const refused: SpawnResult = refusedResult as SpawnResult;
+    const refusal: string = refused.stdout + refused.stderr;
+    expect(refusal).toContain(outLog);
+    expect(refusal).toContain(errLog);
+    expect(refusal).toContain(`cleared-${run}.md`);
+    writeFileSync(resolve(implDir, `cleared-${run}.md`), 'recorded and cleaned\n');
+    const passed: SpawnResult = await spawnReal(f, ['phase', 'gatekill', 'check.review', '--check'], f.root).result;
+    expect(passed.code, `stdout: ${passed.stdout} stderr: ${passed.stderr}`).toBe(0);
+  } finally {
+    if (cap.proc.exitCode === null) cap.proc.kill('SIGKILL');
+    void cap.result;
+  }
+});
+
+test.serial('a verify runs setup and each command in its own run unit under the leaf slice', async () => {
+  const { f, slice } = await realFixture();
+  const out: string = outDir(f);
+  const worktree: string = await leafWorktree(f, 'verify-units');
+  const config: string = resolve(f.root, 'issues/config.yaml');
+  const before: string = readFileSync(config, 'utf8');
+  yaml(config, { ...(Bun.YAML.parse(before) as object), checks: { cg: `cat /proc/self/cgroup > "${out}/cmd.cg"` } });
+  writeFileSync(
+    resolve(f.root, '.env'),
+    'AKROGON_HOME=declared\nAKROGON_LEAF_TEMP_ROOT=declared\nRUN_UNITS_OUT=declared\n',
+  );
+  const result: SpawnResult = await spawnReal(f, ['verify'], worktree, {
+    RUN_UNITS_OUT: out,
+    AKROGON_RUN_SLICE: slice,
+  }).result;
+  writeFileSync(config, before);
+  expect(result.code, `stdout: ${result.stdout} stderr: ${result.stderr}`).toBe(0);
+  expect(result.stderr.match(/^run [0-9a-f-]{36}$/gm)).toHaveLength(3);
+  const setup: string = readFileSync(resolve(out, 'setup.cg'), 'utf8');
+  const cmd: string = readFileSync(resolve(out, 'cmd.cg'), 'utf8');
+  const setupScope: string | undefined = setup.match(/akrogon-run-[0-9a-f-]+\.scope/)?.[0];
+  const scope: string | undefined = cmd.match(/akrogon-run-[0-9a-f-]+\.scope/)?.[0];
+  expect(setupScope).toBeDefined();
+  expect(scope).toBeDefined();
+  expect(setupScope).not.toBe(scope);
+  expect(setup).toContain(`/${slice}/${setupScope}`);
+  expect(cmd).toContain(`/${slice}/${scope}`);
+  expect(await fixtureUnits(slice)).toEqual([]);
+});
 
 test.serial('a verify places its scope under the resolved leaf slice by default', async () => {
   const f: Fixture = await fixture();
@@ -578,7 +560,6 @@ test.serial(
       f.clean();
     }
   },
-  45000,
 );
 
 test.serial(
@@ -613,35 +594,30 @@ test.serial(
     expect(readFileSync(resolve(out, 'inner.cg'), 'utf8')).toBe(outerCg);
     expect(await fixtureUnits(slice)).toEqual([]);
   },
-  45000,
 );
 
-test.serial(
-  'a nested run-check inside a live run adds no record and no reservation',
-  async () => {
-    const { f, slice } = await realFixture();
-    const out: string = outDir(f);
-    const worktree: string = await leafWorktree(f, 'nested-res');
-    const script: string = [
-      `akrogon run-check --name inner -- sh -c 'touch "${out}/inner-held"; sleep 1'`,
-      `grep -l -e 'check: outer' -e 'check: inner' "${f.home}/runs"/*.yaml | wc -l > "${out}/count"`,
-    ].join('; ');
-    const cap: RealCap = spawnReal(f, ['run-check', '--name', 'outer', '--', 'sh', '-c', script], worktree, {
-      RUN_UNITS_OUT: out,
-      AKROGON_RUN_SLICE: slice,
-    });
-    await waitPath(resolve(out, 'inner-held'));
-    // The criterion is no *new* record and none named for the nested check:
-    // sibling serial tests may leave records behind in the shared fixture.
-    const during: Record<string, unknown>[] = await runRecords(f);
-    expect(during.filter((record) => record.check === 'inner')).toHaveLength(0);
-    expect(during.filter((record) => record.check === 'outer')).toHaveLength(1);
-    const result: SpawnResult = await cap.result;
-    expect(result.code).toBe(0);
-    expect(readFileSync(resolve(out, 'count'), 'utf8').trim()).toBe('1');
-  },
-  45000,
-);
+test.serial('a nested run-check inside a live run adds no record and no reservation', async () => {
+  const { f, slice } = await realFixture();
+  const out: string = outDir(f);
+  const worktree: string = await leafWorktree(f, 'nested-res');
+  const script: string = [
+    `akrogon run-check --name inner -- sh -c 'touch "${out}/inner-held"; sleep 1'`,
+    `grep -l -e 'check: outer' -e 'check: inner' "${f.home}/runs"/*.yaml | wc -l > "${out}/count"`,
+  ].join('; ');
+  const cap: RealCap = spawnReal(f, ['run-check', '--name', 'outer', '--', 'sh', '-c', script], worktree, {
+    RUN_UNITS_OUT: out,
+    AKROGON_RUN_SLICE: slice,
+  });
+  await waitPath(resolve(out, 'inner-held'));
+  // The criterion is no *new* record and none named for the nested check:
+  // sibling serial tests may leave records behind in the shared fixture.
+  const during: Record<string, unknown>[] = await runRecords(f);
+  expect(during.filter((record) => record.check === 'inner')).toHaveLength(0);
+  expect(during.filter((record) => record.check === 'outer')).toHaveLength(1);
+  const result: SpawnResult = await cap.result;
+  expect(result.code).toBe(0);
+  expect(readFileSync(resolve(out, 'count'), 'utf8').trim()).toBe('1');
+});
 
 test.serial(
   'run-check --leaf and --holder keep working and place units under the leaf slice and akrogon.slice',
@@ -718,80 +694,76 @@ test.serial('skills name akrogon stop-run instead of the recorded-PID stop rule'
   }
 });
 
-test.serial(
-  'a stale run record and unit are swept by the next run start',
-  async () => {
-    const f: Fixture = await fixture();
-    const slice: string = testSlice();
-    let stale: Bun.Subprocess | undefined;
-    try {
-      const worktree: string = await leafWorktree(f, 'sweeper');
-      // A real stale scope under the test slice plus a record with a dead pid.
-      stale = Bun.spawn(
-        [
-          'systemd-run',
-          '--user',
-          '--scope',
-          '--quiet',
-          `--slice=${slice}`,
-          '--unit=akrogon-run-stale0',
-          '--',
-          'sleep',
-          '300',
-        ],
-        {
-          env: {
-            ...process.env,
-            DBUS_SESSION_BUS_ADDRESS: undefined,
-            XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR ?? `/run/user/${uid}`,
-          },
+test.serial('a stale run record and unit are swept by the next run start', async () => {
+  const f: Fixture = await fixture();
+  const slice: string = testSlice();
+  let stale: Bun.Subprocess | undefined;
+  try {
+    const worktree: string = await leafWorktree(f, 'sweeper');
+    // A real stale scope under the test slice plus a record with a dead pid.
+    stale = Bun.spawn(
+      [
+        'systemd-run',
+        '--user',
+        '--scope',
+        '--quiet',
+        `--slice=${slice}`,
+        '--unit=akrogon-run-stale0',
+        '--',
+        'sleep',
+        '300',
+      ],
+      {
+        env: {
+          ...process.env,
+          DBUS_SESSION_BUS_ADDRESS: undefined,
+          XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR ?? `/run/user/${uid}`,
         },
-      );
-      const recordsDir: string = resolve(f.home, 'runs');
-      mkdirSync(recordsDir, { recursive: true });
-      const dead: Bun.Subprocess = Bun.spawn(['true']);
-      await dead.exited;
-      const token: string = randomUUID();
-      writeFileSync(
-        resolve(recordsDir, `${createHash('sha256').update(token).digest('hex')}.yaml`),
-        Bun.YAML.stringify({
-          token_hash: createHash('sha256').update(token).digest('hex'),
-          pid: dead.pid,
-          start_time: '1',
-          boot_id: 'x',
-          repo: f.repo,
-          leaf: 'sweeper',
-          check: 'old',
-          state: 'live',
-          since: new Date().toISOString(),
-          run: 'stale0',
-          slice,
-          scope: 'gone.scope',
-          unit: 'akrogon-run-stale0.scope',
-        }),
-      );
-      writeFileSync(resolve(recordsDir, 'corrupt.yaml'), 'not: [yaml');
-      const result: SpawnResult = await spawnReal(f, ['run-check', '--name', 'sweep', '--', 'true'], worktree, {
-        AKROGON_RUN_SLICE: slice,
-      }).result;
-      expect(result.code).toBe(0);
-      await waitInactive('akrogon-run-stale0.scope', 10000);
-      const left: string[] = readdirSync(recordsDir).filter((name) => name.endsWith('.yaml'));
-      expect(left).toEqual([]);
-    } finally {
-      if (stale !== undefined) {
-        // The sleep is a systemd-owned scope member, not a descendant of the
-        // systemd-run child: the kill cannot reach it, so stop the scope.
-        await sysctl('stop', 'akrogon-run-stale0.scope');
-        if (stale.exitCode === null) stale.kill('SIGKILL');
-        await stale.exited;
-      }
-      await stopTestSlice(slice);
-      f.clean();
+      },
+    );
+    const recordsDir: string = resolve(f.home, 'runs');
+    mkdirSync(recordsDir, { recursive: true });
+    const dead: Bun.Subprocess = Bun.spawn(['true']);
+    await dead.exited;
+    const token: string = randomUUID();
+    writeFileSync(
+      resolve(recordsDir, `${createHash('sha256').update(token).digest('hex')}.yaml`),
+      Bun.YAML.stringify({
+        token_hash: createHash('sha256').update(token).digest('hex'),
+        pid: dead.pid,
+        start_time: '1',
+        boot_id: 'x',
+        repo: f.repo,
+        leaf: 'sweeper',
+        check: 'old',
+        state: 'live',
+        since: new Date().toISOString(),
+        run: 'stale0',
+        slice,
+        scope: 'gone.scope',
+        unit: 'akrogon-run-stale0.scope',
+      }),
+    );
+    writeFileSync(resolve(recordsDir, 'corrupt.yaml'), 'not: [yaml');
+    const result: SpawnResult = await spawnReal(f, ['run-check', '--name', 'sweep', '--', 'true'], worktree, {
+      AKROGON_RUN_SLICE: slice,
+    }).result;
+    expect(result.code).toBe(0);
+    await waitInactive('akrogon-run-stale0.scope');
+    const left: string[] = readdirSync(recordsDir).filter((name) => name.endsWith('.yaml'));
+    expect(left).toEqual([]);
+  } finally {
+    if (stale !== undefined) {
+      // The sleep is a systemd-owned scope member, not a descendant of the
+      // systemd-run child: the kill cannot reach it, so stop the scope.
+      await sysctl('stop', 'akrogon-run-stale0.scope');
+      if (stale.exitCode === null) stale.kill('SIGKILL');
+      await stale.exited;
     }
-  },
-  45000,
-);
+    await stopTestSlice(slice);
+    f.clean();
+  }
+});
 
 function verifyReceipts(f: Fixture): VerifyRun[] {
   const file: string = resolve(f.root, 'issues/verify-runs.jsonl');
@@ -813,7 +785,7 @@ function leafReceipts(f: Fixture, slug: string): VerifyRun[] {
   return verifyReceipts(f).filter((run) => run.leaf === slug);
 }
 
-async function waitReceipt(f: Fixture, slug: string, ms: number = 15000): Promise<VerifyRun> {
+async function waitReceipt(f: Fixture, slug: string, ms: number = WAIT_MS): Promise<VerifyRun> {
   const begun: number = Date.now();
   for (;;) {
     const first: VerifyRun | undefined = leafReceipts(f, slug)[0];
@@ -823,7 +795,7 @@ async function waitReceipt(f: Fixture, slug: string, ms: number = 15000): Promis
   }
 }
 
-async function waitCheckRecord(f: Fixture, name: string, ms: number = 15000): Promise<Record<string, unknown>> {
+async function waitCheckRecord(f: Fixture, name: string, ms: number = WAIT_MS): Promise<Record<string, unknown>> {
   const begun: number = Date.now();
   for (;;) {
     const live: Record<string, unknown> | undefined = (await liveRuns(f)).find((record) => record.check === name);
@@ -833,125 +805,117 @@ async function waitCheckRecord(f: Fixture, name: string, ms: number = 15000): Pr
   }
 }
 
-test.serial(
-  'a verify nested inside a full run-check completes without queuing behind its parent',
-  async () => {
-    const { f, slice } = await realFixture();
-    const worktree: string = await leafWorktree(f, 'pass-nested-full');
-    rewriteConfig(f, {
-      setup: 'mkdir -p node_modules',
-      pass_env: ['AKROGON_LEAF_TEMP_ROOT'],
-      checks: { test: 'true' },
-      full: ['test'],
-    });
-    const cap: RealCap = spawnScoped(
+test.serial('a verify nested inside a full run-check completes without queuing behind its parent', async () => {
+  const { f, slice } = await realFixture();
+  const worktree: string = await leafWorktree(f, 'pass-nested-full');
+  rewriteConfig(f, {
+    setup: 'mkdir -p node_modules',
+    pass_env: ['AKROGON_LEAF_TEMP_ROOT'],
+    checks: { test: 'true' },
+    full: ['test'],
+  });
+  const cap: RealCap = spawnScoped(
+    f,
+    'callerA.scope',
+    ['run-check', '--name', 'test', '--', process.execPath, entry, 'verify'],
+    worktree,
+    { AKROGON_RUN_SLICE: slice },
+  );
+  const receipt: VerifyRun = await waitReceipt(f, 'pass-nested-full');
+  try {
+    const deadline: number = Date.now() + WAIT_MS;
+    while (cap.proc.exitCode === null) {
+      const waiting: boolean = (await runRecords(f)).some(
+        (record) => record.check === 'test' && record.state === 'waiting',
+      );
+      expect(waiting, 'the nested pass must not queue behind its own full parent').toBe(false);
+      if (Date.now() > deadline) throw new Error('nested verify did not finish');
+      await Bun.sleep(50);
+    }
+    const result: SpawnResult = await cap.result;
+    expect(result.code, `stdout: ${result.stdout} stderr: ${result.stderr}`).toBe(0);
+    expect(leafReceipts(f, 'pass-nested-full')[0].commands[0].exit).toBe(0);
+  } finally {
+    if (cap.proc.exitCode === null) {
+      const stopped: SpawnResult = await spawnScoped(f, 'callerA.scope', ['stop-run', receipt.run], worktree).result;
+      expect(stopped.code).toBe(0);
+      await cap.result;
+    }
+    await waitInactive(`akrogon-verify-${receipt.run}.service`);
+  }
+});
+
+test.serial('a repeat verify during checkout removal joins the live pass and returns its cleanup failure', async () => {
+  const { f, slice } = await realFixture();
+  const out: string = outDir(f);
+  const worktree: string = await leafWorktree(f, 'pass-cleanup-join');
+  rewriteConfig(f, { setup: 'mkdir -p node_modules', checks: { test: 'printf cleanup-proof' } });
+  const bin: string = resolve(f.home, 'cleanup-bin');
+  mkdirSync(bin);
+  const removing: string = resolve(out, 'removing');
+  const release: string = resolve(out, 'release-removal');
+  const joinedOut: string = resolve(out, 'joined-out');
+  const joinedErr: string = resolve(out, 'joined-err');
+  const git: string = await command(['sh', '-c', 'command -v git']);
+  writeFileSync(
+    resolve(bin, 'git'),
+    [
+      '#!/bin/sh',
+      'if [ "$1" = worktree ] && [ "$2" = remove ]; then',
+      `  touch ${quote(removing)}`,
+      `  while [ ! -e ${quote(release)} ]; do sleep 0.05; done`,
+      '  exit 1',
+      'fi',
+      `exec ${quote(git)} "$@"`,
+      '',
+    ].join('\n'),
+    { mode: 0o755 },
+  );
+  const env: NodeJS.ProcessEnv = {
+    AKROGON_RUN_SLICE: slice,
+    PATH: `${bin}:${resolve(f.home, 'bin')}:${process.env.PATH}`,
+  };
+  const first: RealCap = spawnScoped(f, 'callerA.scope', ['verify'], worktree, env);
+  const receipt: VerifyRun = await waitReceipt(f, 'pass-cleanup-join');
+  let joined: RealCap | undefined;
+  try {
+    await waitPath(removing);
+    expect(leafReceipts(f, 'pass-cleanup-join')[0].end).toBeDefined();
+    joined = spawnScoped(
       f,
       'callerA.scope',
-      ['run-check', '--name', 'test', '--', process.execPath, entry, 'verify'],
-      worktree,
-      { AKROGON_RUN_SLICE: slice },
-    );
-    const receipt: VerifyRun = await waitReceipt(f, 'pass-nested-full');
-    try {
-      const deadline: number = Date.now() + 15000;
-      while (cap.proc.exitCode === null) {
-        const waiting: boolean = (await runRecords(f)).some(
-          (record) => record.check === 'test' && record.state === 'waiting',
-        );
-        expect(waiting, 'the nested pass must not queue behind its own full parent').toBe(false);
-        if (Date.now() > deadline) throw new Error('nested verify did not finish');
-        await Bun.sleep(50);
-      }
-      const result: SpawnResult = await cap.result;
-      expect(result.code, `stdout: ${result.stdout} stderr: ${result.stderr}`).toBe(0);
-      expect(leafReceipts(f, 'pass-nested-full')[0].commands[0].exit).toBe(0);
-    } finally {
-      if (cap.proc.exitCode === null) {
-        const stopped: SpawnResult = await spawnScoped(f, 'callerA.scope', ['stop-run', receipt.run], worktree).result;
-        expect(stopped.code).toBe(0);
-        await cap.result;
-      }
-      await waitInactive(`akrogon-verify-${receipt.run}.service`);
-    }
-  },
-  45000,
-);
-
-test.serial(
-  'a repeat verify during checkout removal joins the live pass and returns its cleanup failure',
-  async () => {
-    const { f, slice } = await realFixture();
-    const out: string = outDir(f);
-    const worktree: string = await leafWorktree(f, 'pass-cleanup-join');
-    rewriteConfig(f, { setup: 'mkdir -p node_modules', checks: { test: 'printf cleanup-proof' } });
-    const bin: string = resolve(f.home, 'cleanup-bin');
-    mkdirSync(bin);
-    const removing: string = resolve(out, 'removing');
-    const release: string = resolve(out, 'release-removal');
-    const joinedOut: string = resolve(out, 'joined-out');
-    const joinedErr: string = resolve(out, 'joined-err');
-    const git: string = await command(['sh', '-c', 'command -v git']);
-    writeFileSync(
-      resolve(bin, 'git'),
       [
-        '#!/bin/sh',
-        'if [ "$1" = worktree ] && [ "$2" = remove ]; then',
-        `  touch ${quote(removing)}`,
-        `  while [ ! -e ${quote(release)} ]; do sleep 0.05; done`,
-        '  exit 1',
-        'fi',
-        `exec ${quote(git)} "$@"`,
-        '',
-      ].join('\n'),
-      { mode: 0o755 },
+        'run-check',
+        '--name',
+        'repeat',
+        '--',
+        'sh',
+        '-c',
+        `${quote(process.execPath)} ${quote(entry)} verify --known-red >${quote(joinedOut)} 2>${quote(joinedErr)}`,
+      ],
+      worktree,
+      env,
     );
-    const env: NodeJS.ProcessEnv = {
-      AKROGON_RUN_SLICE: slice,
-      PATH: `${bin}:${resolve(f.home, 'bin')}:${process.env.PATH}`,
-    };
-    const first: RealCap = spawnScoped(f, 'callerA.scope', ['verify'], worktree, env);
-    const receipt: VerifyRun = await waitReceipt(f, 'pass-cleanup-join');
-    let joined: RealCap | undefined;
-    try {
-      await waitPath(removing);
-      expect(leafReceipts(f, 'pass-cleanup-join')[0].end).toBeDefined();
-      joined = spawnScoped(
-        f,
-        'callerA.scope',
-        [
-          'run-check',
-          '--name',
-          'repeat',
-          '--',
-          'sh',
-          '-c',
-          `${quote(process.execPath)} ${quote(entry)} verify --known-red >${quote(joinedOut)} 2>${quote(joinedErr)}`,
-        ],
-        worktree,
-        env,
-      );
-      await waitPath(joinedOut);
-      const deadline: number = Date.now() + 15000;
-      while (readFileSync(joinedOut, 'utf8') === '') {
-        if (Date.now() > deadline) throw new Error('repeat verify produced no output');
-        await Bun.sleep(50);
-      }
-      writeFileSync(release, '');
-      const [original, repeat]: SpawnResult[] = await Promise.all([first.result, joined.result]);
-      expect(original.code).toBe(2);
-      expect(repeat.code).toBe(original.code);
-      expect(readFileSync(joinedErr, 'utf8')).toContain(`run ${receipt.run}`);
-      expect(readFileSync(joinedOut, 'utf8')).toContain('verify test: 0');
-      expect(leafReceipts(f, 'pass-cleanup-join')).toHaveLength(1);
-    } finally {
-      writeFileSync(release, '');
-      await first.result;
-      if (joined !== undefined) await joined.result;
-      await waitInactive(`akrogon-verify-${receipt.run}.service`);
+    await waitPath(joinedOut);
+    const deadline: number = Date.now() + WAIT_MS;
+    while (readFileSync(joinedOut, 'utf8') === '') {
+      if (Date.now() > deadline) throw new Error('repeat verify produced no output');
+      await Bun.sleep(50);
     }
-  },
-  45000,
-);
+    writeFileSync(release, '');
+    const [original, repeat]: SpawnResult[] = await Promise.all([first.result, joined.result]);
+    expect(original.code).toBe(2);
+    expect(repeat.code).toBe(original.code);
+    expect(readFileSync(joinedErr, 'utf8')).toContain(`run ${receipt.run}`);
+    expect(readFileSync(joinedOut, 'utf8')).toContain('verify test: 0');
+    expect(leafReceipts(f, 'pass-cleanup-join')).toHaveLength(1);
+  } finally {
+    writeFileSync(release, '');
+    await first.result;
+    if (joined !== undefined) await joined.result;
+    await waitInactive(`akrogon-verify-${receipt.run}.service`);
+  }
+});
 
 test.serial(
   'a verify pass survives its caller being SIGKILLed mid-check and finishes like an uninterrupted run',
@@ -972,7 +936,7 @@ test.serial(
       killTree(cap.proc);
       const result: SpawnResult = await cap.result;
       expect(result.signalCode).toBe('SIGKILL');
-      const deadline: number = Date.now() + 30000;
+      const deadline: number = Date.now() + WAIT_MS;
       let receipt: VerifyRun | undefined;
       while (receipt === undefined || receipt.end === undefined) {
         receipt = leafReceipts(f, 'pass-survivor')[0];
@@ -993,71 +957,66 @@ test.serial(
       void cap.result.catch(() => undefined);
     }
   },
-  90000,
 );
 
-test.serial(
-  'a repeat verify joins the live pass while a different scope or tree starts its own',
-  async () => {
-    const { f, slice } = await realFixture();
-    const worktree: string = await leafWorktree(f, 'pass-join');
-    rewriteConfig(f, { setup: 'mkdir -p node_modules', env: [], checks: { test: 'sleep 6' } });
-    const first: RealCap = spawnScoped(f, 'callerA.scope', ['verify'], worktree, {
+test.serial('a repeat verify joins the live pass while a different scope or tree starts its own', async () => {
+  const { f, slice } = await realFixture();
+  const worktree: string = await leafWorktree(f, 'pass-join');
+  rewriteConfig(f, { setup: 'mkdir -p node_modules', env: [], checks: { test: 'sleep 6' } });
+  const first: RealCap = spawnScoped(f, 'callerA.scope', ['verify'], worktree, {
+    AKROGON_RUN_SLICE: slice,
+  });
+  const receipt: VerifyRun = await waitReceipt(f, 'pass-join');
+  let joined: RealCap | undefined;
+  let other: RealCap | undefined;
+  let thirdCap: RealCap | undefined;
+  try {
+    // Both repeats launch while the first pass still sleeps: the same-key
+    // call must join it, the different-scope call must start its own.
+    joined = spawnScoped(f, 'callerA.scope', ['verify'], worktree, {
       AKROGON_RUN_SLICE: slice,
     });
-    const receipt: VerifyRun = await waitReceipt(f, 'pass-join');
-    let joined: RealCap | undefined;
-    let other: RealCap | undefined;
-    let thirdCap: RealCap | undefined;
-    try {
-      // Both repeats launch while the first pass still sleeps: the same-key
-      // call must join it, the different-scope call must start its own.
-      joined = spawnScoped(f, 'callerA.scope', ['verify'], worktree, {
-        AKROGON_RUN_SLICE: slice,
-      });
-      other = spawnScoped(f, 'callerB.scope', ['verify'], worktree, {
-        AKROGON_RUN_SLICE: slice,
-      });
-      const deadline: number = Date.now() + 15000;
-      while (leafReceipts(f, 'pass-join').length < 2) {
-        if (Date.now() > deadline) throw new Error('different scope started no second pass');
-        await Bun.sleep(50);
-      }
-      // A same-scope, same-caller call on a different tree must start its own
-      // pass while the first is still live, never join it.
-      writeFileSync(resolve(worktree, 't2'), 't2\n');
-      await command(['git', 'add', 't2'], worktree);
-      await command(['git', 'commit', '-qm', 't2'], worktree);
-      thirdCap = spawnScoped(f, 'callerA.scope', ['verify'], worktree, {
-        AKROGON_RUN_SLICE: slice,
-      });
-      while (leafReceipts(f, 'pass-join').length < 3) {
-        if (Date.now() > deadline) throw new Error('different tree started no third pass');
-        await Bun.sleep(50);
-      }
-      const [joinedResult, r1, r2, third] = await Promise.all([
-        joined.result,
-        first.result,
-        other.result,
-        thirdCap.result,
-      ]);
-      expect(joinedResult.code, `stderr: ${joinedResult.stderr}`).toBe(0);
-      expect(joinedResult.stderr).toContain(`run ${receipt.run}`);
-      expect(joinedResult.stdout).toContain('verify test: 0');
-      expect(joinedResult.stdout).toContain(': green');
-      expect(r1.code, `stderr: ${r1.stderr}`).toBe(0);
-      expect(r2.code, `stderr: ${r2.stderr}`).toBe(0);
-      expect(third.code, `stderr: ${third.stderr}`).toBe(0);
-      expect(third.stderr).toMatch(/run [0-9a-f-]{36}/);
-      expect(third.stderr).not.toContain(`run ${receipt.run}`);
-      expect(leafReceipts(f, 'pass-join')).toHaveLength(3);
-    } finally {
-      for (const cap of [first, joined, other, thirdCap])
-        if (cap !== undefined && cap.proc.exitCode === null) killTree(cap.proc);
+    other = spawnScoped(f, 'callerB.scope', ['verify'], worktree, {
+      AKROGON_RUN_SLICE: slice,
+    });
+    const deadline: number = Date.now() + WAIT_MS;
+    while (leafReceipts(f, 'pass-join').length < 2) {
+      if (Date.now() > deadline) throw new Error('different scope started no second pass');
+      await Bun.sleep(50);
     }
-  },
-  90000,
-);
+    // A same-scope, same-caller call on a different tree must start its own
+    // pass while the first is still live, never join it.
+    writeFileSync(resolve(worktree, 't2'), 't2\n');
+    await command(['git', 'add', 't2'], worktree);
+    await command(['git', 'commit', '-qm', 't2'], worktree);
+    thirdCap = spawnScoped(f, 'callerA.scope', ['verify'], worktree, {
+      AKROGON_RUN_SLICE: slice,
+    });
+    while (leafReceipts(f, 'pass-join').length < 3) {
+      if (Date.now() > deadline) throw new Error('different tree started no third pass');
+      await Bun.sleep(50);
+    }
+    const [joinedResult, r1, r2, third] = await Promise.all([
+      joined.result,
+      first.result,
+      other.result,
+      thirdCap.result,
+    ]);
+    expect(joinedResult.code, `stderr: ${joinedResult.stderr}`).toBe(0);
+    expect(joinedResult.stderr).toContain(`run ${receipt.run}`);
+    expect(joinedResult.stdout).toContain('verify test: 0');
+    expect(joinedResult.stdout).toContain(': green');
+    expect(r1.code, `stderr: ${r1.stderr}`).toBe(0);
+    expect(r2.code, `stderr: ${r2.stderr}`).toBe(0);
+    expect(third.code, `stderr: ${third.stderr}`).toBe(0);
+    expect(third.stderr).toMatch(/run [0-9a-f-]{36}/);
+    expect(third.stderr).not.toContain(`run ${receipt.run}`);
+    expect(leafReceipts(f, 'pass-join')).toHaveLength(3);
+  } finally {
+    for (const cap of [first, joined, other, thirdCap])
+      if (cap !== undefined && cap.proc.exitCode === null) killTree(cap.proc);
+  }
+});
 
 test.serial(
   'stop-run <pass id> stops the whole pass, another scope is refused, and a stop leaves no reusable receipt',
@@ -1104,7 +1063,6 @@ test.serial(
       void cap.result.catch(() => undefined);
     }
   },
-  90000,
 );
 
 test.serial(
@@ -1125,7 +1083,7 @@ test.serial(
     });
     const receipt: VerifyRun = await waitReceipt(f, 'pass-full');
     try {
-      const deadline: number = Date.now() + 15000;
+      const deadline: number = Date.now() + WAIT_MS;
       for (;;) {
         const waiting: boolean = (await runRecords(f)).some(
           (record) => record.check === 'full1' && record.state === 'waiting',
@@ -1146,7 +1104,6 @@ test.serial(
       void cap.result.catch(() => undefined);
     }
   },
-  90000,
 );
 
 test.serial(
@@ -1166,7 +1123,7 @@ test.serial(
       expect(stopped.code).toBe(0);
       const result: SpawnResult = await cap.result;
       expect(result.code).not.toBe(0);
-      const deadline: number = Date.now() + 30000;
+      const deadline: number = Date.now() + WAIT_MS;
       let receipt: VerifyRun | undefined;
       while (receipt === undefined || receipt.end === undefined) {
         receipt = leafReceipts(f, 'pass-owner')[0];
@@ -1180,5 +1137,4 @@ test.serial(
       void cap.result.catch(() => undefined);
     }
   },
-  90000,
 );

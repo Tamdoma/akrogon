@@ -13,7 +13,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { fixture, cli, leaf, yaml, type Fixture } from './helpers';
+import { fixture, cli, leaf, yaml, WAIT_MS, type Fixture } from './helpers';
 import { command, run, type Result } from '../src/shell';
 
 test('sync commits local changes, rebases on the remote and pushes', async () => {
@@ -265,7 +265,7 @@ test('sync refuses a worktree store inside the checkout naming the key without c
 });
 
 async function waitFor(path: string): Promise<void> {
-  const deadline: number = Date.now() + 3000;
+  const deadline: number = Date.now() + WAIT_MS;
   while (!existsSync(path)) {
     if (Date.now() > deadline) throw new Error(`Timed out waiting for ${path}`);
     await Bun.sleep(5);

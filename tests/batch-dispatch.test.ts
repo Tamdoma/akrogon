@@ -132,7 +132,7 @@ test('the holder gets a batch record rebased onto the remote and nothing is prom
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('an interrupted build is discarded and rebuilt under a new attempt', async () => {
   const f: DispatchFixture = await dispatchFixture();
@@ -163,7 +163,7 @@ test('an interrupted build is discarded and rebuilt under a new attempt', async 
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('the pass that releases a merged holder batch cleans up the holder in the same invocation', async () => {
   const f: DispatchFixture = await dispatchFixture({ window: 'open' });
@@ -201,7 +201,7 @@ test('the pass that releases a merged holder batch cleans up the holder in the s
     adopting();
     await f.clean();
   }
-}, 25000);
+});
 
 test('the releasing pass leaves a merged holder fully cleaned for the next pass', async () => {
   const f: DispatchFixture = await dispatchFixture();
@@ -251,7 +251,7 @@ test('the releasing pass leaves a merged holder fully cleaned for the next pass'
   } finally {
     await f.clean();
   }
-}, 25000);
+});
 
 test('a failed holder with a landed candidate is told to move back, then reconciles without run or push', async () => {
   const f: DispatchFixture = await dispatchFixture();
@@ -284,7 +284,7 @@ test('a failed holder with a landed candidate is told to move back, then reconci
   } finally {
     await f.clean();
   }
-}, 20000);
+});
 
 test('a failed holder with no candidate is rebuilt on the new base, never rerun on its stale attempt', async () => {
   const f: DispatchFixture = await dispatchFixture();
@@ -324,7 +324,7 @@ test('a failed holder with no candidate is rebuilt on the new base, never rerun 
   } finally {
     await f.clean();
   }
-}, 25000);
+});
 
 test('a fetch failure keeps the record, moves nothing and reports the error', async () => {
   const f: DispatchFixture = await dispatchFixture();
@@ -349,7 +349,7 @@ test('a fetch failure keeps the record, moves nothing and reports the error', as
   } finally {
     await f.clean();
   }
-}, 20000);
+});
 
 test('cleanup retains a merged holder worktree while publication recovery is blocked', async () => {
   const f: DispatchFixture = await dispatchFixture();
@@ -398,7 +398,7 @@ test('a failed published holder receives one recovery notice across repeated pas
   } finally {
     await f.clean();
   }
-}, 20000);
+});
 
 test('a dirty holder worktree exits to check.repair and keeps its branch and edit', async () => {
   const f: DispatchFixture = await dispatchFixture();
@@ -421,7 +421,7 @@ test('a dirty holder worktree exits to check.repair and keeps its branch and edi
   } finally {
     await f.clean();
   }
-}, 15000);
+});
 
 test('a refused check.fix keeps the holder-seat commit on the branch', async () => {
   const f: DispatchFixture = await dispatchFixture();
@@ -579,7 +579,7 @@ test('a waiting leaf stays out of the holder turn and lands in its own turn', as
   } finally {
     await f.clean();
   }
-}, 30000);
+});
 
 test('a red verify with another leaf waiting exits the holder to check.repair', async () => {
   const f: DispatchFixture = await dispatchFixture();
@@ -617,7 +617,7 @@ test('a red verify with another leaf waiting exits the holder to check.repair', 
   } finally {
     await f.clean();
   }
-}, 30000);
+});
 
 test('a refused push restacks only the holder while another leaf waits', async () => {
   const f: DispatchFixture = await dispatchFixture();
@@ -661,7 +661,7 @@ test('a refused push restacks only the holder while another leaf waits', async (
   } finally {
     await f.clean();
   }
-}, 30000);
+});
 
 test('a push reported lost but landed moves only the holder to merged once', async () => {
   const f: DispatchFixture = await dispatchFixture();
@@ -711,4 +711,4 @@ exec "${git}" "$@"
   } finally {
     await f.clean();
   }
-}, 30000);
+});

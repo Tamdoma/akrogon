@@ -12,6 +12,7 @@ import {
   leaf,
   leafTempRoot,
   yaml,
+  WAIT_MS,
   type Fixture,
   type SystemctlFixture,
 } from './helpers';
@@ -508,7 +509,7 @@ test('race A: pause recorded before the locked merge section suppresses the laun
       },
     );
     child.current = spawned.child;
-    await waitFor(resolve(barrier, 'entered'), 15000);
+    await waitFor(resolve(barrier, 'entered'), WAIT_MS);
     const paused: Result = await cli(f, ['pause']);
     expect(paused.code).toBe(0);
     expect(Object.keys(Bun.YAML.parse(readFileSync(resolve(f.home, 'paused.yaml'), 'utf8')) as object)).toEqual([
@@ -555,7 +556,7 @@ test('race B: pause waits for a held launch lock, later automatic work is suppre
       stderr: 'pipe',
     });
     procs.push(pass);
-    await waitFor(resolve(barrier, 'entered'), 15000);
+    await waitFor(resolve(barrier, 'entered'), WAIT_MS);
     const pausing = Bun.spawn([process.execPath, entry, 'pause'], {
       cwd: f.root,
       env: cliEnv(f, {}),
@@ -654,7 +655,7 @@ test('a freed slot starts the longest capacity waiter across repos, skipping one
   } finally {
     await f.clean();
   }
-}, 60000);
+});
 
 test('a freed slot starts the leaf that has waited longest on capacity, never a leaf never refused', async () => {
   const f: DispatchFixture = await hcFixture();
@@ -676,7 +677,7 @@ test('a freed slot starts the leaf that has waited longest on capacity, never a 
   } finally {
     await f.clean();
   }
-}, 60000);
+});
 
 test('a restarted stopped leaf queues behind an older capacity waiter', async () => {
   const f: DispatchFixture = await hcFixture();
@@ -708,7 +709,7 @@ test('a restarted stopped leaf queues behind an older capacity waiter', async ()
   } finally {
     await f.clean();
   }
-}, 60000);
+});
 
 test('unpause refills a slot freed while the repo was paused', async () => {
   const f: DispatchFixture = await hcFixture();
@@ -734,7 +735,7 @@ test('unpause refills a slot freed while the repo was paused', async () => {
   } finally {
     await f.clean();
   }
-}, 60000);
+});
 
 test('the older capacity waiter wins even in the repo visited later', async () => {
   const f: DispatchFixture = await hcFixture({ occupiedPrefix: 'yp' });
@@ -758,7 +759,7 @@ test('the older capacity waiter wins even in the repo visited later', async () =
   } finally {
     await f.clean();
   }
-}, 60000);
+});
 
 test("unpause gives a freed slot to another repo's older waiter", async () => {
   const f: DispatchFixture = await hcFixture({ occupiedPrefix: 'yp' });
@@ -782,7 +783,7 @@ test("unpause gives a freed slot to another repo's older waiter", async () => {
   } finally {
     await f.clean();
   }
-}, 60000);
+});
 
 test('a refused seat stays a manual failure and never joins the refill', async () => {
   const f: DispatchFixture = await hcFixture();
@@ -798,4 +799,4 @@ test('a refused seat stays a manual failure and never joins the refill', async (
   } finally {
     await f.clean();
   }
-}, 60000);
+});

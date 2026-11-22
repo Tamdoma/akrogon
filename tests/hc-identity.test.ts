@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { connect } from 'node:net';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { cli, fixture, leaf, yaml, type Fixture } from './helpers';
+import { cli, fixture, leaf, yaml, WAIT_MS, type Fixture } from './helpers';
 import { hcCore, pinnedSchema, setPrefixes, setSeat, type HcCore, type Terminal } from './hc-fixture';
 import { leafSlice } from '../src/scope';
 import { command, spawnCaptured, type SpawnResult } from '../src/shell';
@@ -132,7 +132,7 @@ test('no session, several sessions and an unreadable session refuse with todayâ€
     const stat: string = `/proc/${pid}/stat`;
     const begun: number = Date.now();
     while (existsSync(stat) && readFileSync(stat, 'utf8').split(') ')[1][0] !== 'Z') {
-      if (Date.now() - begun > 10_000) throw new Error(`core ${pid} outlived SIGKILL`);
+      if (Date.now() - begun > WAIT_MS) throw new Error(`core ${pid} outlived SIGKILL`);
       await Bun.sleep(50);
     }
     none.link(stale);

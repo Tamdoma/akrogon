@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { spawnCaptured, command, type SpawnResult } from '../src/shell';
 import { withAdmissionLock } from '../src/admission';
 import { TIMING_USAGE } from '../src/usage';
+import { WAIT_MS } from './helpers';
 
 const worktreeRoot: string = resolve(import.meta.dir, '..');
 const tempDirs: Set<string> = new Set();
@@ -54,7 +55,7 @@ async function cli(
   return spawnCaptured([process.execPath, resolve(root, 'src/akrogon.ts'), ...args], {
     cwd,
     env: { ...rest, HOME: home, ...env },
-    timeout: 30000,
+    timeout: WAIT_MS,
     killSignal: 'SIGKILL',
   });
 }
@@ -316,7 +317,7 @@ test('an already-running command that admits a nested checked run defers cutover
   );
   try {
     // Wait until the outer run's admission record exists in the tool root.
-    const deadline: number = Date.now() + 10000;
+    const deadline: number = Date.now() + WAIT_MS;
     while (Date.now() < deadline && readdirSync(runsDir).filter((n) => n.endsWith('.yaml')).length < 2)
       await new Promise((r) => setTimeout(r, 50));
     rmSync(seed);
@@ -360,7 +361,7 @@ test('an already-running command that admits a nested checked run defers cutover
     root,
   );
   expect(stray.trim()).toBe('');
-}, 30000);
+});
 
 test('an explicit empty state home keeps using the tool root while cutover is deferred', async () => {
   const home: string = temp();
@@ -396,7 +397,7 @@ test('cutover takes the global lock and waits for an in-flight admission even wh
   });
   const mainLock: string = resolve(root, '.lock');
   try {
-    const deadline: number = Date.now() + 5000;
+    const deadline: number = Date.now() + WAIT_MS;
     while (!existsSync(mainLock) && !finished && Date.now() < deadline) await Bun.sleep(10);
     expect(existsSync(mainLock)).toBe(true);
     const competing: SpawnResult = await spawnCaptured(['flock', '-n', mainLock, 'true'], { cwd: home });

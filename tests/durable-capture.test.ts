@@ -11,7 +11,7 @@ import {
 } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { command, spawnFiles, finishCaptured, type Result, type SpawnResult } from '../src/shell';
-import { fixture, cli, entry, leaf, yaml, procFixture, leafTempRoot, holding, type Fixture } from './helpers';
+import { fixture, cli, entry, leaf, yaml, procFixture, leafTempRoot, holding, WAIT_MS, type Fixture } from './helpers';
 import type { Captured } from '../src/shell';
 import { hcFixture, type HcFixture } from './hc-fixture';
 
@@ -43,7 +43,7 @@ function captures(dir: string): { out: string; err: string }[] {
     .map((name) => ({ out: join(dir, name), err: join(dir, name.replace(/-out\.log$/, '-err.log')) }));
 }
 
-async function waitFor(check: () => boolean, label: string, ms: number = 15000): Promise<void> {
+async function waitFor(check: () => boolean, label: string, ms: number = WAIT_MS): Promise<void> {
   const begun: number = Date.now();
   while (!check()) {
     if (Date.now() - begun > ms) throw new Error(`Timed out waiting for ${label}`);
@@ -122,7 +122,7 @@ test('a SIGKILLed run-check leaves both streams in holder capture files after re
   } finally {
     await f.clean();
   }
-}, 45000);
+});
 
 test('a SIGKILLed nested run-check leaves its captures in its own holder after reconcile', async () => {
   const f: Fixture = await fixture();
@@ -207,7 +207,7 @@ test('a SIGKILLed nested run-check leaves its captures in its own holder after r
   } finally {
     f.clean();
   }
-}, 45000);
+});
 
 test('a normal exit leaves exactly the combined check log in the holder', async () => {
   const f: Fixture = await fixture();
@@ -247,7 +247,7 @@ test('a normal exit leaves exactly the combined check log in the holder', async 
   } finally {
     f.clean();
   }
-}, 45000);
+});
 
 test('an owner moved aside at publication keeps output in the run root and never recreates the owner', async () => {
   const f: Fixture = await fixture();
@@ -285,7 +285,7 @@ test('an owner moved aside at publication keeps output in the run root and never
   } finally {
     f.clean();
   }
-}, 45000);
+});
 
 test('a pack started during a live capture waits for writers and publication, then akrogon log reads both streams', async () => {
   const f: Fixture = await fixture();
@@ -341,4 +341,4 @@ test('a pack started during a live capture waits for writers and publication, th
   } finally {
     f.clean();
   }
-}, 60000);
+});
