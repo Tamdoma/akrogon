@@ -367,9 +367,9 @@ export function findLeaf(repo: Repo, slug: string): Leaf {
 }
 
 // Git lists every registered worktree inside add and remove and dies when a concurrent remove
-// deletes an entry mid-listing, so both run under this repo-wide lock.
+// deletes an entry mid-listing, so both run under this lock in the common directory every checkout shares.
 export async function worktreeLock(root: string): Promise<string> {
-  return resolve(root, await command(['git', 'rev-parse', '--git-path', 'akrogon-worktree.lock'], root));
+  return resolve(root, await command(['git', 'rev-parse', '--git-common-dir'], root), 'akrogon-worktree.lock');
 }
 
 export async function withLock<T>(

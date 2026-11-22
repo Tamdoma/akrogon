@@ -13,8 +13,10 @@ const real: Bun.SyncSubprocess<'pipe', 'inherit'> = Bun.spawnSync(
   [z.string().parse(process.env.OWN_SLICES_SYSTEMCTL), ...args],
   { stdout: 'pipe', stderr: 'inherit' },
 );
-if (!args.includes('list-units') || !args.includes('akrogon-l*.slice') || real.exitCode !== 0) {
+if (!args.includes('list-units') || !args.includes('akrogon-l*.slice') || !real.success) {
   process.stdout.write(real.stdout);
+  // A signaled systemctl dies by the same signal here, never reading as exit 0.
+  if (real.signalCode !== undefined) process.kill(process.pid, real.signalCode);
   process.exit(real.exitCode);
 }
 const folders = (dir: string): string[] =>
