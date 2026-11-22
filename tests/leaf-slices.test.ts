@@ -174,6 +174,8 @@ test('a shell run admitted while another slice stops protects its own slice', as
 
 async function slicesFixture(window: 'open' | 'closed' = 'closed'): Promise<SliceFixture> {
   const f: HcFixture = await hcFixture({ window });
+  mkdirSync(resolve(f.home, 'own-slices-bin'));
+  symlinkSync(resolve(import.meta.dir, 'own-slices-systemctl.ts'), resolve(f.home, 'own-slices-bin/systemctl'));
   // The fake /proc root the fake herdr env used to set: reconcile sees no process inside a worktree or temp.
   return { ...f, env: { ...f.env, AKROGON_PROC_ROOT: procRoot(f) } };
 }
@@ -208,8 +210,12 @@ function realEnv(f: SliceFixture, env: NodeJS.ProcessEnv = {}): NodeJS.ProcessEn
   return {
     ...process.env,
     ...f.env,
-    // The real systemctl: these cases use unique slugs, so their real slices collide with no other case.
-    PATH: f.core.env.PATH,
+    // The real systemctl, listing only this case's leaf slices: these cases use unique slugs, so their
+    // real slices collide with no other case.
+    PATH: `${resolve(f.home, 'own-slices-bin')}:${f.core.env.PATH}`,
+    OWN_SLICES_SYSTEMCTL: z.string().parse(Bun.which('systemctl', { PATH: f.core.env.PATH })),
+    OWN_SLICES_REPO: f.repo,
+    OWN_SLICES_ROOT: f.root,
     AKROGON_HOME: f.home,
     HERDR_PANE_ID: '',
     HOME: f.home,
