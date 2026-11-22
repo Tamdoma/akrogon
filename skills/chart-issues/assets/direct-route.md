@@ -4,7 +4,7 @@ Read when the direct route is chosen.
 
 Protocol, using the shapes in [shapes.md](shapes.md):
 
-1. Attempt start: choose a slug, create the worktree with `git worktree add --lock --reason "<chart-folder> direct" <worktree_store>/<slug>` on branch `<slug>` from the destination's default branch, and write the `Direct attempt` section with the slug recorded.
+1. Attempt start: choose a slug, create the worktree sparse, with no `issues/` folder, by running `git worktree add --lock --reason "<chart-folder> direct" --no-checkout -b <slug> <worktree_store>/<slug> <base>` with `<base>` the destination's default branch, then `git -C <worktree_store>/<slug> sparse-checkout set --no-cone '/*' '!/issues/'`, then `git -C <worktree_store>/<slug> checkout`, and write the `Direct attempt` section with the slug recorded.
 2. Implement: the door itself runs `implement-issue direct chart=<chart-folder> worktree=<path>`, which writes `<chart>/direct/plan.md` and `<chart>/direct/report.md`.
 3. B review: `hc send --json <B address> "check-issue direct slot=B chart=<chart-folder> worktree=<path> base=<sha> head=<sha> out=<chart>/slots/review-B-<n>.md. When the review file is written, run: hc send <door address> 'done B: <out path>'"`, with `n` = 1 for the initial review and the exact path named, sent only while B's last status under the asking rule in [questions.md](questions.md) is `idle` or `done`, and the door collects the review by that report and the out file under the exchange rules in [questions.md](questions.md). The Fix/Nit bar and verdict rules are check-issue's.
 4. Repair rounds per the bound below.
