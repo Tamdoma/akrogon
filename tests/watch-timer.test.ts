@@ -100,7 +100,8 @@ const tickLines = (rig: Rig, due: number | null = null): string[] =>
   );
 
 // A wrapper `akrogon` ahead of the real one: logs each call (argv, hc turn), holds a `status` call
-// while <flags>/hold-status exists, then forwards to the checkout's akrogon with fixture env.
+// while <flags>/hold-status exists (logging `held status n=<status calls before it>`), then
+// forwards to the checkout's akrogon with fixture env.
 function logbin(f: HcFixture, flags: string): { bin: string; calls: string } {
   const bin: string = resolve(f.home, 'watch-logbin');
   const calls: string = resolve(f.home, 'watch-calls.log');
@@ -121,6 +122,7 @@ function logbin(f: HcFixture, flags: string): { bin: string; calls: string } {
     resolve(bin, 'akrogon'),
     `#!/bin/sh
 if [ "$1" = "status" ] && [ -f '${flags}/hold-status' ]; then
+  echo "held status n=$(grep -c '^call status' '${calls}')" >> '${calls}'
   sleep "$(cat '${flags}/hold-status')"
   rm -f '${flags}/hold-status'
 fi
@@ -216,6 +218,34 @@ async function waitLabel(rig: Rig, due: number, ms: number = WAIT_MS): Promise<v
   }
   throw new Error(`receipt due=${due} missing: ${JSON.stringify(await get(rig.core, rig.timer))}`);
 }
+
+// At least n checks have called status (the start check's is the first). Dues keep running,
+// so later tick checks may already have run too.
+async function waitChecks(rig: Rig, n: number, ms: number = WAIT_MS): Promise<void> {
+  const deadline: number = Date.now() + ms;
+  while (Date.now() < deadline && statusCalls(rig) < n) await Bun.sleep(200);
+  expect(statusCalls(rig)).toBeGreaterThanOrEqual(n);
+}
+
+// Status call n is the n-th accepted tick's check (call 0 is the start check's), so the held
+// call names the delivered tick that took the hold. Returns its due and the next one delivered.
+async function heldPair(rig: Rig, ms: number = WAIT_MS): Promise<[number, number]> {
+  const deadline: number = Date.now() + ms;
+  while (Date.now() < deadline) {
+    const held: string | undefined = calls(rig).find((l) => l.startsWith('held status n='));
+    const delivered: number[] = tickLines(rig).map((line: string) => Number(/due=(\d+)/.exec(line)?.[1]));
+    const k: number = Number(held?.slice('held status n='.length));
+    if (held !== undefined && delivered.length > k) return [delivered[k - 1], delivered[k]];
+    await Bun.sleep(200);
+  }
+  throw new Error(
+    `no tick after the held one: calls=${JSON.stringify(calls(rig))} tasks=${JSON.stringify(tasks(rig))}`,
+  );
+}
+
+// The due numbers sent on the timer screen, in order.
+const sentDues = async (rig: Rig): Promise<number[]> =>
+  [...(await screenOf(rig.core, rig.timer)).matchAll(/due=(\d+) sent/g)].map((match) => Number(match[1]));
 
 async function waitGone(core: HcCore, address: string, ms: number = WAIT_MS): Promise<void> {
   const deadline: number = Date.now() + ms;
@@ -1026,27 +1056,18 @@ test.serial('dues queued behind a busy watcher coalesce to the latest boundary',
   try {
     const rig: Rig = await watchUp(f);
     rig.timer = await started(rig);
-    // The hold must grab due 1's check call: it is written once the start check's status call
-    // has run, so the next status call — due 1's — is the one that sleeps.
-    for (let n: number = 0; n < 50 && statusCalls(rig) < 1; n += 1) await Bun.sleep(200);
-    expect(statusCalls(rig)).toBe(1); // the start check's status call
+    // Armed after the start check's status call, the hold grabs whichever tick's check runs
+    // next; due numbers depend on host speed, so the test reads which tick that was.
+    await waitChecks(rig, 1);
     writeFileSync(resolve(rig.flags, 'hold-status'), '6');
-    await waitTick(rig, 1);
-    // dues 2, 3 and 4 accrue while the watcher is busy. The timer must not queue them all.
-    await waitLabel(rig, 1);
-    await Bun.sleep(7500);
-    // The check ends; the held dues collapse into one send carrying the newest due number.
-    const deadline: number = Date.now() + WAIT_MS;
-    while (Date.now() < deadline && tickLines(rig, 4).length === 0) await Bun.sleep(200);
-    expect(tickLines(rig, 4)).toHaveLength(1);
-    expect(tickLines(rig, 2)).toHaveLength(0);
-    expect(tickLines(rig, 3)).toHaveLength(0);
+    // The held check keeps the watcher busy at least 6 s past its due's boundary, three more
+    // boundaries; they collapse into one send carrying the newest due number.
+    const [head, coalesced]: [number, number] = await heldPair(rig);
+    expect(coalesced).toBeGreaterThanOrEqual(head + 3);
     // The coalesced due receipts and runs its own check, like any accepted due.
-    await waitLabel(rig, 4);
-    const screen: string = await screenOf(f.core, rig.timer);
-    expect(screen).toContain('due=4 sent');
-    expect(screen).not.toContain('due=2 sent');
-    expect(screen).not.toContain('due=3 sent');
+    await waitLabel(rig, coalesced);
+    const sent: number[] = await sentDues(rig);
+    expect(sent.slice(sent.indexOf(head), sent.indexOf(head) + 2)).toEqual([head, coalesced]);
   } finally {
     await f.clean();
   }
