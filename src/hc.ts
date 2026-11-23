@@ -355,29 +355,71 @@ export type HcLine =
   | { method: 'event'; params: { type: string; terminal: string; seq: number; data: Record<string, unknown> | null } }
   | { method: 'event'; params: { type: 'doc'; seq: number; data: { name: string; version: number } } };
 
-const lineSchema = z.union([
-  z.object({ terminals: z.array(terminalSchema) }),
-  z.object({
-    method: z.literal('event'),
-    params: z.object({
-      type: z.string(),
-      terminal: z.string(),
-      seq: z.number().int(),
-      data: z.record(z.string(), z.unknown()).nullable(),
-    }),
+const snapshotSchema = z.object({ terminals: z.array(terminalSchema) });
+const terminalEventSchema = z.object({
+  method: z.literal('event'),
+  params: z.object({
+    type: z.string(),
+    terminal: z.string(),
+    seq: z.number().int(),
+    data: z.record(z.string(), z.unknown()).nullable(),
   }),
-  z.object({
-    method: z.literal('event'),
-    params: z.object({
-      type: z.literal('doc'),
-      seq: z.number().int(),
-      data: z.object({ name: z.string(), version: z.number().int() }),
-    }),
+});
+const docEventSchema = z.object({
+  method: z.literal('event'),
+  params: z.object({
+    type: z.literal('doc'),
+    seq: z.number().int(),
+    data: z.object({ name: z.string(), version: z.number().int() }),
   }),
+});
+
+export type HcMessage = { snapshot: unknown } | { event: unknown; type: string } | null;
+
+// One reader per event stream. hc's own discriminators classify a line: the subscribe reply carries no
+// method and `missed` (sent to a subscriber that fell behind) carries a fresh snapshot in its params;
+// `event` is a fact change of a type. Kinds and event types the caller does not read (heartbeats,
+// notifications or event types a newer hc adds) are null, and so is an event whose seq is not above the
+// latest snapshot's: hc's contract says the snapshot already covers it.
+export function hcReader(types: ReadonlySet<string>): (message: unknown) => HcMessage {
+  let covered: number = -1;
+  return (message: unknown): HcMessage => {
+    const { method, params } = z
+      .object({ method: z.string().optional(), params: z.unknown().optional() })
+      .parse(message);
+    if (method === undefined || method === 'missed') {
+      const snapshot: unknown = method === undefined ? message : params;
+      covered = z.object({ seq: z.number().int() }).parse(snapshot).seq;
+      return { snapshot };
+    }
+    if (method !== 'event') return null;
+    const { type } = z.object({ type: z.string() }).parse(params);
+    if (!types.has(type)) return null;
+    return z.object({ seq: z.number().int() }).parse(params).seq > covered ? { event: message, type } : null;
+  };
+}
+
+// The event types akrogon reads: doc, merged() below and the listener's wakes (src/listen.ts).
+const eventTypes: ReadonlySet<string> = new Set([
+  'doc',
+  'created',
+  'status',
+  'turn',
+  'labels',
+  'foreground',
+  'finished',
+  'lost',
 ]);
 
-// An idle stream carries heartbeat lines; they hold no fact.
-const heartbeatSchema = z.object({ method: z.literal('heartbeat') });
+// A kind or event type akrogon reads parses strictly; any other holds no fact akrogon reads and is
+// skipped (null).
+function lineOf(
+  read: HcMessage,
+): z.infer<typeof snapshotSchema> | z.infer<typeof terminalEventSchema> | z.infer<typeof docEventSchema> | null {
+  if (read === null) return null;
+  if ('snapshot' in read) return snapshotSchema.parse(read.snapshot);
+  return read.type === 'doc' ? docEventSchema.parse(read.event) : terminalEventSchema.parse(read.event);
+}
 
 export function follow(
   session: string,
@@ -390,14 +432,14 @@ export function follow(
   const ended: Promise<void> = (async (): Promise<void> => {
     const decoder: TextDecoder = new TextDecoder();
     let buffer: string = '';
+    const read = hcReader(eventTypes);
     for await (const chunk of child.stdout) {
       buffer += decoder.decode(chunk, { stream: true });
       const lines: string[] = buffer.split('\n');
       buffer = lines.pop() ?? '';
       for (const line of lines.filter((l: string) => l.trim() !== '')) {
-        const message: unknown = JSON.parse(line);
-        if (heartbeatSchema.safeParse(message).success) continue;
-        const parsed = lineSchema.parse(message);
+        const parsed = lineOf(read(JSON.parse(line)));
+        if (parsed === null) continue;
         await onEvent(
           'terminals' in parsed ? { terminals: parsed.terminals.map((t: Terminal) => seen(session, t)) } : parsed,
         );

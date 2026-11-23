@@ -10,6 +10,7 @@ import { connect } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { spawnCaptured, type SpawnResult } from '../src/shell';
+import { hcReader } from '../src/hc';
 import { fixture, procRoot, WAIT_MS, type Fixture, type SystemctlFixture } from './helpers';
 import { afterAll } from 'bun:test';
 import './isolation';
@@ -291,13 +292,15 @@ export async function hcCore(
       };
       (async () => {
         let buffer: string = '';
+        const reader = hcReader(new Set(['status', 'turn']));
         for await (const chunk of child.stdout) {
           buffer += new TextDecoder().decode(chunk);
           const lines: string[] = buffer.split('\n');
           buffer = lines.pop() ?? '';
           for (const line of lines.filter((l) => l.trim() !== '')) {
-            const message = z.record(z.string(), z.unknown()).parse(JSON.parse(line));
-            if (message.method === 'heartbeat') continue;
+            const read = reader(JSON.parse(line));
+            if (read === null) continue;
+            const message = z.record(z.string(), z.unknown()).parse('snapshot' in read ? read.snapshot : read.event);
             if (Array.isArray(message.terminals)) current = z.array(terminalSchema).parse(message.terminals)[0] ?? null;
             else if (current !== null) {
               const params = z

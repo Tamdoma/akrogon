@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { cli, fixture, WAIT_MS, type Fixture } from './helpers';
 import { hcCore, type HcCore, type Terminal, stopCoresAfterFile } from './hc-fixture';
 import { spawnCaptured, type SpawnResult } from '../src/shell';
+import { hcReader } from '../src/hc';
 
 stopCoresAfterFile();
 
@@ -99,20 +100,21 @@ async function foreground(core: HcCore, door: Door, until: (argv: string[] | nul
   const timer = setTimeout(() => child.kill(), WAIT_MS);
   const fg = z.object({ argv: z.array(z.string()) }).nullable();
   let buffer: string = '';
+  const reader = hcReader(new Set(['foreground']));
   let reached: boolean = false;
   for await (const chunk of child.stdout) {
     buffer += new TextDecoder().decode(chunk);
     const lines: string[] = buffer.split('\n');
     buffer = lines.pop() ?? '';
     for (const line of lines.filter((l: string) => l.trim() !== '')) {
-      const json = z.object({ method: z.string().optional() }).passthrough().parse(JSON.parse(line));
-      if (json.method === 'heartbeat') continue;
+      const read = reader(JSON.parse(line));
+      if (read === null) continue;
       const message = z
         .object({
           terminals: z.array(z.object({ foreground: fg.optional() })).optional(),
           params: z.object({ type: z.string(), data: z.unknown() }).optional(),
         })
-        .parse(json);
+        .parse('snapshot' in read ? read.snapshot : read.event);
       const argv: string[] | null | undefined =
         message.terminals !== undefined
           ? (message.terminals[0]?.foreground?.argv ?? null)

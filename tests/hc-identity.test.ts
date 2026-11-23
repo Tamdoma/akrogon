@@ -10,7 +10,7 @@ import { cli, fixture, leaf, yaml, WAIT_MS, type Fixture } from './helpers';
 import { hcCore, setPrefixes, setSeat, type HcCore, type Terminal, stopCoresAfterFile } from './hc-fixture';
 import { leafSlice } from '../src/scope';
 import { command, spawnCaptured, type SpawnResult } from '../src/shell';
-import { GONE_CODES, sessions } from '../src/hc';
+import { GONE_CODES, hcReader, sessions } from '../src/hc';
 import { readState } from '../src/state';
 
 stopCoresAfterFile();
@@ -179,6 +179,87 @@ test('dispatch refuses a repo without a prefix and init refuses a duplicate pref
   } finally {
     await core.stop();
     f.clean();
+  }
+});
+
+// hc evolves on its own release cadence: a line kind or event type akrogon does not read (a heartbeat, a
+// notification or event type a newer hc adds) is skipped, `missed` delivers its fresh snapshot and drops
+// the stale events it already covers, and a malformed line of a kind akrogon reads still fails the stream.
+test('the event stream skips line kinds it does not read and still rejects a malformed terminal event', async () => {
+  const dir: string = mkdtempSync(resolve(tmpdir(), 'akr-follow-'));
+  try {
+    const stream = (lines: object[]): Promise<SpawnResult> => {
+      writeFileSync(
+        resolve(dir, 'hc'),
+        `#!/bin/sh\ncat <<'EOF'\n${lines.map((line: object) => JSON.stringify(line)).join('\n')}\nEOF\n`,
+        { mode: 0o755 },
+      );
+      const script: string = [
+        `import { follow } from ${JSON.stringify(resolve(import.meta.dir, '../src/hc.ts'))};`,
+        'const got = [];',
+        "await follow('s', [], (line) => { got.push(line); }).ended;",
+        'console.log(JSON.stringify(got));',
+      ].join('\n');
+      return spawnCaptured(['bun', '-e', script], { env: { ...process.env, PATH: `${dir}:${process.env.PATH}` } });
+    };
+    const record = (turn: number): object => ({
+      address: 't1',
+      labels: {},
+      argv: ['sh'],
+      cwd: '/',
+      state: 'live',
+      created_ms: 1,
+      screen: 'exact',
+      cols: 80,
+      rows: 24,
+      turn,
+    });
+    const status = (seq: number, state: string): object => ({
+      method: 'event',
+      params: { type: 'status', terminal: 't1', seq, data: { status: { state } } },
+    });
+    const turn = { method: 'event', params: { type: 'turn', terminal: 't1', seq: 6, data: null } };
+    const skipped: SpawnResult = await stream([
+      { seq: 0, terminals: [record(0)] },
+      { seq: 0, terminals: [record(1)], params: null },
+      { method: 'heartbeat', params: { seq: 0 } },
+      { method: 'notice', params: { text: 'a newer hc kind' } },
+      { method: 'event', params: { type: 'presence', seq: 1, data: {} } },
+      { method: 'missed', params: { seq: 5, terminals: [record(2)] } },
+      status(3, 'idle'),
+      status(5, 'idle'),
+      turn,
+    ]);
+    expect(skipped.code).toBe(0);
+    expect(JSON.parse(skipped.stdout)).toMatchObject([
+      { terminals: [{ session: 's', address: 't1', turn: 0 }] },
+      { terminals: [{ session: 's', address: 't1', turn: 1 }] },
+      { terminals: [{ session: 's', address: 't1', turn: 2 }] },
+      turn,
+    ]);
+    const malformed: [object, string][] = [
+      [{ method: 'event', params: { type: 'turn', terminal: 't1', seq: 'two', data: null } }, 'seq'],
+      [{ method: 'event', params: { type: 'turn', seq: 2, data: null } }, 'terminal'],
+      [{ seq: 0, terminals: 42, params: null }, 'terminals'],
+      [{ method: 'missed', params: { seq: 5, terminals: 42 } }, 'terminals'],
+    ];
+    for (const [line, field] of malformed) {
+      const failed: SpawnResult = await stream([line]);
+      expect(failed.code).not.toBe(0);
+      expect(failed.stderr).toContain(field);
+    }
+    // The test readers share the cutoff: the hc fixture's reader drops the same stale status.
+    const fixtureReader = hcReader(new Set(['status', 'turn']));
+    expect(
+      [
+        { seq: 0, terminals: [record(1)] },
+        { method: 'missed', params: { seq: 5, terminals: [record(2)] } },
+        status(3, 'idle'),
+        status(6, 'idle'),
+      ].map((line: object) => fixtureReader(line) !== null),
+    ).toEqual([true, true, false, true]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 

@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { entry, fixture, leaf, WAIT_MS, type Fixture } from './helpers';
 import { hcCore, recordedDoc, type HcCore, type Terminal, stopCoresAfterFile } from './hc-fixture';
 import { spawnCaptured, type SpawnResult } from '../src/shell';
+import { hcReader } from '../src/hc';
 
 stopCoresAfterFile();
 
@@ -72,20 +73,21 @@ function restarted(core: HcCore, address: string, ms: number = WAIT_MS): { ready
   const ready: Promise<void> = new Promise<void>((done) => (snapshot = done));
   const done: Promise<void> = (async (): Promise<void> => {
     let buffer: string = '';
+    const reader = hcReader(new Set(['restarted']));
     try {
       for await (const chunk of child.stdout) {
         buffer += new TextDecoder().decode(chunk);
         const parts: string[] = buffer.split('\n');
         buffer = parts.pop() ?? '';
         for (const line of parts.filter((l: string) => l.trim() !== '')) {
-          const json = z.object({ method: z.string().optional() }).passthrough().parse(JSON.parse(line));
-          if (json.method === 'heartbeat') continue;
+          const read = reader(JSON.parse(line));
+          if (read === null) continue;
           const message = z
             .object({
               terminals: z.array(z.unknown()).optional(),
               params: z.object({ type: z.string(), terminal: z.string().optional() }).optional(),
             })
-            .parse(json);
+            .parse('snapshot' in read ? read.snapshot : read.event);
           if (message.terminals !== undefined) snapshot();
           if (message.params?.type === 'restarted' && message.params.terminal === address) return;
         }
