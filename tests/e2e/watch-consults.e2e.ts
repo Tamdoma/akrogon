@@ -15,35 +15,31 @@
 //      bun test --timeout=720000 ./tests/e2e/watch-consults.e2e.ts
 import { test, expect } from 'bun:test';
 import type { Subprocess } from 'bun';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { spawnCaptured, type SpawnResult } from '../../src/shell';
 import { realRuntime, required, reservedSessions } from './tier';
-import { absent, claimCoreRuntime, coreRuntime, coreState } from './watch-tier';
+import { absent, holdSession, killSlice, session, slice, stopAndRemove } from './watch-tier';
+
+await holdSession();
 
 const leafTemp: string = realpathSync(required('AKROGON_E2E_ROOT'));
 const out: string = required('AKROGON_E2E_OUT');
 // The seat's minute budget bounds the whole run. Teardown gets its own margin past it.
 const minutes: number = z.coerce.number().positive().parse(process.env.AKROGON_SESSION_MINUTES);
 const teardownMs: number = 120_000;
-const killMs: number = 10_000;
 const realBus: Record<string, string> = {
   DBUS_SESSION_BUS_ADDRESS: `unix:path=${realRuntime}/bus`,
   XDG_RUNTIME_DIR: realRuntime,
 };
 
-// This test is the judge. It claims the core runtime, then runs the body (watch-consults-body.ts) as
-// one process in this run's own slice, and everything the body starts stays in that slice (watch-tier.ts
-// coreRuntime). The body writes only to the judge's private control folder. The judge stays outside: at
-// the body's exit or the deadline, whichever comes first, it decides the outcome from the files the
-// body wrote, then ends the whole slice with one cgroup kill, which no process can refuse, removes
-// what it claimed and copies the control folder to <out> as the run's report.
-const slice: string = `akrogon-e2e${process.pid}.slice`;
-const manager: string = z
-  .string()
-  .parse(/^0::(\/.*\/user@\d+\.service)\//m.exec(readFileSync('/proc/self/cgroup', 'utf8'))?.[1]);
-const cgroup: string = `/sys/fs/cgroup${manager}/akrogon.slice/${slice}`;
+// This test is the judge. It holds the session (watch-tier.ts holdSession), then runs the body
+// (watch-consults-body.ts) as one process in the session's slice, and everything the body starts stays in
+// that slice (watch-tier.ts sessionPaths). The body writes only to the judge's private control folder. The
+// judge stays outside: at the body's exit or the deadline, whichever comes first, it decides the outcome
+// from the files the body wrote, kills the slice, counts the sessions, stops the slices and removes the
+// core state and runtime, replaces <out> with the control folder as the run's report and checks absence,
+// all before its process exits and drops the lock.
 const written = (control: string, file: string): string | null =>
   existsSync(resolve(control, file)) ? readFileSync(resolve(control, file), 'utf8') : null;
 const lines = (text: string | null): string[] => (text ?? '').split('\n').filter(Boolean);
@@ -95,36 +91,19 @@ async function teardown(launcher: Subprocess, control: string): Promise<void> {
   try {
     launcher.kill('SIGKILL');
     await launcher.exited;
-    if (existsSync(cgroup)) {
-      writeFileSync(resolve(cgroup, 'cgroup.kill'), '1');
-      const by: number = Date.now() + killMs;
-      while (readFileSync(resolve(cgroup, 'cgroup.events'), 'utf8').includes('populated 1')) {
-        if (Date.now() > by) throw new Error(`${slice} still populated ${killMs} ms after cgroup.kill`);
-        await Bun.sleep(20);
-      }
-    }
+    await killSlice();
+    // Counted once the slice is empty, so a failed stop or removal still leaves the count.
     const used: Usage = usage(control);
     writeFileSync(resolve(control, 'paid-sessions.json'), JSON.stringify(used, null, 2));
     console.log(JSON.stringify(used));
-    // Seats join their leaf slice through tests/core-bin/systemd-run, which lists each slice it used.
-    const leafSlices: string[] = existsSync(resolve(coreRuntime, 'slices'))
-      ? lines(readFileSync(resolve(coreRuntime, 'slices'), 'utf8'))
-      : [];
-    const units: string[] = [...(existsSync(cgroup) ? [slice] : []), ...new Set(leafSlices)];
-    if (units.length > 0) {
-      const stopped: SpawnResult = await spawnCaptured(['systemctl', '--user', 'stop', ...units], {
-        env: { ...process.env, ...realBus },
-      });
-      if (stopped.code !== 0) throw new Error(`slice stop failed: ${JSON.stringify({ units, ...stopped })}`);
-    }
-    for (const path of [coreState, coreRuntime]) rmSync(path, { recursive: true, force: true });
+    await stopAndRemove();
   } finally {
-    mkdirSync(out, { recursive: true });
-    cpSync(control, out, { recursive: true, force: true });
+    rmSync(out, { recursive: true, force: true });
+    cpSync(control, out, { recursive: true });
   }
   // Every tier folder but the core runtime lives under leafTemp, and so does the control folder.
   rmSync(leafTemp, { recursive: true, force: true });
-  const left: string[] = absent();
+  const left: string[] = absent(session);
   writeFileSync(resolve(out, 'absence.json'), JSON.stringify({ left }, null, 2));
   expect(left).toEqual([]);
 }
@@ -134,8 +113,6 @@ test.serial(
   async () => {
     expect(required('AKROGON_E2E')).toBe('watch-consults');
     reservedSessions(2);
-    // A run refused here has claimed nothing and started nothing, so it has nothing to remove.
-    claimCoreRuntime();
     const control: string = mkdtempSync(resolve(leafTemp, 'control-'));
     const deadline: number = Date.now() + minutes * 60_000;
     console.log(`session deadline: ${new Date(deadline).toISOString()} (AKROGON_SESSION_MINUTES=${minutes})`);

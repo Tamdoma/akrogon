@@ -3,20 +3,73 @@
 // fails the run. No herdr-app window opens: akrogon runs with a scratch HOME holding the session's
 // herdr-app home and the strict fake herdr-app (window closed) on its PATH, while the core and every
 // harness keep the operator's real HOME and logins.
-import { chmodSync, existsSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
-import { connect } from 'node:net';
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
+import { flockHold } from '../../src/flock';
 import { command, spawnCaptured, type SpawnResult } from '../../src/shell';
 import { realHome, realRuntime, required } from './tier';
 
-export const session: string = 'akr-e2e-watch';
-// The core's own runtime folder holds a `bus` link and no `systemd` link, as tests/hc-fixture.ts does:
-// hc then starts no systemd units, so the core, its terminals and any replacement core stay in the
-// cgroup of whoever started them, and a run can end all of them with one cgroup kill.
-export const coreRuntime: string = resolve(realRuntime, session);
-export const socket: string = resolve(coreRuntime, 'herdr-core', `${session}.sock`);
-export const coreState: string = resolve(realHome, '.local/state/herdr-core', session);
+// The paths one session owns. The core's own runtime folder holds a `bus` link and no `systemd` link, as
+// tests/hc-fixture.ts does: hc then starts no systemd units, so the core, its terminals and any
+// replacement core stay in the session's slice, and one cgroup kill ends all of them.
+export type SessionPaths = {
+  session: SessionName;
+  coreRuntime: string;
+  socket: string;
+  coreState: string;
+  lock: string;
+  slice: string;
+};
+
+// The only names a session may have: the grant's, or a private one the deadline proof generates
+// (akr-d<pid>, and akr-d<pid>h for the owner it holds beside its judges). Anything else would derive
+// cleanup paths outside the session's own folders, so it stops the module before any path exists.
+const sessionName = z
+  .string()
+  .regex(/^(akr-e2e-watch|akr-d\d+h?)$/)
+  .brand<'SessionName'>();
+export type SessionName = z.infer<typeof sessionName>;
+
+export class SessionNameError extends Error {
+  constructor(readonly value: string) {
+    super(`AKROGON_E2E_SESSION must be akr-e2e-watch or akr-d<digits>[h], got ${JSON.stringify(value)}`);
+  }
+}
+
+export function parseSessionName(value: string): SessionName {
+  const parsed = sessionName.safeParse(value);
+  if (!parsed.success) throw new SessionNameError(value);
+  return parsed.data;
+}
+
+export function sessionPaths(name: SessionName): SessionPaths {
+  const coreRuntime: string = resolve(realRuntime, name);
+  return {
+    session: name,
+    coreRuntime,
+    socket: resolve(coreRuntime, 'herdr-core', `${name}.sock`),
+    coreState: resolve(realHome, '.local/state/herdr-core', name),
+    lock: resolve(realRuntime, `${name}.lock`),
+    // One level under akrogon.slice: systemd reads each `-` in a slice name as a parent.
+    slice: `akrogon-${name.replace(/[^a-zA-Z0-9]/g, '')}.slice`,
+  };
+}
+
+// Paid commands never set AKROGON_E2E_SESSION and use the grant's akr-e2e-watch; the deadline proof
+// sets a private name for its child judges.
+export const { session, coreRuntime, socket, coreState, lock, slice }: SessionPaths = sessionPaths(
+  parseSessionName(process.env.AKROGON_E2E_SESSION ?? 'akr-e2e-watch'),
+);
+const manager: string = z
+  .string()
+  .parse(/^0::(\/.*\/user@\d+\.service)\//m.exec(readFileSync('/proc/self/cgroup', 'utf8'))?.[1]);
+const cgroup: string = `/sys/fs/cgroup${manager}/akrogon.slice/${slice}`;
+const killMs: number = 10_000;
+const realBus: Record<string, string> = {
+  DBUS_SESSION_BUS_ADDRESS: `unix:path=${realRuntime}/bus`,
+  XDG_RUNTIME_DIR: realRuntime,
+};
 const entry: string = resolve(import.meta.dir, '../../src/akrogon.ts');
 const tests: string = resolve(import.meta.dir, '..');
 
@@ -36,28 +89,54 @@ export type WatchTier = {
   record: (name: string, value: unknown) => void;
 };
 
-function listening(path: string): Promise<boolean> {
-  return new Promise<boolean>((done) => {
-    const probe = connect(path);
-    probe.once('connect', () => {
-      probe.destroy();
-      done(true);
+export function absent(name: SessionName): string[] {
+  const paths: SessionPaths = sessionPaths(name);
+  return [paths.coreRuntime, paths.coreState].filter((path: string) => existsSync(path));
+}
+
+// Ends every process in the session's slice with one cgroup kill, which no process can refuse.
+export async function killSlice(): Promise<void> {
+  if (existsSync(cgroup)) {
+    writeFileSync(resolve(cgroup, 'cgroup.kill'), '1');
+    const by: number = Date.now() + killMs;
+    while (readFileSync(resolve(cgroup, 'cgroup.events'), 'utf8').includes('populated 1')) {
+      if (Date.now() > by) throw new Error(`${slice} still populated ${killMs} ms after cgroup.kill`);
+      await Bun.sleep(20);
+    }
+  }
+}
+
+// Stops the session's slice and the seats' leaf slices, then removes the core state and runtime.
+export async function stopAndRemove(): Promise<void> {
+  // Seats join their leaf slice through tests/core-bin/systemd-run, which lists each slice it used.
+  const leafSlices: string[] = existsSync(resolve(coreRuntime, 'slices'))
+    ? lines(readFileSync(resolve(coreRuntime, 'slices'), 'utf8'))
+    : [];
+  const units: string[] = [...new Set([...(existsSync(cgroup) ? [slice] : []), ...leafSlices])];
+  if (units.length > 0) {
+    const stopped: SpawnResult = await spawnCaptured(['systemctl', '--user', 'stop', ...units], {
+      env: { ...process.env, ...realBus },
     });
-    probe.once('error', () => done(false));
-  });
+    if (stopped.code !== 0) throw new Error(`slice stop failed: ${JSON.stringify({ units, ...stopped })}`);
+  }
+  for (const path of [coreState, coreRuntime]) rmSync(path, { recursive: true, force: true });
 }
 
-export function absent(): string[] {
-  return [coreRuntime, coreState].filter((path: string) => existsSync(path));
-}
-
-// A run claims the core runtime before startWatchTier: created without `recursive`, so a folder
-// another run holds is refused, and from then on the folder, the core state and the seats' leaf
-// slices are the claiming run's to remove.
-export function claimCoreRuntime(): void {
-  const left: string[] = absent();
-  if (left.length > 0) throw new Error(`akr-e2e-watch leftovers before the run: ${left.join(', ')}`);
-  mkdirSync(coreRuntime);
+// One run at a time owns the session: each test file that uses it takes this lock at module level,
+// before any test timer starts, and holds it until its process exits, so a second run waits and a dead
+// run's lock goes with its process. Under the lock nothing else runs in the session, so whatever a dead
+// owner left is ended and removed. One promise per process, so a process loading two owner files takes
+// the lock once; each caller notes on stderr that it holds the session. The body script imports this module too and
+// never takes it.
+let held: Promise<void> | undefined;
+export async function holdSession(): Promise<void> {
+  held ??= (async (): Promise<void> => {
+    await flockHold(lock, '-x');
+    await killSlice();
+    await stopAndRemove();
+  })();
+  await held;
+  console.error(`holds ${session}`);
 }
 
 // `name` names the registered repo root `<leaf temp>/<name>`; every folder the run creates is
@@ -129,7 +208,7 @@ export async function startWatchTier(
   symlinkSync(resolve(tests, 'stand-in.sh'), resolve(standinBin, 'fake'));
   // tests/core-bin's systemd-run lets seat scopes reach the user manager from a core with no systemd link.
   const corePath: string = `${standinBin}:${resolve(tests, 'core-bin')}:${dirname(process.execPath)}:${z.string().parse(process.env.PATH)}`;
-  mkdirSync(resolve(coreRuntime, 'herdr-core'));
+  mkdirSync(resolve(coreRuntime, 'herdr-core'), { recursive: true });
   symlinkSync(resolve(realRuntime, 'bus'), resolve(coreRuntime, 'bus'));
   const coreEnv: Record<string, string> = {
     HOME: realHome,
@@ -140,10 +219,27 @@ export async function startWatchTier(
     DBUS_SESSION_BUS_ADDRESS: `unix:path=${realRuntime}/bus`,
     HC_SESSION: session,
     STANDIN_DIR: standin,
-    // A run's check and verify scopes join the slice the run was started in (src/scope.ts runSlice).
-    AKROGON_RUN_SLICE: process.env.AKROGON_RUN_SLICE ?? '',
+    // A run's check and verify scopes join the session's slice (src/scope.ts runSlice).
+    AKROGON_RUN_SLICE: slice,
   };
-  const started: SpawnResult = await spawnCaptured(['hc', 'server', 'start'], { cwd: root, env: coreEnv });
+  // The core starts in the session's slice, so everything it starts stays there. The consults body
+  // already runs in it and starts the core directly.
+  const inSlice: boolean = readFileSync('/proc/self/cgroup', 'utf8').includes(`/${slice}/`);
+  const serverStart: string[] = ['hc', 'server', 'start'];
+  const started: SpawnResult = await spawnCaptured(
+    inSlice
+      ? serverStart
+      : [
+          resolve(tests, 'core-bin/systemd-run'),
+          '--user',
+          '--scope',
+          '--quiet',
+          `--slice=${slice}`,
+          '--',
+          ...serverStart,
+        ],
+    { cwd: root, env: coreEnv },
+  );
   if (started.code !== 0) throw new Error(`hc server start failed: ${JSON.stringify(started)}`);
   symlinkSync(socket, linked);
   symlinkSync(resolve(realRuntime, 'bus'), resolve(runtime, 'bus'));
@@ -199,26 +295,14 @@ export async function startWatchTier(
   return { root, runtime, shimBin, corePath, standin, out, paths, akrogonEnv, hc, rpc, akrogon, observe, record };
 }
 
-// The grant's cleanup and absence check (readiness grants[0].fixtures[0]): every terminal of the
-// session is killed and removed, the core stops, its state and every recorded folder go. Transcripts,
-// agy's trustedWorkspaces entry and the agy conversation ids are A's after the report quotes them.
+// The grant's cleanup and absence check (readiness grants[0].fixtures[0]): the session ends the way a
+// dead owner's is recovered, its state and every recorded folder go. Transcripts, agy's trustedWorkspaces
+// entry and the agy conversation ids are A's after the report quotes them.
 export async function stopWatchTier(tier: WatchTier, cwds: string[]): Promise<string[]> {
-  const listed = z
-    .object({ terminals: z.array(z.object({ address: z.string(), state: z.string() }).passthrough()) })
-    .parse(await tier.rpc('terminal.list', { all: true, labels: {} }));
-  for (const t of listed.terminals) {
-    await tier.hc(['kill', t.address]);
-    await tier.hc(['rm', t.address]);
-  }
-  const status = z
-    .object({ pid: z.number() })
-    .safeParse(JSON.parse((await tier.hc(['server', 'status', '--json'])).stdout || '{}'));
-  // Any hc call on a stopped session starts a new core, so stop only a core still listening.
-  if (await listening(socket)) await tier.hc(['server', 'stop']);
-  if (status.success) await spawnCaptured(['timeout', '10', 'tail', `--pid=${status.data.pid}`, '-f', '/dev/null']);
-  rmSync(coreState, { recursive: true, force: true });
+  await killSlice();
+  await stopAndRemove();
   for (const path of [...cwds, ...tier.paths]) rmSync(path, { recursive: true, force: true });
-  return absent();
+  return absent(session);
 }
 
 export function lines(stdout: string): string[] {

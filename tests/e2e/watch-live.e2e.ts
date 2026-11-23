@@ -39,7 +39,9 @@ import { z } from 'zod';
 import { waitForTerminal, type Seen } from '../../src/hc';
 import { spawnCaptured, type SpawnResult } from '../../src/shell';
 import { answerTrust, realHome, required, reservedSessions } from './tier';
-import { claimCoreRuntime, observeReady, session, startWatchTier, stopWatchTier, type WatchTier } from './watch-tier';
+import { holdSession, observeReady, session, startWatchTier, stopWatchTier, type WatchTier } from './watch-tier';
+
+await holdSession();
 
 const skill: string = resolve(import.meta.dir, '../../skills/watch-issues');
 const timerScript: string = resolve(skill, 'scripts/timer.ts');
@@ -477,7 +479,6 @@ type Cell = {
 async function setupCell(kind: string, shape: string): Promise<Cell> {
   const name: string = `akr-e2e-watch-${kind}-${shape}`;
   const rootName: string = shape === 'shell' ? `${name} sp` : name;
-  claimCoreRuntime();
   const tier: WatchTier = await startWatchTier(
     name,
     {

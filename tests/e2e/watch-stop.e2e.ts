@@ -12,7 +12,9 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 import { type SpawnResult } from '../../src/shell';
 import { answerTrust, required, reservedSessions } from './tier';
-import { claimCoreRuntime, observeReady, session, startWatchTier, stopWatchTier, type WatchTier } from './watch-tier';
+import { holdSession, observeReady, session, startWatchTier, stopWatchTier, type WatchTier } from './watch-tier';
+
+await holdSession();
 
 // command: the long shell command the seat runs. agy refuses `sleep 600` as a shell timer (B-R1), so it
 // runs a long ping instead. running: screen text that shows the command itself started; agy prints
@@ -108,7 +110,6 @@ test('watch stop: a working seat stops on its stop key, ends idle and takes one 
   const slug: string = `akr-e2e-watch-${kind}`;
   const cwd: string = resolve(required('AKROGON_E2E_ROOT'), slug);
   reservedSessions(4);
-  claimCoreRuntime();
   const tier: WatchTier = await startWatchTier(
     `akr-e2e-watch-${kind}-root`,
     {
