@@ -419,7 +419,7 @@ test.serial('start runs the check and claims the labelled timer; refusals and co
     });
     expect(outside.code).toBe(1);
     expect(outside.stdout).toMatch(/refused \S+/);
-    await otherCore.discard();
+    await otherCore.stop();
   } finally {
     await f.clean();
   }
