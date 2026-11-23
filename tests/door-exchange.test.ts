@@ -47,7 +47,8 @@ async function startDoor(core: HcCore, f: Fixture, name: string, waits: number):
   await spawnCaptured(['mkdir', '-p', dir]);
   const wait = (n: number): string => {
     const tag: string = n === 1 ? 'wait' : `wait${n}`;
-    return `hc wait --children any --json --timeout 20 > ${dir}/${tag}.json 2> ${dir}/${tag}.err; echo $? > ${dir}/${tag}.code; `;
+    // Each wait's timeout differs so its argv names it; the code file appears whole, after the wait ended.
+    return `hc wait --children any --json --timeout ${19 + n} > ${dir}/${tag}.json 2> ${dir}/${tag}.err; echo $? > ${dir}/${tag}.tmp; mv ${dir}/${tag}.tmp ${dir}/${tag}.code; `;
   };
   const script: string = `set -m; printf '\\033]7501;state=idle\\007'; read go; printf '\\033]7501;state=working\\007'; ${Array.from({ length: waits }, (_: unknown, i: number) => wait(i + 1)).join('')}IFS= read -r line; printf '%s\\n' "$line" > ${dir}/inbox; exec cat`;
   const started: SpawnResult = await core.hc([
@@ -127,7 +128,11 @@ async function foreground(core: HcCore, door: Door, until: (argv: string[] | nul
   expect(reached).toBe(true);
 }
 
-const inWait = (argv: string[] | null): boolean => argv !== null && argv[0] === 'hc' && argv[1] === 'wait';
+const inWait = (argv: string[] | null): argv is string[] => argv !== null && argv[0] === 'hc' && argv[1] === 'wait';
+const inWaitNumber =
+  (n: number) =>
+  (argv: string[] | null): boolean =>
+    inWait(argv) && argv.at(-1) === String(19 + n);
 
 // Resolves when `path` exists, woken by the folder's change events; the timer only bounds it.
 function appears(path: string, ms: number = WAIT_MS): Promise<void> {
@@ -170,7 +175,7 @@ async function exchange(
   expect((await core.hc(['send', door.address, 'go'])).code).toBe(0);
   await foreground(core, door, inWait);
   for (const key of triggers) await trigger(core, key);
-  await foreground(core, door, (argv) => !inWait(argv));
+  await appears(`${door.dir}/wait.code`);
   const ended: { code: string; json: string } = {
     code: readFileSync(`${door.dir}/wait.code`, 'utf8').trim(),
     json: readFileSync(`${door.dir}/wait.json`, 'utf8'),
@@ -246,9 +251,11 @@ test('a re-armed wait ignores the report it already woke on and ends on the next
     await trigger(core, 'kh');
     await appears(`${door.dir}/wait.code`);
     expect(readFileSync(`${door.dir}/wait.code`, 'utf8').trim()).toBe('0');
+    // News that lands before the re-armed wait starts is not news to it, so the blocker blocks only once it runs.
+    await foreground(core, door, inWaitNumber(2));
     expect((await core.get(blocker.address)).status?.state).toBe('working');
     await trigger(core, 'ki');
-    await foreground(core, door, (argv) => !inWait(argv));
+    await appears(`${door.dir}/wait2.code`);
     expect(readFileSync(`${door.dir}/wait2.code`, 'utf8').trim()).toBe('0');
     const woke = z.object({
       reason: z.string(),
