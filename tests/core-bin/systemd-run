@@ -1,4 +1,12 @@
 #!/bin/sh
 # A test core's runtime dir has no systemd link, so hc starts no units for it; seat scopes still reach
 # the user manager through the real runtime dir, and the scoped command keeps the core's own.
+# Each slice a seat enters is appended to the core's ledger, so the core's stop and the abandoned-core
+# sweep stop exactly the slices this core launched.
+for arg; do
+	case "$arg" in
+	--slice=*) printf '%s\n' "${arg#--slice=}" >> "$XDG_RUNTIME_DIR/slices" ;;
+	--) break ;;
+	esac
+done
 XDG_RUNTIME_DIR="/run/user/$(id -u)" exec /usr/bin/systemd-run --setenv=XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" "$@"

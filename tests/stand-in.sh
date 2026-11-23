@@ -33,8 +33,9 @@ turn() {
 case "$mode" in
 exit) exit 3 ;;
 idle)
-	status idle
+	# The argv task is logged before the first status, so a seen idle status means it is recorded.
 	[ $# -gt 0 ] && printf '%s\n' "$1" >> "$log"
+	status idle
 	while IFS= read -r line; do
 		printf '%s\n' "$line" >> "$log"
 		[ "$line" = WORK ] && status working && status idle

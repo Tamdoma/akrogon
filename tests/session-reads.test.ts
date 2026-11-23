@@ -221,6 +221,8 @@ test('a manual next ignores an inherited HC_TERMINAL_ID', async () => {
       HC_TERMINAL_ID: otherSeat,
       HC_SESSION: f.core.session,
     };
+    // The idle stand-in logs its argv task before its first status: once idle, the start task is counted.
+    await f.core.waitFor(otherSeat, (t: Terminal) => t.status?.state === 'idle');
     const before: number = (await delivered(f, 'other-seat')).length;
 
     const named: Result = await next(f, ['target'], inherited);
@@ -231,6 +233,10 @@ test('a manual next ignores an inherited HC_TERMINAL_ID', async () => {
     const untyped: Result = await next(f, [], inherited);
     expect(untyped.code).toBe(0);
     expect((await delivered(f, 'other-seat')).length).toBe(before);
+    await f.core.waitFor(
+      z.string().parse(readState(target).seat.A?.address),
+      (t: Terminal) => t.status?.state === 'idle',
+    );
     expect((await delivered(f, 'target')).map((d) => d.text)).toEqual([expect.stringContaining('plan-issue target')]);
   } finally {
     await f.clean();

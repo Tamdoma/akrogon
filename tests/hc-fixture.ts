@@ -6,7 +6,6 @@
 // link there hc starts no units for a test core; `systemd-run` on the core's PATH reaches the user
 // manager for seat scopes.
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
-import { connect } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { spawnCaptured, type SpawnResult } from '../src/shell';
@@ -42,28 +41,57 @@ function alive(pid: number): boolean {
   }
 }
 
-function listening(path: string): Promise<boolean> {
-  return new Promise<boolean>((done) => {
-    const probe = connect(path);
-    probe.once('connect', () => {
-      probe.destroy();
-      done(true);
-    });
-    probe.once('error', () => done(false));
-  });
-}
-
-async function sweepAbandoned(): Promise<void> {
+export async function sweepAbandoned(ms: number = WAIT_MS): Promise<void> {
   for (const name of readdirSync(realRuntime)) {
     const owner: RegExpExecArray | null = /^akt([0-9a-z]+)-\d+$/.exec(name);
     if (owner === null || alive(parseInt(owner[1], 36)) || realHc === null) continue;
     const runtime: string = resolve(realRuntime, name);
-    if (await listening(resolve(runtime, 'core/herdr-core', `${name}.sock`)))
-      await spawnCaptured([realHc, 'server', 'stop'], {
-        env: cleanEnv(name, resolve(runtime, 'core'), {}, z.string().parse(process.env.PATH)),
-      });
+    // A runtime without a daemon file never got past `hc server start`.
+    if (existsSync(daemonFile(resolve(runtime, 'core')))) await stopDaemon(name, resolve(runtime, 'core'), ms);
+    await stopLedgerSlices(name, resolve(runtime, 'core'));
     rmSync(runtime, { recursive: true, force: true });
   }
+}
+
+// `<pid> <start time>` of the core's daemon, written once `hc server start` returns; the start time
+// tells the daemon from a later process that reuses its pid.
+const daemonFile = (coreRuntime: string): string => resolve(coreRuntime, 'daemon');
+
+// The /proc start time of a running pid; null once it exited (gone or a zombie).
+function startTime(pid: number): string | null {
+  const stat: string = resolve('/proc', String(pid), 'stat');
+  if (!existsSync(stat)) return null;
+  const line: string = readFileSync(stat, 'utf8');
+  const fields: string[] = line.slice(line.lastIndexOf(')') + 2).split(' ');
+  return fields[0] === 'Z' ? null : fields[19];
+}
+
+// `hc server stop` exits 0 with `stopped:false` when it reaches no daemon (a moved socket, a dead
+// path), so a core counts as stopped only once its recorded daemon has exited.
+async function stopDaemon(session: string, coreRuntime: string, ms: number): Promise<void> {
+  const [pid, start]: string[] = readFileSync(daemonFile(coreRuntime), 'utf8').trim().split(' ');
+  const down: SpawnResult = await spawnCaptured([z.string().parse(realHc), 'server', 'stop'], {
+    env: cleanEnv(session, coreRuntime, {}, z.string().parse(process.env.PATH)),
+  });
+  const deadline: number = Date.now() + ms;
+  while (startTime(Number(pid)) === start) {
+    if (Date.now() > deadline)
+      throw new Error(`hc daemon still running after server stop: ${JSON.stringify({ session, pid, ms, ...down })}`);
+    await Bun.sleep(50);
+  }
+}
+
+// Ending a seat empties its leaf slice but leaves the slice active in the user manager; left behind, tens
+// of thousands of empty slices made every `systemd-run --scope` take seconds, past the start-proof window.
+// The core-bin systemd-run appends each slice a seat of the core entered to `<core runtime>/slices`.
+async function stopLedgerSlices(session: string, coreRuntime: string): Promise<void> {
+  const ledger: string = resolve(coreRuntime, 'slices');
+  if (!existsSync(ledger)) return;
+  const slices: string[] = [...new Set(readFileSync(ledger, 'utf8').split('\n').filter(Boolean))];
+  const stopped: SpawnResult = await spawnCaptured(['systemctl', '--user', 'stop', ...slices], {
+    env: cleanEnv(session, realRuntime, {}, z.string().parse(process.env.PATH)),
+  });
+  if (stopped.code !== 0) throw new Error(`leaf slice stop failed: ${JSON.stringify({ ledger, slices, ...stopped })}`);
 }
 
 export type Terminal = {
@@ -124,7 +152,7 @@ export type HcCore = {
   setWindow: (window: 'open' | 'closed', rename?: 'ok' | 'fail') => void;
   link: (other: HcCore) => void;
   discard: () => void;
-  stop: () => Promise<void>;
+  stop: (ms?: number) => Promise<void>;
 };
 
 // The herdr-app document shape recorded by the window tier (P7, P11): one space named after the repo.
@@ -220,6 +248,8 @@ export async function hcCore(
     env: cleanEnv(session, coreRuntime, { XDG_STATE_HOME: state, STANDIN_DIR: standin, ...opts.coreEnv }, corePath),
   });
   if (start.code !== 0) throw new Error(`hc server start failed: ${JSON.stringify(start)}`);
+  const pid: number = z.object({ pid: z.number().int() }).parse(JSON.parse(start.stdout)).pid;
+  writeFileSync(daemonFile(coreRuntime), `${pid} ${z.string().parse(startTime(pid))}\n`);
   symlinkSync(socket, resolve(runtime, 'herdr-core', `${session}.sock`));
   // Tests drop their own stubs in <home>/bin; akrogon's sweeps read the proc root.
   for (const dir of [resolve(f.home, 'bin'), procRoot(f)]) mkdirSync(dir, { recursive: true });
@@ -346,16 +376,18 @@ export async function hcCore(
     link: (other: HcCore): void => symlinkSync(other.socket, resolve(runtime, 'herdr-core', `${other.session}.sock`)),
     // Removes this core's files without contacting hc (a killed core's socket would start a new one).
     discard: (): void => {
-      started.delete(core);
       for (const name of readdirSync(dirname(socket)))
         if (name === `${session}.sock` || name.startsWith(`${session}.holder.`))
           rmSync(resolve(dirname(socket), name), { force: true });
       rmSync(runtime, { recursive: true, force: true });
       rmSync(state, { recursive: true, force: true });
+      started.delete(core);
     },
-    stop: async (): Promise<void> => {
-      if (!started.delete(core)) return;
-      await hc(['server', 'stop']);
+    // The core stays in `started` until its teardown completes, so a failed stop is retried after the file.
+    stop: async (ms: number = WAIT_MS): Promise<void> => {
+      if (!started.has(core)) return;
+      await stopDaemon(session, coreRuntime, ms);
+      await stopLedgerSlices(session, coreRuntime);
       core.discard();
     },
   };

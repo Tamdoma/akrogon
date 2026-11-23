@@ -1382,6 +1382,7 @@ test.serial(
       const record: Record<string, unknown> = await waitCheckRecord(f, 'slow');
       expect(record.scope).toBe('callerA.scope');
       const checkId: string = record.run as string;
+      await waitActive(record.unit as string);
       const stopped: SpawnResult = await spawnScoped(f, 'callerA.scope', ['stop-run', checkId], worktree).result;
       expect(stopped.code).toBe(0);
       const result: SpawnResult = await cap.result;
