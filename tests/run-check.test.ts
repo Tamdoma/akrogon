@@ -169,6 +169,7 @@ test('run-check builds an allowlisted env, copies declared names and omits undec
       'PATH',
       'XDG_CACHE_HOME',
       'NODE_DISABLE_COMPILE_CACHE',
+      'BUN_RUNTIME_TRANSPILER_CACHE_PATH',
       'TMPDIR',
       'AKROGON_BASE',
       'AKROGON_EVIDENCE',
@@ -210,31 +211,45 @@ test('run-check cuts the session bus even when the caller has one', async () => 
   }
 });
 
-test('run-check disables the Node compile cache even when the caller does not', async () => {
+test('run-check disables the Node compile cache and keeps the Bun cache in the run folder whatever the caller passes', async () => {
   const f: Fixture = await fixture();
   try {
     const { worktree } = await leafWorktree(f, 'compile-cache');
     const result: Result = await cli(
       f,
-      ['run-check', '--', ...sh('printf "cache=%s\\n" "$NODE_DISABLE_COMPILE_CACHE"')],
+      [
+        'run-check',
+        '--',
+        ...sh(
+          'printf "cache=%s bun=%s tmp=%s\\n" "$NODE_DISABLE_COMPILE_CACHE" "$BUN_RUNTIME_TRANSPILER_CACHE_PATH" "$TMPDIR"',
+        ),
+      ],
       worktree,
       baseEnv(f),
     );
     expect(result.code).toBe(0);
     expect(result.stdout).toContain('cache=1');
+    expect(result.stdout).toMatch(/bun=(\S+)\/bun-cache tmp=\1$/);
     yaml(resolve(f.root, 'issues/config.yaml'), {
-      pass_env: ['NODE_DISABLE_COMPILE_CACHE'],
+      pass_env: ['NODE_DISABLE_COMPILE_CACHE', 'BUN_RUNTIME_TRANSPILER_CACHE_PATH'],
       checks: {},
       grounding: 'none',
     });
     const passed: Result = await cli(
       f,
-      ['run-check', '--', ...sh('printf "cache=%s\\n" "$NODE_DISABLE_COMPILE_CACHE"')],
+      [
+        'run-check',
+        '--',
+        ...sh(
+          'printf "cache=%s bun=%s tmp=%s\\n" "$NODE_DISABLE_COMPILE_CACHE" "$BUN_RUNTIME_TRANSPILER_CACHE_PATH" "$TMPDIR"',
+        ),
+      ],
       worktree,
-      baseEnv(f, { NODE_DISABLE_COMPILE_CACHE: '0' }),
+      baseEnv(f, { NODE_DISABLE_COMPILE_CACHE: '0', BUN_RUNTIME_TRANSPILER_CACHE_PATH: '0' }),
     );
     expect(passed.code).toBe(0);
     expect(passed.stdout).toContain('cache=1');
+    expect(passed.stdout).toMatch(/bun=(\S+)\/bun-cache tmp=\1$/);
   } finally {
     f.clean();
   }

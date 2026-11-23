@@ -74,6 +74,8 @@ export function constructedEnv(repo: Repo, runRoot: string): Record<string, stri
   env.DBUS_SESSION_BUS_ADDRESS = 'unix:path=/nonexistent';
   // Node's compile cache writes hundreds of MB into each run's TMPDIR and is never reused.
   env.NODE_DISABLE_COMPILE_CACHE = '1';
+  // Bun's transpiler cache is reused only inside one run and never evicted, so it ends with the run.
+  env.BUN_RUNTIME_TRANSPILER_CACHE_PATH = join(runRoot, 'bun-cache');
   return env;
 }
 
