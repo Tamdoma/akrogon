@@ -49,6 +49,10 @@ async function next(
 ): Promise<Result> {
   return cli(f, ['next', ...args], cwd, { ...f.env, ...env });
 }
+// A failed call keeps its stderr, so the assertion shows the error it printed.
+function outcome(result: Result): { code: number; stderr: string } {
+  return { code: result.code, stderr: result.code === 0 ? '' : result.stderr };
+}
 async function status(f: DispatchFixture, slug: string): Promise<Result> {
   return cli(f, ['status', slug], f.root, f.env);
 }
@@ -112,7 +116,7 @@ async function dispatchLeaf(f: DispatchFixture, slug: string, extra: object = {}
     container === undefined
       ? leaf(f, slug, 'plan.synthesis', extra)
       : leaf(f, slug, 'plan.synthesis', extra, container);
-  expect((await next(f, [slug])).code).toBe(0);
+  expect(outcome(await next(f, [slug]))).toEqual({ code: 0, stderr: '' });
   return path;
 }
 
@@ -147,7 +151,7 @@ test('failed leaf worktree is removed and its branch is kept', async () => {
       phase: 'failed',
       failure: { cause: 'blocked', phase: 'plan.synthesis', slot: 'A', reason: 'test' },
     });
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(worktree)).toBe(false);
     expect(await worktreeList(f)).not.toContain(worktree);
     expect((await branchExists(f, 'gone-leaf')).code).toBe(0);
@@ -165,7 +169,7 @@ test('dirty merged worktree is kept and reported with path and reason', async ()
     const worktree: string = readState(path).worktree!;
     writeFileSync(resolve(worktree, 'untracked'), 'dirty');
     saveState(path, { ...readState(path), phase: 'merged' });
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(worktree)).toBe(true);
     const out: Result = await status(f, 'dirty-leaf');
     expect(out.stdout).toContain(worktree);
@@ -194,7 +198,7 @@ test('mid-rebase worktree is kept and reported', async () => {
     const marker: string = await command(['git', '-C', worktree, 'rev-parse', '--git-path', 'rebase-merge'], f.root);
     mkdirSync(resolve(worktree, marker), { recursive: true });
     saveState(path, { ...readState(path), phase: 'merged' });
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(worktree)).toBe(true);
     const out: Result = await status(f, 'rebase-leaf');
     expect(out.stdout).toContain(worktree);
@@ -214,7 +218,7 @@ test('worktree with unreachable commits is kept and reported with a count', asyn
     await command(['git', '-C', worktree, 'add', 'unreach'], f.root);
     await command(['git', '-C', worktree, 'commit', '-m', 'unreachable'], f.root);
     saveState(path, { ...readState(path), phase: 'merged' });
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(worktree)).toBe(true);
     const out: Result = await status(f, 'lost-leaf');
     expect(out.stdout).toContain(worktree);
@@ -233,7 +237,7 @@ test('worktree with a live pane inside is kept and reported', async () => {
     // The dispatch tab is closed but another pane sits inside the worktree.
     await closeTab(f, readState(path).tab!);
     await paneAt(f, resolve(worktree, 'subdir'));
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(worktree)).toBe(true);
     const out: Result = await status(f, 'pane-leaf');
     expect(out.stdout).toContain(worktree);
@@ -252,11 +256,11 @@ test('an unowned directory inside the store is kept while a leaf runs, removed o
     const stray: string = resolve(storeDir(f), 'not-a-leaf');
     mkdirSync(stray, { recursive: true });
     writeFileSync(resolve(stray, 'file'), 'x');
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(stray)).toBe(true);
     await closeTab(f, readState(path).tab!);
     saveState(path, { ...readState(path), phase: 'merged' });
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(stray)).toBe(false);
   } finally {
     await f.clean();
@@ -285,7 +289,7 @@ test('run root with a dead owner pid is removed, live owner kept', async () => {
       resolve(live, '.owner'),
       JSON.stringify({ pid: process.pid, boot_id: boot, started: new Date().toISOString() }),
     );
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(dead)).toBe(false);
     expect(existsSync(foreignBoot)).toBe(false);
     expect(existsSync(live)).toBe(true);
@@ -315,7 +319,7 @@ test('a run root an older release marked .akrogon-kept follows the owner rules',
     const liveMarked: string = mkdtempSync(resolve(scratch, 'run-'));
     writeFileSync(resolve(liveMarked, '.owner'), ownerRecord(process.pid));
     writeFileSync(resolve(liveMarked, '.akrogon-kept'), '');
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(deadMarked)).toBe(false);
     expect(existsSync(liveMarked)).toBe(true);
     expect(keptReport(f).find((entry) => entry.path === liveMarked)?.reason).toBe('run in progress');
@@ -357,7 +361,7 @@ test('a failed leaf temp stays while its tab lives, because its seats still use 
     await next(f, ['--all']);
     expect(existsSync(scratch)).toBe(true);
     await closeTab(f, readState(path).tab!);
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(scratch)).toBe(false);
   } finally {
     await f.clean();
@@ -378,7 +382,7 @@ test('clean old-location worktree of an active leaf is removed and recreated spa
     expect(readState(path).worktree).toBeUndefined();
     // The next dispatch recreates it at the store, sparse, from the branch.
     const second: Result = await next(f, ['migrate-me']);
-    expect(second.code).toBe(0);
+    expect(outcome(second)).toEqual({ code: 0, stderr: '' });
     const recreated: string | undefined = readState(path).worktree;
     expect(recreated).toBe(resolve(storeDir(f), 'migrate-me'));
     expect(existsSync(recreated!)).toBe(true);
@@ -386,7 +390,7 @@ test('clean old-location worktree of an active leaf is removed and recreated spa
     // and a later merged pass removes it under the removal rule.
     saveState(path, { ...readState(path), phase: 'merged' });
     await closeTab(f, readState(path).tab!);
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(recreated!)).toBe(false);
     expect((await branchExists(f, 'migrate-me')).code).toBe(1);
   } finally {
@@ -446,7 +450,7 @@ test('operator worktree outside managed roots is kept as unmanaged', async () =>
     await dispatchLeaf(f, 'seed-leaf');
     const outside: string = resolve(f.home, 'operator-wt');
     await command(['git', 'worktree', 'add', '--detach', outside], f.root);
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(outside)).toBe(true);
     const out: Result = await status(f, 'seed-leaf');
     expect(out.stdout).toContain(outside);
@@ -510,7 +514,7 @@ test('unconfirmed verify worktrees are removed once the run ends', async () => {
       resolve(f.root, 'issues/verify-runs.jsonl'),
       record('clean-run', clean) + '\n' + record('dirty-run', dirty) + '\n',
     );
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(clean)).toBe(false);
     // An ended verify run's copy is scratch: removed force, dirty or not.
     expect(existsSync(dirty)).toBe(false);
@@ -532,7 +536,7 @@ test('store variants are kept as unmanaged through live, unavailable and absent 
     const variant: string = resolve(storeDir(f), 'variant-holder-v0');
     await command(['git', 'worktree', 'add', '--detach', variant], f.root);
     const inside: string = await paneAt(f, variant);
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(variant)).toBe(true);
     expect((await status(f, 'variant-holder')).stdout).toContain(variant);
     expect((await status(f, 'variant-holder')).stdout).toContain('unmanaged worktree');
@@ -544,7 +548,7 @@ test('store variants are kept as unmanaged through live, unavailable and absent 
     await endTerminal(f, inside);
     await closeTab(f, readState(path).tab!);
     saveState(path, { ...readState(path), phase: 'merged' });
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(variant)).toBe(true);
     expect((await status(f, 'variant-holder')).stdout).toContain('unmanaged worktree');
     expect(keptReport(f).some((entry) => entry.path === variant && entry.reason === 'unmanaged worktree')).toBe(true);
@@ -579,7 +583,7 @@ test('failed leaf scratch preserves an actual running verify command', async () 
         phase: 'failed',
         failure: { cause: 'blocked', phase: 'plan.synthesis', slot: 'A', reason: 'operator stop' },
       });
-      expect((await next(f, ['--all'])).code).toBe(0);
+      expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
       expect(existsSync(runRoot)).toBe(true);
       expect((await status(f, 'running-base')).stdout).toContain(runRoot);
     } finally {
@@ -600,7 +604,7 @@ test('targeted next keeps unused registered variants', async () => {
     await dispatchLeaf(f, 'typed-holder');
     const variant: string = resolve(storeDir(f), 'typed-holder-v1');
     await command(['git', 'worktree', 'add', '--detach', variant], f.root);
-    expect((await next(f, ['typed-holder'])).code).toBe(0);
+    expect(outcome(await next(f, ['typed-holder']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(variant)).toBe(true);
     expect((await status(f, 'typed-holder')).stdout).toContain('unmanaged worktree');
     expect(keptReport(f).some((entry) => entry.path === variant && entry.reason === 'unmanaged worktree')).toBe(true);
@@ -615,7 +619,7 @@ test('a worker worktree of an active leaf is kept until the leaf fails', async (
     const path: string = await dispatchLeaf(f, 'worker-holder');
     const worker: string = resolve(storeDir(f), 'worker-holder-u1');
     await command(['git', 'worktree', 'add', '--detach', worker], f.root);
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(worker)).toBe(true);
     expect((await status(f, 'worker-holder')).stdout).toContain('active leaf worker');
     await closeTab(f, readState(path).tab!);
@@ -624,7 +628,7 @@ test('a worker worktree of an active leaf is kept until the leaf fails', async (
       phase: 'failed',
       failure: { cause: 'blocked', phase: 'plan.synthesis', slot: 'A', reason: 'test' },
     });
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(worker)).toBe(false);
   } finally {
     await f.clean();
@@ -663,7 +667,7 @@ test('verify scratch copies are removed by owner state and kept while the run is
       resolve(f.root, 'issues/verify-runs.jsonl'),
       record('dead-run', dead, 4194303) + '\n' + record('live-run', live, process.pid) + '\n',
     );
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(dead)).toBe(false);
     expect(existsSync(live)).toBe(true);
     const out: Result = await status(f, 'scratch-holder');
@@ -681,7 +685,7 @@ test('a verify scratch copy with no record is removed like a dead-owner copy', a
     const stray: string = resolve(storeDir(f), 'verify-no-record');
     await command(['git', 'worktree', 'add', '--detach', stray], f.root);
     await unreachable(stray, f.root);
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(stray)).toBe(false);
   } finally {
     await f.clean();
@@ -704,8 +708,8 @@ test('batch copies follow their owner record: live kept, dead and absent removed
       writeFileSync(ownerFile, JSON.stringify({ pid, boot_id: boot, started: new Date().toISOString() }));
     };
     writeOwner(child.pid);
-    expect((await next(f, ['--all'])).code).toBe(0);
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(owned)).toBe(true);
     expect(existsSync(ownerFile)).toBe(true);
     child.kill('SIGKILL');
@@ -715,7 +719,7 @@ test('batch copies follow their owner record: live kept, dead and absent removed
     writeFileSync(resolve(stray, 'untracked'), 'dirty');
     const orphaned: string = resolve(storeDir(f), 'batch-gone.owner');
     writeFileSync(orphaned, JSON.stringify({ pid: 4194303, boot_id: boot, started: new Date().toISOString() }));
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(owned)).toBe(false);
     expect(existsSync(ownerFile)).toBe(false);
     expect(existsSync(stray)).toBe(false);
@@ -740,7 +744,7 @@ test('worker copies follow the owner leaf: merged removes, failed keeps the guar
     writeFileSync(resolve(worker, '__pycache__/x.pyc'), 'x');
     await closeTab(f, readState(path).tab!);
     saveState(path, { ...readState(path), phase: 'merged' });
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(worker)).toBe(false);
     // The merge pass completed the issue: the leaf record now lives in closed.
     const closed: string = resolve(f.root, 'issues/closed/issue/done-holder');
@@ -753,7 +757,7 @@ test('worker copies follow the owner leaf: merged removes, failed keeps the guar
     const kept: string = resolve(storeDir(f), 'done-holder-u2');
     await command(['git', 'worktree', 'add', '--detach', kept], f.root);
     await unreachable(kept, f.root);
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(kept)).toBe(true);
     const out: Result = await status(f, 'done-holder');
     expect(out.stdout).toContain(kept);
@@ -778,14 +782,14 @@ test('a leaf slug ending in -u<N> is handled as that leaf, not as a worker copy'
     await closeTab(f, readState(path).tab!);
     saveState(path, { ...readState(path), phase: 'merged' });
     await command(['git', 'worktree', 'add', '--detach', stray], f.root);
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(stray)).toBe(false);
     const closed: string = resolve(f.root, 'issues/closed/issue/mine-u1');
     expect(existsSync(resolve(closed, 'state.yaml'))).toBe(true);
     expect(readState(closed).worktree).toBeUndefined();
     // Handled as the leaf itself: a second pass drops the merged branch; a
     // worker-copy reading would keep it forever.
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect((await branchExists(f, 'mine-u1')).code).toBe(1);
   } finally {
     await f.clean();
@@ -826,7 +830,7 @@ test('scratch copies stay while a pane is inside or the pane list is unavailable
     expect(existsSync(dead)).toBe(true);
     expect(existsSync(stray)).toBe(true);
     await paneAt(f, dead);
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(dead)).toBe(true);
     expect(existsSync(stray)).toBe(false);
     const out: Result = await status(f, 'pane-holder');
@@ -868,14 +872,14 @@ test('a scratch copy with a process inside stays, recorded with the pid', async 
     symlinkSync(dead, resolve(procDir, 'cwd'));
     writeFileSync(resolve(dead, 'open-file'), 'x');
     symlinkSync(resolve(dead, 'open-file'), resolve(procDir, 'fd/3'));
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(dead)).toBe(true);
     const out: Result = await status(f, 'proc-holder');
     expect(out.stdout).toContain(dead);
     expect(out.stdout).toContain(String(child.pid));
     child.kill('SIGKILL');
     await child.exited;
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(dead)).toBe(false);
   } finally {
     child.kill('SIGKILL');
@@ -911,7 +915,7 @@ while (true) {
       expect(new TextDecoder().decode((await output.read()).value)).toContain('ready');
       output.releaseLock();
       for (let pass: number = 0; pass < 10; pass++) {
-        expect((await next(f, ['--all'], { AKROGON_PROC_ROOT: '/proc' })).code).toBe(0);
+        expect(outcome(await next(f, ['--all'], { AKROGON_PROC_ROOT: '/proc' }))).toEqual({ code: 0, stderr: '' });
         expect(existsSync(copy)).toBe(true);
         const out: Result = await cli(f, ['leftovers'], f.root, f.env);
         expect(out.stdout).toContain(`process ${child.pid} inside`);
@@ -920,7 +924,7 @@ while (true) {
       child.kill('SIGKILL');
       await child.exited;
     }
-    expect((await next(f, ['--all'], { AKROGON_PROC_ROOT: '/proc' })).code).toBe(0);
+    expect(outcome(await next(f, ['--all'], { AKROGON_PROC_ROOT: '/proc' }))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(copy)).toBe(false);
   } finally {
     await f.clean();
@@ -941,7 +945,7 @@ test('configured destination store migrates a clean old managed worktree', async
     await next(f, ['configured-migration']);
     expect(existsSync(old)).toBe(false);
     expect(readState(path).worktree).toBeUndefined();
-    expect((await next(f, ['configured-migration'])).code).toBe(0);
+    expect(outcome(await next(f, ['configured-migration']))).toEqual({ code: 0, stderr: '' });
     expect(readState(path).worktree).toBe(resolve(storeDir(f), 'configured-migration'));
   } finally {
     await f.clean();
@@ -972,7 +976,7 @@ test('unregistered and stray entries are deleted when no leaf of the repo runs',
     writeFileSync(resolve(temp, 'stray.file'), 'x');
     mkdirSync(resolve(temp, 'wrench.42.tmp'));
     mkdirSync(resolve(temp, 'other.abc'));
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     for (const root of [storeDir(f), legacy]) {
       expect(existsSync(resolve(root, 'junk'))).toBe(false);
       // lstatSync reads the entry itself: existsSync follows the dangling
@@ -1001,12 +1005,12 @@ test('a running leaf keeps its temp, its slug entries and unowned entries', asyn
     const temp: string = repoTempDir(f);
     mkdirSync(resolve(temp, 'guard-tmp'), { recursive: true });
     writeFileSync(resolve(temp, 'guard-tmp', 'x'), 'x');
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     for (const item of ['guard-leaf-old', 'stray.txt']) expect(existsSync(resolve(store, item))).toBe(true);
     expect(existsSync(resolve(temp, 'guard-tmp'))).toBe(true);
     await closeTab(f, readState(path).tab!);
     saveState(path, { ...readState(path), phase: 'merged' });
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(resolve(store, 'guard-leaf-old'))).toBe(false);
     expect(existsSync(resolve(store, 'stray.txt'))).toBe(false);
     expect(existsSync(temp)).toBe(false);
@@ -1032,7 +1036,7 @@ test('live owners keep run dirs and build records; a young ownerless run dir sta
     writeFileSync(resolve(runDead, '.owner'), ownerRecord(4194303));
     const orphan: string = resolve(storeDir(f), 'batch-gone.owner');
     writeFileSync(orphan, ownerRecord(child.pid));
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     // The live-owner run keeps the leaf temp alive too.
     expect(existsSync(scratch)).toBe(true);
     expect(existsSync(runLive)).toBe(true);
@@ -1130,7 +1134,7 @@ test('unowned entries stay while a pane or process sits inside', async () => {
     const procDir: string = resolve(procRoot(f), String(child.pid));
     mkdirSync(resolve(procDir, 'fd'), { recursive: true });
     symlinkSync(junkProc, resolve(procDir, 'cwd'));
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(junkFree)).toBe(false);
     expect(existsSync(junkPane)).toBe(true);
     expect(existsSync(junkProc)).toBe(true);
@@ -1153,7 +1157,7 @@ test('unknown registered worktrees are kept unmanaged; locked ones are never rem
     await command(['git', 'worktree', 'add', '--detach', mystery], f.root);
     const locked: string = resolve(storeDir(f), 'locked');
     await command(['git', 'worktree', 'add', '--detach', '--lock', locked], f.root);
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(mystery)).toBe(true);
     expect(existsSync(locked)).toBe(true);
     const kept: { path: string; reason: string }[] = keptReport(f);
@@ -1176,7 +1180,7 @@ test('a failed delete is reported with path and error and the item remains', asy
     writeFileSync(resolve(junk, 'x'), 'x');
     chmodSync(storeDir(f), 0o555);
     try {
-      expect((await next(f, ['--all'])).code).toBe(0);
+      expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     } finally {
       chmodSync(storeDir(f), 0o755);
     }
@@ -1195,7 +1199,7 @@ test('a stray-file-only pass fetches the pane list before deleting', async () =>
   try {
     mkdirSync(storeDir(f), { recursive: true });
     writeFileSync(resolve(storeDir(f), 'stray.txt'), 'x');
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     // The terminal list is an rpc through `hc connect`.
     expect(calls(f).some((args) => args[0] === 'connect')).toBe(true);
     expect(existsSync(resolve(storeDir(f), 'stray.txt'))).toBe(false);
@@ -1254,7 +1258,7 @@ test('ended claude agent worktree is removed and its landed branch deleted', asy
     await command(['git', 'cherry-pick', '--no-commit', 'agent-landed'], f.root);
     await command(['git', 'commit', '-m', 'agent work'], f.root);
     await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(empty)).toBe(false);
     expect(existsSync(landed)).toBe(false);
     expect(await worktreeList(f)).not.toContain(landed);
@@ -1283,7 +1287,7 @@ test('agent worktree with a live lock owner stays, recycled pid releases', async
       'recycled',
       `claude agent agent-recycled (pid ${child.pid} start ${Number(start) + 1})`,
     );
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(liveDir)).toBe(true);
     expect(await agentLockText(f, liveDir)).toContain('locked');
     expect(keptReport(f).some((entry) => entry.path === liveDir)).toBe(true);
@@ -1338,7 +1342,7 @@ test('agent worktrees failing one check stay locked as unmanaged', async () => {
     const outside: string = resolve(f.home, 'agent-outside');
     await command(['git', 'worktree', 'add', '-b', 'agent-outside', outside], f.root);
     await command(['git', 'worktree', 'lock', '--reason', deadAgentLock('outside'), outside], f.root);
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     for (const dir of [unlanded, dirty, untracked, mergeDir, detached, bareLock, mismatch, otherForm, outside]) {
       expect(existsSync(dir)).toBe(true);
       expect(await agentLockText(f, dir)).toContain('locked');
@@ -1362,7 +1366,7 @@ test('eligible agent worktree stays while a pane or process sits inside', async 
     const procEntry: string = resolve(procRoot(f), String(child.pid));
     mkdirSync(resolve(procEntry, 'fd'), { recursive: true });
     symlinkSync(procDir, resolve(procEntry, 'cwd'));
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     // The terminal list is an rpc through `hc connect`.
     expect(calls(f).some((args) => args[0] === 'connect')).toBe(true);
     expect(existsSync(paneDir)).toBe(true);
@@ -1385,7 +1389,7 @@ test('ignored files do not block agent worktree removal', async () => {
     writeFileSync(resolve(f.root, '.git/info/exclude'), 'node_modules/\n');
     mkdirSync(resolve(dir, 'node_modules/pkg'), { recursive: true });
     writeFileSync(resolve(dir, 'node_modules/pkg/index.js'), 'x');
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(dir)).toBe(false);
     expect((await branchExists(f, 'agent-ignored')).code).toBe(1);
   } finally {
@@ -1402,7 +1406,7 @@ test('stuck agent branch ref reports the delete error; failed unlock leaves the 
   try {
     const stuck: string = await agentWorktree(f, 'stuck');
     writeFileSync(resolve(f.root, '.git/refs/heads/agent-stuck.lock'), '');
-    expect((await next(f, ['--all'])).code).toBe(0);
+    expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     expect(existsSync(stuck)).toBe(false);
     expect((await branchExists(f, 'agent-stuck')).code).toBe(0);
     const kept: { path: string; reason: string }[] = keptReport(f);
@@ -1412,7 +1416,7 @@ test('stuck agent branch ref reports the delete error; failed unlock leaves the 
     const admin: string = resolve(f.root, '.git/worktrees/agent-unlockable');
     chmodSync(admin, 0o555);
     try {
-      expect((await next(f, ['--all'])).code).toBe(0);
+      expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     } finally {
       chmodSync(admin, 0o755);
     }
@@ -1429,7 +1433,7 @@ test('stuck agent branch ref reports the delete error; failed unlock leaves the 
     const parent: string = dirname(partial);
     chmodSync(parent, 0o555);
     try {
-      expect((await next(f, ['--all'])).code).toBe(0);
+      expect(outcome(await next(f, ['--all']))).toEqual({ code: 0, stderr: '' });
     } finally {
       chmodSync(parent, 0o755);
     }
