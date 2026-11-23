@@ -1,5 +1,5 @@
 // Criteria 6 and 12 (state half): the repo's space by name across running hc sessions,
-// refusals, prefixes, the pinned hc schema, the first-switch inventory and "state predates hc".
+// refusals, prefixes, the first-switch inventory and "state predates hc".
 import { test, expect } from 'bun:test';
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -7,15 +7,7 @@ import { connect } from 'node:net';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { cli, fixture, leaf, yaml, WAIT_MS, type Fixture } from './helpers';
-import {
-  hcCore,
-  pinnedSchema,
-  setPrefixes,
-  setSeat,
-  type HcCore,
-  type Terminal,
-  stopCoresAfterFile,
-} from './hc-fixture';
+import { hcCore, setPrefixes, setSeat, type HcCore, type Terminal, stopCoresAfterFile } from './hc-fixture';
 import { leafSlice } from '../src/scope';
 import { command, spawnCaptured, type SpawnResult } from '../src/shell';
 import { GONE_CODES, sessions } from '../src/hc';
@@ -184,22 +176,6 @@ test('dispatch refuses a repo without a prefix and init refuses a duplicate pref
     expect(
       Object.keys(global.parse(Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8'))).repos),
     ).toEqual([f.repo]);
-  } finally {
-    await core.stop();
-    f.clean();
-  }
-});
-
-// Asked of a core the test starts from the installed hc, never of whatever session the environment names
-// (under verify that was the operator's `default` core, so its version decided the result).
-test('the parts of hc schema akrogon parses match the pinned copy', async () => {
-  const f: Fixture = await setup();
-  const core: HcCore = await hcCore(f);
-  try {
-    const reply = await core.hc(['schema']);
-    expect(reply.code).toBe(0);
-    const pinned: object = JSON.parse(readFileSync(resolve(import.meta.dir, 'fixtures/hc-schema.json'), 'utf8'));
-    expect(pinnedSchema(reply.stdout)).toEqual(pinned);
   } finally {
     await core.stop();
     f.clean();

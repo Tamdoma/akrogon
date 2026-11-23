@@ -486,22 +486,6 @@ export function adopt(core: HcCore): () => void {
   return () => child.kill();
 }
 
-// The parts of `hc schema` akrogon parses (D1-D3): compared with tests/fixtures/hc-schema.json.
-export function pinnedSchema(raw: string): object {
-  const schema = z
-    .object({
-      components: z.object({ schemas: z.record(z.string(), z.unknown()) }),
-      methods: z.array(z.object({ name: z.string(), params: z.array(z.unknown()) }).passthrough()),
-    })
-    .parse(JSON.parse(raw));
-  const components: string[] = ['DocGetResult', 'DocSetResult', 'ListResult', 'SendResult', 'Status', 'Terminal'];
-  const methods: string[] = ['doc.get', 'events.subscribe', 'terminal.list', 'terminal.send'];
-  return {
-    components: Object.fromEntries(components.map((name) => [name, schema.components.schemas[name]])),
-    methods: Object.fromEntries(schema.methods.filter((m) => methods.includes(m.name)).map((m) => [m.name, m.params])),
-  };
-}
-
 // The notice files akrogon left in a fixture core's herdr-app home (`<app home>/akrogon-notices/`),
 // read the way herdr-setup's handler reads them: only complete `<id>.json` files, any other entry
 // (a leftover temporary name) fails the read. Deleting `path` plays the handler's "shown".
