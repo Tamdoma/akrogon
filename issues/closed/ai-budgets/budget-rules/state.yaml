@@ -1,0 +1,47 @@
+slug: budget-rules
+phase: merged
+created: 2026-11-22
+repo: akrogon
+blocked-by:
+  - session-ceiling
+sources: []
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: ak967030fa3be5cb1f56e9a596736194
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t34n
+  B:
+    session: infra
+    address: t34w
+prompted:
+  B:
+    turn: 3
+    address: t34w
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-22T18:36:20.761Z
+broadcast:
+  kind: issue
+  name: ai-budgets
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/ai-budgets
+  pushed: f08d7e9c7b2ae70cd07190dad7295f1322b08dd7
+  sources: []
+frozen:
+  tests/chart-shapes.test.ts: c5ad6a6656f1f23b63f9a130812193f04d0ec31d
+  tests/docs-links.test.ts: 2eb7c70331b06cf63921df6f80694db9d27dd2fc
+frozen_cited: []

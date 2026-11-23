@@ -6,5 +6,21 @@ seats:
     recipe:
       harness: claude
     session: /home/ivan/.claude/projects/-home-ivan-Work-infra-akrogon/5d8542a8-366c-477b-b80b-1a7c0cdf14df.jsonl
+  - seat: B
+    address: t350
+    name: ak-slot-b
+    recipe:
+      harness: claude
+      model: claude-fable-5-2
+      effort: high
+    session: /home/ivan/.claude/projects/-home-ivan-Work-infra-akrogon/5c1461d7-f0d8-4859-b80c-a319e2685b9c.jsonl
+  - seat: C
+    address: t351
+    name: ak-slot-c
+    recipe:
+      harness: agy
+      model: neon
+      effort: high
+    session: /home/ivan/.gemini/antigravity-cli/conversations/e5d2b17b-9d7f-4027-b004-11dd567d2636.db
 spans:
   - from: '2026-11-22T17:54:08Z'

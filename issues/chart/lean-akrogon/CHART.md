@@ -10,10 +10,11 @@ Route: pending
 
 - [Seed decision #148](forks/seed-148-decision.md): taken at import
 - [Seed decision #149](forks/seed-149-decision.md): taken at import
+- [Signposts](forks/signposts.md): taken (A)
 
 ## Open forks
 
-- [Signposts](forks/signposts.md): session direction (A answers, full autopilot)
+none until the map
 
 ## Fog
 
