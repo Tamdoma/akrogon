@@ -47,10 +47,14 @@ case "$task" in
 	;;
 esac
 # check steps (what the model does after an accepted start or tick); paused anywhere in the
-# status output acts on nothing, matching the skill's Observe paused rule.
+# status output acts on nothing, matching the skill's Observe paused rule. The last line,
+# `check paused|acting t=<turn>`, marks the check done with the state its status saw.
 st=$(cd "$root" && akrogon status 2>&1)
 printf 'status %s\n' "$(printf '%s' "$st" | head -1)" >> "$hooks"
 case "$st" in
-*paused*) ;;
-*) (cd "$root" && akrogon next --all >> "$hooks" 2>&1) || true ;;
+*paused*) printf 'check paused t=%s\n' "${turn:-?}" >> "$hooks" ;;
+*)
+	(cd "$root" && akrogon next --all >> "$hooks" 2>&1) || true
+	printf 'check acting t=%s\n' "${turn:-?}" >> "$hooks"
+	;;
 esac

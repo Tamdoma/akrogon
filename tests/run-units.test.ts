@@ -56,13 +56,24 @@ function outDir(f: Fixture): string {
   return dir;
 }
 
+// The innermost slice on this process's own cgroup path when it is akrogon's (a leaf or
+// akrogon.slice), else akrogon. Test slices sit exactly one name level under it: a deeper
+// name makes systemd add parent slices that stopping the child never removes.
+const innermostSlice: string | undefined = /^0::.*\/([^/]+)\.slice(?:\/|$)/m.exec(
+  readFileSync('/proc/self/cgroup', 'utf8'),
+)?.[1];
+const ownSlice: string = innermostSlice?.startsWith('akrogon') ? innermostSlice : 'akrogon';
+
 let serial = 0;
+const createdSlices: Set<string> = new Set();
 function testSlice(): string {
-  return `akrogon-test-${process.pid}-${serial++}.slice`;
+  const slice: string = `${ownSlice}-t${process.pid}s${serial++}.slice`;
+  createdSlices.add(slice);
+  return slice;
 }
 
 // Spawn the entry with the real systemd-run/systemctl on PATH so units are
-// real; AKROGON_RUN_SLICE lands them under an akrogon-test-* slice per the grant.
+// real; AKROGON_RUN_SLICE lands them under a test slice per the grant.
 function spawnReal(f: Fixture, args: string[], cwd: string, env: NodeJS.ProcessEnv = {}): RealCap {
   const merged: NodeJS.ProcessEnv = {
     ...process.env,
@@ -111,9 +122,10 @@ async function realFixture(): Promise<{ f: Fixture; slice: string }> {
   return shared;
 }
 
-// Stopping the parent slice stops every test slice under it, and the parent itself.
 afterAll(async () => {
-  await stopTestSlice(`akrogon-test-${process.pid}.slice`);
+  for (const slice of createdSlices) {
+    await stopTestSlice(slice);
+  }
   if (shared !== undefined) {
     shared.f.clean();
     shared = undefined;
