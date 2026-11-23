@@ -20,11 +20,13 @@ import {
   end,
   HcError,
   keys,
+  labelArgs,
   renameTab,
   run,
   screen,
   seatName,
   send,
+  subscribe,
   terminal,
   waitFor,
   waitForDoc,
@@ -32,6 +34,7 @@ import {
   type HcLine,
   type Seen,
   type Space,
+  type Stream,
 } from './hc';
 
 const msSchema = z
@@ -128,20 +131,22 @@ function remaining(deadline: number): number {
 }
 
 // agy takes no task in argv: answer its trust dialog once, wait for idle, send the task once, and
-// retry on the next status when hc refuses it as still starting. Returns the turn the task went in at, or the
-// state that ended the seat, or null when the budget ran out first.
+// retry on the next status when hc refuses it as still starting. Returns the turn the task went in at with
+// the seat as it stood, or the state that ended the seat, or null when the budget ran out first.
 async function agyTask(
-  session: string,
+  stream: Stream,
   address: string,
   task: string,
   deadline: number,
-): Promise<{ turn: number } | { ended: Seen } | null> {
+): Promise<{ turn: number; seat: Seen } | { ended: Seen } | null> {
+  const session: string = stream.session;
   let answered: boolean = false;
   let attempted: boolean = false;
   let turn: number = 0;
   const ready: Seen | null = await waitFor(
-    session,
+    stream,
     address,
+    null,
     async (t: Seen, line: HcLine): Promise<boolean> => {
       if (ended(t)) return true;
       if (!('terminals' in line) && line.params.type !== 'status') return false;
@@ -173,7 +178,7 @@ async function agyTask(
   );
   if (ready === null) return null;
   if (ended(ready)) return { ended: ready };
-  return { turn };
+  return { turn, seat: ready };
 }
 
 function cgroupOf(pid: number): string | null {
@@ -200,8 +205,9 @@ async function scopeEntry(pid: number, scope: string): Promise<string | null> {
 }
 
 // The first task is proven started when the seat goes working or its turn passes the turn the task
-// went in at; nothing is sent before that (start proof, plan D9).
-async function firstTask(seat: Seen, kind: string, task: string): Promise<Started> {
+// went in at; nothing is sent before that (start proof, plan D9). It reads the seat's stream, opened before
+// the seat ran.
+async function firstTask(stream: Stream, seat: Seen, kind: string, task: string): Promise<Started> {
   const deadline: number = Date.now() + START_PROOF_MS;
   const fail = async (last: Seen): Promise<Started> => ({
     outcome: 'failed',
@@ -210,14 +216,24 @@ async function firstTask(seat: Seen, kind: string, task: string): Promise<Starte
   });
   // A new terminal starts at turn 0, the turn an argv task goes in at.
   let delivered: number = 0;
+  let start: Seen | null = null;
   if (kind === 'agy') {
-    const sent: { turn: number } | { ended: Seen } | null = await agyTask(seat.session, seat.address, task, deadline);
+    const sent: { turn: number; seat: Seen } | { ended: Seen } | null = await agyTask(
+      stream,
+      seat.address,
+      task,
+      deadline,
+    );
     if (sent !== null && 'ended' in sent) return fail(sent.ended);
-    if (sent !== null) delivered = sent.turn;
+    if (sent !== null) {
+      delivered = sent.turn;
+      start = sent.seat;
+    }
   }
   const proof: Seen | null = await waitFor(
-    seat.session,
+    stream,
     seat.address,
+    start,
     (t: Seen) => ended(t) || t.status?.state === 'working' || t.turn > delivered,
     remaining(deadline),
   );
@@ -287,81 +303,86 @@ export async function startSeat(
   const slice: string = leafSlice(repo, state.slug, homePath());
   const unit: string = `${slice.replace(/\.slice$/, '')}-${name}-${randomBytes(4).toString('hex')}.scope`;
   const a: Seen | undefined = slot === 'B' ? (await leafSeats(space.session, repo, readState(leaf.path))).A : undefined;
-  const launched: Seen = await run(space.session, {
-    name,
-    cwd: worktree,
-    parent: a?.state === 'live' ? { address: a.address, outlive: true } : null,
-    labels: {
-      akrogon: '1',
-      'akrogon.repo': repo.name,
-      'akrogon.leaf': state.slug,
-      'akrogon.seat': seat,
-      'herdr.space': space.space,
-      'herdr.tab': tab,
-    },
-    argv: [
-      'systemd-run',
-      '--user',
-      '--scope',
-      '--quiet',
-      '--expand-environment=no',
-      `--unit=${unit}`,
-      `--slice=${slice}`,
-      '-p',
-      'TimeoutStopSec=5',
-      '-p',
-      'CollectMode=inactive-or-failed',
-      '-p',
-      'SendSIGHUP=yes',
-      '--',
-      'env',
-      ...UNSET,
-      `AKROGON_BASE=${await base(repo, worktree)}`,
-      'GIT_EDITOR=true',
-      `TMPDIR=${leafTemp(repo, state.slug)}`,
-      'NODE_DISABLE_COMPILE_CACHE=1',
-      ...harness.argv,
-      ...(harness.kind === 'agy' ? [] : [task]),
-    ],
-  });
-  record(leaf.path, (s: State) => ({
-    ...s,
-    seat: { ...s.seat, [slot]: { session: space.session, address: launched.address } },
-    prompted: { ...s.prompted, [slot]: undefined },
-    delivery_error: { ...s.delivery_error, [slot]: undefined },
-  }));
-  const cgroup: string | null = await scopeEntry(z.number().parse(launched.pid), `/${slice}/${unit}`);
-  if (cgroup !== null) {
-    await end(space.session, launched.address);
-    throw new Error(
-      JSON.stringify({ seat: launched.address, error: 'seat outside its leaf scope', expected: unit, cgroup }),
-    );
-  }
-  const started: Started = await firstTask(launched, harness.kind, task);
-  announce(started);
-  if (started.outcome === 'failed') return started;
-  record(leaf.path, (s: State) =>
-    started.outcome === 'confirmed'
-      ? {
-          ...s,
-          prompted: { ...s.prompted, [slot]: { turn: started.turn, address: launched.address } },
-        }
-      : {
-          ...s,
-          delivery_error: {
-            ...s.delivery_error,
-            [slot]: {
-              code: 'not_confirmed',
-              address: launched.address,
-              turn: started.turn,
-              screen: started.screen,
-              at: new Date().toISOString(),
+  // The seat's own labels: hc sets them at creation and herdr-app never changes them.
+  const own: Record<string, string> = { 'akrogon.repo': repo.name, 'akrogon.leaf': state.slug, 'akrogon.seat': seat };
+  const stream: Stream = await subscribe(space.session, labelArgs(own));
+  try {
+    const launched: Seen = await run(space.session, {
+      name,
+      cwd: worktree,
+      parent: a?.state === 'live' ? { address: a.address, outlive: true } : null,
+      labels: {
+        akrogon: '1',
+        ...own,
+        'herdr.space': space.space,
+        'herdr.tab': tab,
+      },
+      argv: [
+        'systemd-run',
+        '--user',
+        '--scope',
+        '--quiet',
+        '--expand-environment=no',
+        `--unit=${unit}`,
+        `--slice=${slice}`,
+        '-p',
+        'TimeoutStopSec=5',
+        '-p',
+        'CollectMode=inactive-or-failed',
+        '-p',
+        'SendSIGHUP=yes',
+        '--',
+        'env',
+        ...UNSET,
+        `AKROGON_BASE=${await base(repo, worktree)}`,
+        'GIT_EDITOR=true',
+        `TMPDIR=${leafTemp(repo, state.slug)}`,
+        'NODE_DISABLE_COMPILE_CACHE=1',
+        ...harness.argv,
+        ...(harness.kind === 'agy' ? [] : [task]),
+      ],
+    });
+    record(leaf.path, (s: State) => ({
+      ...s,
+      seat: { ...s.seat, [slot]: { session: space.session, address: launched.address } },
+      prompted: { ...s.prompted, [slot]: undefined },
+      delivery_error: { ...s.delivery_error, [slot]: undefined },
+    }));
+    const cgroup: string | null = await scopeEntry(z.number().parse(launched.pid), `/${slice}/${unit}`);
+    if (cgroup !== null) {
+      await end(space.session, launched.address);
+      throw new Error(
+        JSON.stringify({ seat: launched.address, error: 'seat outside its leaf scope', expected: unit, cgroup }),
+      );
+    }
+    const started: Started = await firstTask(stream, launched, harness.kind, task);
+    announce(started);
+    if (started.outcome === 'failed') return started;
+    record(leaf.path, (s: State) =>
+      started.outcome === 'confirmed'
+        ? {
+            ...s,
+            prompted: { ...s.prompted, [slot]: { turn: started.turn, address: launched.address } },
+          }
+        : {
+            ...s,
+            delivery_error: {
+              ...s.delivery_error,
+              [slot]: {
+                code: 'not_confirmed',
+                address: launched.address,
+                turn: started.turn,
+                screen: started.screen,
+                at: new Date().toISOString(),
+              },
             },
           },
-        },
-  );
-  await place(space.session, launched.address, tab, expectedTabName(readState(leaf.path)));
-  return started;
+    );
+    await place(space.session, launched.address, tab, expectedTabName(readState(leaf.path)));
+    return started;
+  } finally {
+    stream.stop();
+  }
 }
 
 // A consultant or direct reviewer: a child of the calling terminal, in the caller's tab when it sits
@@ -380,27 +401,32 @@ async function launch(
   const tabs: { space: string; tab: string }[] = (await docGet(space.session)).spaces.flatMap((s: Space) =>
     s.tabs.filter((t) => t.terminals.includes(caller)).map((t) => ({ space: s.id, tab: t.id })),
   );
-  const launched: Seen = await run(space.session, {
-    name: spec.name,
-    cwd: process.cwd(),
-    parent: { address: caller, outlive: false },
-    labels: {
-      akrogon: '1',
-      'akrogon.repo': repo.name,
-      ...spec.labels,
-      ...(tabs.length === 0
-        ? { 'herdr.space': space.space }
-        : { 'herdr.space': tabs[0].space, 'herdr.tab': tabs[0].tab }),
-    },
-    argv: ['env', ...UNSET, ...harness.argv, ...(task === undefined || harness.kind === 'agy' ? [] : [task])],
-  });
-  if (task === undefined) {
-    console.log(launched.address);
-    return null;
+  const stream: Stream = await subscribe(space.session, labelArgs(spec.labels));
+  try {
+    const launched: Seen = await run(space.session, {
+      name: spec.name,
+      cwd: process.cwd(),
+      parent: { address: caller, outlive: false },
+      labels: {
+        akrogon: '1',
+        'akrogon.repo': repo.name,
+        ...spec.labels,
+        ...(tabs.length === 0
+          ? { 'herdr.space': space.space }
+          : { 'herdr.space': tabs[0].space, 'herdr.tab': tabs[0].tab }),
+      },
+      argv: ['env', ...UNSET, ...harness.argv, ...(task === undefined || harness.kind === 'agy' ? [] : [task])],
+    });
+    if (task === undefined) {
+      console.log(launched.address);
+      return null;
+    }
+    const started: Started = await firstTask(stream, launched, harness.kind, task);
+    announce(started);
+    return started;
+  } finally {
+    stream.stop();
   }
-  const started: Started = await firstTask(launched, harness.kind, task);
-  announce(started);
-  return started;
 }
 
 export async function startConsultant(

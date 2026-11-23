@@ -288,6 +288,10 @@ export function screen(session: string, address: string): Promise<string> {
   return hc(session, ['read', address]);
 }
 
+export function labelArgs(labels: Record<string, string>): string[] {
+  return Object.entries(labels).flatMap(([key, value]) => ['--label', `${key}=${value}`]);
+}
+
 export async function run(
   session: string,
   spec: {
@@ -314,7 +318,7 @@ export async function run(
           spec.name,
           '--cwd',
           spec.cwd,
-          ...Object.entries(spec.labels).flatMap(([key, value]) => ['--label', `${key}=${value}`]),
+          ...labelArgs(spec.labels),
           '--',
           ...spec.argv,
         ]),
@@ -488,40 +492,138 @@ function merged(t: Seen, type: string, data: Record<string, unknown> | null): Se
   }
 }
 
-export function waitFor(
+// An event stream whose lines queue until read. hc 0.1.22 can drop the events of a change made while a
+// subscription starts, so a seat's stream opens, by its labels, before the seat runs.
+export type Stream = { session: string; next: (ms: number) => Promise<HcLine | null>; stop: () => void };
+
+// Opens the stream and resolves once its snapshot has arrived, or null when none arrives by `deadline`.
+// `next` returns the oldest queued line, or null when `ms` runs out first, so a spent wait takes no line;
+// once the stream has ended and its queue is read, it throws.
+async function open(session: string, args: string[], deadline: number): Promise<Stream | null> {
+  const queue: HcLine[] = [];
+  let wake: () => void = (): void => {};
+  let ended: Error | null = null;
+  const stream = follow(session, args, (line: HcLine): void => {
+    queue.push(line);
+    wake();
+  });
+  stream.ended.then(
+    () => {
+      ended = new Error(JSON.stringify({ session, args, error: 'event stream ended' }));
+      wake();
+    },
+    (error: Error) => {
+      ended = error;
+      wake();
+    },
+  );
+  const arrival = (ms: number): Promise<void> =>
+    new Promise<void>((done) => {
+      const timer = setTimeout(done, ms);
+      wake = (): void => {
+        clearTimeout(timer);
+        done();
+      };
+    });
+  const next = async (ms: number): Promise<HcLine | null> => {
+    const end: number = Date.now() + ms;
+    for (;;) {
+      if (queue.length === 0 && ended !== null) throw ended;
+      if (Date.now() >= end) return null;
+      if (queue.length > 0) return queue.splice(0, 1)[0];
+      await arrival(end - Date.now());
+    }
+  };
+  while (queue.length === 0) {
+    if (ended !== null) {
+      stream.stop();
+      throw ended;
+    }
+    if (Date.now() >= deadline) {
+      stream.stop();
+      return null;
+    }
+    await arrival(deadline - Date.now());
+  }
+  return { session, next, stop: stream.stop };
+}
+
+// A seat's stream, whose snapshot must arrive within the hc deadline.
+export async function subscribe(session: string, args: string[]): Promise<Stream> {
+  const stream: Stream | null = await open(session, args, Date.now() + HC_DEADLINE_MS);
+  if (stream === null) throw new Error(JSON.stringify({ session, args, error: 'no snapshot', ms: HC_DEADLINE_MS }));
+  return stream;
+}
+
+// Reads the stream in order until `until` passes on the terminal at `address`, or null once `ms` runs out,
+// which settles the wait even while `until` is pending: a spent wait asks `until` nothing more, and a late
+// result of `until` changes nothing (a late failure is logged). The terminal starts as `start` (null: not
+// seen yet); a snapshot, or its `created` event while it is unseen, sets it, and its other events merge
+// into it. Lines of other terminals are skipped.
+export async function waitFor(
+  stream: Stream,
+  address: string,
+  start: Seen | null,
+  until: (t: Seen, line: HcLine) => boolean | Promise<boolean>,
+  ms: number,
+): Promise<Seen | null> {
+  const deadline: number = Date.now() + ms;
+  const expired: PromiseWithResolvers<null> = Promise.withResolvers<null>();
+  const timer: Timer = setTimeout(() => expired.resolve(null), ms);
+  let current: Seen | null = start;
+  try {
+    for (;;) {
+      const line: HcLine | null = await stream.next(deadline - Date.now());
+      if (line === null) return null;
+      if (!('terminals' in line) && (!('terminal' in line.params) || line.params.terminal !== address)) continue;
+      current =
+        'terminals' in line
+          ? (line.terminals.find((t: Seen) => t.address === address) ?? null)
+          : current === null
+            ? line.params.type === 'created'
+              ? seen(stream.session, terminalSchema.parse(line.params.data))
+              : null
+            : merged(current, line.params.type, line.params.data);
+      if (current === null) continue;
+      const asked: Promise<boolean> = Promise.resolve(until(current, line));
+      const passed: boolean | null = await Promise.race([asked, expired.promise]);
+      if (passed === null) {
+        asked.catch((error: unknown) =>
+          console.warn(
+            JSON.stringify({
+              warning: 'wait predicate failed after its deadline',
+              session: stream.session,
+              address,
+              ...(error instanceof Error
+                ? { error: error.name, message: error.message }
+                : { error: Bun.inspect(error) }),
+            }),
+          ),
+        );
+        return null;
+      }
+      if (passed) return current;
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// A wait on a terminal that already runs, over a stream of its own; `ms` bounds the subscription too.
+export async function waitForTerminal(
   session: string,
   address: string,
   until: (t: Seen, line: HcLine) => boolean | Promise<boolean>,
   ms: number,
 ): Promise<Seen | null> {
-  return new Promise<Seen | null>((done, fail) => {
-    let current: Seen | null = null;
-    let settled: boolean = false;
-    const settle = (outcome: () => void): void => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      stream.stop();
-      outcome();
-    };
-    const stream = follow(session, ['--terminal', address], async (line: HcLine): Promise<void> => {
-      if (settled) return;
-      current =
-        'terminals' in line
-          ? (line.terminals.find((t: Seen) => t.address === address) ?? null)
-          : current === null || !('terminal' in line.params)
-            ? current
-            : merged(current, line.params.type, line.params.data);
-      const reached: Seen | null = current;
-      if (reached !== null && (await until(reached, line))) settle(() => done(reached));
-    });
-    const timer = setTimeout(() => settle(() => done(null)), ms);
-    stream.ended.then(
-      () =>
-        settle(() => fail(new Error(JSON.stringify({ session, address, error: 'event stream ended', last: current })))),
-      (error: unknown) => settle(() => fail(error)),
-    );
-  });
+  const deadline: number = Date.now() + ms;
+  const stream: Stream | null = await open(session, ['--terminal', address], deadline);
+  if (stream === null) return null;
+  try {
+    return await waitFor(stream, address, null, until, deadline - Date.now());
+  } finally {
+    stream.stop();
+  }
 }
 
 // Follows the session's events and reads the herdr-app document at subscription and on each of its

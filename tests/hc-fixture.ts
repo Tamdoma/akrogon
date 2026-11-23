@@ -202,6 +202,8 @@ export type HcCore = {
   get: (address: string) => Promise<Terminal>;
   tasks: (address: string) => string[];
   waitFor: (address: string, until: (t: Terminal) => boolean, ms?: number) => Promise<Terminal>;
+  // Resolves once every waitFor reader of this core has ended, including a read still running after its wait settled.
+  reading: () => Promise<void>;
   appCalls: () => { argv: string[]; home: string | null; planned: boolean }[];
   setWindow: (window: 'open' | 'closed', rename?: 'ok' | 'fail') => void;
   link: (other: HcCore) => void;
@@ -352,6 +354,7 @@ export async function hcCore(
     if (reply.code !== 0) throw new Error(`hc get ${address} failed: ${reply.stderr}`);
     return terminalSchema.parse(JSON.parse(reply.stdout));
   };
+  const readers: Promise<void>[] = [];
   // Follows hc events for one terminal (snapshot first), never a timed re-read; the timer only bounds it.
   const waitFor = (address: string, until: (t: Terminal) => boolean, ms: number = WAIT_MS): Promise<Terminal> =>
     new Promise<Terminal>((done, fail) => {
@@ -362,16 +365,19 @@ export async function hcCore(
         stderr: 'ignore',
       });
       let current: Terminal | null = null;
+      let settled: boolean = false;
       const timer = setTimeout(() => {
+        settled = true;
         child.kill();
         fail(new Error(`terminal ${address} did not reach the expected state in ${ms} ms: ${JSON.stringify(current)}`));
       }, ms);
       const finish = (t: Terminal): void => {
+        settled = true;
         clearTimeout(timer);
         child.kill();
         done(t);
       };
-      (async () => {
+      const reading: Promise<void> = (async (): Promise<void> => {
         let buffer: string = '';
         const reader = hcReader(new Set(['status', 'turn']));
         for await (const chunk of child.stdout) {
@@ -382,17 +388,27 @@ export async function hcCore(
             const read = reader(JSON.parse(line));
             if (read === null) continue;
             const message = z.record(z.string(), z.unknown()).parse('snapshot' in read ? read.snapshot : read.event);
-            if (Array.isArray(message.terminals)) current = z.array(terminalSchema).parse(message.terminals)[0] ?? null;
+            // A snapshot can miss a change made while the stream started, whose events hc 0.1.22 can drop:
+            // the terminal is read when the snapshot arrives.
+            if (Array.isArray(message.terminals))
+              current = z
+                .array(terminalSchema)
+                .parse(message.terminals)
+                .some((t: Terminal) => t.address === address)
+                ? await get(address)
+                : null;
             else if (current !== null) {
               const params = z
                 .object({ type: z.string(), data: z.record(z.string(), z.unknown()) })
                 .parse(message.params);
               current = terminalSchema.parse({ ...current, ...params.data });
             }
+            if (settled) return;
             if (current !== null && until(current)) return finish(current);
           }
         }
       })().catch(fail);
+      readers.push(reading);
     });
   const tasks = (address: string): string[] => {
     const file: string = resolve(standin, `${address}.tasks`);
@@ -422,6 +438,9 @@ export async function hcCore(
     get,
     tasks,
     waitFor,
+    reading: async (): Promise<void> => {
+      await Promise.all(readers);
+    },
     appCalls,
     setWindow,
     link: (other: HcCore): void => symlinkSync(other.socket, resolve(runtime, 'herdr-core', `${other.session}.sock`)),

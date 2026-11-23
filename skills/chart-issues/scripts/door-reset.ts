@@ -14,7 +14,7 @@
 import { appendFileSync } from 'node:fs';
 import { z } from 'zod';
 import { readGlobal, requireRepo } from '../../../src/config';
-import { docGet, hc, repoSpace, send, waitFor, type Seen, type SpaceResolution } from '../../../src/hc';
+import { docGet, hc, repoSpace, send, waitForTerminal, type Seen, type SpaceResolution } from '../../../src/hc';
 import {
   transcriptEnd,
   transcriptFor,
@@ -86,7 +86,7 @@ const boundary: number = transcriptEnd(pre);
 step('started', 'queued', { pre, boundary, kind });
 
 const gone = (t: Seen): boolean => t.state === 'finished';
-const ended: Seen | null = await waitFor(session, a, (t) => idle(t) || gone(t), env.DOOR_RESET_TURN_BOUND_MS);
+const ended: Seen | null = await waitForTerminal(session, a, (t) => idle(t) || gone(t), env.DOOR_RESET_TURN_BOUND_MS);
 if (ended === null) stop('wait-turn-end', 'turn open');
 if (gone(ended)) stop('wait-turn-end', 'identity changed');
 step('wait-turn-end', 'turn ended', { turn: ended.turn });
@@ -128,7 +128,7 @@ else {
       if (sent.started === false) await hc(session, ['keys', a, 'enter']);
       // A wait on idle alone can return on the snapshot from before the rename: the turn count must
       // pass the one the send answered.
-      const renamed: Seen | null = await waitFor(
+      const renamed: Seen | null = await waitForTerminal(
         session,
         a,
         (t) => gone(t) || (idle(t) && t.turn > sent.turn),

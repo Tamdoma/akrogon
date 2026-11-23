@@ -263,6 +263,294 @@ test('the event stream skips line kinds it does not read and still rejects a mal
   }
 });
 
+// A fake hc terminal record and its status report event, and a fake hc in <dir> that logs each call's
+// command to <dir>/calls.
+function fakeRecord(turn: number, status: string | null): object {
+  return {
+    address: 't1',
+    labels: {},
+    argv: ['sh'],
+    cwd: '/',
+    state: 'live',
+    created_ms: 1,
+    screen: 'exact',
+    cols: 80,
+    rows: 24,
+    turn,
+    status: status === null ? null : { state: status },
+  };
+}
+function fakeReport(seq: number, state: string): object {
+  return {
+    method: 'event',
+    params: { type: 'status', terminal: 't1', seq, data: { records: {}, reported: true, status: { state } } },
+  };
+}
+function fakeHc(dir: string, body: string[]): void {
+  rmSync(resolve(dir, 'calls'), { force: true });
+  writeFileSync(
+    resolve(dir, 'hc'),
+    ['#!/bin/sh', `printf '%s\n' "$1" >> '${dir}/calls'`, ...body, 'exit 1'].join('\n') + '\n',
+    { mode: 0o755 },
+  );
+}
+function fakeLines(lines: object[]): string {
+  return `printf '%s\n' ${lines.map((line: object) => `'${JSON.stringify(line)}'`).join(' ')}`;
+}
+function fakeCalls(dir: string): string[] {
+  return readFileSync(resolve(dir, 'calls'), 'utf8').split('\n').filter(Boolean);
+}
+function inProcess(dir: string, script: string[], env: NodeJS.ProcessEnv = {}): Promise<SpawnResult> {
+  return spawnCaptured(['bun', '-e', [...script, 'process.exit(0);'].join('\n')], {
+    env: { ...process.env, ...env, PATH: `${dir}:${process.env.PATH}` },
+  });
+}
+
+// The agy retry reads events: hc sends a fresh idle report although the state stays idle, and that report
+// reaches the predicate.
+test('an event wait passes a fresh status report with an unchanged state to its predicate', async () => {
+  const dir: string = mkdtempSync(resolve(tmpdir(), 'akr-wait-'));
+  try {
+    fakeHc(dir, [
+      `if [ "$1" = events ]; then ${fakeLines([{ seq: 5, terminals: [fakeRecord(0, 'idle')] }, fakeReport(6, 'idle')])}; exec sleep 30; fi`,
+    ]);
+    const repeated: SpawnResult = await inProcess(dir, [
+      `import { subscribe, waitFor } from ${JSON.stringify(resolve(import.meta.dir, '../src/hc.ts'))};`,
+      'const asked = [];',
+      "const stream = await subscribe('s', ['--terminal', 't1']);",
+      "const t = await waitFor(stream, 't1', null, (t) => { asked.push(`${t.turn} ${t.status?.state}`); return false; }, 1500);",
+      'stream.stop();',
+      'console.log(JSON.stringify({ t, asked }));',
+    ]);
+    expect(repeated.code).toBe(0);
+    expect(JSON.parse(repeated.stdout)).toEqual({ t: null, asked: ['0 idle', '0 idle'] });
+    expect(fakeCalls(dir)).toEqual(['events']);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// hc 0.1.22 can drop the report a seat makes while a subscription starts, from the events and the
+// snapshot both. The fake hc closes a stream opened after the seat runs at once, so that order fails fast;
+// a stream opened before it gets the seat's `created` event and its reports. An agy seat reports idle at
+// once: its task goes in on that report and its start is confirmed.
+test('a seat that reports at once never loses that report', async () => {
+  const dir: string = mkdtempSync(resolve(tmpdir(), 'akr-start-'));
+  try {
+    const created: object = {
+      method: 'event',
+      params: { type: 'created', terminal: 't1', seq: 2, data: fakeRecord(0, null) },
+    };
+    const wait = (command: string): string => `while ! grep -q '^${command}$' '${dir}/calls'; do sleep 0.02; done`;
+    fakeHc(dir, [
+      'if [ "$1" = events ]; then',
+      `  if grep -q '^run$' '${dir}/calls'; then exit 1; fi`,
+      `  ${fakeLines([{ seq: 1, terminals: [] }])}`,
+      `  ${wait('run')}`,
+      `  ${fakeLines([created, fakeReport(3, 'idle')])}`,
+      `  ${wait('send')}`,
+      `  ${fakeLines([fakeReport(4, 'working')])}`,
+      '  exec sleep 30',
+      'fi',
+      `if [ "$1" = connect ]; then ${fakeLines([{ jsonrpc: '2.0', id: 1, result: { version: 1, value: null } }])}; exit 0; fi`,
+      `if [ "$1" = run ]; then ${fakeLines([{ address: 't1' }])}; exit 0; fi`,
+      `if [ "$1" = get ]; then ${fakeLines([fakeRecord(0, 'idle')])}; exit 0; fi`,
+      `if [ "$1" = send ]; then ${fakeLines([{ started: true, status: 'working', turn: 0 }])}; exit 0; fi`,
+      `if [ "$1" = read ]; then echo screen; exit 0; fi`,
+    ]);
+    const started: SpawnResult = await inProcess(
+      dir,
+      [
+        `import { startConsultant } from ${JSON.stringify(resolve(import.meta.dir, '../src/seat.ts'))};`,
+        "const global = { harnesses: { agy: 'agy --model {model}' }, prefixes: { r: 'rp' } };",
+        "const config = { harness: 'agy', model: 'm', effort: 'high' };",
+        "const started = await startConsultant(global, { name: 'r' }, { session: 's', space: 'sp' }, 't0', 'c', config, 'task');",
+        'console.log(JSON.stringify(started.outcome));',
+      ],
+      { AKROGON_START_PROOF_MS: String(WAIT_MS) },
+    );
+    expect(started.code).toBe(0);
+    expect(started.stdout.trim().split('\n').at(-1)).toBe('"confirmed"');
+    expect(fakeCalls(dir).filter((call: string) => call === 'send')).toHaveLength(1);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// One deadline bounds a seat's agy wait, and it settles at that deadline while the trust-key call is still
+// pending. The fake `hc run` returns once the seat's trust dialog is on the stream, so the start-proof
+// budget covers no launch. The reply comes after that budget, with an idle report queued meanwhile: the
+// wait sends no task, and the reply, a success or a failure, changes nothing (a failure is logged).
+test.each([
+  ['succeeds', 0],
+  ['fails', 1],
+])(
+  'a spent agy wait settles at its deadline while a held trust-key reply later %s',
+  async (_: string, code: number) => {
+    const dir: string = mkdtempSync(resolve(tmpdir(), 'akr-held-'));
+    try {
+      const created: object = {
+        method: 'event',
+        params: { type: 'created', terminal: 't1', seq: 2, data: fakeRecord(0, null) },
+      };
+      const blocked: object = {
+        method: 'event',
+        params: {
+          type: 'status',
+          terminal: 't1',
+          seq: 3,
+          data: { records: {}, reported: true, status: { state: 'blocked', kind: 'permission' } },
+        },
+      };
+      const wait = (command: string): string => `while ! grep -q '^${command}$' '${dir}/calls'; do sleep 0.02; done`;
+      fakeHc(dir, [
+        'if [ "$1" = events ]; then',
+        `  ${fakeLines([{ seq: 1, terminals: [] }])}`,
+        `  ${wait('run')}`,
+        `  ${fakeLines([created, blocked])}`,
+        `  touch '${dir}/announced'`,
+        `  ${wait('keys')}`,
+        `  ${fakeLines([fakeReport(4, 'idle')])}`,
+        '  exec sleep 30',
+        'fi',
+        `if [ "$1" = connect ]; then ${fakeLines([{ jsonrpc: '2.0', id: 1, result: { version: 1, value: null } }])}; exit 0; fi`,
+        `if [ "$1" = run ]; then while [ ! -e '${dir}/announced' ]; do sleep 0.02; done; ${fakeLines([{ address: 't1' }])}; exit 0; fi`,
+        `if [ "$1" = keys ]; then sleep 3; touch '${dir}/replied'; exit ${code}; fi`,
+        `if [ "$1" = get ]; then ${fakeLines([fakeRecord(0, 'idle')])}; exit 0; fi`,
+        `if [ "$1" = send ]; then ${fakeLines([{ started: true, status: 'working', turn: 0 }])}; exit 0; fi`,
+        `if [ "$1" = read ]; then echo screen; exit 0; fi`,
+      ]);
+      const started: SpawnResult = await inProcess(
+        dir,
+        [
+          `import { existsSync } from 'node:fs';`,
+          `import { startConsultant } from ${JSON.stringify(resolve(import.meta.dir, '../src/seat.ts'))};`,
+          'const warned = Promise.withResolvers();',
+          'const warn = console.warn;',
+          "console.warn = (line) => { warn(line); if (String(line).includes('wait predicate failed after its deadline')) warned.resolve(true); };",
+          "const global = { harnesses: { agy: 'agy --model {model}' }, prefixes: { r: 'rp' } };",
+          "const config = { harness: 'agy', model: 'm', effort: 'high' };",
+          "const started = await startConsultant(global, { name: 'r' }, { session: 's', space: 'sp' }, 't0', 'c', config, 'task');",
+          `const early = !existsSync(${JSON.stringify(resolve(dir, 'replied'))});`,
+          `const logged = ${code} === 0 ? false : await Promise.race([warned.promise, Bun.sleep(10000).then(() => false)]);`,
+          'console.log(JSON.stringify({ outcome: started.outcome, early, logged }));',
+        ],
+        { AKROGON_START_PROOF_MS: '300' },
+      );
+      expect(started.code).toBe(0);
+      expect(JSON.parse(started.stdout.trim().split('\n').at(-1) ?? '')).toEqual({
+        outcome: 'unconfirmed',
+        early: true,
+        logged: code !== 0,
+      });
+      expect(fakeCalls(dir)).toContain('keys');
+      expect(fakeCalls(dir)).not.toContain('send');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  },
+);
+
+// A predicate that rejects after its wait ended, with a reason that is no Error, is logged and changes
+// nothing. The short wait starts once the stream has its snapshot, so it covers no launch.
+test.each([['undefined'], ['Object.create(null)']])(
+  'a predicate rejection after the deadline is logged when its reason is %s',
+  async (reason: string) => {
+    const dir: string = mkdtempSync(resolve(tmpdir(), 'akr-reason-'));
+    try {
+      fakeHc(dir, [
+        `if [ "$1" = events ]; then ${fakeLines([{ seq: 5, terminals: [fakeRecord(0, 'idle')] }])}; exec sleep 30; fi`,
+      ]);
+      const late: SpawnResult = await inProcess(dir, [
+        `import { subscribe, waitFor } from ${JSON.stringify(resolve(import.meta.dir, '../src/hc.ts'))};`,
+        'const warned = Promise.withResolvers();',
+        'const warn = console.warn;',
+        "console.warn = (line) => { warn(line); if (String(line).includes('wait predicate failed after its deadline')) warned.resolve(typeof JSON.parse(line).error === 'string'); };",
+        "const stream = await subscribe('s', ['--terminal', 't1']);",
+        `const t = await waitFor(stream, 't1', null, () => new Promise((_, reject) => setTimeout(() => reject(${reason}), 300)), 100);`,
+        'const logged = await Promise.race([warned.promise, Bun.sleep(5000).then(() => false)]);',
+        'stream.stop();',
+        'console.log(JSON.stringify({ t, logged }));',
+      ]);
+      expect(late.code).toBe(0);
+      expect(JSON.parse(late.stdout)).toEqual({ t: null, logged: true });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  },
+);
+
+// The caller's bound covers the subscription: a snapshot that comes after it is never read.
+test('a wait on a running terminal ends at its bound while the snapshot is late', async () => {
+  const dir: string = mkdtempSync(resolve(tmpdir(), 'akr-late-'));
+  try {
+    fakeHc(dir, [
+      `if [ "$1" = events ]; then sleep 2; ${fakeLines([{ seq: 5, terminals: [fakeRecord(0, 'idle')] }])}; exec sleep 30; fi`,
+    ]);
+    const late: SpawnResult = await inProcess(dir, [
+      `import { waitForTerminal } from ${JSON.stringify(resolve(import.meta.dir, '../src/hc.ts'))};`,
+      'const begun = Date.now();',
+      "const t = await waitForTerminal('s', 't1', (t) => t.status?.state === 'idle', 50);",
+      'console.log(JSON.stringify({ t, early: Date.now() - begun < 2000 }));',
+    ]);
+    expect(late.code).toBe(0);
+    expect(JSON.parse(late.stdout)).toEqual({ t: null, early: true });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// The fixture's wait reads the terminal when the snapshot lists it; a read that returns after the wait
+// rejected asks the predicate nothing. Here `hc get` holds until the rejection, then returns the terminal,
+// and the predicate count is read once the fixture's reader has taken that reply.
+test('the fixture wait asks its predicate nothing after it rejects', async () => {
+  const dir: string = mkdtempSync(resolve(tmpdir(), 'akr-fixture-wait-'));
+  try {
+    writeFileSync(
+      resolve(dir, 'hc'),
+      [
+        '#!/bin/sh',
+        'if [ "$1" = get ]; then',
+        `  touch '${dir}/get'`,
+        `  while [ ! -e '${dir}/go' ]; do sleep 0.05; done`,
+        `  out=$(${JSON.stringify(Bun.which('hc'))} "$@"); code=$?`,
+        `  printf '%s\\n' "$out" | tee '${dir}/got'`,
+        '  exit $code',
+        'fi',
+        `exec ${JSON.stringify(Bun.which('hc'))} "$@"`,
+      ].join('\n') + '\n',
+      { mode: 0o755 },
+    );
+    const script: string = [
+      `import { existsSync, readFileSync, writeFileSync } from 'node:fs';`,
+      `import { fixture } from ${JSON.stringify(resolve(import.meta.dir, 'helpers.ts'))};`,
+      `import { hcCore } from ${JSON.stringify(resolve(import.meta.dir, 'hc-fixture.ts'))};`,
+      'const f = await fixture();',
+      'const core = await hcCore(f);',
+      'try {',
+      "  const address = JSON.parse((await core.hc(['run', '--bg', '--json', 'sleep', '60'])).stdout).address;",
+      '  let asked = 0;',
+      '  const rejected = await core.waitFor(address, () => { asked += 1; return false; }, 3000).then(() => false, () => true);',
+      `  const read = existsSync(${JSON.stringify(resolve(dir, 'get'))});`,
+      `  writeFileSync(${JSON.stringify(resolve(dir, 'go'))}, '');`,
+      '  await core.reading();',
+      `  const got = readFileSync(${JSON.stringify(resolve(dir, 'got'))}, 'utf8').trim();`,
+      "  console.log(JSON.stringify({ rejected, read, asked, looked: got !== '' && JSON.parse(got).address === address }));",
+      '} finally {',
+      '  await core.stop();',
+      '  f.clean();',
+      '}',
+    ].join('\n');
+    const result: SpawnResult = await spawnCaptured(['bun', '-e', script], {
+      env: { ...process.env, PATH: `${dir}:${process.env.PATH}` },
+    });
+    expect(result.code).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual({ rejected: true, read: true, asked: 0, looked: true });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // The listener died on 2026-11-08: a test core closing while it was probed made connect fail with
 // ECONNRESET, sessions() threw and the listener exited. A reset reads as gone like a refused or missing
 // socket; a socket this process may not reach still fails discovery, so a live duplicate is never hidden.

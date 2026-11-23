@@ -36,7 +36,7 @@ import {
 } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
-import { waitFor, type Seen } from '../../src/hc';
+import { waitForTerminal, type Seen } from '../../src/hc';
 import { spawnCaptured, type SpawnResult } from '../../src/shell';
 import { answerTrust, realHome, required, reservedSessions } from './tier';
 import { observeReady, session, startWatchTier, stopWatchTier, type WatchTier } from './watch-tier';
@@ -174,7 +174,7 @@ async function send(tier: WatchTier, address: string, text: string): Promise<num
 }
 
 async function turnDone(tier: WatchTier, address: string, turn: number, ms: number): Promise<void> {
-  const seen: Seen | null = await waitFor(session, address, (t: Seen) => t.turn > turn && idle(t), ms);
+  const seen: Seen | null = await waitForTerminal(session, address, (t: Seen) => t.turn > turn && idle(t), ms);
   if (seen === null) {
     const term: Term = await get(tier, address);
     throw new Error(`${address} never finished turn ${turn}: ${JSON.stringify(term)}\n${await screen(tier, address)}`);
@@ -560,7 +560,7 @@ async function startCell(cell: Cell): Promise<Term> {
     watcher = z.object({ address: z.string() }).parse(JSON.parse(run.stdout)).address;
     cell.watcher = watcher;
     await Bun.sleep(1000);
-    const ready: Promise<Seen | null> = waitFor(session, watcher, idle, readyTimeout);
+    const ready: Promise<Seen | null> = waitForTerminal(session, watcher, idle, readyTimeout);
     const launchSh: string = resolve(leafTemp, `launch-${cell.kind}-${cell.shape}.sh`);
     const q = (s: string): string => `'${s.replaceAll(`'`, `'\\''`)}'`;
     writeFileSync(launchSh, `#!/bin/sh\nexec env ${launchEnv.map(q).join(' ')} ${spec.argv(model).map(q).join(' ')}\n`);
@@ -585,7 +585,7 @@ async function startCell(cell: Cell): Promise<Term> {
     expect(run.code).toBe(0);
     watcher = z.object({ address: z.string() }).parse(JSON.parse(run.stdout)).address;
     cell.watcher = watcher;
-    const ready: Promise<Seen | null> = waitFor(session, watcher, idle, readyTimeout);
+    const ready: Promise<Seen | null> = waitForTerminal(session, watcher, idle, readyTimeout);
     if (spec.trust !== null) await answerTrust(cell.tier, 'watcher', async () => watcher, spec.trust, ready);
     expect(await ready).not.toBeNull();
   }
@@ -725,7 +725,7 @@ test.serial(
       ]);
       expect(run.code).toBe(0);
       cell.watcher = z.object({ address: z.string() }).parse(JSON.parse(run.stdout)).address;
-      const ready: Promise<Seen | null> = waitFor(session, cell.watcher, idle, 120_000);
+      const ready: Promise<Seen | null> = waitForTerminal(session, cell.watcher, idle, 120_000);
       if (spec.trust !== null) await answerTrust(cell.tier, 'watcher', async () => cell.watcher, spec.trust, ready);
       expect(await ready).not.toBeNull();
 
