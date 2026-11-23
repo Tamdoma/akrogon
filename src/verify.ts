@@ -240,8 +240,9 @@ function minutes(ms: number): number {
 // One eligible head row passes when it holds at least one red entry and every red entry's failed
 // names also fail the same command on a completed base run linked from that head at the merge-base;
 // a blocked entry never ran on the head and needs no cover, and a base entry at exit 0 never covers.
-// A head entry whose log is gone is never covered; a head entry naming no test is covered only by a
-// base entry of the same command also naming none, so a named-vs-nameless pair never covers.
+// Stored failures name each entry; a legacy head entry without them whose log is gone is never covered.
+// A head entry naming no test is covered only by a base entry of the same command also naming none,
+// so a named-vs-nameless pair never covers.
 async function knownRedReceipt(repo: Repo, sha: string, scope: VerifyScope): Promise<boolean> {
   const runs: VerifyRun[] = readVerifyRuns(repo);
   const expected: NamedCommand[] = verifyCommands(repo.config, scope);
@@ -256,10 +257,9 @@ async function knownRedReceipt(repo: Repo, sha: string, scope: VerifyScope): Pro
       for (const entry of head.commands) {
         if (entry.exit === 0 || entry.blocked !== undefined) continue;
         red += 1;
-        const logNames: string[] = await failedTests(repo, entry.log);
-        if (logNames.includes('(log gone)')) return false;
         // A rerun row's final failures are stored; its log holds only the rerun's own names.
-        const names: string[] = entry.failures ?? logNames;
+        const names: string[] = entry.failures ?? (await failedTests(repo, entry.log));
+        if (names.includes('(log gone)')) return false;
         const onCoveredBase = async (): Promise<boolean> => {
           for (const baseRun of runs.filter(
             (run) => run.compares === head.run && run.sha === mergeBase && completed(run),
@@ -268,7 +268,7 @@ async function knownRedReceipt(repo: Repo, sha: string, scope: VerifyScope): Pro
               (item) => item.name === entry.name && item.command === entry.command,
             );
             if (onBase === undefined || onBase.exit === 0 || onBase.blocked !== undefined) continue;
-            const baseNames: string[] = await failedTests(repo, onBase.log);
+            const baseNames: string[] = onBase.failures ?? (await failedTests(repo, onBase.log));
             if (names.every((name) => baseNames.includes(name))) return true;
           }
           return false;

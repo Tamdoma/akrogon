@@ -2376,9 +2376,9 @@ test('a stored name keeps an unresolved main-red covered after its log is gone w
   }
 });
 
-// The receipt gate never reads the field: a gone head or base log refuses even when both rows store
-// the same names.
-test('stored names never satisfy the receipt when a linked head or base log is gone', async () => {
+// The receipt gate reads stored names before any log: a closed leaf's deleted head or base log
+// still satisfies it when both rows store the same names.
+test('stored names satisfy the receipt when a linked head or base log is gone', async () => {
   const f: Fixture = await fixture();
   try {
     const { leafPath, worktree } = await callerWorktree(f);
@@ -2409,19 +2409,17 @@ test('stored names never satisfy the receipt when a linked head or base log is g
     // Both logs present: the stored-equal pair satisfies the gate exactly as its logs do.
     await requireGreenReceipt(repo, head, 'leaf');
     rmSync(headLog);
-    await expect(requireGreenReceipt(repo, head, 'leaf')).rejects.toThrow(`No green leaf verify receipt for ${head}`);
-    writeFileSync(headLog, '(fail) alpha\n');
+    await requireGreenReceipt(repo, head, 'leaf');
     rmSync(baseLog);
-    await expect(requireGreenReceipt(repo, head, 'leaf')).rejects.toThrow(`No green leaf verify receipt for ${head}`);
+    await requireGreenReceipt(repo, head, 'leaf');
     expect(records(f)).toHaveLength(size);
   } finally {
     f.clean();
   }
 });
 
-// `verify --known-red` on a gone head log stays a fail even though the recorded pair stores equal
-// names; the base run it starts compares as before.
-test('verify --known-red fails a gone head log whose row stores the same names as its base', async () => {
+// `verify --known-red` passes on a gone head log when the recorded pair stores equal names.
+test('verify --known-red passes a gone head log whose row stores the same names as its base', async () => {
   const f: Fixture = await fixture();
   try {
     await failureScript(f, 'alpha');
@@ -2436,9 +2434,8 @@ test('verify --known-red fails a gone head log whose row stores the same names a
     rmSync(headRun.commands[0].log);
     const size: number = records(f).length;
     const result: Result = await verify(f, ['--known-red'], worktree);
-    expect(result.code).toBe(1);
-    expect(result.stdout).toContain(`verify known-red ${head}: fail`);
-    // The fresh base run's readable log is compared as today; every row stays recorded.
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain(`verify known-red ${head}: pass`);
     expect(records(f).length).toBeGreaterThan(size);
   } finally {
     f.clean();
