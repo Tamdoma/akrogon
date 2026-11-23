@@ -390,8 +390,6 @@ test('pi: a label older than the conversation pi started with, or a pi file from
   const run: Run = await startA('pi', 'switch');
   try {
     const folder: string = resolve(run.f.home, '.pi/agent/sessions', `--${run.f.root.replace(/[/.]/g, '-')}--`);
-    // 'working' is reported before the agent opens its first transcript, so the folder may not exist yet.
-    mkdirSync(folder, { recursive: true });
     const left: string = resolve(folder, `1_${randomUUID()}.jsonl`);
     appendFileSync(left, '{}\n');
     utimesSync(left, new Date(0), new Date(0));

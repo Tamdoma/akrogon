@@ -146,12 +146,14 @@ function endTurn(): void {
 
 async function turn(input: string): Promise<void> {
   busy = true;
-  status('working');
   if (transcript === null || pendingSwitch) {
     transcript = open(kind === 'pi' && transcript === null && flag !== -1 ? args[flag + 1] : randomUUID());
     pendingSwitch = false;
   }
   write(record('user', input));
+  // A real harness has written the prompt into its transcript by the time it reports working, so a helper
+  // started on that report always finds A's transcript and the prompt before its boundary.
+  status('working');
   if (input.startsWith('hold')) await readFile(resolve(out, 'release'));
   else await Bun.sleep(300);
   write(record('assistant', 'done'));
