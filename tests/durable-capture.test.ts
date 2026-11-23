@@ -289,7 +289,7 @@ test('an owner moved aside at publication keeps output in the run root and never
   }
 });
 
-test('a pack started during a live capture waits for writers and publication, then akrogon log reads both streams', async () => {
+test('a completion started during a live capture waits for writers and publication, then deletes the published log', async () => {
   const f: Fixture = await fixture();
   try {
     await mergingLeaf(f, 'packw');
@@ -304,7 +304,7 @@ test('a pack started during a live capture waits for writers and publication, th
     try {
       await waitFor(() => existsSync(`${f.home}/ready-pk`), 'ready file');
       await waitFor(() => captures(impl).length === 1, 'capture files');
-      // The pack starts only once the capture is live: a phase that wins the
+      // The completion starts only once the capture is live: a phase that wins the
       // race moves the owner first and the run-check refuses it as gone.
       let phaseDone: boolean = false;
       const phase = cli(f, ['phase', 'packw', 'merged']).then((result) => {
@@ -312,7 +312,7 @@ test('a pack started during a live capture waits for writers and publication, th
         return result;
       });
       // The command cannot exit until released: a finished phase here proves
-      // pack did not wait for the capture writers.
+      // completion did not wait for the capture writers.
       for (let i = 0; i < 30; i++) {
         if (phaseDone) throw new Error('phase finished while the capture was live');
         await Bun.sleep(100);
@@ -328,14 +328,11 @@ test('a pack started during a live capture waits for writers and publication, th
       const checkLog: string | undefined = runResult.stderr.match(/check pk: 0 (\S+)/)?.[1];
       expect(checkLog).toBeDefined();
       expect(checkLog!).toMatch(/check-pk-.+-\d+\.log$/);
-      // Publication removed the partial captures; the archive holds the
-      // combined log and akrogon log reads both streams back.
+      // Publication removed the partial captures; completion then deleted the
+      // combined log and wrote no archive.
       expect(captures(impl)).toEqual([]);
-      expect(readFileSync(resolve(closed, 'evidence.tar.zst')).length).toBeGreaterThan(0);
-      const logged: Result = await cli(f, ['log', checkLog!]);
-      expect(logged.code, logged.stderr).toBe(0);
-      expect(logged.stdout).toContain('MARKER-pk-OUT');
-      expect(logged.stdout).toContain('MARKER-pk-ERR');
+      expect(existsSync(resolve(closed, 'evidence.tar.zst'))).toBe(false);
+      expect([...new Bun.Glob('**/*.log').scanSync({ cwd: closed, dot: true })]).toEqual([]);
     } finally {
       writeFileSync(`${f.home}/release-pk`, '');
       if (cap.proc.exitCode === null) cap.proc.kill('SIGKILL');

@@ -1,5 +1,6 @@
 import { test, expect } from 'bun:test';
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -262,6 +263,41 @@ test('a non-leaf caller with --holder verifies at merge scope and logs into the 
     expect(run).toMatchObject({ leaf: 'checkout', scope: 'merge', sha });
     expect(run.commands.map((item) => item.name)).toEqual(['unit', 'full']);
     expect(run.commands[1].log.startsWith(holder + '/check-full-')).toBe(true);
+  } finally {
+    f.clean();
+  }
+});
+
+// Owner completion can delete a published log before its row is written; the names come from the
+// captured output. A git wrapper deletes the published log on the first git call after it lands,
+// which comes before any reader could open it: resolving a recorded log path itself runs git.
+test('a red row stores its failure names when its published log is deleted before any later git call', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await failureScript(f, 'alpha');
+    const direct: string = resolve(storeDir(f), 'direct');
+    await command(['git', 'worktree', 'add', direct, '-b', 'direct'], f.root);
+    await commitIn(direct, 'code.ts');
+    const holder: string = directHolder(f);
+    const deleted: string = resolve(f.home, 'deleted');
+    const git: string = await command(['sh', '-c', 'command -v git']);
+    const wrapper: string = resolve(f.home, 'bin/git');
+    mkdirSync(dirname(wrapper), { recursive: true });
+    writeFileSync(
+      wrapper,
+      `#!/bin/sh
+for log in '${holder}'/check-test-*.log; do
+  if [ -e "$log" ]; then rm "$log"; printf '%s\\n' "$log" >> '${deleted}'; fi
+done
+exec '${git}' "$@"
+`,
+    );
+    chmodSync(wrapper, 0o755);
+    const result: Result = await verify(f, ['--holder', holder], direct);
+    expect(result.code).toBe(1);
+    const entry: VerifyRun['commands'][number] = records(f)[0].commands[0];
+    expect(readFileSync(deleted, 'utf8')).toBe(`${entry.log}\n`);
+    expect(entry.failures).toEqual(['alpha']);
   } finally {
     f.clean();
   }

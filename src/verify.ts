@@ -22,7 +22,7 @@ import {
   type Repo,
   type RepoConfig,
 } from './config';
-import { failedTests } from './flaky';
+import { failedTests, failureNames } from './flaky';
 import { checkLocation } from './guard';
 import { createSparseWorktree, emitEnvFile } from './next';
 import { trackingRef } from './preflight';
@@ -660,17 +660,17 @@ async function commandRow(
   caller: LeafTarget,
   target: string,
   item: NamedCommand,
-  first: { code: number; log: string },
+  first: { code: number; log: string; output: string },
 ): Promise<CommandRow> {
-  const names: string[] | undefined = first.code === 0 ? undefined : await failedTests(repo, first.log);
-  const failures: string[] | undefined = names === undefined || names.includes('(log gone)') ? undefined : names;
+  // Names come from the captured output: owner completion may delete the published log first.
+  const failures: string[] | undefined = first.code === 0 ? undefined : failureNames(first.output);
   const rerun: string | undefined =
     record.scope === 'merge' && record.compares === undefined ? repo.config.rerun?.[item.name] : undefined;
   if (rerun === undefined || failures === undefined || failures.includes('(no test name)') || failures.length > 3)
     return { ...item, exit: first.code, log: first.log, ...(failures === undefined ? {} : { failures }) };
   const file: string = resolve(passesRoot(), record.run, `rerun-${encodeURIComponent(item.name)}.txt`);
   writeFileSync(file, failures.map((name) => `${name}\n`).join(''));
-  const second: { code: number; log: string } = await checkedRun(
+  const second: { code: number; log: string; output: string } = await checkedRun(
     repo,
     caller,
     record.akrogon_base,
@@ -680,7 +680,7 @@ async function commandRow(
     undefined,
     file,
   );
-  const again: string[] = second.code === 0 ? [] : await failedTests(repo, second.log);
+  const again: string[] = second.code === 0 ? [] : failureNames(second.output);
   const still: string[] = failures.filter((name) => again.includes(name));
   return {
     ...item,
@@ -779,7 +779,7 @@ async function runOnce(repo: Repo, record: PassRecord): Promise<VerifyRun> {
         process.stdout.write(`verify ${item.name}: blocked by ${blocker.name} (${blocker.exit}) ${blocker.log}\n`);
       }
     } else {
-      const settled: PromiseSettledResult<{ code: number; log: string }>[] = await Promise.allSettled(
+      const settled: PromiseSettledResult<{ code: number; log: string; output: string }>[] = await Promise.allSettled(
         members.map((item) => checkedRun(repo, caller, akrogonBase, item.name, ['sh', '-c', item.command], target)),
       );
       let first: unknown;

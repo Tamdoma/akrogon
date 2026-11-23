@@ -268,7 +268,7 @@ function failedRefusal(caller: LeafTarget, repo: Repo, name: string, run: string
 }
 
 // A publish target under an owner that already sits in issues/closed, or that
-// holds .closing while packing, is refused; chart-direct holders resolve to a
+// holds .closing while it packs or completes, is refused; chart-direct holders resolve to a
 // single owner dir and stay allowed. The late rule adds the vanished-owner
 // case: the owner moved to closed while the command ran.
 async function ownerRefusal(target: string, repo: Repo, late: boolean): Promise<string | undefined> {
@@ -303,7 +303,7 @@ export async function checkedRun(
   cwd: string,
   sessions?: string,
   rerunNames?: string,
-): Promise<{ code: number; log: string; stderr_final_nl: boolean }> {
+): Promise<{ code: number; log: string; output: string; stderr_final_nl: boolean }> {
   const early: string | undefined = await ownerRefusal(target, repo, false);
   if (early !== undefined) throw new PublishRefusedError(early);
   const run: string = randomUUID();
@@ -452,7 +452,12 @@ export async function checkedRun(
             });
             unlinkSync(captureOut);
             unlinkSync(captureErr);
-            return { code: result.code, log: kept, stderr_final_nl: result.stderr.endsWith('\n') };
+            return {
+              code: result.code,
+              log: kept,
+              output: result.stdout + result.stderr,
+              stderr_final_nl: result.stderr.endsWith('\n'),
+            };
           } finally {
             closeSync(capFd);
             rmSync(pending, { force: true });

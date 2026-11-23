@@ -211,7 +211,7 @@ test('run-check refuses owner-root holders before running, and same-owner comple
   }
 });
 
-test('completion packs every log into evidence.tar.zst and a logless owner gets no archive', async () => {
+test('completion deletes every log and writes no archive', async () => {
   const f: Fixture = await fixture();
   try {
     const packed: string = leaf(f, 'packed', 'merge', holding(f), 'issue');
@@ -223,51 +223,40 @@ test('completion packs every log into evidence.tar.zst and a logless owner gets 
     expect((await cli(f, ['phase', 'packed', 'merged'])).code).toBe(0);
     expect((await cli(f, ['phase', 'quiet', 'merged'])).code).toBe(0);
     const closed: string = resolve(f.root, 'issues/closed/issue');
-    const members: Map<string, Buffer> | null = await archiveMembers(resolve(closed, 'evidence.tar.zst'));
-    expect(members).not.toBeNull();
-    expect([...members!.keys()].sort()).toEqual([
-      'packed/implementation/check-a-1.log',
-      'packed/implementation/nested/.deep/check-b-1.log',
-    ]);
-    expect(members!.get('packed/implementation/check-a-1.log')!.toString()).toBe('alpha\n');
-    expect(members!.get('packed/implementation/nested/.deep/check-b-1.log')).toEqual(Buffer.from([0, 13, 255]));
+    expect(existsSync(resolve(closed, 'evidence.tar.zst'))).toBe(false);
     expect(findLogs(closed)).toEqual([]);
     const reread = await logBytes(f, resolve(f.root, 'issues/open/issue/packed/implementation/check-a-1.log'));
-    expect(reread.code).toBe(0);
-    expect(reread.bytes.toString()).toBe('alpha\n');
+    expect(reread.code).not.toBe(0);
     expect(readFileSync(resolve(closed, 'packed/notes.txt'), 'utf8')).toBe('not a log\n');
     expect(readFileSync(resolve(f.root, 'issues/closed/issue2/notes.txt'), 'utf8')).toBe('plain\n');
     expect(readState(resolve(closed, 'packed')).phase).toBe('merged');
     const noLogs: string = resolve(f.root, 'issues/closed/issue2');
     expect(readdirSync(noLogs)).toContain('quiet');
-    expect(await archiveMembers(resolve(noLogs, 'evidence.tar.zst'))).toBeNull();
+    expect(existsSync(resolve(noLogs, 'evidence.tar.zst'))).toBe(false);
   } finally {
     f.clean();
   }
 });
 
-test('a retried completion merges the partial archive with the remaining plain logs', async () => {
+test('a retried completion deletes the remaining plain logs and keeps an existing archive readable', async () => {
   const f: Fixture = await fixture();
   try {
     const dir: string = leaf(f, 'union', 'merged', {}, 'issue');
     const owner: string = resolve(f.root, 'issues/open/issue');
     const member: string = 'union/implementation/a.log';
     const bytes: Uint8Array = await new Bun.Archive({ [member]: 'old\n' }).bytes();
-    writeFileSync(resolve(owner, 'evidence.tar.zst'), Bun.zstdCompressSync(bytes, { level: 19 }));
+    const archiveBytes: Uint8Array = Bun.zstdCompressSync(bytes, { level: 19 });
+    writeFileSync(resolve(owner, 'evidence.tar.zst'), archiveBytes);
     writeFileSync(resolve(owner, '.closing'), '');
     writeLog(resolve(dir, 'implementation/b.log'), 'new\n');
     expect((await cli(f, ['next'])).code).toBe(0);
     const closed: string = resolve(f.root, 'issues/closed/issue');
-    const members: Map<string, Buffer> | null = await archiveMembers(resolve(closed, 'evidence.tar.zst'));
-    expect(members).not.toBeNull();
-    expect([...members!.keys()].sort()).toEqual(['union/implementation/a.log', 'union/implementation/b.log']);
-    expect(members!.get('union/implementation/a.log')!.toString()).toBe('old\n');
-    expect(members!.get('union/implementation/b.log')!.toString()).toBe('new\n');
+    expect(Buffer.compare(readFileSync(resolve(closed, 'evidence.tar.zst')), archiveBytes)).toBe(0);
     expect(findLogs(closed)).toEqual([]);
     const first = await logBytes(f, resolve(f.root, 'issues/open/issue/union/implementation/a.log'));
     const second = await logBytes(f, resolve(f.root, 'issues/open/issue/union/implementation/b.log'));
     expect(first.bytes.toString()).toBe('old\n');
-    expect(second.bytes.toString()).toBe('new\n');
+    expect(second.code).not.toBe(0);
   } finally {
     f.clean();
   }
@@ -293,7 +282,7 @@ test('a symlinked log stops the completion and the owner stays open with its log
   }
 });
 
-test('the .closing marker rides through the failed pack and is absent after the move', async () => {
+test('the .closing marker rides through the failed close and is absent after the move', async () => {
   const f: Fixture = await fixture();
   try {
     const dir: string = leaf(f, 'marked', 'merge', holding(f), 'issue');
@@ -309,9 +298,8 @@ test('the .closing marker rides through the failed pack and is absent after the 
     expect((await cli(f, ['next'])).code).toBe(0);
     const closed: string = resolve(f.root, 'issues/closed/issue');
     expect(readdirSync(closed)).not.toContain('.closing');
-    const members: Map<string, Buffer> | null = await archiveMembers(resolve(closed, 'evidence.tar.zst'));
-    expect(members).not.toBeNull();
-    expect(members!.get('marked/.bad.log')!.toString()).toBe('dotfile log\n');
+    expect(existsSync(resolve(closed, 'evidence.tar.zst'))).toBe(false);
+    expect(logPaths(closed)).toEqual([]);
   } finally {
     f.clean();
   }
@@ -354,8 +342,9 @@ test('run-check refuses closed and closing owners at start', async () => {
 test('a member byte conflict between the archive and a plain log stops the pack unchanged', async () => {
   const f: Fixture = await fixture();
   try {
-    const dir: string = leaf(f, 'conflict', 'merge', holding(f), 'issue');
-    const owner: string = resolve(f.root, 'issues/open/issue');
+    const owner: string = resolve(f.root, 'issues/closed/issue');
+    const dir: string = resolve(owner, 'conflict');
+    mkdirSync(dir, { recursive: true });
     const member: string = 'conflict/implementation/a.log';
     const archiveBytes: Uint8Array = Bun.zstdCompressSync(await new Bun.Archive({ [member]: 'old\n' }).bytes(), {
       level: 19,
@@ -363,7 +352,7 @@ test('a member byte conflict between the archive and a plain log stops the pack 
     writeFileSync(resolve(owner, 'evidence.tar.zst'), archiveBytes);
     writeLog(resolve(dir, 'implementation/a.log'), 'different\n');
     writeLog(resolve(dir, 'implementation/b.log'), 'other\n');
-    const result = await cli(f, ['phase', 'conflict', 'merged']);
+    const result = await cli(f, ['pack', 'issues/closed/issue']);
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain(member);
     expect(Buffer.compare(readFileSync(resolve(owner, 'evidence.tar.zst')), archiveBytes)).toBe(0);

@@ -24,7 +24,7 @@ function prefixOf(short: string[], long: string[]): boolean {
 // A red log's names come only from lines Bun prints: `(fail)` titles, `(unnamed)` qualified by its
 // stream's innermost token, and `(script) <script>` for a failed script whose own stream printed no
 // `(fail)` line — the stream's wrappers dropped first, `Signaled:` and free text never naming.
-function names(text: string): string[] {
+export function failureNames(text: string): string[] {
   const titles: string[] = [];
   const failedStreams: string[][] = [];
   for (const match of text.matchAll(/^(?:\(fail\) |(.+?)\| \(fail\) )(.+?)(?: \[[\d.]+m?s\])?$/gm)) {
@@ -56,13 +56,15 @@ export async function failedTests(repo: Repo, recorded: string): Promise<string[
   try {
     bytes = await readLog(repo, recorded, repo.root);
   } catch (error) {
+    // A member an older archive lacks is a plain log completion deleted beside it.
+    if (error instanceof LogError && error.kind === 'member') return ['(log gone)'];
     if (error instanceof LogError && error.kind === 'nomatch') {
       const plain: string = resolve(repo.root, recorded);
       if (existsSync(plain) && statSync(plain).isFile()) bytes = readFileSync(plain);
       else return ['(log gone)'];
     } else throw error;
   }
-  return names(new TextDecoder().decode(bytes));
+  return failureNames(new TextDecoder().decode(bytes));
 }
 
 // A command red then green on the same tree, in completed runs whose setup passed, is one flip

@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { readRepo, type Repo } from '../src/config';
 import { flakyLines } from '../src/flaky';
 import { type VerifyRun } from '../src/verify';
-import { cli, fixture, leaf, seedRun, type Fixture } from './helpers';
+import { cli, fixture, holding, leaf, seedRun, type Fixture } from './helpers';
 
 type Step = {
   tree: string;
@@ -115,7 +115,7 @@ test('flaky lists a command red then green on the same tree by failed test, and 
   }
 });
 
-test('flaky lists failed test names from plain and packed red logs and fails on broken archives', async (): Promise<void> => {
+test('flaky lists failed test names from plain and packed red logs, fails on broken archives and reports a member an archive lacks as gone', async (): Promise<void> => {
   const f: Fixture = await fixture();
   try {
     const repo: Repo = readRepo(f.repo, f.root);
@@ -202,12 +202,37 @@ test('flaky lists failed test names from plain and packed red logs and fails on 
       },
       { tree: 'A', command: 'bun test', exit: 0, log: green, end: '2026-10-14T02:00:00.000Z' },
     ];
-    await expect(
-      flakyLines(
+    expect(
+      await flakyLines(
         repo,
         absent.map((step, index) => run(f, step, index)),
       ),
-    ).rejects.toThrow(resolve(present, 'evidence.tar.zst'));
+    ).toEqual([{ name: 'test', test: '(log gone)', count: 1, last: '2026-10-14T02:00:00.000Z' }]);
+  } finally {
+    f.clean();
+  }
+});
+
+// A legacy row without stored names keeps an owner's older archive readable for flaky after
+// completion deletes the plain log the archive never held.
+test('flaky reports a legacy red log as gone after completion deletes it beside an older archive', async (): Promise<void> => {
+  const f: Fixture = await fixture();
+  try {
+    const dir: string = leaf(f, 'leaf', 'merge', holding(f));
+    await packEvidence(dirname(dir), { 'leaf/old.log': 'old\n' });
+    const log: string = resolve(dir, 'check-test.log');
+    writeFileSync(log, '(fail) alpha\n');
+    const green: string = resolve(dir, 'check-green.log');
+    seedRun(f, run(f, { tree: 'A', command: 'bun test', exit: 1, log, end: '2026-10-14T01:00:00.000Z' }, 0));
+    seedRun(f, run(f, { tree: 'A', command: 'bun test', exit: 0, log: green, end: '2026-10-14T02:00:00.000Z' }, 1));
+    const before: Awaited<ReturnType<typeof cli>> = await cli(f, ['flaky']);
+    expect(before.code).toBe(0);
+    expect(before.stdout).toContain('alpha');
+    expect((await cli(f, ['phase', 'leaf', 'merged'])).code).toBe(0);
+    const after: Awaited<ReturnType<typeof cli>> = await cli(f, ['flaky']);
+    expect(after.code, after.stderr).toBe(0);
+    expect(after.stdout).toContain('(log gone)');
+    expect(after.stdout).not.toContain('alpha');
   } finally {
     f.clean();
   }

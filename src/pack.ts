@@ -54,16 +54,20 @@ export async function packFolder(repo: Repo, folder: string, cwd: string = repo.
   }
 }
 
-// The pack under a lock the caller already holds: completeOwner wraps its own
-// .closing, pack and move in the same exclusive hold.
-export async function packFolderLocked(repo: Repo, folder: string, cwd: string): Promise<void> {
-  const plain: Map<string, Uint8Array> = new Map();
-  for (const name of new Bun.Glob('**/*.log').scanSync({ cwd: folder, dot: true, onlyFiles: false })) {
+// The folder's plain log files, relative to it; a symlinked log refuses.
+export function logFiles(repo: Repo, folder: string): string[] {
+  return [...new Bun.Glob('**/*.log').scanSync({ cwd: folder, dot: true, onlyFiles: false })].filter((name) => {
     const stat = lstatSync(resolve(folder, name));
     if (stat.isSymbolicLink()) throw new Error(`Log is a symlink: ${relative(repo.root, resolve(folder, name))}`);
-    if (!stat.isFile()) continue;
-    plain.set(name, readFileSync(resolve(folder, name)));
-  }
+    return stat.isFile();
+  });
+}
+
+// The pack under a lock the caller already holds.
+async function packFolderLocked(repo: Repo, folder: string, cwd: string): Promise<void> {
+  const plain: Map<string, Uint8Array> = new Map(
+    logFiles(repo, folder).map((name): [string, Uint8Array] => [name, readFileSync(resolve(folder, name))]),
+  );
   const archivePath: string = resolve(folder, ARCHIVE);
   const archived: Map<string, Uint8Array> = new Map();
   if (existsSync(archivePath))

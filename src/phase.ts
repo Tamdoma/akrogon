@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, realpathSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import {
@@ -52,7 +52,7 @@ import { trackingRef } from './preflight';
 import { retiredLessonsPresent } from './lessons';
 import { applyTop, buildStack, isAncestor } from './batch';
 import { requireGreenReceipt } from './verify';
-import { enclosingCapture, packFolderLocked } from './pack';
+import { enclosingCapture, logFiles } from './pack';
 import { flockHold } from './flock';
 import { abandonedCaptures } from './run-check';
 
@@ -390,15 +390,16 @@ export async function completeOwner(repo: Repo, leaf: Leaf, justMerged: boolean)
   if (justMerged) console.log(`${completed.kind} complete ${completed.name}`);
   const enclosing: string | undefined = enclosingCapture(owner);
   if (enclosing !== undefined) throw new Error(`Refusing to complete ${owner}: inside run-check run ${enclosing}`);
-  // The exclusive hold covers the marker, the pack and the move: a capture
-  // writer publishes before any of them or never sees the owner go.
+  // The exclusive hold covers the marker, the log removal and the move: a
+  // capture writer publishes before any of them or never sees the owner go.
+  // Closed owners keep no logs: each run's failures are stored in its row.
   const holder: { release: () => Promise<void> } = await flockHold(resolve(owner, '.lock'), '-x');
   try {
     // Under the exclusive hold every pair found is abandoned: live writers
     // still holding the shared lock would have kept this hold waiting.
     refuseAbandonedCaptures(owner);
     writeFileSync(resolve(owner, '.closing'), '');
-    await packFolderLocked(repo, owner, leaf.path);
+    for (const name of logFiles(repo, owner)) unlinkSync(resolve(owner, name));
     mkdirSync(resolve(repo.root, 'issues/closed'), { recursive: true });
     renameSync(owner, completed.destination);
     rmSync(resolve(completed.destination, '.closing'));
