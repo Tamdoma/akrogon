@@ -1017,51 +1017,6 @@ test('config refuses AKROGON_SESSIONS and AKROGON_SESSION_MINUTES in env and pas
   }
 });
 
-test('config prints paid_budget from the machine config', async () => {
-  const f: Fixture = await fixture();
-  try {
-    const globalPath: string = resolve(f.home, 'config.yaml');
-    const paid_budget = {
-      sessions_per_day: 8,
-      session_minutes: 45,
-      approved: { date: '2026-11-22', answer: 'eight a day is fine' },
-    };
-    yaml(globalPath, { ...(Bun.YAML.parse(readFileSync(globalPath, 'utf8')) as object), paid_budget });
-    const printed = await cli(f, ['config']);
-    expect(printed.code, printed.stderr).toBe(0);
-    expect(Bun.YAML.parse(printed.stdout)).toMatchObject({ paid_budget });
-  } finally {
-    f.clean();
-  }
-});
-
-test('config prints the paid_budget approval answer verbatim and refuses a blank answer', async () => {
-  const f: Fixture = await fixture();
-  try {
-    const globalPath: string = resolve(f.home, 'config.yaml');
-    const machine: object = Bun.YAML.parse(readFileSync(globalPath, 'utf8')) as object;
-    const paid_budget = {
-      sessions_per_day: 8,
-      session_minutes: 45,
-      approved: { date: '2026-11-22', answer: '  Use eight sessions.\n' },
-    };
-    yaml(globalPath, { ...machine, paid_budget });
-    const printed = await cli(f, ['config']);
-    expect(printed.code, printed.stderr).toBe(0);
-    expect(Bun.YAML.parse(printed.stdout)).toMatchObject({ paid_budget });
-
-    yaml(globalPath, {
-      ...machine,
-      paid_budget: { ...paid_budget, approved: { ...paid_budget.approved, answer: ' \n' } },
-    });
-    const refused = await cli(f, ['config']);
-    expect(refused.code).not.toBe(0);
-    expect(refused.stderr).toContain('answer');
-  } finally {
-    f.clean();
-  }
-});
-
 test('ensureLeafTemp creates every level private and refuses a symlinked root', () => {
   const previous: string | undefined = process.env.AKROGON_LEAF_TEMP_ROOT;
   const dir: string = mkdtempSync(resolve(tmpdir(), 'leaf-temp-'));

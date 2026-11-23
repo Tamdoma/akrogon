@@ -653,6 +653,46 @@ test('constructed PATH can dispatch akrogon itself', async () => {
   }
 });
 
+test('a nested run-check inherits neither AKROGON_SESSIONS nor AKROGON_SESSION_MINUTES', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      env: ['AKROGON_HOME', 'AKROGON_LEAF_TEMP_ROOT'],
+      checks: {},
+      grounding: 'none',
+    });
+    const { worktree } = await leafWorktree(f, 'nested');
+    const shim = fakeAkrogon(f);
+    const inner: string = resolve(f.home, 'inner-env');
+    const result: Result = await cli(
+      f,
+      [
+        'run-check',
+        '--name',
+        'outer',
+        '--',
+        'env',
+        'AKROGON_SESSIONS=1',
+        'AKROGON_SESSION_MINUTES=30',
+        'akrogon',
+        'run-check',
+        '--name',
+        'inner',
+        '--',
+        'sh',
+        '-c',
+        `printf %s:%s "\${AKROGON_SESSIONS:-unset}" "\${AKROGON_SESSION_MINUTES:-unset}" > ${inner}`,
+      ],
+      worktree,
+      { ...shim.env, HOME: f.home },
+    );
+    expect(result.code, result.stderr).toBe(0);
+    expect(readFileSync(inner, 'utf8')).toBe('unset:unset');
+  } finally {
+    f.clean();
+  }
+});
+
 test('printed checks refuse before setup and isolate both setup and check environments', async () => {
   const f: Fixture = await fixture();
   try {

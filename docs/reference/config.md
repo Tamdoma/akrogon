@@ -30,7 +30,6 @@ Akrogon looks for `config.yaml` in its home folder. The home folder is `$AKROGON
 | `toolkits` | Test toolkit choices per language, for example `<language>: <runner>`. Setup reads them when a repo has no tests. Default empty. |
 | `repos` | Maps a repo name to its checkout folder. A relative path is read from the akrogon home folder, and `~` means your home folder. Default empty. |
 | `prefixes` | Maps a registered repo name to its prefix of two lowercase letters. Optional. No command reads it yet. |
-| `paid_budget` | The optional paid-session ceiling `akrogon run-check --sessions <n>` reserves against. `sessions_per_day` and `session_minutes` are positive whole numbers; `approved.date` and `approved.answer` hold the operator's approval words. Written only by the operator, never by akrogon. |
 | `run_root` | Optional. When set, each check run's `TMPDIR` and Bun transpiler cache move to a fresh folder `<run_root>/run-XXXXXX`, meant for a RAM-backed path such as `/tmp/akr-ram`. The run's guard unit removes that folder when the run ends, however it ends. The run's record (`.owner`, `out.log`, `refusal.json`) and `AKROGON_EVIDENCE` stay under the leaf temp on disk, seat `TMPDIR` does not move, and a run-check nested inside another check keeps its `TMPDIR` on disk. Reconcile never reads this key. Akrogon creates the folder with mode 700 when it is missing. An absolute path of at most 40 bytes using only letters, digits, `.`, `_`, `-` and `/`, not equal to or inside the leaf temp root (`/var/tmp/akr-<uid>`) or the retired temp root (`/tmp/akr-<uid>`). To roll back, remove the key. |
 
 ```yaml
@@ -50,11 +49,6 @@ repos:
   <repo-name>: <path-to-checkout>
 prefixes:
   <repo-name>: <two letters>
-# Optional paid-session ceiling; written by the operator, never by akrogon.
-# paid_budget:
-#   sessions_per_day: <n>
-#   session_minutes: <minutes>
-#   approved: { date: <YYYY-MM-DD>, answer: <the approval words> }
 ```
 
 ## Repo issues/config.yaml
@@ -85,7 +79,7 @@ Each registered checkout has `issues/config.yaml`. The [init-akrogon skill](../.
 
 Checks run on every leaf, while merge checks run only when a leaf lands.
 
-Environment variable names in `env` and `pass_env` use capital letters, digits and `_`. A few names akrogon sets itself, such as `TMPDIR`, `AKROGON_BASE`, `AKROGON_EVIDENCE`, `AKROGON_SESSIONS` and `AKROGON_SESSION_MINUTES`, are refused.
+Environment variable names in `env` and `pass_env` use capital letters, digits and `_`. A few names akrogon sets itself, such as `TMPDIR`, `AKROGON_BASE` and `AKROGON_EVIDENCE`, are refused. So are `AKROGON_SESSIONS` and `AKROGON_SESSION_MINUTES`, because a paid test's budget is passed in its command, never stored in a repo file.
 
 ```yaml
 remote: origin

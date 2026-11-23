@@ -15,12 +15,12 @@
 //
 // Writes stay under AKROGON_E2E_ROOT (must resolve inside the process TMPDIR) and
 // AKROGON_E2E_OUT; no operator-home file beyond the grant-named trust entries is touched.
-// Paid run: akrogon run-check --name watch-live-<kind>-<shape> --sessions <n> -- env AKROGON_E2E=watch-live
+// Paid run: akrogon run-check --name watch-live-<kind>-<shape> -- env AKROGON_SESSIONS=<n> AKROGON_E2E=watch-live
 //      AKROGON_E2E_KIND=<kind> AKROGON_E2E_SHAPE=<shape> AKROGON_E2E_ROOT=<tmp>
 //      AKROGON_E2E_OUT=<leaf>/implementation/e2e-<kind>-<shape>
 //      WATCH_TICK_SECONDS=<10 standin|30 paid>
 //      bun test --timeout=30000 ./tests/e2e/watch-live.e2e.ts --test-name-pattern <pattern>
-// Use n=2 for root or n=1 for shell. For the free cells above, omit --sessions.
+// Use n=2 for root or n=1 for shell. For the free cells above, omit AKROGON_SESSIONS.
 // A cell runs exactly its own test: preflight cells use the first, stand-in the second, paid
 // the third (patterns 'preflight', 'standin', 'real harness').
 import { test, expect } from 'bun:test';
@@ -39,7 +39,7 @@ import { z } from 'zod';
 import { waitForTerminal, type Seen } from '../../src/hc';
 import { spawnCaptured, type SpawnResult } from '../../src/shell';
 import { answerTrust, realHome, required, reservedSessions } from './tier';
-import { observeReady, session, startWatchTier, stopWatchTier, type WatchTier } from './watch-tier';
+import { claimCoreRuntime, observeReady, session, startWatchTier, stopWatchTier, type WatchTier } from './watch-tier';
 
 const skill: string = resolve(import.meta.dir, '../../skills/watch-issues');
 const timerScript: string = resolve(skill, 'scripts/timer.ts');
@@ -477,6 +477,7 @@ type Cell = {
 async function setupCell(kind: string, shape: string): Promise<Cell> {
   const name: string = `akr-e2e-watch-${kind}-${shape}`;
   const rootName: string = shape === 'shell' ? `${name} sp` : name;
+  claimCoreRuntime();
   const tier: WatchTier = await startWatchTier(
     name,
     {

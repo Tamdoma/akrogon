@@ -364,12 +364,12 @@ grants:
         absence_check: <how absence is confirmed>
     operations: [<allowed operation>]
     effects: <what the operations touch>
-    bounds: <non-count limits on use, or "sessions under paid_budget" for a standing entry>
+    bounds: <non-count limits on use, or "none" for a standing entry with no such limit>
     stop_line: <never-cross condition>
   - approved:
       by: standing
-      date: <YYYY-MM-DD of the paid_budget approval; "pending" while the key is absent>
-      answer: '~/.akrogon/config.yaml paid_budget'
+      date: '2026-11-23'
+      answer: '3b: every money or usage limit (paid runs, paid launches, nested runs), no operator approval'
     principal: <agent identity>
     account: <logged-in harness account>
     credential:
@@ -379,7 +379,7 @@ grants:
     fixtures: []
     operations: [<paid launch operations>]
     effects: <paid model sessions on the logged-in account>
-    bounds: sessions under paid_budget
+    bounds: none
     stop_line: <never-cross condition>
 retained:
   - resources: [<kept resource>]

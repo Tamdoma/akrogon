@@ -30,7 +30,6 @@ import { command, type Result } from './shell';
 import { RUN_CHECK_USAGE } from './usage';
 import { appendTiming } from './timing';
 import { callerScope, runCancelled, withAdmission } from './admission';
-import { reserve } from './budget';
 import { locate, type LogTarget } from './evidence';
 import { FlockError, flockHold } from './flock';
 import { captureAncestry } from './pack';
@@ -216,7 +215,6 @@ export async function runCheck(
   leafOverride: string | undefined,
   holder: string | undefined,
   argv: string[],
-  sessions?: string,
 ): Promise<number> {
   if (leafOverride !== undefined && holder !== undefined) throw new Error('Use --leaf or --holder, not both');
   if (argv.length === 0) throw new Error(RUN_CHECK_USAGE);
@@ -240,7 +238,6 @@ export async function runCheck(
     name ?? 'run',
     argv,
     cwd,
-    sessions,
   );
   process.stderr.write(`${result.stderr_final_nl ? '' : '\n'}check ${name ?? 'run'}: ${result.code} ${result.log}\n`);
   return result.code;
@@ -315,7 +312,6 @@ export async function checkedRun(
   name: string,
   argv: string[],
   cwd: string,
-  sessions?: string,
   rerunNames?: string,
 ): Promise<{ code: number; log: string; output: string; stderr_final_nl: boolean }> {
   const early: string | undefined = await ownerRefusal(target, repo, false);
@@ -332,8 +328,6 @@ export async function checkedRun(
     ...(attempt === undefined ? {} : { attempt }),
   };
   failedRefusal(caller, repo, name, run);
-  const reserved: { sessions: number; minutes: number } | undefined =
-    sessions === undefined ? undefined : await reserve(repo, slug, run, sessions);
   const leafTempDir: string = ensureLeafTemp(repo, slug);
   const runRoot: string = mkdtempSync(resolve(leafTempDir, 'run-'));
   let refused: boolean = false;
@@ -346,10 +340,6 @@ export async function checkedRun(
       JSON.stringify({ pid: process.pid, boot_id: boot, started: new Date().toISOString() }),
     );
     const env: Record<string, string> = constructedEnv(repo, runRoot);
-    if (reserved !== undefined) {
-      env.AKROGON_SESSIONS = String(reserved.sessions);
-      env.AKROGON_SESSION_MINUTES = String(reserved.minutes);
-    }
     env.AKROGON_BASE = akrogonBase;
     if (rerunNames !== undefined) env.AKROGON_RERUN_NAMES = rerunNames;
     env.AKROGON_EVIDENCE = join(leafTempDir, 'evidence', `${encodeURIComponent(name)}-${run}`);

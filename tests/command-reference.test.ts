@@ -29,7 +29,7 @@ const contracts: Record<string, string> = {
   timing: '<slug>|--cohort --since <iso>|--flow --since <YYYY-MM-DD>',
   flaky: '',
   log: '<path>',
-  'run-check': '[--name <n>] [--leaf <path>] [--holder <dir>] [--sessions <n>] -- <argv>...',
+  'run-check': '[--name <n>] [--leaf <path>] [--holder <dir>] -- <argv>...',
   verify: '[--sha <rev>] [--attempt <id>] [--holder <dir>] [--known-red]',
   'verify-pass': '<dir>',
   'stop-run': '[<run-id>]',

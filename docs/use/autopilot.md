@@ -18,7 +18,7 @@ In the chart door's own pane, say it in plain words. Name autopilot, the work yo
 
 You can also switch it on later in the same door, naming a chart. Answers you already gave in that chart stay yours. If the session has no signposts yet, the signposts round runs first, before A answers anything.
 
-The door's first reply repeats the mode, the handed work and the consultants. With the signposts round it asks one needs sheet for the session: every key, login, file, account, permission and approval — including live-change grants and `paid_budget` for paid charting probes — the charting will require, each with purpose and destination. You answer the rows. Charting proceeds while they are pending. A pending need holds the proofs and handoffs that depend on it. The budget row applies only to paid probes by the door.
+The door's first reply repeats the mode, the handed work and the consultants. With the signposts round it asks one needs sheet for the session: every key, login, file, account, permission and approval — including live-change grants — the charting will require, each with purpose and destination. You answer the rows. Charting proceeds while they are pending. A pending need holds the proofs and handoffs that depend on it.
 
 ## What the door does
 
@@ -34,7 +34,7 @@ Every handed chart takes the lifecycle route. The direct route is not offered. T
 
 These make a chart wait while the door moves on to the next chart not waiting, in the signposts order:
 
-- A pending needs-sheet row: a missing key, an approval such as a live-account grant, fixture retention or saving a secret — a refused `paid_budget` reservation waits on its needs row.
+- A pending needs-sheet row: a missing key, an approval such as a live-account grant, fixture retention or saving a secret.
 - A needed new chart: when the chart finds work it cannot hand off without and that work needs its own destination, the door writes a `proposal:` line asking "chart <X> on its own (yes) or bring it into <waiting chart> (no)?". Yes adds that chart to the list you handed it; no brings the work into the waiting chart. The park also sends one `akrogon notice --attention`.
 - A mutating proof call that still needs an operator grant.
 - A need or wider authority found after the signposts round that cannot stay inside what the sheet recorded: the chart parks and the door sends one `akrogon notice --attention` naming the chart, what blocks it and where the record is; outside hc or an unregistered repo it writes the statement and record only.

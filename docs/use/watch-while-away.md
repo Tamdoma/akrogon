@@ -27,7 +27,7 @@ While the watcher is busy, the timer keeps the latest unsent tick. That tick run
 
 ## What stays yours
 
-The watch now consults and recovers on its own: a failure it cannot retry starts a consultant, a peer agent the watch exchanges case files with, and a verified fix resumes the leaf without you. What it stops for and brings to you is the stop list: a credential, login, grant or permission; spend past a recorded grant; a change to a decision or lock you made; host tooling installs or downgrades; a force push or history rewrite; and a fix that would change what was decided. Stopping the watch itself is yours too.
+The watch now consults and recovers on its own: a failure it cannot retry starts a consultant, a peer agent the watch exchanges case files with, and a verified fix resumes the leaf without you. What it stops for and brings to you is the stop list: a credential, login, grant or permission; a change to a decision or lock you made; host tooling installs or downgrades; a force push or history rewrite; and a fix that would change what was decided. Stopping the watch itself is yours too.
 
 The watch still never kills an agent, kills or removes a terminal other than the timer and its own consultant, answers a leaf seat, or edits `state.yaml`, worktrees or `issues/`.
 

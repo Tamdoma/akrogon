@@ -11,8 +11,12 @@ import { command, spawnCaptured, type SpawnResult } from '../../src/shell';
 import { realHome, realRuntime, required } from './tier';
 
 export const session: string = 'akr-e2e-watch';
-export const socket: string = resolve(realRuntime, 'herdr-core', `${session}.sock`);
-const coreState: string = resolve(realHome, '.local/state/herdr-core', session);
+// The core's own runtime folder holds a `bus` link and no `systemd` link, as tests/hc-fixture.ts does:
+// hc then starts no systemd units, so the core, its terminals and any replacement core stay in the
+// cgroup of whoever started them, and a run can end all of them with one cgroup kill.
+export const coreRuntime: string = resolve(realRuntime, session);
+export const socket: string = resolve(coreRuntime, 'herdr-core', `${session}.sock`);
+export const coreState: string = resolve(realHome, '.local/state/herdr-core', session);
 const entry: string = resolve(import.meta.dir, '../../src/akrogon.ts');
 const tests: string = resolve(import.meta.dir, '..');
 
@@ -44,7 +48,16 @@ function listening(path: string): Promise<boolean> {
 }
 
 export function absent(): string[] {
-  return [socket, coreState].filter((path: string) => existsSync(path));
+  return [coreRuntime, coreState].filter((path: string) => existsSync(path));
+}
+
+// A run claims the core runtime before startWatchTier: created without `recursive`, so a folder
+// another run holds is refused, and from then on the folder, the core state and the seats' leaf
+// slices are the claiming run's to remove.
+export function claimCoreRuntime(): void {
+  const left: string[] = absent();
+  if (left.length > 0) throw new Error(`akr-e2e-watch leftovers before the run: ${left.join(', ')}`);
+  mkdirSync(coreRuntime);
 }
 
 // `name` names the registered repo root `<leaf temp>/<name>`; every folder the run creates is
@@ -58,8 +71,6 @@ export async function startWatchTier(
 ): Promise<WatchTier> {
   const leafTemp: string = required('AKROGON_E2E_ROOT');
   const out: string = required('AKROGON_E2E_OUT');
-  const left: string[] = absent();
-  if (left.length > 0) throw new Error(`akr-e2e-watch leftovers before the run: ${left.join(', ')}`);
   const root: string = resolve(leafTemp, opts.rootName ?? name);
   const home: string = resolve(leafTemp, `${name}-home`);
   const scratch: string = resolve(leafTemp, `${name}-scratch`);
@@ -73,7 +84,7 @@ export async function startWatchTier(
   // socket symlink (leafTemp as the store let it delete <rt> and every hc call after unpause
   // answered `unavailable`, which starved the timer's dues in shell-shape runs).
   const worktrees: string = resolve(leafTemp, `${name}-wtr`);
-  const paths: string[] = [root, home, scratch, runtime, appBin, shimBin, standin, standinBin, worktrees];
+  const paths: string[] = [root, home, scratch, runtime, appBin, shimBin, standin, standinBin, worktrees, coreRuntime];
   mkdirSync(out, { recursive: true });
   const record = (file: string, value: unknown): void =>
     writeFileSync(resolve(out, file), typeof value === 'string' ? value : JSON.stringify(value, null, 2));
@@ -116,16 +127,21 @@ export async function startWatchTier(
   writeFileSync(appPlan, JSON.stringify({ window: 'closed', rename: 'ok', calls: [] }));
   symlinkSync(resolve(tests, 'fake-herdr-app.ts'), resolve(appBin, 'herdr-app'));
   symlinkSync(resolve(tests, 'stand-in.sh'), resolve(standinBin, 'fake'));
-  const corePath: string = `${standinBin}:${dirname(process.execPath)}:${z.string().parse(process.env.PATH)}`;
+  // tests/core-bin's systemd-run lets seat scopes reach the user manager from a core with no systemd link.
+  const corePath: string = `${standinBin}:${resolve(tests, 'core-bin')}:${dirname(process.execPath)}:${z.string().parse(process.env.PATH)}`;
+  mkdirSync(resolve(coreRuntime, 'herdr-core'));
+  symlinkSync(resolve(realRuntime, 'bus'), resolve(coreRuntime, 'bus'));
   const coreEnv: Record<string, string> = {
     HOME: realHome,
     PATH: corePath,
     LANG: 'C.UTF-8',
     TERM: 'xterm-256color',
-    XDG_RUNTIME_DIR: realRuntime,
+    XDG_RUNTIME_DIR: coreRuntime,
     DBUS_SESSION_BUS_ADDRESS: `unix:path=${realRuntime}/bus`,
     HC_SESSION: session,
     STANDIN_DIR: standin,
+    // A run's check and verify scopes join the slice the run was started in (src/scope.ts runSlice).
+    AKROGON_RUN_SLICE: process.env.AKROGON_RUN_SLICE ?? '',
   };
   const started: SpawnResult = await spawnCaptured(['hc', 'server', 'start'], { cwd: root, env: coreEnv });
   if (started.code !== 0) throw new Error(`hc server start failed: ${JSON.stringify(started)}`);

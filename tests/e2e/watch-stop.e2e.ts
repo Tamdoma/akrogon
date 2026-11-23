@@ -1,8 +1,8 @@
-// Criterion 3 (watcher-on-hc), attended paid run under its standing grant (reserve 4 harness sessions,
+// Criterion 3 (watcher-on-hc), attended paid run under its standing grant (a budget of 4 harness sessions,
 // at most 4 prompts per stop-check session): one real seat of AKROGON_E2E_KIND (codex or agy)
 // works on a long shell command; the watcher's busy-rule stop is applied and its outcome, screens,
 // transcript label and corrective send are recorded under AKROGON_E2E_OUT for the skill's stop keys.
-// Run: akrogon run-check --name watch-stop-<kind> --sessions 4 -- env AKROGON_E2E=watch-stop AKROGON_E2E_KIND=<kind>
+// Run: akrogon run-check --name watch-stop-<kind> -- env AKROGON_SESSIONS=4 AKROGON_E2E=watch-stop AKROGON_E2E_KIND=<kind>
 //      AKROGON_E2E_ROOT=<leaf temp> AKROGON_E2E_OUT=<leaf>/implementation/watch-e2e
 //      bun test --timeout=30000 ./tests/e2e/watch-stop.e2e.ts
 // Prompts per session: the first task (argv, or agy's first send) and one corrective send.
@@ -12,7 +12,7 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 import { type SpawnResult } from '../../src/shell';
 import { answerTrust, required, reservedSessions } from './tier';
-import { observeReady, session, startWatchTier, stopWatchTier, type WatchTier } from './watch-tier';
+import { claimCoreRuntime, observeReady, session, startWatchTier, stopWatchTier, type WatchTier } from './watch-tier';
 
 // command: the long shell command the seat runs. agy refuses `sleep 600` as a shell timer (B-R1), so it
 // runs a long ping instead. running: screen text that shows the command itself started; agy prints
@@ -108,6 +108,7 @@ test('watch stop: a working seat stops on its stop key, ends idle and takes one 
   const slug: string = `akr-e2e-watch-${kind}`;
   const cwd: string = resolve(required('AKROGON_E2E_ROOT'), slug);
   reservedSessions(4);
+  claimCoreRuntime();
   const tier: WatchTier = await startWatchTier(
     `akr-e2e-watch-${kind}-root`,
     {

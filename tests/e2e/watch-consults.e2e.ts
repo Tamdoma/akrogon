@@ -7,142 +7,126 @@
 // the case record and its signature, notices the push and the move non-attention, and closes
 // the consultant before the resume.
 // The tier records the watcher (pi), initial consultant (agy neon high) and all consultant
-// replacements. Reserve at least 2 sessions. The resumed leaf uses a stand-in.
-// Run: akrogon run-check --name watch-consults --sessions <n> -- env AKROGON_E2E=watch-consults
+// replacements. Pass at least 2 sessions. The resumed leaf uses a stand-in.
+// Run: akrogon run-check --name watch-consults -- env AKROGON_SESSIONS=<n> AKROGON_SESSION_MINUTES=<m>
+//      AKROGON_E2E=watch-consults
 //      AKROGON_E2E_ROOT=<leaf temp> AKROGON_E2E_OUT=<leaf>/implementation/watch-consults-e2e
 //      WATCH_TICK_SECONDS=15
 //      bun test --timeout=720000 ./tests/e2e/watch-consults.e2e.ts
 import { test, expect } from 'bun:test';
-import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import type { Subprocess } from 'bun';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { z } from 'zod';
-import { follow, waitForTerminal, type Seen } from '../../src/hc';
-import { command, spawnCaptured, type SpawnResult } from '../../src/shell';
-import { transcriptFor } from '../../src/transcript';
-import { realHome, required, reservedSessions } from './tier';
-import { observeReady, session, startWatchTier, stopWatchTier, type WatchTier } from './watch-tier';
+import { spawnCaptured, type SpawnResult } from '../../src/shell';
+import { realRuntime, required, reservedSessions } from './tier';
+import { absent, claimCoreRuntime, coreRuntime, coreState } from './watch-tier';
 
-const skill: string = resolve(import.meta.dir, '../../skills/watch-issues');
-const intervalSec: number = Number(process.env.WATCH_TICK_SECONDS ?? '15');
 const leafTemp: string = realpathSync(required('AKROGON_E2E_ROOT'));
-process.env.AKROGON_E2E_ROOT = leafTemp;
+const out: string = required('AKROGON_E2E_OUT');
+// The seat's minute budget bounds the whole run. Teardown gets its own margin past it.
+const minutes: number = z.coerce.number().positive().parse(process.env.AKROGON_SESSION_MINUTES);
+const teardownMs: number = 120_000;
+const killMs: number = 10_000;
+const realBus: Record<string, string> = {
+  DBUS_SESSION_BUS_ADDRESS: `unix:path=${realRuntime}/bus`,
+  XDG_RUNTIME_DIR: realRuntime,
+};
 
-const termSchema = z.object({
-  address: z.string(),
-  name: z.string().nullable().default(null),
-  state: z.string(),
-  turn: z.number().int().default(0),
-  pid: z.number().int().nullable().default(null),
-  parent: z.string().nullable().default(null),
-  labels: z.record(z.string(), z.string()),
-  argv: z.array(z.string()).nullable().default(null),
-  foreground: z
-    .object({ pid: z.number(), argv: z.array(z.string()).default([]) })
-    .passthrough()
-    .nullable()
-    .default(null),
-  status: z.object({ state: z.string() }).passthrough().nullable().default(null),
-});
-type Term = z.infer<typeof termSchema>;
+// This test is the judge. It claims the core runtime, then runs the body (watch-consults-body.ts) as
+// one process in this run's own slice, and everything the body starts stays in that slice (watch-tier.ts
+// coreRuntime). The body writes only to the judge's private control folder. The judge stays outside: at
+// the body's exit or the deadline, whichever comes first, it decides the outcome from the files the
+// body wrote, then ends the whole slice with one cgroup kill, which no process can refuse, removes
+// what it claimed and copies the control folder to <out> as the run's report.
+const slice: string = `akrogon-e2e${process.pid}.slice`;
+const manager: string = z
+  .string()
+  .parse(/^0::(\/.*\/user@\d+\.service)\//m.exec(readFileSync('/proc/self/cgroup', 'utf8'))?.[1]);
+const cgroup: string = `/sys/fs/cgroup${manager}/akrogon.slice/${slice}`;
+const written = (control: string, file: string): string | null =>
+  existsSync(resolve(control, file)) ? readFileSync(resolve(control, file), 'utf8') : null;
+const lines = (text: string | null): string[] => (text ?? '').split('\n').filter(Boolean);
 
-async function get(tier: WatchTier, address: string): Promise<Term> {
-  const reply: SpawnResult = await tier.hc(['get', '--json', address]);
-  if (reply.code !== 0) throw new Error(`hc get ${address}: ${reply.stderr}`);
-  return termSchema.parse(JSON.parse(reply.stdout));
-}
-
-const gone = async (tier: WatchTier, address: string): Promise<boolean> =>
-  (await tier.hc(['get', '--json', address])).code !== 0;
-
-const screen = async (tier: WatchTier, address: string, n: number = 80): Promise<string> =>
-  (await tier.hc(['read', address, '--lines', String(n)])).stdout;
-
-async function send(tier: WatchTier, address: string, text: string): Promise<void> {
-  const sent: SpawnResult = await tier.hc(['send', '--json', address, text]);
-  expect(sent.code).toBe(0);
-}
-
-async function waitLabelled(tier: WatchTier, labels: Record<string, string>, ms: number): Promise<Term | null> {
-  const deadline: number = Date.now() + ms;
-  while (Date.now() < deadline) {
-    const listed = z
-      .object({ terminals: z.array(termSchema) })
-      .parse(await tier.rpc('terminal.list', { all: true, labels }));
-    const live: Term[] = listed.terminals.filter((t) => t.state === 'live');
-    if (live.length > 0) return live[0];
-    await Bun.sleep(1000);
-  }
-  return null;
-}
-
-function statePhase(root: string, slug: string): string {
-  const file: string = resolve(root, 'issues/open/e2e', slug, 'state.yaml');
-  return z.object({ phase: z.string() }).parse(Bun.YAML.parse(readFileSync(file, 'utf8'))).phase;
-}
-
-function notices(scratch: string): { title: string; body: string; attention: boolean }[] {
-  const folder: string = resolve(scratch, '.config/herdr-app-sessions', session, 'akrogon-notices');
-  if (!existsSync(folder)) return [];
-  return readdirSync(folder)
-    .filter((f) => f.endsWith('.json'))
-    .sort()
-    .map((f) =>
-      z
-        .object({ title: z.string(), body: z.string(), attention: z.boolean() })
-        .parse(JSON.parse(readFileSync(resolve(folder, f), 'utf8'))),
-    );
-}
-
-// The staged notify-only failure: `check.review -> failed` happened, two unproductive
-// `failed -> check.review -> failed` cycles followed, so today's Judge only notifies.
-const SLUG: string = 'watch-consult-leaf';
-async function stageLeaf(tier: WatchTier, worktrees: string): Promise<void> {
-  const leafPath: string = resolve(tier.root, 'issues/open/e2e', SLUG);
-  mkdirSync(leafPath, { recursive: true });
-  await command(['git', 'worktree', 'add', '--detach', resolve(worktrees, SLUG), 'main'], tier.root);
-  const state: Record<string, unknown> = {
-    slug: SLUG,
-    phase: 'failed',
-    created: '2026-11-21',
-    repo: 'akre2e',
-    'blocked-by': [],
-    worktree: resolve(worktrees, SLUG),
-    fix_rounds: 1,
-    failure: {
-      cause: 'blocked',
-      phase: 'check.review',
-      slot: 'A',
-      reason: 'merge verify red on main: test fails (BROKEN marker on main)',
-    },
-  };
-  writeFileSync(resolve(leafPath, 'state.yaml'), Bun.YAML.stringify(state));
-  const head: string = (
-    await spawnCaptured(['git', 'rev-parse', 'HEAD'], { cwd: resolve(worktrees, SLUG) })
-  ).stdout.trim();
-  const line = (from: string, to: string): string =>
-    JSON.stringify({
-      ts: '2026-11-21T18:00:00.000Z',
-      repo: 'akre2e',
-      slug: SLUG,
-      from,
-      to,
-      slot: 'A',
-      attempts: { A: 0, B: 0 },
-      fix_rounds: 1,
-      verdict: {},
-      head,
-      diff: '',
-      session: null,
-    });
-  writeFileSync(
-    resolve(tier.root, 'issues/log.jsonl'),
-    [
-      line('failed', 'check.review'),
-      line('check.review', 'failed'),
-      line('failed', 'check.review'),
-      line('check.review', 'failed'),
-    ].join('\n') + '\n',
+// Decided before the kill: an exit is a pass or a red; at the deadline a red the body already wrote
+// stays a red, otherwise it is a deadline stop at the last stage the body reached.
+function verdict(control: string, ended: number | 'deadline'): Error | null {
+  if (ended === 0) return null;
+  const red: string | null = written(control, 'red.txt');
+  if (ended !== 'deadline') return new Error(`watch-consults body exited ${ended}${red === null ? '' : `: ${red}`}`);
+  if (red !== null) return new Error(red);
+  return new Error(
+    `watch-consults exceeded its ${minutes}-minute session deadline; last completed stage: ${written(control, 'stage.txt') ?? 'none'}`,
   );
+}
+
+// paid-starts.jsonl: a line per launch request, written before the request goes out; a line with the
+// address it got (or `failed` when it got none) under the same id; and a line per consultant terminal
+// the core reported. Every request counts, and so does a reported terminal no request got.
+const startLine = z.union([
+  z.object({ id: z.string(), role: z.enum(['watcher', 'consultant']) }),
+  z.object({ id: z.string(), address: z.string() }),
+  z.object({ id: z.string(), failed: z.literal(true) }),
+  z.object({ event: z.string() }),
+]);
+type Usage = { watcher: string | null; consultants: (string | null)[]; sessions: number };
+
+function usage(control: string): Usage {
+  const starts: z.infer<typeof startLine>[] = lines(written(control, 'paid-starts.jsonl')).map((l: string) =>
+    startLine.parse(JSON.parse(l)),
+  );
+  const address = (id: string): string | null =>
+    starts.flatMap((s) => ('address' in s && s.id === id ? [s.address] : []))[0] ?? null;
+  const requested: Set<string> = new Set(starts.flatMap((s) => ('address' in s ? [s.address] : [])));
+  const requests: { id: string; role: 'watcher' | 'consultant' }[] = starts.flatMap((s) => ('role' in s ? [s] : []));
+  const unannounced: string[] = [
+    ...new Set(starts.flatMap((s) => ('event' in s && !requested.has(s.event) ? [s.event] : []))),
+  ];
+  return {
+    watcher: requests.filter((s) => s.role === 'watcher').map((s) => address(s.id))[0] ?? null,
+    consultants: [...requests.filter((s) => s.role === 'consultant').map((s) => address(s.id)), ...unannounced],
+    sessions: requests.length + unannounced.length,
+  };
+}
+
+// `systemd-run --scope` becomes the body once the scope is registered, so killing `launcher` also
+// ends a launcher that has not registered yet: it then creates no scope.
+async function teardown(launcher: Subprocess, control: string): Promise<void> {
+  try {
+    launcher.kill('SIGKILL');
+    await launcher.exited;
+    if (existsSync(cgroup)) {
+      writeFileSync(resolve(cgroup, 'cgroup.kill'), '1');
+      const by: number = Date.now() + killMs;
+      while (readFileSync(resolve(cgroup, 'cgroup.events'), 'utf8').includes('populated 1')) {
+        if (Date.now() > by) throw new Error(`${slice} still populated ${killMs} ms after cgroup.kill`);
+        await Bun.sleep(20);
+      }
+    }
+    const used: Usage = usage(control);
+    writeFileSync(resolve(control, 'paid-sessions.json'), JSON.stringify(used, null, 2));
+    console.log(JSON.stringify(used));
+    // Seats join their leaf slice through tests/core-bin/systemd-run, which lists each slice it used.
+    const leafSlices: string[] = existsSync(resolve(coreRuntime, 'slices'))
+      ? lines(readFileSync(resolve(coreRuntime, 'slices'), 'utf8'))
+      : [];
+    const units: string[] = [...(existsSync(cgroup) ? [slice] : []), ...new Set(leafSlices)];
+    if (units.length > 0) {
+      const stopped: SpawnResult = await spawnCaptured(['systemctl', '--user', 'stop', ...units], {
+        env: { ...process.env, ...realBus },
+      });
+      if (stopped.code !== 0) throw new Error(`slice stop failed: ${JSON.stringify({ units, ...stopped })}`);
+    }
+    for (const path of [coreState, coreRuntime]) rmSync(path, { recursive: true, force: true });
+  } finally {
+    mkdirSync(out, { recursive: true });
+    cpSync(control, out, { recursive: true, force: true });
+  }
+  // Every tier folder but the core runtime lives under leafTemp, and so does the control folder.
+  rmSync(leafTemp, { recursive: true, force: true });
+  const left: string[] = absent();
+  writeFileSync(resolve(out, 'absence.json'), JSON.stringify({ left }, null, 2));
+  expect(left).toEqual([]);
 }
 
 test.serial(
@@ -150,294 +134,53 @@ test.serial(
   async () => {
     expect(required('AKROGON_E2E')).toBe('watch-consults');
     reservedSessions(2);
-    const minutes: number = z.coerce.number().positive().parse(process.env.AKROGON_SESSION_MINUTES);
+    // A run refused here has claimed nothing and started nothing, so it has nothing to remove.
+    claimCoreRuntime();
+    const control: string = mkdtempSync(resolve(leafTemp, 'control-'));
     const deadline: number = Date.now() + minutes * 60_000;
-    const remaining = (limit: number): number => Math.max(0, Math.min(limit, deadline - Date.now()));
-    const requireTime = (): void => {
-      if (Date.now() >= deadline) throw new Error(`watch-consults exceeded its ${minutes}-minute session deadline`);
-    };
     console.log(`session deadline: ${new Date(deadline).toISOString()} (AKROGON_SESSION_MINUTES=${minutes})`);
-    const watcherBinary: string = z.string().parse(Bun.which('pi'));
-    const name: string = 'akr-e2e-watch-consults';
-    const tier: WatchTier = await startWatchTier(
-      name,
+    const body = Bun.spawn(
+      [
+        'systemd-run',
+        '--user',
+        '--scope',
+        '--quiet',
+        `--slice=${slice}`,
+        '--',
+        process.execPath,
+        resolve(import.meta.dir, 'watch-consults-body.ts'),
+      ],
       {
-        a: { harness: 'fake', model: 'work', effort: 'low' },
-        b: { harness: 'fake', model: 'work', effort: 'low' },
-        consultant: { harness: 'agy', model: 'neon', effort: 'high' },
-      },
-      {
-        fake: 'fake --model {model} --effort {effort}',
-        agy: 'agy --model {model} --effort {effort} --mode auto',
-        pi: 'pi --model {model} --thinking {effort} -a --exclude-tools request_user_input',
-      },
-      {
-        startProofMs: 60_000,
-        // The staged base red: the repo's checks and one merge_check share the BROKEN gate.
-        repoConfig: {
-          checks: { test: "sh -c 'test ! -f BROKEN'" },
-          merge_checks: { merge: "sh -c 'test ! -f BROKEN'" },
+        env: {
+          ...process.env,
+          ...realBus,
+          AKROGON_RUN_SLICE: slice,
+          AKROGON_E2E_ROOT: leafTemp,
+          AKROGON_E2E_OUT: control,
+          AKROGON_E2E_DEADLINE: String(deadline),
         },
+        stdout: 'inherit',
+        stderr: 'inherit',
       },
     );
-    const scratch: string = resolve(leafTemp, `${name}-scratch`);
-    const worktrees: string = resolve(leafTemp, `${name}-wtr`);
-    let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
-    let deadlineStop: Promise<SpawnResult> | undefined;
-    let watcherAddress: string | null = null;
-    const consultantStarts: Set<string> = new Set();
-    let observing: Promise<void> | undefined;
-    let closingTier: boolean = false;
-    try {
-      await observeReady(tier);
-      // The leaf's skill copy must be the only watch-issues pi sees.
-      mkdirSync(resolve(tier.root, '.pi/skills'), { recursive: true });
-      symlinkSync(skill, resolve(tier.root, '.pi/skills/watch-issues'));
-      // Stage the base red and the failed leaf.
-      writeFileSync(resolve(tier.root, 'BROKEN'), 'staged base red\n');
-      await command(['git', 'add', 'BROKEN'], tier.root);
-      await command(['git', 'commit', '-m', 'stage base red'], tier.root);
-      await command(['git', 'push', 'origin', 'HEAD:main'], tier.root);
-      await stageLeaf(tier, worktrees);
-      const staged: string = (
-        await spawnCaptured(['git', 'rev-parse', 'origin/main'], { cwd: tier.root })
-      ).stdout.trim();
-      tier.record('staged.txt', `base=${staged}\n`);
-
-      // The watcher session (pi, low): the leaf's skill copy plus its scripts on PATH, then
-      // `watch-issues <root>` starts the timer.
-      const watcherEnv: string[] = [
-        `XDG_RUNTIME_DIR=${tier.runtime}`,
-        `HOME=${realHome}`,
-        `PATH=${tier.shimBin}:${dirname(process.execPath)}:${z.string().parse(process.env.PATH)}`,
-        `DBUS_SESSION_BUS_ADDRESS=unix:path=${tier.runtime}/bus`,
-        // The watcher's own consults.ts calls globalHome() directly — the akrogon shim's
-        // AKROGON_HOME only covers akrogon processes; without it case folders land in the
-        // real ~/.akrogon.
-        `AKROGON_HOME=${z.string().parse(tier.akrogonEnv.AKROGON_HOME)}`,
-        `WATCH_TICK_SECONDS=${intervalSec}`,
-        `AKROGON_E2E_ROOT=${leafTemp}`,
-      ];
-      // Subscribe before the first launch so even a consultant removed before polling is counted.
-      process.env.XDG_RUNTIME_DIR = tier.runtime;
-      const subscribed = Promise.withResolvers<void>();
-      const events = follow(session, ['--label', 'akrogon.watch-consult=akre2e'], (line): void => {
-        if ('terminals' in line) {
-          subscribed.resolve();
-        } else if ('terminal' in line.params && line.params.type === 'created') {
-          consultantStarts.add(line.params.terminal);
-        }
-      });
-      observing = events.ended.then((): void => {
-        if (!closingTier) throw new Error('watch-consults lost its consultant launch stream before teardown');
-      });
-      await Promise.race([subscribed.promise, observing]);
-      requireTime();
-      const run: SpawnResult = await tier.hc([
-        'run',
-        '--bg',
-        '--json',
-        '--name',
-        'akr-e2e-watcher',
-        '--cwd',
-        tier.root,
-        '--',
-        '/usr/bin/env',
-        ...watcherEnv,
-        watcherBinary,
-        '--model',
-        'devin/swe-2-max',
-        '--thinking',
-        'low',
-        '-a',
-        '--exclude-tools',
-        'request_user_input',
-        '--no-skills',
-        '--skill',
-        skill,
-      ]);
-      expect(run.code).toBe(0);
-      const watcher: string = z.object({ address: z.string() }).parse(JSON.parse(run.stdout)).address;
-      watcherAddress = watcher;
-      // The watcher owns the paid consultant terminals. Ending it ends those children too.
-      deadlineTimer = setTimeout(() => {
-        deadlineStop = tier.hc(['kill', watcher]);
-      }, remaining(780_000));
-      tier.record('cwds.json', [tier.root, leafTemp]);
-      // pi must be listening before the task lands: a send before its idle state sits
-      // unsubmitted in the input line (plan-red run and the first lane run both lost it).
-      const ready: Seen | null = await waitForTerminal(
-        session,
-        watcher,
-        (t: Seen) => t.status?.state === 'idle' || t.status?.state === 'done',
-        remaining(120_000),
-      );
-      expect(ready, `watcher never idle; screen:\n${await screen(tier, watcher)}`).not.toBeNull();
-      requireTime();
-      await send(tier, watcher, `watch-issues ${tier.root}`);
-
-      // The consult: the consultant terminal appears under the verified name and labels.
-      const consultant: Term | null = await waitLabelled(
-        tier,
-        { 'akrogon.watch-consult': 'akre2e' },
-        remaining(
-          Math.min(
-            Number(process.env.AKROGON_E2E_CONSULT_WAIT_MS ?? '420000'),
-            Math.max(60_000, deadline - Date.now() - 8 * 60_000),
-          ),
-        ),
-      );
-      requireTime();
-      expect(consultant, `no consultant started; watcher screen:\n${await screen(tier, watcher)}`).not.toBeNull();
-      expect(consultant!.name).toBe('aw-watch-consult');
-      expect(consultant!.parent).toBe(watcher);
-      expect(consultant!.labels['akrogon.repo']).toBe('akre2e');
-      tier.record('consultant.json', consultant);
-
-      // The fix lands: the leaf resumes out of failed, and the case end already closed the
-      // consultant (hc kill + rm) before the resume commands ran: no consultant terminal is left,
-      // a replacement started under liveness included.
-      const resumed: string[] = ['check.fix', 'check.review', 'check.repair'];
-      // The sends are read off the screens while the case runs: `hc read` returns only pi's last
-      // screenful, so a send seen once is kept. A consultant's sends land on the watcher's screen
-      // inside `<hc from="<address> aw-watch-consult">` and its own screen shows its `hc send`;
-      // the watcher's go out as `hc send` commands on its screen. Each send's absolute path is
-      // kept as sent.
-      const named = (l: string): string[] =>
-        [...l.matchAll(/(?:^|[\s"'])(\/[^\s"'<>]*turn-\d+-(?:watch|consultant)\.md)/g)].map((m) => m[1]);
-      const inbound: Set<string> = new Set();
-      const outbound: Set<string> = new Set();
-      const consultants = async (): Promise<Term[]> =>
-        z
-          .object({ terminals: z.array(termSchema) })
-          .parse(await tier.rpc('terminal.list', { all: true, labels: { 'akrogon.watch-consult': 'akre2e' } }))
-          .terminals;
-      const sample = async (): Promise<void> => {
-        for (const l of (await screen(tier, watcher, 200)).split('\n')) {
-          if (/<hc from="\S+ aw-watch-consult">/.test(l)) for (const f of named(l)) inbound.add(f);
-          else if (/\bhc send\b/.test(l)) for (const f of named(l)) outbound.add(f);
-        }
-        for (const c of await consultants())
-          for (const l of (await screen(tier, c.address, 200)).split('\n'))
-            if (/\bhc send\b/.test(l)) for (const f of named(l)) inbound.add(f);
-      };
-      while (!resumed.includes(statePhase(tier.root, SLUG)) && Date.now() < deadline) {
-        await sample();
-        await Bun.sleep(remaining(2000));
-      }
-      requireTime();
-      await sample();
-      const phase: string = statePhase(tier.root, SLUG);
-      const lingering: Term[] = await consultants();
-      tier.record('watcher-screen.txt', await screen(tier, watcher, 200));
-      tier.record('watcher-transcript.txt', (await transcriptFor({ session, address: watcher })) ?? 'none');
-      expect(resumed).toContain(phase);
-      expect(
-        lingering.map((t) => t.address),
-        `consultant not removed\n${await screen(tier, watcher, 60)}`,
-      ).toEqual([]);
-
-      // The leaf's seat A (the tier stand-in) starts on the resumed phase: akrogon next dispatched it.
-      const seat: Term | null = await waitLabelled(
-        tier,
-        { 'akrogon.leaf': SLUG, 'akrogon.seat': 'a' },
-        remaining(Math.min(180_000, Math.max(30_000, deadline - Date.now() - 150_000))),
-      );
-      requireTime();
-      tier.record('seat.json', seat);
-      expect(seat, `no leaf seat after resume to ${phase}`).not.toBeNull();
-
-      // The case record: folder under <AKROGON_HOME>/watch/<repo>/consults/<case-id>/. The case
-      // ends after the resume (status written, then the push and move notices), so the record
-      // is read once its status has ended and both notices landed.
-      const consults: string = resolve(leafTemp, `${name}-home`, 'watch/akre2e/consults');
-      const cases: string[] = readdirSync(consults);
-      expect(cases.length).toBe(1);
-      const caseDir: string = resolve(consults, cases[0]);
-      const status = (): string =>
-        existsSync(resolve(caseDir, 'status')) ? readFileSync(resolve(caseDir, 'status'), 'utf8').trim() : 'missing';
-      const ended: string[] = ['closed', 'resumed'];
-      const settleBy: number =
-        Date.now() + remaining(Math.min(90_000, Math.max(10_000, deadline - Date.now() - 30_000)));
-      while ((notices(scratch).length < 2 || !ended.includes(status())) && Date.now() < settleBy)
-        await Bun.sleep(Math.max(0, Math.min(2000, settleBy - Date.now())));
-      requireTime();
-      const seen = notices(scratch);
-      tier.record('notices.json', seen);
-      tier.record('case-status.txt', status());
-      tier.record('case-listing.txt', readdirSync(caseDir).join('\n'));
-      for (const file of ['brief.md', 'signature.json', 'case.md'])
-        expect(existsSync(resolve(caseDir, file)), `missing ${file}`).toBe(true);
-      const signature = z
-        .object({
-          anchor: z.string().min(1),
-          cause: z.string(),
-          phase: z.string(),
-          command: z.string(),
-          base: z.string().regex(/^[0-9a-f]{40}$/),
-          heads: z.record(z.string(), z.string()),
-        })
-        .parse(JSON.parse(readFileSync(resolve(caseDir, 'signature.json'), 'utf8')));
-      tier.record('case-signature.json', signature);
-      for (const turn of readdirSync(caseDir).filter((f) => f.startsWith('turn-')))
-        tier.record(`case-${turn}`, readFileSync(resolve(caseDir, turn), 'utf8'));
-      tier.record('case-brief.md', readFileSync(resolve(caseDir, 'brief.md'), 'utf8'));
-      tier.record('case-case.md', readFileSync(resolve(caseDir, 'case.md'), 'utf8'));
-      expect(signature.anchor).toBe(SLUG);
-      expect(ended).toContain(status());
-      // Notices: one for the push and one for the move, none attention.
-      expect(seen.length).toBeGreaterThanOrEqual(2);
-      expect(seen.every((n) => n.attention === false)).toBe(true);
-
-      // Every turn file named in a send is a file of this case, with a send each way.
-      tier.record('sent-turn-files.json', { inbound: [...inbound], outbound: [...outbound] });
-      expect([...inbound].some((f) => f.endsWith('-consultant.md'))).toBe(true);
-      expect([...outbound].some((f) => f.endsWith('-watch.md'))).toBe(true);
-      for (const file of [...inbound, ...outbound]) {
-        expect(dirname(file), `sent ${file} is outside the case ${caseDir}`).toBe(caseDir);
-        expect(existsSync(file), `sent ${file} missing`).toBe(true);
-      }
-
-      // The base fix advanced the remote default branch fast-forward from the staged base.
-      await command(['git', 'fetch', '-q', 'origin'], tier.root);
-      const tip: string = (await spawnCaptured(['git', 'rev-parse', 'origin/main'], { cwd: tier.root })).stdout.trim();
-      const forward: SpawnResult = await spawnCaptured(['git', 'merge-base', '--is-ancestor', staged, tip], {
-        cwd: tier.root,
-      });
-      tier.record(
-        'base-log.txt',
-        (await spawnCaptured(['git', 'log', '--oneline', '-5', 'origin/main'], { cwd: tier.root })).stdout,
-      );
-      expect(tip).not.toBe(staged);
-      expect(forward.code).toBe(0);
-
-      requireTime();
-    } catch (error) {
-      try {
-        const listed = z
-          .object({ terminals: z.array(termSchema) })
-          .parse(await tier.rpc('terminal.list', { all: true, labels: {} }));
-        for (const t of listed.terminals) tier.record(`screen-${t.address}.txt`, await screen(tier, t.address, 120));
-      } catch {}
-      throw error;
-    } finally {
-      clearTimeout(deadlineTimer);
-      const stopped: SpawnResult | undefined = await deadlineStop;
-      closingTier = true;
-      const left: string[] = await stopWatchTier(tier, [leafTemp]);
-      tier.record('absence.json', { left });
-      expect(left).toEqual([]);
-      // Core shutdown closes the stream after it has sent the queued terminal events.
-      await observing;
-      const usage: { watcher: string | null; consultants: string[]; sessions: number } = {
-        watcher: watcherAddress,
-        consultants: [...consultantStarts],
-        sessions: (watcherAddress === null ? 0 : 1) + consultantStarts.size,
-      };
-      tier.record('paid-sessions.json', usage);
-      console.log(JSON.stringify(usage));
-      if (stopped !== undefined) expect(stopped.code, stopped.stderr).toBe(0);
-    }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const ended: number | 'deadline' = await Promise.race([
+      body.exited,
+      new Promise<'deadline'>((done): void => {
+        timer = setTimeout((): void => done('deadline'), deadline - Date.now());
+      }),
+    ]);
+    clearTimeout(timer);
+    const outcome: Error | null = verdict(control, ended);
+    const failed: Error | null = await teardown(body, control).then(
+      (): null => null,
+      (error: Error): Error => error,
+    );
+    // A teardown failure is reported with the run's outcome, never in place of it.
+    if (outcome !== null && failed !== null)
+      throw new Error(`${outcome.message}\nteardown also failed: ${failed.message}`, { cause: outcome });
+    if (outcome !== null) throw outcome;
+    if (failed !== null) throw failed;
   },
-  780_000,
+  minutes * 60_000 + teardownMs,
 );

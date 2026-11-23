@@ -15,7 +15,6 @@ const copiedEntries: string[] = [
   'reconcile-host.json',
   'reconcile',
   'runs',
-  'budget.jsonl',
 ];
 
 // The fields admission.ts's liveness check reads, applied to the tool root's
@@ -59,7 +58,8 @@ export async function migrateStateHome(): Promise<void> {
       if (existsSync(source)) cpSync(source, resolve(stateHome, entry), { recursive: true });
     }
     if (!settled()) return;
-    const config = z
+    // paid_budget is retired (#152) and the strict machine schema refuses it.
+    const { paid_budget, ...config } = z
       .looseObject({ repos: z.record(z.string(), z.string()).default({}) })
       .parse(Bun.YAML.parse(readFileSync(resolve(toolRoot, 'config.yaml'), 'utf8')));
     writeYaml(resolve(stateHome, 'config.yaml'), {

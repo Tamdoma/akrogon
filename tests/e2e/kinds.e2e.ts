@@ -1,6 +1,6 @@
-// Criterion 9, attended paid per-kind tier under its standing grant (reserve 8 harness sessions,
+// Criterion 9, attended paid per-kind tier under its standing grant (a budget of 8 harness sessions,
 // at most 4 prompts each): one real seat per kind through the start verb in akr-e2e-engine.
-// Run: akrogon run-check --name kinds --sessions 8 -- env AKROGON_E2E=kinds
+// Run: akrogon run-check --name kinds -- env AKROGON_SESSIONS=8 AKROGON_E2E=kinds
 //      AKROGON_E2E_ROOT=<leaf temp> AKROGON_E2E_OUT=<leaf>/implementation/kinds-tier
 //      bun test ./tests/e2e/kinds.e2e.ts
 // Each seat gets 2 prompts: the first task (argv, or agy's first send) and one later send.

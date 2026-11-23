@@ -677,7 +677,6 @@ async function commandRow(
     item.name,
     ['sh', '-c', rerun],
     target,
-    undefined,
     file,
   );
   const again: string[] = second.code === 0 ? [] : failureNames(second.output);

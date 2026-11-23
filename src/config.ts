@@ -28,16 +28,6 @@ export const globalSchema = z
     toolkits: z.record(text, text).default({}),
     repos: z.record(text, text).default({}),
     prefixes: z.record(text, z.string().regex(/^[a-z]{2}$/, 'prefix must be two lowercase letters')).optional(),
-    paid_budget: z
-      .strictObject({
-        sessions_per_day: z.number().int().positive(),
-        session_minutes: z.number().int().positive(),
-        approved: z.strictObject({
-          date: z.string().trim().min(1),
-          answer: z.string().refine((answer: string): boolean => answer.trim().length > 0, 'Must not be blank'),
-        }),
-      })
-      .optional(),
     run_root: z.string().optional(),
   })
   .superRefine((config, ctx) => {

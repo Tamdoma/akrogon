@@ -38,8 +38,8 @@ export function required(name: string): string {
   return z.string().min(1, `${name} must be set for the attended tier`).parse(process.env[name]);
 }
 
-// D9, criterion 4: a paid cell may start only under a run-check --sessions reservation, which
-// exports AKROGON_SESSIONS. Free cells never reach this: it is called inside paid test bodies.
+// D9, criterion 4: a paid cell may start only under a budget the seat set in its command, which
+// passes AKROGON_SESSIONS. Free cells never reach this: it is called inside paid test bodies.
 export function reservedSessions(planned: number): void {
   const raw: string | undefined = process.env.AKROGON_SESSIONS;
   if (raw === undefined || !/^\d+$/.test(raw) || Number(raw) < planned) {
