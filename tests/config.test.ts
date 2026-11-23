@@ -1123,6 +1123,65 @@ test('repoSchema reserves AKROGON_EVIDENCE in env and pass_env', () => {
   }
 });
 
+// run_root goes into a systemd unit property, where % and quotes are read.
+test('globalSchema refuses a run_root holding anything but plain path characters', () => {
+  const seat = { harness: 'claude', model: 'm', effort: 'e' };
+  const machine = { slots: { a: seat, b: seat }, harnesses: { claude: 'claude' } };
+  expect(globalSchema.safeParse({ ...machine, run_root: '/dev/shm/akr_runs-1.d' }).success).toBe(true);
+  for (const value of [
+    '/dev/shm/akr runs',
+    '/dev/shm/akr%i',
+    "/dev/shm/a'b",
+    '/dev/shm/a"b',
+    '/dev/shm/a$b',
+    '/dev/shm/a;b',
+    '/dev/shm/a\\b',
+  ]) {
+    const refused = globalSchema.safeParse({ ...machine, run_root: value });
+    expect(refused.success, value).toBe(false);
+    expect(refused.error?.message, value).toContain('plain path characters');
+  }
+});
+
+test('globalSchema refuses a run_root whose symlinked ancestor leads into the leaf temp or retired temp root', () => {
+  const previous: { leaf: string | undefined; retired: string | undefined } = {
+    leaf: process.env.AKROGON_LEAF_TEMP_ROOT,
+    retired: process.env.AKROGON_RETIRED_TEMP_ROOT,
+  };
+  const seat = { harness: 'claude', model: 'm', effort: 'e' };
+  const machine = { slots: { a: seat, b: seat }, harnesses: { claude: 'claude' } };
+  // Short on purpose: run_root is at most 40 bytes.
+  const base: string = mkdtempSync('/tmp/akt-');
+  try {
+    process.env.AKROGON_LEAF_TEMP_ROOT = resolve(base, 'leaf');
+    process.env.AKROGON_RETIRED_TEMP_ROOT = resolve(base, 'retired');
+    mkdirSync(resolve(base, 'leaf'));
+    mkdirSync(resolve(base, 'retired'));
+    symlinkSync(resolve(base, 'leaf'), resolve(base, 'l'));
+    symlinkSync(resolve(base, 'retired'), resolve(base, 'r'));
+    const refusals: [string, string][] = [
+      [resolve(base, 'l/ram'), 'leaf temp root'],
+      [resolve(base, 'r/ram'), 'retired temp root'],
+      [resolve(base, 'r/gone/ram'), 'retired temp root'],
+    ];
+    for (const [value, message] of refusals) {
+      const refused = globalSchema.safeParse({ ...machine, run_root: value });
+      expect(refused.success, value).toBe(false);
+      expect(refused.error?.message, value).toContain(message);
+    }
+    expect(globalSchema.safeParse({ ...machine, run_root: resolve(base, 'ram') }).success).toBe(true);
+  } finally {
+    for (const [name, value] of [
+      ['AKROGON_LEAF_TEMP_ROOT', previous.leaf],
+      ['AKROGON_RETIRED_TEMP_ROOT', previous.retired],
+    ] as const) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
 test('globalSchema accepts an absolute short run_root and refuses relative, long or temp-root paths', () => {
   const previous: { leaf: string | undefined; retired: string | undefined } = {
     leaf: process.env.AKROGON_LEAF_TEMP_ROOT,

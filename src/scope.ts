@@ -46,6 +46,10 @@ export function runUnitArgv(slice: string, run: string, argv: string[], cutBus: 
     'TimeoutStopSec=5',
     '-p',
     'CollectMode=inactive-or-failed',
+    // Stopped in one call (stop-run, a slice stop), the scope goes before its
+    // guard, so the guard's TMPDIR cleanup never races the dying command.
+    '-p',
+    `After=${runUnitBase(run)}-guard.service`,
     '--',
     'env',
     `DBUS_SESSION_BUS_ADDRESS=${cutBus}`,
@@ -55,7 +59,19 @@ export function runUnitArgv(slice: string, run: string, argv: string[], cutBus: 
 
 // The guard tracks the wrapper pid: when the wrapper dies its finally can no
 // longer run, so the guard drops the run record and stops the scope itself.
-export async function startRunGuard(slice: string, run: string, wpid: number, recordPath: string): Promise<void> {
+// A RAM TMPDIR goes when the guard stops, however the run ends. Directories
+// lacking u+rwx regain it first (top down, so a dir without search permission
+// is opened before find descends; one chmod per such dir only, so a large tree
+// fits the stop timeout) so rm can empty them; files are never touched, since a
+// hard link inside may share its mode with a file outside. A gone folder fails
+// find, which is ignored.
+export async function startRunGuard(
+  slice: string,
+  run: string,
+  wpid: number,
+  recordPath: string,
+  tmp: string | undefined,
+): Promise<void> {
   const base: string = runUnitBase(run);
   const argv: string[] = [
     'systemd-run',
@@ -67,6 +83,14 @@ export async function startRunGuard(slice: string, run: string, wpid: number, re
     'TimeoutStopSec=5',
     '-p',
     'CollectMode=inactive-or-failed',
+    ...(tmp === undefined
+      ? []
+      : [
+          '-p',
+          `ExecStopPost=-find ${tmp} -type d ! -perm -u=rwx -exec chmod u+rwx {} ;`,
+          '-p',
+          `ExecStopPost=rm -rf ${tmp}`,
+        ]),
     '--',
     'sh',
     '-c',

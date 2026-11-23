@@ -15,7 +15,16 @@ import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { parse } from 'shell-quote';
-import { base, ensureLeafTemp, homePath, readGlobal, requireRepo, setupCommand, type Repo } from './config';
+import {
+  base,
+  ensureLeafTemp,
+  ensureRunRoot,
+  homePath,
+  readGlobal,
+  requireRepo,
+  setupCommand,
+  type Repo,
+} from './config';
 import { repoInventory, RepoMismatchError, readState, type Inventory, type Leaf, type State } from './state';
 import { command, type Result } from './shell';
 import { RUN_CHECK_USAGE } from './usage';
@@ -65,7 +74,6 @@ export function constructedEnv(repo: Repo, runRoot: string): Record<string, stri
     const value: string | undefined = process.env[key];
     if (value !== undefined) env[key] = value;
   }
-  env.TMPDIR = runRoot;
   env.LANG = 'C.UTF-8';
   for (const key of [...repo.config.env, ...repo.config.pass_env]) {
     const value: string | undefined = process.env[key];
@@ -74,9 +82,13 @@ export function constructedEnv(repo: Repo, runRoot: string): Record<string, stri
   env.DBUS_SESSION_BUS_ADDRESS = 'unix:path=/nonexistent';
   // Node's compile cache writes hundreds of MB into each run's TMPDIR and is never reused.
   env.NODE_DISABLE_COMPILE_CACHE = '1';
-  // Bun's transpiler cache is reused only inside one run and never evicted, so it ends with the run.
-  env.BUN_RUNTIME_TRANSPILER_CACHE_PATH = join(runRoot, 'bun-cache');
-  return env;
+  return { ...env, ...scratchEnv(runRoot) };
+}
+
+// The names bound to the run's scratch folder. Bun's transpiler cache is reused
+// only inside one run and never evicted, so it ends with the run.
+function scratchEnv(folder: string): { TMPDIR: string; BUN_RUNTIME_TRANSPILER_CACHE_PATH: string } {
+  return { TMPDIR: folder, BUN_RUNTIME_TRANSPILER_CACHE_PATH: join(folder, 'bun-cache') };
 }
 
 // The command writes into run-unique capture files inside the holder from
@@ -416,12 +428,21 @@ export async function checkedRun(
                     err: captureErr,
                   })
                 : await (async () => {
-                    await startRunGuard(slice, run, process.pid, admission.record_path);
+                    // With run_root set, a held run's TMPDIR is a RAM folder its guard
+                    // removes; the run root and its record stay on disk.
+                    const runParent: string | undefined = ensureRunRoot();
+                    const tmp: string | undefined =
+                      runParent === undefined ? undefined : mkdtempSync(resolve(runParent, 'run-'));
+                    await startRunGuard(slice, run, process.pid, admission.record_path, tmp);
                     try {
                       return await spawnLogged(
                         ['flock', '-s', lockPath, ...runUnitArgv(slice, run, argv, env.DBUS_SESSION_BUS_ADDRESS)],
                         cwd,
-                        { ...env, DBUS_SESSION_BUS_ADDRESS: sessionBusAddress() },
+                        {
+                          ...env,
+                          ...(tmp === undefined ? {} : scratchEnv(tmp)),
+                          DBUS_SESSION_BUS_ADDRESS: sessionBusAddress(),
+                        },
                         { out: captureOut, outFd: capFd, err: captureErr },
                       );
                     } finally {

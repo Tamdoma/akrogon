@@ -1,7 +1,18 @@
 import { afterAll, test, expect } from 'bun:test';
 import { createHash, randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { basename, dirname, resolve } from 'node:path';
 import {
   cli,
   entry,
@@ -398,6 +409,256 @@ for (const signal of ['SIGTERM', 'SIGKILL'] as const) {
     }
   });
 }
+
+// run_root set on the shared fixture for one test: a short folder of the test's
+// own (the 40-byte limit rules out the suite TMPDIR), restored and removed after.
+async function withRunRoot(f: Fixture, body: (runRoot: string) => Promise<void>): Promise<void> {
+  const config: string = resolve(f.home, 'config.yaml');
+  const before: string = readFileSync(config, 'utf8');
+  const runRoot: string = mkdtempSync('/tmp/akt-');
+  yaml(config, { ...(Bun.YAML.parse(before) as object), run_root: runRoot });
+  try {
+    await body(runRoot);
+  } finally {
+    writeFileSync(config, before);
+    await command(['chmod', '-R', 'u+rwx', runRoot]);
+    rmSync(runRoot, { recursive: true, force: true });
+  }
+}
+
+// The command's TMPDIR holds a mode-555 dir, which a plain rm -rf cannot empty.
+const readOnlyTmp: string = 'mkdir -p "$TMPDIR/ro/x"; chmod 555 "$TMPDIR/ro"';
+
+async function waitGone(path: string, ms: number = WAIT_MS): Promise<void> {
+  const begun: number = Date.now();
+  while (existsSync(path)) {
+    if (Date.now() - begun > ms) throw new Error(`Timed out waiting for ${path} to go`);
+    await Bun.sleep(50);
+  }
+}
+
+test.serial(
+  'with run_root set, TMPDIR and the Bun cache live in a RAM folder gone after a green and a red run while the record stays under the leaf temp',
+  async () => {
+    const { f, slice } = await realFixture();
+    const out: string = outDir(f);
+    const worktree: string = await leafWorktree(f, 'ram-ends');
+    await withRunRoot(f, async (runRoot: string) => {
+      for (const exit of [0, 7]) {
+        const script: string = [
+          readOnlyTmp,
+          'printf "%s\\n%s\\n%s\\n" "$TMPDIR" "$BUN_RUNTIME_TRANSPILER_CACHE_PATH" "$AKROGON_EVIDENCE"',
+          `ls -d "${leafTempRoot(f)}"/*/*/run-*/.owner`,
+          `akrogon run-check --name inner -- sh -c 'printf "%s\\n" "$TMPDIR"'`,
+          `exit ${exit}`,
+        ].join('; ');
+        const result: SpawnResult = await spawnReal(
+          f,
+          ['run-check', '--name', `ram-${exit}`, '--', 'sh', '-c', script],
+          worktree,
+          { RUN_UNITS_OUT: out, AKROGON_RUN_SLICE: slice },
+        ).result;
+        expect(result.code, `stdout: ${result.stdout} stderr: ${result.stderr}`).toBe(exit);
+        const [tmp, cache, evidence, owner, nested]: string[] = result.stdout.trim().split('\n');
+        expect(dirname(tmp)).toBe(runRoot);
+        expect(basename(tmp)).toMatch(/^run-/);
+        expect(cache).toBe(resolve(tmp, 'bun-cache'));
+        expect(evidence.startsWith(`${leafTempRoot(f)}/`)).toBe(true);
+        expect(owner.startsWith(`${leafTempRoot(f)}/`)).toBe(true);
+        // A nested run has no guard to remove a RAM folder, so its TMPDIR stays on disk.
+        expect(nested.startsWith(`${leafTempRoot(f)}/`)).toBe(true);
+        expect(existsSync(tmp)).toBe(false);
+        expect(readdirSync(runRoot)).toEqual([]);
+      }
+    });
+  },
+);
+
+test.serial(
+  'with run_root set, the guard empties a dir without search permission and leaves a hard-linked file outside alone',
+  async () => {
+    const { f, slice } = await realFixture();
+    const out: string = outDir(f);
+    const worktree: string = await leafWorktree(f, 'ram-modes');
+    // Same filesystem as run_root, so the command can hard-link it into TMPDIR.
+    const outside: string = mkdtempSync('/tmp/akt-');
+    const kept: string = resolve(outside, 'kept');
+    writeFileSync(kept, 'kept\n');
+    chmodSync(kept, 0o444);
+    try {
+      await withRunRoot(f, async (runRoot: string) => {
+        const script: string = `mkdir -p "$TMPDIR/np/y"; chmod 600 "$TMPDIR/np"; ln "${kept}" "$TMPDIR/link"; printf %s "$TMPDIR"`;
+        const result: SpawnResult = await spawnReal(
+          f,
+          ['run-check', '--name', 'ram-modes', '--', 'sh', '-c', script],
+          worktree,
+          { RUN_UNITS_OUT: out, AKROGON_RUN_SLICE: slice },
+        ).result;
+        expect(result.code, `stdout: ${result.stdout} stderr: ${result.stderr}`).toBe(0);
+        const tmp: string = result.stdout.trim();
+        expect(dirname(tmp)).toBe(runRoot);
+        expect(statSync(kept).mode & 0o777).toBe(0o444);
+        expect(existsSync(tmp)).toBe(false);
+        expect(readdirSync(runRoot)).toEqual([]);
+      });
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
+  },
+);
+
+test.serial('with run_root set, the command keeps the capture ancestry run-check gives it', async () => {
+  const { f, slice } = await realFixture();
+  const out: string = outDir(f);
+  const worktree: string = await leafWorktree(f, 'ram-captures');
+  const config: string = resolve(f.root, 'issues/config.yaml');
+  const before: string = readFileSync(config, 'utf8');
+  const parsed: { pass_env?: string[] } = Bun.YAML.parse(before) as { pass_env?: string[] };
+  yaml(config, { ...parsed, pass_env: [...(parsed.pass_env ?? []), 'AKROGON_CAPTURES'] });
+  try {
+    await withRunRoot(f, async (runRoot: string) => {
+      const result: SpawnResult = await spawnReal(
+        f,
+        ['run-check', '--name', 'ram-captures', '--', 'sh', '-c', 'printf "%s\\n%s" "$TMPDIR" "$AKROGON_CAPTURES"'],
+        worktree,
+        { RUN_UNITS_OUT: out, AKROGON_RUN_SLICE: slice, AKROGON_CAPTURES: '[]' },
+      ).result;
+      expect(result.code, `stdout: ${result.stdout} stderr: ${result.stderr}`).toBe(0);
+      const [tmp, captures]: string[] = result.stdout.trim().split('\n');
+      expect(dirname(tmp)).toBe(runRoot);
+      expect(JSON.parse(captures)).toHaveLength(1);
+    });
+  } finally {
+    writeFileSync(config, before);
+  }
+});
+
+test.serial(
+  'with run_root set, a publish refusal keeps its record under the leaf temp and drops the RAM folder',
+  async () => {
+    const { f, slice } = await realFixture();
+    const out: string = outDir(f);
+    const worktree: string = await leafWorktree(f, 'ram-refused');
+    const closing: string = resolve(f.root, 'issues/open/issue/.closing');
+    await withRunRoot(f, async (runRoot: string) => {
+      try {
+        const result: SpawnResult = await spawnReal(
+          f,
+          [
+            'run-check',
+            '--name',
+            'ram-refused',
+            '--',
+            'sh',
+            '-c',
+            `${readOnlyTmp}; printf %s "$TMPDIR"; touch "${closing}"`,
+          ],
+          worktree,
+          { RUN_UNITS_OUT: out, AKROGON_RUN_SLICE: slice },
+        ).result;
+        expect(result.code).not.toBe(0);
+        expect(result.stderr).toContain('owner closing');
+        const tmp: string = result.stdout.trim();
+        expect(dirname(tmp)).toBe(runRoot);
+        expect(existsSync(tmp)).toBe(false);
+        expect(readdirSync(runRoot)).toEqual([]);
+        const refusals: string[] = [...new Bun.Glob('*/*/run-*/refusal.json').scanSync({ cwd: leafTempRoot(f) })];
+        expect(
+          refusals.some((path) => readFileSync(resolve(leafTempRoot(f), path), 'utf8').includes('owner closing')),
+        ).toBe(true);
+      } finally {
+        rmSync(closing, { force: true });
+      }
+    });
+  },
+);
+
+test.serial(
+  'with run_root set, stop-run drops the RAM folder and the scope is ordered to stop before its guard',
+  async () => {
+    const { f, slice } = await realFixture();
+    const out: string = outDir(f);
+    const worktree: string = await leafWorktree(f, 'ram-stop');
+    const marker: string = resolve(out, 'ram-stop.tmp');
+    await withRunRoot(f, async (runRoot: string) => {
+      const cap: RealCap = spawnScoped(
+        f,
+        'ramStop.scope',
+        [
+          'run-check',
+          '--name',
+          'ram-stop',
+          '--',
+          'sh',
+          '-c',
+          `${readOnlyTmp}; printf %s "$TMPDIR" > "${marker}"; exec sleep 60`,
+        ],
+        worktree,
+        { AKROGON_RUN_SLICE: slice },
+      );
+      try {
+        await waitPath(marker);
+        const record: Record<string, unknown> | undefined = (await liveRuns(f)).find((row) => row.check === 'ram-stop');
+        if (record === undefined) throw new Error('No live ram-stop record');
+        const unit: string = record.unit as string;
+        await waitActive(unit);
+        // stop-run stops both units in one call: only this ordering keeps the
+        // guard's rm from running while the command is still dying.
+        const after: Result = await sysctl('show', unit, '-p', 'After');
+        expect(after.stdout).toContain(unit.replace(/\.scope$/, '-guard.service'));
+        const tmp: string = readFileSync(marker, 'utf8');
+        expect(dirname(tmp)).toBe(runRoot);
+        const stopped: SpawnResult = await spawnScoped(f, 'ramStop.scope', ['stop-run', record.run as string], worktree)
+          .result;
+        expect(stopped.code, `stdout: ${stopped.stdout} stderr: ${stopped.stderr}`).toBe(0);
+        await cap.result;
+        expect(existsSync(tmp)).toBe(false);
+        expect(readdirSync(runRoot)).toEqual([]);
+      } finally {
+        if (cap.proc.exitCode === null) cap.proc.kill('SIGKILL');
+        void cap.result;
+      }
+    });
+  },
+);
+
+test.serial('with run_root set, a SIGKILL of the wrapper still drops the RAM folder', async () => {
+  const { f, slice } = await realFixture();
+  const out: string = outDir(f);
+  const worktree: string = await leafWorktree(f, 'ram-kill');
+  const marker: string = resolve(out, 'ram-kill.tmp');
+  await withRunRoot(f, async (runRoot: string) => {
+    const cap: RealCap = spawnReal(
+      f,
+      [
+        'run-check',
+        '--name',
+        'ram-kill',
+        '--',
+        'sh',
+        '-c',
+        `${readOnlyTmp}; printf %s "$TMPDIR" > "${marker}"; exec sleep 60`,
+      ],
+      worktree,
+      { AKROGON_RUN_SLICE: slice },
+    );
+    try {
+      await waitPath(marker);
+      const record: Record<string, unknown> | undefined = (await liveRuns(f)).find((row) => row.check === 'ram-kill');
+      if (record === undefined) throw new Error('No live ram-kill record');
+      await waitActive(record.unit as string);
+      const tmp: string = readFileSync(marker, 'utf8');
+      expect(dirname(tmp)).toBe(runRoot);
+      cap.proc.kill('SIGKILL');
+      expect((await cap.result).signalCode).toBe('SIGKILL');
+      await waitGone(tmp);
+      expect(readdirSync(runRoot)).toEqual([]);
+    } finally {
+      if (cap.proc.exitCode === null) cap.proc.kill('SIGKILL');
+      void cap.result;
+    }
+  });
+});
 
 test.serial("a killed run-check pair refuses the leaf's non-failed phase moves under the real run unit", async () => {
   const { f, slice } = await realFixture();

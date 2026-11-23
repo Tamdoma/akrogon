@@ -51,12 +51,19 @@ export const globalSchema = z
           ['leaf temp root', leafTempRoot()],
           ['retired temp root', retiredLeafTempRoot()],
         ] as const)
-          if (within(resolve(runRoot), root))
+          // Canonical too: a symlinked ancestor must not lead into an excluded root.
+          if (within(resolve(runRoot), root) || within(canonicalPath(runRoot), canonicalPath(root)))
             ctx.addIssue({
               code: 'custom',
               path: ['run_root'],
               message: `run_root must not be the ${label} or inside it: ${runRoot} is within ${root}`,
             });
+      if (!/^[A-Za-z0-9._/-]+$/.test(runRoot))
+        ctx.addIssue({
+          code: 'custom',
+          path: ['run_root'],
+          message: `run_root must use only plain path characters (letters, digits, . _ - /): it goes into a systemd unit property: ${runRoot}`,
+        });
       if (bytes > 40)
         ctx.addIssue({
           code: 'custom',
@@ -433,6 +440,13 @@ export function ensureLeafTemp(repo: Repo, slug: string): string {
   const repoTemp: string = dirname(leaf);
   for (const path of [dirname(repoTemp), repoTemp, leaf]) ensurePrivateDir(path);
   return leaf;
+}
+
+// The parent of a held run's RAM TMPDIR folder: the machine run_root, made private, when set.
+export function ensureRunRoot(): string | undefined {
+  const runRoot: string | undefined = readGlobal().run_root;
+  if (runRoot !== undefined) ensurePrivateDir(runRoot);
+  return runRoot;
 }
 
 function ensurePrivateDir(path: string): void {
