@@ -5,7 +5,7 @@ import { type Repo } from './config';
 import { command, CommandError, run } from './shell';
 import { toolSchema, type Batch, type Tool } from './state';
 
-export const attemptOutcomeSchema = z.enum(['merged', 'red', 'split', 'held', 'reuse', 'ejected']);
+export const attemptOutcomeSchema = z.enum(['merged', 'red', 'held', 'reuse', 'ejected']);
 export type Outcome = z.infer<typeof attemptOutcomeSchema>;
 
 export type PressureSnapshot = { cpu: number; memory: number; io: number; boot_id: string };
@@ -32,7 +32,6 @@ export const attemptRecordSchema = z.object({
   built_on: z.string(),
   tested_top: z.string().optional(),
   outcome: attemptOutcomeSchema,
-  members: z.array(z.union([z.string(), z.strictObject({ slug: z.string(), head: z.string() })])).optional(),
   start: z.string().optional(),
   end: z.string(),
   pressure: z

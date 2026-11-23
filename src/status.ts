@@ -85,7 +85,7 @@ function scanRepo(name: string, registeredPath: string, global: GlobalConfig): S
     path = resolve(path, 'issues/config.yaml');
     const repo: Repo = readRepo(name, registeredPath);
     const open: string = resolve(repo.root, 'issues/open');
-    const inventory: Inventory = repoInventory(repo);
+    const inventory: Inventory = repoInventory(repo, ['open', 'closed']);
     const closed: Leaf[] = inventory.leaves.filter((leaf) => !leaf.path.startsWith(open + sep));
     const leaves: ScannedLeaf[] = inventory.leaves
       .filter((leaf) => leaf.path.startsWith(open + sep))
@@ -739,7 +739,7 @@ export async function statusCommand(
   const stopped: Set<string> = readStopped();
   if (slug !== undefined) {
     const repo: Repo = await requireRepo(global, process.cwd());
-    const inventory: Inventory = repoInventory(repo);
+    const inventory: Inventory = repoInventory(repo, ['open', 'closed']);
     const invalidRoot: LeafFailure | undefined = inventory.unreadable.find((failure) =>
       ['open', 'closed'].some((area) => failure.path === resolve(repo.root, 'issues', area)),
     );

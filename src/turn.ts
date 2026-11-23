@@ -3,7 +3,7 @@ import { relative, resolve, sep } from 'node:path';
 import { type GlobalConfig, type Repo, within } from './config';
 import { type LogRecord } from './log';
 import { type Gap, gaps, readReadiness, type Readiness } from './readiness';
-import { hasLeafFolder, isParked, type Leaf } from './state';
+import { closedLeaf, hasLeafFolder, isParked, type Leaf } from './state';
 import { isStopped } from './stop';
 
 export type Block =
@@ -25,7 +25,7 @@ export function twinConflict(repo: Repo, leafPath: string): { open: string; conf
 
 export function unmergedDeps(repo: Repo, leaf: Leaf, leaves: Leaf[]): DepDetail[] {
   return leaf.state['blocked-by'].flatMap((slug: string): DepDetail[] => {
-    const dependency: Leaf | undefined = leaves.find((item) => item.state.slug === slug);
+    const dependency: Leaf | undefined = leaves.find((item) => item.state.slug === slug) ?? closedLeaf(repo, slug);
     if (dependency !== undefined && dependency.state.phase === 'merged') return [];
     if (dependency !== undefined) return [{ slug, label: dependency.state.phase }];
     if (isParked(repo, slug)) return [{ slug, label: 'parked' }];
@@ -59,13 +59,7 @@ export function blockDetail(
 export function eligibility(global: GlobalConfig, repo: Repo, leaf: Leaf, leaves: Leaf[]): Block | null {
   const twin: { open: string; conflict: string } | null = twinConflict(repo, leaf.path);
   if (twin !== null) return { kind: 'twin', ...twin };
-  if (
-    leaf.state['blocked-by'].some((slug) => {
-      const dependency: Leaf | undefined = leaves.find((leaf) => leaf.state.slug === slug);
-      return dependency === undefined || dependency.state.phase !== 'merged';
-    })
-  )
-    return { kind: 'deps' };
+  if (unmergedDeps(repo, leaf, leaves).length > 0) return { kind: 'deps' };
   const readiness: Readiness | null = readReadiness(leaf.path);
   if (readiness !== null) {
     const missing: Gap[] = gaps(global, readiness);

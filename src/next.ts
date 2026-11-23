@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, realpathSync, renameSync, statSync, writeFileSync } from 'node:fs';
-import { relative, resolve, sep } from 'node:path';
+import { basename, relative, resolve, sep } from 'node:path';
 import { parseEnv } from 'node:util';
 import { z } from 'zod';
 import {
@@ -26,6 +26,8 @@ import {
   inventoryFailures,
   missingLeafMessage,
   findLeaf,
+  closedLeaf,
+  leafFolders,
   withLock,
   broadcastPending,
   refusePredatesHc,
@@ -73,7 +75,7 @@ import { isPaused, readPaused } from './pause';
 import { isStopped } from './stop';
 import { selfUpdate } from './self-update';
 import { blockDetail, dependentCounts, mergeQueue, twinConflict, type DepDetail, type QueueEntry } from './turn';
-import { appendTiming, capacityWaits, currentVisit, readTimings, recordWait, type WaitReason } from './timing';
+import { appendTiming, capacityWaits, currentVisit, recordWait, wakeRows, type WaitReason } from './timing';
 import { closeMergedTab, leafSeats, reconcile, reconcileHost, reconcileNeedsPanes, type Seats } from './reconcile';
 
 type Invocation = { skipped: Set<string>; dispatched: Set<string>; sessionRefusals: Set<string> };
@@ -105,8 +107,8 @@ function liveSeat(t: Seen | undefined): t is Seen {
   return t !== undefined && t.state === 'live';
 }
 
-function discover(repo: Repo, invocation: Invocation): Inventory {
-  const result: Inventory = repoInventory(repo);
+function discover(repo: Repo, invocation: Invocation, areas: readonly string[] = ['open']): Inventory {
+  const result: Inventory = repoInventory(repo, areas);
   for (const entry of result.unreadable) report(invocation, repo.name, entry.path, new Error(entry.error));
   for (const entry of result.unknown) report(invocation, repo.name, entry.path, new Error(entry.error));
   if (result.foreign.length > 0 && !invocation.skipped.has(repo.name)) {
@@ -675,7 +677,7 @@ async function dispatchLeaf(
     return 'waiting';
   };
   const inventory: Inventory = discover(repo, invocation);
-  const leaf: Leaf | undefined = inventory.leaves.find((leaf) => leaf.state.slug === slug);
+  const leaf: Leaf | undefined = inventory.leaves.find((leaf) => leaf.state.slug === slug) ?? closedLeaf(repo, slug);
   if (leaf === undefined) {
     report(invocation, repo.name, identity.path, new Error(`Missing or unreadable leaf: ${slug}`), slug);
     return 'skipped';
@@ -700,7 +702,7 @@ async function dispatchLeaf(
   try {
     let state: State = readState(leaf.path);
     if (state.slug !== slug || state.repo !== repo.name) throw new Error(`Leaf identity changed: ${leaf.path}`);
-    if (!readTimings(repo.root).some((event) => event.kind === 'visit_start' && event.slug === slug))
+    if (!wakeRows(repo.root).some((event) => event.kind === 'visit_start' && event.slug === slug))
       appendTiming(repo, {
         kind: 'visit_start',
         slug,
@@ -837,14 +839,29 @@ async function resumeRepos(
   const swept: Set<string> = new Set(repos.map((repo) => repo.name));
   const unpaused: RepoWaits[] = registeredRepos(global, invocation)
     .repos.filter((repo) => !isPaused(repo.name))
-    .map((repo) => ({ repo, waiting: capacityWaits(readTimings(repo.root)) }));
+    .map((repo) => ({ repo, waiting: capacityWaits(wakeRows(repo.root)) }));
   for (const { repo, waiting } of unpaused.filter((entry) => swept.has(entry.repo.name))) {
+    const leaves: Leaf[] = discover(repo, invocation).leaves;
+    const unlisted: Set<string> = new Set(
+      leaves
+        .filter((leaf) => leaf.state.tab === undefined && leaf.state.worktree === undefined)
+        .flatMap((leaf) => leaf.state['blocked-by'])
+        .filter((slug) => !leaves.some((leaf) => leaf.state.slug === slug)),
+    );
+    // An unstarted leaf wakes when a blocked-by slug is no open leaf but has a closed folder; that walk runs only then.
+    const closed: Set<string> =
+      unlisted.size === 0
+        ? new Set()
+        : new Set(leafFolders(resolve(repo.root, 'issues/closed')).map((path) => basename(path)));
     await sweep(
       global,
       repo,
-      discover(repo, invocation).leaves.filter(
+      leaves.filter(
         (leaf) =>
-          (leaf.state.phase === 'merged' || leaf.state.tab !== undefined || leaf.state.worktree !== undefined) &&
+          (leaf.state.phase === 'merged' ||
+            leaf.state.tab !== undefined ||
+            leaf.state.worktree !== undefined ||
+            leaf.state['blocked-by'].some((slug) => unlisted.has(slug) && closed.has(slug))) &&
           !waiting.has(leaf.state.slug),
       ),
       invocation,
@@ -881,21 +898,6 @@ async function sweep(
   if (isAutomatic && isPaused(repo.name)) return;
   const counts: Map<string, number> = dependentCounts(discover(repo, invocation).leaves);
   const closedRoot: string = resolve(repo.root, 'issues/closed');
-  const closedSlugs: Set<string> = new Set(
-    leaves.filter((leaf) => within(leaf.path, closedRoot)).map((leaf) => leaf.state.slug),
-  );
-  if (closedSlugs.size > 0)
-    await sweep(
-      global,
-      repo,
-      discover(repo, invocation).leaves.filter(
-        (leaf) =>
-          !within(leaf.path, closedRoot) && leaf.state['blocked-by'].some((slug: string) => closedSlugs.has(slug)),
-      ),
-      invocation,
-      false,
-      isAutomatic,
-    );
   const ordered: Leaf[] = leaves
     .filter((leaf) => !within(leaf.path, closedRoot))
     .sort(
@@ -959,7 +961,9 @@ async function reconcileBatch(
   }
   await withLock(resolve(globalHome(), '.lock'), async () => {
     if (isAutomatic && isPaused(repo.name)) return;
-    const fresh: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === holder.state.slug);
+    const fresh: Leaf | undefined = repoInventory(repo, ['open', 'closed']).leaves.find(
+      (item) => item.state.slug === holder.state.slug,
+    );
     const batch: Batch | undefined = fresh?.state.batch;
     if (
       fresh === undefined ||
@@ -981,11 +985,15 @@ async function reconcileBatch(
     }
     if ((fresh.state.phase === 'merge' || fresh.state.phase === 'failed') && batch.recorded !== true)
       appendAttempt(repo, holder.state.slug, batch, 'merged', end);
-    const holderNow: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === holder.state.slug);
+    const holderNow: Leaf | undefined = repoInventory(repo, ['open', 'closed']).leaves.find(
+      (item) => item.state.slug === holder.state.slug,
+    );
     if (holderNow === undefined) return;
     if (holderNow.state.phase === 'merge') {
       await commandMerged(repo, holderNow, z.string().parse(batch.candidate));
-      const remaining: Leaf | undefined = allLeaves(repo).find((item) => item.state.slug === holder.state.slug);
+      const remaining: Leaf | undefined = repoInventory(repo, ['open', 'closed']).leaves.find(
+        (item) => item.state.slug === holder.state.slug,
+      );
       if (remaining !== undefined) saveState(remaining.path, { ...remaining.state, batch: undefined });
     } else if (holderNow.state.phase === 'failed') {
       const notified: Batch['notified'] = await mergeNotice(repo, holderNow.state.slug, batch.notified);
@@ -1003,7 +1011,7 @@ async function mergeTurn(
 ): Promise<void> {
   if (isAutomatic && isPaused(repo.name)) return;
   await broadcastPass(global, repo, invocation);
-  const inventory: Inventory = discover(repo, invocation);
+  const inventory: Inventory = discover(repo, invocation, ['open', 'closed']);
   for (const leaf of inventory.leaves.filter((item) => item.state.batch !== undefined)) {
     try {
       await reconcileBatch(repo, leaf, invocation, isAutomatic, pressureDir);
@@ -1162,10 +1170,12 @@ async function mergeTurnExit(
 
 // A command-run merge leaves the completing owner's broadcast to a broadcast-only B seat; prompted.B is its ack.
 async function broadcastPass(global: GlobalConfig, repo: Repo, invocation: Invocation): Promise<void> {
-  for (const pending of discover(repo, invocation).leaves.filter((leaf) => broadcastPending(leaf.state))) {
+  for (const pending of discover(repo, invocation, ['open', 'closed']).leaves.filter((leaf) =>
+    broadcastPending(leaf.state),
+  )) {
     try {
       await withLock(resolve(globalHome(), '.lock'), async () => {
-        const fresh: Leaf | undefined = discover(repo, invocation).leaves.find(
+        const fresh: Leaf | undefined = discover(repo, invocation, ['open', 'closed']).leaves.find(
           (leaf) => leaf.state.slug === pending.state.slug,
         );
         if (fresh === undefined || fresh.state.broadcast === undefined || !broadcastPending(fresh.state)) return;
@@ -1236,7 +1246,8 @@ export async function phaseWake(global: GlobalConfig, repo: Repo, slug: string):
   const invocation: Invocation = { skipped: new Set(), dispatched: new Set(), sessionRefusals: new Set() };
   try {
     await withLock(resolve(globalHome(), '.lock'), async () => {
-      const leaf: Leaf | undefined = discover(repo, invocation).leaves.find((item) => item.state.slug === slug);
+      const leaf: Leaf | undefined =
+        discover(repo, invocation).leaves.find((item) => item.state.slug === slug) ?? closedLeaf(repo, slug);
       if (leaf === undefined) return;
       const outcome: DispatchOutcome = await dispatchLeaf(global, repo, leaf, false, invocation, true);
       if (outcome === 'completed') await dispatchDependents(global, repo, slug, invocation, true);
@@ -1269,6 +1280,19 @@ export async function seatCommand(slug: string, slot: Slot, task: string | undef
       allocated.place,
     );
     if (started.outcome === 'failed') process.exitCode = 1;
+    else {
+      // The prompt row ends the leaf's wait in timings.jsonl, as a dispatched prompt does.
+      const now: State = readState(leaf.path);
+      appendTiming(repo, {
+        kind: 'prompt',
+        slug: now.slug,
+        slot,
+        phase: now.phase,
+        visit: currentVisit(readLog(repo.root), now.slug, now.phase),
+        session: await transcriptFor({ session: allocated.place.session, address: started.seat.address }),
+        outcome: started.outcome === 'confirmed' ? 'delivered' : 'failed',
+      });
+    }
   });
 }
 
@@ -1307,8 +1331,10 @@ export async function landedWake(global: GlobalConfig, repo: Repo, slug: string)
   await mergeWake(global, repo, 'merged');
   const invocation: Invocation = { skipped: new Set(), dispatched: new Set(), sessionRefusals: new Set() };
   try {
-    await dispatchDependents(global, repo, slug, invocation, true);
-    const merged: Leaf | undefined = discover(repo, invocation).leaves.find((leaf) => leaf.state.slug === slug);
+    await withLock(resolve(globalHome(), '.lock'), () => dispatchDependents(global, repo, slug, invocation, true));
+    const merged: Leaf | undefined = discover(repo, invocation, ['open', 'closed']).leaves.find(
+      (leaf) => leaf.state.slug === slug,
+    );
     if (merged !== undefined && merged.state.broadcast === undefined)
       await closeMergedTab(repo, merged, await repoTerminals(repo));
   } catch (error) {
@@ -1414,7 +1440,7 @@ async function selectLeaves(
   if (matches.length > 1) throw new Error(`Multiple registered checkouts for ${selection}`);
   if (matches.length === 0) throw new Error(`No initialized registered checkout for ${selection}`);
   const repo: Repo = matches[0];
-  const inventory: Inventory = discover(repo, invocation);
+  const inventory: Inventory = discover(repo, invocation, ['open', 'closed']);
   const selected: Leaf[] =
     input !== undefined && !existsSync(folder)
       ? (resolveName(repo, inventory, input) ?? inventory.leaves.filter((leaf) => leaf.state.slug === input))
@@ -1436,7 +1462,7 @@ async function reconcileRepos(repos: Repo[], invocation: Invocation, isAutomatic
   const acting: Set<string> = new Set();
   for (const repo of repos) {
     if (isAutomatic && isPaused(repo.name)) continue;
-    const inventory: Inventory = discover(repo, invocation);
+    const inventory: Inventory = discover(repo, invocation, ['open', 'closed']);
     try {
       acting.add(repo.name);
       const needsPanes: boolean = await reconcileNeedsPanes(repo, inventory.leaves);

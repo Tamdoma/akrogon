@@ -1,4 +1,13 @@
-import { appendFileSync, readdirSync, readFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  closeSync,
+  fstatSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  readSync,
+  type Stats,
+} from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { type Repo } from './config';
@@ -22,16 +31,30 @@ const checkCore = {
 const waitReasonSchema = z.enum(['prerequisite', 'parked', 'merge_turn', 'capacity', 'none']);
 export type WaitReason = z.infer<typeof waitReasonSchema>;
 
+const visitStartSchema = z.strictObject({
+  ...slugged,
+  kind: z.literal('visit_start'),
+  phase: historicalPhaseSchema,
+  visit,
+});
+const promptSchema = z.strictObject({
+  ...slugged,
+  kind: z.literal('prompt'),
+  ...seat,
+  session: z.string().nullable(),
+  outcome: z.enum(['delivered', 'failed']),
+  attempt: attempt.optional(),
+});
+const waitSchema = z.strictObject({
+  ...slugged,
+  kind: z.literal('wait'),
+  reason: waitReasonSchema,
+  blocking: z.string().optional(),
+});
+
 export const timingEventSchema = z.discriminatedUnion('kind', [
-  z.strictObject({ ...slugged, kind: z.literal('visit_start'), phase: historicalPhaseSchema, visit }),
-  z.strictObject({
-    ...slugged,
-    kind: z.literal('prompt'),
-    ...seat,
-    session: z.string().nullable(),
-    outcome: z.enum(['delivered', 'failed']),
-    attempt: attempt.optional(),
-  }),
+  visitStartSchema,
+  promptSchema,
   z.strictObject({ ...slugged, kind: z.literal('seat_done'), ...seat }),
   z.strictObject({
     ...slugged,
@@ -69,12 +92,7 @@ export const timingEventSchema = z.discriminatedUnion('kind', [
     members: z.array(z.string()).optional(),
     built_on: z.string(),
   }),
-  z.strictObject({
-    ...slugged,
-    kind: z.literal('wait'),
-    reason: waitReasonSchema,
-    blocking: z.string().optional(),
-  }),
+  waitSchema,
   z.strictObject({ ...stamp, kind: z.literal('repo_pause'), pause: z.enum(['on', 'off']) }),
 ]);
 
@@ -103,6 +121,85 @@ export function readTimings(root: string): TimingEvent[] {
     console.warn(`timing read failed: ${error instanceof Error ? error.message : String(error)}`);
     return [];
   }
+}
+
+// The rows a wake reads: waits, prompts and visit starts. Other kinds pass unchecked.
+const wakeRowSchema = z.discriminatedUnion('kind', [visitStartSchema, promptSchema, waitSchema]);
+type WakeRow = z.infer<typeof wakeRowSchema>;
+const wakeKinds: ReadonlySet<string> = new Set(wakeRowSchema.options.map((option) => option.shape.kind.value));
+type WakeFile = { dev: number; ino: number; offset: number; rows: WakeRow[] };
+const wakeFiles: Map<string, WakeFile> = new Map();
+
+function jsonOf(line: string): { value: unknown } | SyntaxError {
+  try {
+    return { value: JSON.parse(line) };
+  } catch (error) {
+    if (error instanceof SyntaxError) return error;
+    throw error;
+  }
+}
+
+// Each line is parsed once; a bad line is skipped with a warning, so only the leaf it names loses that row.
+function wakeRow(path: string, line: string): WakeRow[] {
+  const skip = (error: string): WakeRow[] => {
+    console.warn(JSON.stringify({ warning: 'timing line skipped', path, line, error }));
+    return [];
+  };
+  const json: { value: unknown } | SyntaxError = jsonOf(line);
+  if (json instanceof SyntaxError) return skip(json.message);
+  const value: unknown = json.value;
+  if (typeof value !== 'object' || value === null || !('kind' in value) || typeof value.kind !== 'string')
+    return skip('row has no kind');
+  if (!wakeKinds.has(value.kind)) return [];
+  const row: z.ZodSafeParseResult<WakeRow> = wakeRowSchema.safeParse(value);
+  return row.success ? [row.data] : skip(row.error.message);
+}
+
+// The whole lines past the kept offset of the opened file. A different file at the path, or one shorter
+// than the kept offset, is read from the start.
+function unreadLines(path: string, kept: WakeFile | undefined): { from: WakeFile; lines: string[] } {
+  const fd: number = openSync(path, 'r');
+  try {
+    const { dev, ino, size }: Stats = fstatSync(fd);
+    const from: WakeFile =
+      kept !== undefined && kept.dev === dev && kept.ino === ino && size >= kept.offset
+        ? kept
+        : { dev, ino, offset: 0, rows: [] };
+    const added: Buffer = Buffer.alloc(size - from.offset);
+    const read: Buffer = added.subarray(0, readSync(fd, added, 0, added.length, from.offset));
+    const end: number = read.lastIndexOf(0x0a) + 1;
+    return {
+      from: { ...from, offset: from.offset + end },
+      lines: read.subarray(0, end).toString('utf8').split('\n').slice(0, -1),
+    };
+  } finally {
+    closeSync(fd);
+  }
+}
+
+// One read per file per process: later calls parse only the whole lines added since. Only an absent
+// file has no rows; another read failure keeps the rows already held.
+export function wakeRows(root: string): WakeRow[] {
+  const path: string = resolve(root, 'issues/timings.jsonl');
+  const kept: WakeFile | undefined = wakeFiles.get(path);
+  let unread: { from: WakeFile; lines: string[] };
+  try {
+    unread = unreadLines(path, kept);
+  } catch (error) {
+    if (!(error instanceof Error && 'code' in error)) throw error;
+    if (error.code === 'ENOENT') {
+      wakeFiles.delete(path);
+      return [];
+    }
+    console.warn(JSON.stringify({ warning: 'timing read failed', path, code: error.code, error: error.message }));
+    return kept?.rows ?? [];
+  }
+  const read: WakeFile = {
+    ...unread.from,
+    rows: unread.from.rows.concat(unread.lines.flatMap((line) => wakeRow(path, line))),
+  };
+  wakeFiles.set(path, read);
+  return read.rows;
 }
 
 export function visitOf(log: LogRecord[], slug: string, phase: Phase): number {
@@ -139,6 +236,6 @@ export function capacityWaits(events: readonly TimingEvent[]): Map<string, strin
 }
 
 export function recordWait(repo: Repo, slug: string, reason: WaitReason, blocking?: string): void {
-  if (reason === waitReasonAt(readTimings(repo.root), slug)) return;
+  if (reason === waitReasonAt(wakeRows(repo.root), slug)) return;
   appendTiming(repo, { kind: 'wait', slug, reason, ...(blocking === undefined ? {} : { blocking }) });
 }

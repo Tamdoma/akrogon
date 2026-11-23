@@ -234,6 +234,33 @@ test('config prints merged slots from root, linked worktree, and global outside'
   }
 });
 
+test('config in a closed owner worktree prints its ISSUE.md seats', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const worktree: string = resolve(f.home, 'closed-owner');
+    await command(['git', 'worktree', 'add', '-b', 'closed-owner', worktree], f.root);
+    const owner: string = resolve(f.root, 'issues/closed/done');
+    mkdirSync(resolve(owner, 'own'), { recursive: true });
+    writeFileSync(
+      resolve(owner, 'ISSUE.md'),
+      '---\nslots:\n  a:\n    harness: fake\n    model: owner-a\n    effort: low\n---\n# Done\n',
+    );
+    yaml(resolve(owner, 'own/state.yaml'), {
+      slug: 'own',
+      phase: 'merged',
+      created: '2026-09-10',
+      repo: f.repo,
+      'blocked-by': [],
+      worktree,
+    });
+    const result: Result = await cli(f, ['config'], worktree);
+    expect(result.code).toBe(0);
+    expect(Bun.YAML.parse(result.stdout)).toMatchObject({ slots: { a: { model: 'owner-a' } } });
+  } finally {
+    f.clean();
+  }
+});
+
 test('config prints worktree_store matching the leaf path for every root shape and caller', async () => {
   const f: Fixture = await fixture();
   try {

@@ -1493,6 +1493,22 @@ test('next --resume starts an open dependent of an already closed leaf', async (
   }
 });
 
+test('next --wake leaves an unstarted leaf blocked by a parked dependency unvisited', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    leaf(f, 'shelved', 'plan.synthesis', {}, 'shelved-owner');
+    mkdirSync(resolve(f.root, 'issues/parked'), { recursive: true });
+    renameSync(resolve(f.root, 'issues/open/shelved-owner'), resolve(f.root, 'issues/parked/shelved-owner'));
+    const child: string = leaf(f, 'child', 'plan.synthesis', { 'blocked-by': ['shelved'] }, 'child-owner');
+    expect((await next(f, ['--wake'], {}, f.home)).code).toBe(0);
+    expect(readState(child).tab).toBeUndefined();
+    const timings: string = resolve(f.root, 'issues/timings.jsonl');
+    expect(existsSync(timings) ? readFileSync(timings, 'utf8') : '').not.toContain('"slug":"child"');
+  } finally {
+    await f.clean();
+  }
+});
+
 test('two repos summarize once per repo on every invocation', async () => {
   const f: HcFixture = await hcFixture();
   const g: Fixture = await fixture();
@@ -1597,16 +1613,19 @@ test('unknown directory population reserves all new capacity but allows existing
     expect((await next(f, ['healthy'])).code).toBe(0);
     await rePromptable(f, healthy);
     leaf(f, 'new', 'plan.synthesis');
-    const closed: string = resolve(f.root, 'issues/closed');
-    writeFileSync(closed, 'not a directory');
+    // The wake reads open leaves only, so the unreadable population sits in open.
+    const hidden: string = resolve(f.root, 'issues/open/hidden');
+    mkdirSync(hidden);
+    chmodSync(hidden, 0o000);
     const result: Result = await next(f, ['--all']);
     expect(result.code).toBe(1);
     expect(skips(result)).toHaveLength(1);
-    expect(skips(result)[0].path).toBe(closed);
-    expect(skips(result)[0].error).toContain('ENOTDIR');
+    expect(skips(result)[0].path).toBe(hidden);
+    expect(skips(result)[0].error).toContain('EACCES');
     expect(await liveTabs(f)).toEqual(['healthy']);
     expect(await allTasks(f)).toHaveLength(2);
   } finally {
+    chmodSync(resolve(f.root, 'issues/open/hidden'), 0o700);
     await f.clean();
   }
 });

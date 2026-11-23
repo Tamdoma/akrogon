@@ -1,8 +1,20 @@
-import { test, expect } from 'bun:test';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { test, expect, spyOn } from 'bun:test';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { cli, fakeAkrogon, leaf, storeDir, yaml, type Fixture, verified } from './helpers';
 import { readState, saveState, type State } from '../src/state';
+import { capacityWaits, readTimings, wakeRows } from '../src/timing';
 import { command, quote, type Result } from '../src/shell';
 import { delivered, hcFixture, type HcFixture, stopCoresAfterFile } from './hc-fixture';
 
@@ -378,5 +390,119 @@ test('capacity waits: a refused dispatch records one capacity wait that closes o
     expect(ofKind(leafEvents(f, 'queued'), 'wait').map((event) => event.reason)).toEqual(['capacity']);
   } finally {
     await f.clean();
+  }
+});
+
+const capacityRow = (f: HcFixture, slug: string, ts: string): string =>
+  JSON.stringify({ kind: 'wait', slug, reason: 'capacity', ts, repo: f.repo }) + '\n';
+
+test('capacity waits: the wake reads each row by its decoded slug and a bad row hides only its own leaf', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    leaf(f, 'held', 'plan.synthesis');
+    maxActive(f, 1);
+    expect((await next(f, ['held'])).code).toBe(0);
+    const amber: string = leaf(f, 'amber', 'plan.synthesis');
+    const child: string = leaf(f, 'child-amber', 'plan.synthesis');
+    const path: string = resolve(f.root, 'issues/timings.jsonl');
+    writeFileSync(
+      path,
+      readFileSync(path, 'utf8') +
+        capacityRow(f, 'amber', '2026-11-23T09:00:00.000Z').replace('"slug":"amber"', '"slug": "\\u0061mber"') +
+        capacityRow(f, 'child-amber', '2026-11-23T09:00:00.000Z').replace('"capacity"', '"bogus"') +
+        '{"kind":"wait","slug":"child-amber",\n',
+    );
+    maxActive(f, 3);
+    const woke: Result = await next(f, ['--wake']);
+    expect(woke.code).toBe(0);
+    expect(woke.stderr.split('\n').filter((line) => line.includes('timing line skipped'))).toHaveLength(2);
+    expect(readState(amber).worktree).toBeDefined();
+    expect(readState(child).worktree).toBeUndefined();
+  } finally {
+    await f.clean();
+  }
+});
+
+test('capacity waits: a manual seat ends its capacity wait in timings.jsonl and the wake keeps its first visit', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    leaf(f, 'held', 'plan.synthesis');
+    maxActive(f, 1);
+    expect((await next(f, ['held'])).code).toBe(0);
+    leaf(f, 'older', 'plan.synthesis');
+    leaf(f, 'newer', 'plan.synthesis');
+    expect((await next(f, ['older'])).code).toBe(0);
+    expect((await next(f, ['newer'])).code).toBe(0);
+    maxActive(f, 2);
+    expect((await cli(f, ['seat', 'newer', 'A'], f.root, f.env)).code).toBe(0);
+    expect([...capacityWaits(readTimings(f.root)).keys()]).toEqual(['older']);
+    expect((await next(f, ['--wake'])).code).toBe(0);
+    expect(ofKind(leafEvents(f, 'newer'), 'visit_start')).toHaveLength(1);
+  } finally {
+    await f.clean();
+  }
+});
+
+test('wake rows: a later read parses only whole lines appended since, and a shorter file is read from the start', () => {
+  const root: string = mkdtempSync(resolve(tmpdir(), 'wake-rows-'));
+  const warn = spyOn(console, 'warn');
+  try {
+    const path: string = resolve(root, 'issues/timings.jsonl');
+    mkdirSync(resolve(root, 'issues'));
+    const row = (slug: string): string =>
+      JSON.stringify({ kind: 'wait', slug, reason: 'capacity', ts: '2026-11-23T09:00:00.000Z', repo: 'r' }) + '\n';
+    const first: string = row('first');
+    const second: string = row('second');
+    writeFileSync(path, first + second.slice(0, 10));
+    expect(wakeRows(root).map((event) => event.slug)).toEqual(['first']);
+    // The kept line is overwritten with bytes that do not parse: only the completed second line is read.
+    writeFileSync(path, 'x'.repeat(first.length - 1) + '\n' + second);
+    expect(wakeRows(root).map((event) => event.slug)).toEqual(['first', 'second']);
+    expect(warn).not.toHaveBeenCalled();
+    writeFileSync(path, row('third'));
+    expect(wakeRows(root).map((event) => event.slug)).toEqual(['third']);
+  } finally {
+    warn.mockRestore();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+const wakeWait = (slug: string): string =>
+  JSON.stringify({ kind: 'wait', slug, reason: 'capacity', ts: '2026-11-23T09:00:00.000Z', repo: 'r' }) + '\n';
+
+test('wake rows: an unreadable log keeps the held rows and warns with the error; an absent log has none', () => {
+  const root: string = mkdtempSync(resolve(tmpdir(), 'wake-rows-'));
+  const warn = spyOn(console, 'warn');
+  try {
+    mkdirSync(resolve(root, 'issues'));
+    mkdirSync(resolve(root, 'logs'));
+    writeFileSync(resolve(root, 'logs/timings.jsonl'), wakeWait('queued'));
+    symlinkSync(resolve(root, 'logs/timings.jsonl'), resolve(root, 'issues/timings.jsonl'));
+    expect(wakeRows(root).map((event) => event.slug)).toEqual(['queued']);
+    chmodSync(resolve(root, 'logs'), 0o000);
+    expect(wakeRows(root).map((event) => event.slug)).toEqual(['queued']);
+    expect(String(warn.mock.calls[0]?.[0])).toContain('EACCES');
+    chmodSync(resolve(root, 'logs'), 0o755);
+    rmSync(resolve(root, 'logs/timings.jsonl'));
+    expect(wakeRows(root)).toEqual([]);
+  } finally {
+    warn.mockRestore();
+    chmodSync(resolve(root, 'logs'), 0o755);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('wake rows: a log replaced by another file of the same size is read from the start', () => {
+  const root: string = mkdtempSync(resolve(tmpdir(), 'wake-rows-'));
+  try {
+    const path: string = resolve(root, 'issues/timings.jsonl');
+    mkdirSync(resolve(root, 'issues'));
+    writeFileSync(path, wakeWait('queued'));
+    expect(wakeRows(root).map((event) => event.slug)).toEqual(['queued']);
+    writeFileSync(resolve(root, 'issues/next.jsonl'), wakeWait('otherx'));
+    renameSync(resolve(root, 'issues/next.jsonl'), path);
+    expect(wakeRows(root).map((event) => event.slug)).toEqual(['otherx']);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });

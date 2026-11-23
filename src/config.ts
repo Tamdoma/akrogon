@@ -508,7 +508,7 @@ export async function effectiveConfig(cwd: string): Promise<string> {
   if (repo !== null && top !== null) {
     const { repoInventory, RepoMismatchError } = await import('./state');
     const realTop: string = realpathSync(top);
-    const inv: import('./state').Inventory = repoInventory(repo);
+    const inv: import('./state').Inventory = repoInventory(repo, ['open', 'closed']);
     const leaf = inv.leaves.find(
       (item) =>
         item.state.worktree !== undefined &&

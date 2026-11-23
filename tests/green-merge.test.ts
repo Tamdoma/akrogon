@@ -482,7 +482,6 @@ test('next preserves a live command attempt while its refused push restacks', as
         applied: false,
         tested_top: undefined,
         tested_main: undefined,
-        decision: undefined,
       },
     });
     expect((await next(f)).code).toBe(0);

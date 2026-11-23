@@ -80,7 +80,6 @@ export const batchSchema = z.strictObject({
   top: z.string().optional(),
   tested_top: z.string().optional(),
   tested_main: z.string().optional(),
-  decision: z.enum(['reuse', 'rerun']).optional(),
   candidate: z.string().optional(),
   // Records written before notice files hold a boolean: true was shown, false was never delivered.
   notified: z
@@ -263,10 +262,7 @@ export function readInventory(path: string, areaRoot: string): Inventory {
   return inv;
 }
 
-export function repoInventory(
-  repo: Pick<Repo, 'name' | 'root'>,
-  areas: readonly string[] = ['open', 'closed'],
-): Inventory {
+export function repoInventory(repo: Pick<Repo, 'name' | 'root'>, areas: readonly string[] = ['open']): Inventory {
   const inv: Inventory = { leaves: [], unreadable: [], unknown: [], foreign: [] };
   for (const area of areas) {
     const areaRoot: string = resolve(repo.root, 'issues', area);
@@ -326,7 +322,8 @@ export function isParked(repo: Repo, slug: string): boolean {
   });
 }
 
-function slugFolders(repo: Pick<Repo, 'root'>, slug: string): string[] {
+// Every folder holding a state.yaml under root, found by name without reading any state.
+export function leafFolders(root: string): string[] {
   const found: string[] = [];
   function visit(path: string): void {
     let entries: Dirent[];
@@ -337,13 +334,27 @@ function slugFolders(repo: Pick<Repo, 'root'>, slug: string): string[] {
       return;
     }
     if (entries.some((entry) => entry.name === 'state.yaml')) {
-      if (basename(path) === slug) found.push(path);
+      found.push(path);
       return;
     }
     for (const entry of entries.filter((entry) => entry.isDirectory())) visit(resolve(path, entry.name));
   }
-  for (const area of ['open', 'closed']) visit(resolve(repo.root, 'issues', area));
+  visit(root);
   return found;
+}
+
+function slugFolders(repo: Pick<Repo, 'root'>, slug: string): string[] {
+  return ['open', 'closed'].flatMap((area) =>
+    leafFolders(resolve(repo.root, 'issues', area)).filter((path) => basename(path) === slug),
+  );
+}
+
+// The repo's one readable closed leaf under the slug; only that folder's state is read.
+export function closedLeaf(repo: Pick<Repo, 'name' | 'root'>, slug: string): Leaf | undefined {
+  const closedRoot: string = resolve(repo.root, 'issues/closed');
+  const folders: string[] = leafFolders(closedRoot).filter((path) => basename(path) === slug);
+  const leaves: Leaf[] = folders.length === 1 ? leavesUnder(folders[0], closedRoot) : [];
+  return leaves.find((leaf) => leaf.state.repo === repo.name && leaf.state.slug === slug);
 }
 
 export function hasLeafFolder(repo: Repo, slug: string): boolean {

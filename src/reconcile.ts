@@ -1304,7 +1304,7 @@ export async function reconcileHost(
   if (loaded !== null) {
     const leafOf: Map<string, { repo: Repo; leaf: Leaf }> = new Map();
     for (const repo of repos)
-      for (const leaf of repoInventory(repo).leaves)
+      for (const leaf of repoInventory(repo, ['open', 'closed']).leaves)
         leafOf.set(leafSlice(repo, leaf.state.slug, homePath()), { repo, leaf });
     const own: Set<string> = ownSlices();
     const runs: Set<string> = new Set(liveRuns().map((record) => record.slice));

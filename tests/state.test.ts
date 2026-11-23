@@ -113,13 +113,13 @@ for (const area of ['open', 'closed']) {
         mkdirSync(path, { recursive: true });
         renameSync(resolve(original, 'state.yaml'), resolve(path, 'state.yaml'));
         if (depth === 2 || depth === 3) {
-          expect(repoInventory(repo).leaves.map((item) => item.path)).toEqual([path]);
+          expect(repoInventory(repo, [area]).leaves.map((item) => item.path)).toEqual([path]);
           expect(leavesUnder(dirname(path), resolve(f.root, 'issues', area)).map((item) => item.path)).toEqual([path]);
         } else {
           writeFileSync(resolve(path, 'state.yaml'), 'invalid: [');
-          expect(repoInventory(repo).leaves).toEqual([]);
+          expect(repoInventory(repo, [area]).leaves).toEqual([]);
           expect(leavesUnder(dirname(path), resolve(f.root, 'issues', area))).toEqual([]);
-          const failures = repoInventory(repo).unreadable;
+          const failures = repoInventory(repo, [area]).unreadable;
           expect(failures).toHaveLength(1);
           expect(failures[0].error).toContain(resolve(path, 'state.yaml'));
         }

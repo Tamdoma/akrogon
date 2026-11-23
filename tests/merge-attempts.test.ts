@@ -513,7 +513,7 @@ test.serial('a solo red line carries PSI stall deltas from batch creation', asyn
   }
 });
 
-test.serial('legacy held, split and ejected lines still parse beside a recorded attempt', async () => {
+test.serial('legacy held and ejected lines still parse beside a recorded attempt', async () => {
   const f: Fixture = await fixture();
   try {
     const { holder, record, proc } = await batchFixture(f);
@@ -536,16 +536,6 @@ test.serial('legacy held, split and ejected lines still parse beside a recorded 
           holder: 'hold',
           members: ['mem-a'],
           built_on: 'a'.repeat(40),
-          outcome: 'split',
-          end: '2026-10-10T00:00:01.000Z',
-        }) +
-        '\n' +
-        JSON.stringify({
-          attempt: 'a0',
-          repo: f.repo,
-          holder: 'hold',
-          members: ['mem-a'],
-          built_on: 'a'.repeat(40),
           outcome: 'ejected',
           culprit: 'mem-a',
           end: '2026-10-10T00:00:02.000Z',
@@ -556,10 +546,10 @@ test.serial('legacy held, split and ejected lines still parse beside a recorded 
     const red: Result = await spawn(f, 'red', landBody(f.repo, 'hold', 'a1', dir), proc.env);
     expect(red.code).toBe(0);
     const lines: Attempt[] = attemptLines(f);
-    expect(lines.map((line) => line.outcome)).toEqual(['held', 'split', 'ejected', 'red']);
-    expect(lines[3].pressure).toEqual({ cpu: 4, memory: 5, io: 10 });
+    expect(lines.map((line) => line.outcome)).toEqual(['held', 'ejected', 'red']);
+    expect(lines[2].pressure).toEqual({ cpu: 4, memory: 5, io: 10 });
     const raw: string[] = readFileSync(resolve(f.root, 'issues/merge-attempts.jsonl'), 'utf8').trim().split('\n');
-    expect(JSON.parse(raw[3])).not.toHaveProperty('members');
+    expect(JSON.parse(raw[2])).not.toHaveProperty('members');
   } finally {
     f.clean();
   }
