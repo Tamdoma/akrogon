@@ -6,7 +6,7 @@ implement: subagents
 setup: bun install --frozen-lockfile --backend=copyfile
 checks:
   format: bunx prettier --check src tests skills/chart-issues/scripts
-  test: bun test --timeout=120000 --parallel=4 --max-concurrency=5 --no-isolate
+  test: bun test --timeout=120000 --parallel=4 --max-concurrency=5 --no-isolate && { set -o pipefail; git diff -z --name-only --diff-filter=ACMR "${AKROGON_BASE:-origin/main}...HEAD" -- 'tests/*.test.ts' | sed -z 's|^|./|' | xargs -0 -r bun test --timeout=120000 --parallel=4 --max-concurrency=5 --no-isolate --rerun-each=5; }
   typecheck: bun run typecheck
 full: [test]
 advisory: 
