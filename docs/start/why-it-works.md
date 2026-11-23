@@ -16,7 +16,7 @@ You can read the same files. They are plain text in your repository, so Git keep
 
 Seat A builds. Then A and B review the build, each without reading the other's review. Each review ends in a verdict: `ready`, `nits` or `fix`. A `fix` names a concrete defect, with its cause and what it breaks.
 
-When there is a fix, B repairs most findings itself. B hands back to A only the few kinds of fix B may not make, such as a change to a test's expected result, and then re-checks A's repair. The seat that wrote the code is never the only one that judges it.
+When there is a fix, B repairs most findings itself. B hands back to A only the few kinds of fix B may not make, such as a change to a locked decision, and then re-checks A's repair. The seat that wrote the code is never the only one that judges it.
 
 Both seats can use the same agent CLI and model. Two seats give two separate passes over the work. They do not promise that every mistake is caught. See [check-issue](../../skills/check-issue/SKILL.md) for how a review is done.
 
