@@ -18,6 +18,7 @@ import {
   WAIT_MS,
   type Fixture,
 } from './helpers';
+import { descendantsOf } from './isolation';
 import { liveStartTime } from '../src/admission';
 import { command, type Result } from '../src/shell';
 import { withLock } from '../src/state';
@@ -84,6 +85,48 @@ async function waitForAny(paths: string[], ms: number = WAIT_MS): Promise<number
     if (Date.now() - begun > ms) throw new Error(`Timed out waiting for any of ${paths.join(', ')}`);
     await Bun.sleep(20);
   }
+}
+
+// Stopped or exited: a process listed a moment ago may have exited, and an
+// exited one holds no lock.
+function halted(pid: number): boolean {
+  let stat: string;
+  try {
+    stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true;
+    throw error;
+  }
+  return 'TZ'.includes(stat[stat.lastIndexOf(')') + 2]);
+}
+
+function signal(pid: number, name: NodeJS.Signals): void {
+  try {
+    process.kill(pid, name);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
+  }
+}
+
+// Stops a run and every process it spawned. The run stops first so its child
+// list is final, then each child: a flock child left running would take the
+// lock for a stopped parent that never frees it. Each pid joins `stopped`
+// before its SIGSTOP, so cleanup reaches every stopped process even when
+// suspend throws partway.
+async function suspend(pid: number, stopped: number[], ms: number = WAIT_MS): Promise<void> {
+  const begun: number = Date.now();
+  const halt = async (pids: number[]): Promise<void> => {
+    for (const each of pids) {
+      stopped.push(each);
+      signal(each, 'SIGSTOP');
+    }
+    while (!pids.every(halted)) {
+      if (Date.now() - begun > ms) throw new Error(`Timed out stopping ${pids.join(', ')}`);
+      await Bun.sleep(20);
+    }
+  };
+  await halt([pid]);
+  await halt(descendantsOf(pid));
 }
 
 const hold = (dir: string, name: string): string[] => [
@@ -525,6 +568,7 @@ test('a killed holder or waiter does not block the line', async () => {
 test('stop-run cancels a waiting run and the next waiter takes its place', async () => {
   const f: Fixture = await fixture();
   const caps: Cap[] = [];
+  const stopped: number[] = [];
   try {
     const dir: string = marks(f);
     yaml(resolve(f.root, 'issues/config.yaml'), FULL_CONFIG);
@@ -533,6 +577,17 @@ test('stop-run cancels a waiting run and the next waiter takes its place', async
     const h: Cap = run(f, ['run-check', '--name', 'test', '--', ...hold(dir, 'h')], worktree, scoped);
     caps.push(h);
     await waitFor(resolve(dir, 'h.held'));
+    const wId = async (leafName: string): Promise<string> => {
+      const begun: number = Date.now();
+      for (;;) {
+        const found: Record<string, unknown> | undefined = (await runRecords(f)).find(
+          (entry) => entry.state === 'waiting' && entry.leaf === leafName,
+        );
+        if (found !== undefined) return String(found.run);
+        if (Date.now() - begun > WAIT_MS) throw new Error(`no waiting record for ${leafName}`);
+        await Bun.sleep(50);
+      }
+    };
     // One leaf per waiter so each record maps to exactly one process.
     const w1: Cap = run(
       f,
@@ -540,6 +595,9 @@ test('stop-run cancels a waiting run and the next waiter takes its place', async
       await leafWorktree(f, 'wait-one'),
       scoped,
     );
+    caps.push(w1);
+    // w1 has arrived before w2 starts, so w1 heads the line that w2 then takes.
+    const w1Id: string = await wId('wait-one');
     const w2: Cap = run(
       f,
       ['run-check', '--name', 'test', '--', ...record('w2', dir)],
@@ -552,24 +610,13 @@ test('stop-run cancels a waiting run and the next waiter takes its place', async
       await leafWorktree(f, 'wait-three'),
       scoped,
     );
-    caps.push(w1, w2, w3);
+    caps.push(w2, w3);
     for (const cap of [w1, w2, w3]) await waitForText(cap, new RegExp(`waiting for ${f.repo}/`));
-    const wId = async (leafName: string): Promise<string> => {
-      const begun: number = Date.now();
-      for (;;) {
-        const found: Record<string, unknown> | undefined = (await runRecords(f)).find(
-          (entry) => entry.state === 'waiting' && entry.leaf === leafName,
-        );
-        if (found !== undefined) return String(found.run);
-        if (Date.now() - begun > WAIT_MS) throw new Error(`no waiting record for ${leafName}`);
-        await Bun.sleep(50);
-      }
-    };
-    const w1Id: string = await wId('wait-one');
     const w3Id: string = await wId('wait-three');
     // Cancel the suspended w3 first: it exits when resumed and its record is
-    // not rewritten while it is stopped.
-    w3.proc.kill('SIGSTOP');
+    // not rewritten while it is stopped. It stops while the test holds the
+    // line lock, so it never stops holding the lock stop-run needs.
+    await withLock(resolve(f.home, 'runs', 'locks', `line-${f.repo}`), () => suspend(w3.proc.pid, stopped));
     const suspended: Result = await cli(f, ['stop-run', w3Id], worktree, scoped);
     expect(suspended.code).toBe(0);
     const begun: number = Date.now();
@@ -584,11 +631,15 @@ test('stop-run cancels a waiting run and the next waiter takes its place', async
     writeFileSync(resolve(dir, 'release'), '');
     expect(await h.proc.exited).toBe(0);
     expect(await w2.proc.exited).toBe(0);
-    w3.proc.kill('SIGCONT');
+    for (const pid of stopped) signal(pid, 'SIGCONT');
     expect(await w3.proc.exited).not.toBe(0);
     expect(readFileSync(resolve(dir, 'order'), 'utf8').trim()).toBe('w2');
     expect((await runRecords(f)).some((entry) => entry.run === w1Id || entry.run === w3Id)).toBe(false);
   } finally {
+    for (const pid of stopped) {
+      signal(pid, 'SIGCONT');
+      signal(pid, 'SIGKILL');
+    }
     for (const cap of caps) {
       if (cap.proc.exitCode === null) cap.proc.kill('SIGCONT');
     }
