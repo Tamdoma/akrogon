@@ -1,4 +1,13 @@
-import { mkdtempSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, symlinkSync } from 'node:fs';
+import {
+  mkdtempSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { dlopen, FFIType } from 'bun:ffi';
@@ -66,6 +75,14 @@ const suiteRuntime: string = join(suiteRoot, 'run');
 mkdirSync(join(suiteRuntime, 'herdr-core'), { recursive: true });
 for (const name of ['bus', 'systemd']) symlinkSync(`/run/user/${process.getuid!()}/${name}`, join(suiteRuntime, name));
 setEnv('XDG_RUNTIME_DIR', suiteRuntime);
+// git starts a detached `maintenance run --auto` after commit, fetch and a push's receive-pack,
+// which adds and removes objects/maintenance.lock after the command returns. Every repo the suite
+// inits or clones copies this template's config, bare remotes included, and linked worktrees share
+// it, so no git starts maintenance even under an env that run-check, a seat or a service filters.
+const gitTemplate: string = join(suiteRoot, 'git-template');
+for (const name of ['hooks', 'info']) mkdirSync(join(gitTemplate, name), { recursive: true });
+writeFileSync(join(gitTemplate, 'config'), '[maintenance]\n\tauto = false\n');
+setEnv('GIT_TEMPLATE_DIR', gitTemplate);
 mkdirSync(process.env.HOME!, { recursive: true });
 mkdirSync(process.env.AKROGON_LEAF_TEMP_ROOT!, { recursive: true });
 
