@@ -6,6 +6,7 @@
 // link there hc starts no units for a test core; `systemd-run` on the core's PATH reaches the user
 // manager for seat scopes.
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { spawnCaptured, type SpawnResult } from '../src/shell';
@@ -41,42 +42,95 @@ function alive(pid: number): boolean {
   }
 }
 
-export async function sweepAbandoned(ms: number = WAIT_MS): Promise<void> {
-  for (const name of readdirSync(realRuntime)) {
+// `root` is the runtime root to sweep; the sweep regressions pass a private one.
+export async function sweepAbandoned(ms: number = WAIT_MS, root: string = realRuntime): Promise<void> {
+  for (const name of readdirSync(root)) {
     const owner: RegExpExecArray | null = /^akt([0-9a-z]+)-\d+$/.exec(name);
     if (owner === null || alive(parseInt(owner[1], 36)) || realHc === null) continue;
-    const runtime: string = resolve(realRuntime, name);
-    // A runtime without a daemon file never got past `hc server start`.
-    if (existsSync(daemonFile(resolve(runtime, 'core')))) await stopDaemon(name, resolve(runtime, 'core'), ms);
+    const runtime: string = resolve(root, name);
+    await stopDaemon(name, resolve(runtime, 'core'), ms);
     await stopLedgerSlices(name, resolve(runtime, 'core'));
     rmSync(runtime, { recursive: true, force: true });
   }
 }
 
-// `<pid> <start time>` of the core's daemon, written once `hc server start` returns; the start time
-// tells the daemon from a later process that reuses its pid.
-const daemonFile = (coreRuntime: string): string => resolve(coreRuntime, 'daemon');
+// A /proc/<pid> read fails this way once the pid has gone or hides it (a non-dumpable process,
+// never an hc daemon).
+function hidden(error: unknown): boolean {
+  const code: string | undefined = (error as NodeJS.ErrnoException).code;
+  return code === 'ENOENT' || code === 'ESRCH' || code === 'EACCES';
+}
 
-// The /proc start time of a running pid; null once it exited (gone or a zombie).
+// A /proc file of a pid, or null once it is hidden.
+export function procFile(pid: number, name: string): string | null {
+  try {
+    return readFileSync(resolve('/proc', String(pid), name), 'utf8');
+  } catch (error) {
+    if (hidden(error)) return null;
+    throw error;
+  }
+}
+
+// The same read without blocking: a scan reads every pid's cmdline while other tests run.
+async function readProcFile(pid: number, name: string): Promise<string | null> {
+  try {
+    return await readFile(resolve('/proc', String(pid), name), 'utf8');
+  } catch (error) {
+    if (hidden(error)) return null;
+    throw error;
+  }
+}
+
+// The /proc start time of a running pid; null once it exited (gone or a zombie). It tells a daemon
+// from a later process that reuses its pid.
 function startTime(pid: number): string | null {
-  const stat: string = resolve('/proc', String(pid), 'stat');
-  if (!existsSync(stat)) return null;
-  const line: string = readFileSync(stat, 'utf8');
+  const line: string | null = procFile(pid, 'stat');
+  if (line === null) return null;
   const fields: string[] = line.slice(line.lastIndexOf(')') + 2).split(' ');
   return fields[0] === 'Z' ? null : fields[19];
 }
 
+type Daemon = { pid: number; start: string };
+
+// The running hc daemons of a session, read from /proc: a daemon runs `<binary> serve` with the
+// HC_SESSION of its `hc server start`, so one is found however far its start got before the worker
+// died, whatever its binary is named.
+async function daemons(session: string): Promise<Daemon[]> {
+  const pids: number[] = readdirSync('/proc')
+    .filter((entry: string) => /^\d+$/.test(entry))
+    .map(Number);
+  const argvs: (string | null)[] = await Promise.all(pids.map((pid: number) => readProcFile(pid, 'cmdline')));
+  return pids
+    .filter((_pid: number, i: number) => (argvs[i] ?? '').split('\0')[1] === 'serve')
+    .flatMap((pid: number): Daemon[] => {
+      // Another user's environ is unreadable, so only this user's daemons match. `hc server start`
+      // gives the daemon HC_RUNTIME=1, which no terminal program carries.
+      const environ: string[] = (procFile(pid, 'environ') ?? '').split('\0');
+      const start: string | null = startTime(pid);
+      return environ.includes(`HC_SESSION=${session}`) && environ.includes('HC_RUNTIME=1') && start !== null
+        ? [{ pid, start }]
+        : [];
+    });
+}
+
 // `hc server stop` exits 0 with `stopped:false` when it reaches no daemon (a moved socket, a dead
-// path), so a core counts as stopped only once its recorded daemon has exited.
+// path), so a session counts as stopped only once its daemons have exited. One deadline covers the
+// stop command and the wait; the caller keeps its runtime when it passes.
 async function stopDaemon(session: string, coreRuntime: string, ms: number): Promise<void> {
-  const [pid, start]: string[] = readFileSync(daemonFile(coreRuntime), 'utf8').trim().split(' ');
+  const deadline: number = Date.now() + ms;
+  const running: Daemon[] = await daemons(session);
+  if (running.length === 0) return;
   const down: SpawnResult = await spawnCaptured([z.string().parse(realHc), 'server', 'stop'], {
     env: cleanEnv(session, coreRuntime, {}, z.string().parse(process.env.PATH)),
+    timeout: Math.max(1, deadline - Date.now()),
+    // A suspended client never acts on SIGTERM.
+    killSignal: 'SIGKILL',
   });
-  const deadline: number = Date.now() + ms;
-  while (startTime(Number(pid)) === start) {
+  while (running.some((d: Daemon) => startTime(d.pid) === d.start)) {
     if (Date.now() > deadline)
-      throw new Error(`hc daemon still running after server stop: ${JSON.stringify({ session, pid, ms, ...down })}`);
+      throw new Error(
+        `hc daemon still running after server stop: ${JSON.stringify({ session, running, ms, ...down })}`,
+      );
     await Bun.sleep(50);
   }
 }
@@ -248,8 +302,6 @@ export async function hcCore(
     env: cleanEnv(session, coreRuntime, { XDG_STATE_HOME: state, STANDIN_DIR: standin, ...opts.coreEnv }, corePath),
   });
   if (start.code !== 0) throw new Error(`hc server start failed: ${JSON.stringify(start)}`);
-  const pid: number = z.object({ pid: z.number().int() }).parse(JSON.parse(start.stdout)).pid;
-  writeFileSync(daemonFile(coreRuntime), `${pid} ${z.string().parse(startTime(pid))}\n`);
   symlinkSync(socket, resolve(runtime, 'herdr-core', `${session}.sock`));
   // Tests drop their own stubs in <home>/bin; akrogon's sweeps read the proc root.
   for (const dir of [resolve(f.home, 'bin'), procRoot(f)]) mkdirSync(dir, { recursive: true });
