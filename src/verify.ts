@@ -627,7 +627,7 @@ export async function requireGreenReceipt(
   );
 }
 
-async function recordLock(repo: Repo): Promise<string> {
+export async function recordLock(repo: Repo): Promise<string> {
   return resolve(repo.root, await command(['git', 'rev-parse', '--git-path', 'akrogon-verify-runs.lock'], repo.root));
 }
 

@@ -27,6 +27,7 @@ import {
   leafTempRoot,
   storeDir,
   registerTemp,
+  unitBin,
   WAIT_MS,
   type GhFixture,
   type Fixture,
@@ -4458,7 +4459,9 @@ async function selfUpdateCli(
       AKROGON_LEAF_TEMP_ROOT: leafTempRoot(f),
       AKROGON_RETIRED_TEMP_ROOT: resolve(f.home, 'retired-temp'),
       SELF_UPDATE_LOG: resolve(f.home, 'self-update.log'),
+      AKROGON_RUN: '',
       ...env,
+      PATH: `${unitBin(f)}:${env.PATH ?? f.env.PATH}`,
     },
   });
   return { code, stdout: stdout.trim(), stderr: stderr.trim() };

@@ -275,7 +275,6 @@ export async function hcCore(
     FAKE_HERDR_APP: appPlan,
     HC_SHIM_LOG: shimLog,
     HC_SHIM_REAL: realHc,
-    AKROGON_PANE_WAIT_MS: '2000',
   };
   const hc = (args: string[]): Promise<SpawnResult> =>
     spawnCaptured([realHc, ...args], {

@@ -2,9 +2,11 @@ import { afterAll, test, expect } from 'bun:test';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   chmodSync,
+  closeSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readdirSync,
   readFileSync,
   realpathSync,
@@ -55,11 +57,8 @@ function outDir(f: Fixture): string {
 }
 
 let serial = 0;
-const createdSlices: Set<string> = new Set();
 function testSlice(): string {
-  const slice: string = `akrogon-test-${process.pid}-${serial++}.slice`;
-  createdSlices.add(slice);
-  return slice;
+  return `akrogon-test-${process.pid}-${serial++}.slice`;
 }
 
 // Spawn the entry with the real systemd-run/systemctl on PATH so units are
@@ -112,10 +111,9 @@ async function realFixture(): Promise<{ f: Fixture; slice: string }> {
   return shared;
 }
 
+// Stopping the parent slice stops every test slice under it, and the parent itself.
 afterAll(async () => {
-  for (const slice of createdSlices) {
-    await stopTestSlice(slice);
-  }
+  await stopTestSlice(`akrogon-test-${process.pid}.slice`);
   if (shared !== undefined) {
     shared.f.clean();
     shared = undefined;
@@ -384,12 +382,11 @@ for (const signal of ['SIGTERM', 'SIGKILL'] as const) {
       await waitPath(unitDir('/sys/fs/cgroup', slice, unit));
       await waitActive(unit);
       cap.proc.kill(signal);
-      // One deadline measured at the signal: TimeoutStopUSec (5 s) plus the
-      // 5 s assertion window from the brief must cover unit inactivity,
-      // guard exit and descendant drain.
+      // One deadline measured at the signal must cover unit inactivity, guard
+      // exit and descendant drain.
       const cgroupProcs: string = resolve(unitDir('/sys/fs/cgroup', slice, unit), 'cgroup.procs');
       const guard: string = unit.replace(/\.scope$/, '-guard.service');
-      const deadline: number = Date.now() + 10000;
+      const deadline: number = Date.now() + WAIT_MS;
       let scopeOff: boolean = false;
       let guardOff: boolean = false;
       let drained: boolean = false;
@@ -428,6 +425,36 @@ async function withRunRoot(f: Fixture, body: (runRoot: string) => Promise<void>)
 
 // The command's TMPDIR holds a mode-555 dir, which a plain rm -rf cannot empty.
 const readOnlyTmp: string = 'mkdir -p "$TMPDIR/ro/x"; chmod 555 "$TMPDIR/ro"';
+
+// A capture pair is abandoned once no process holds capture-out's shared lock,
+// including a holder outside the run scope.
+// The probe locks a read-only descriptor of the existing file, as abandonedCaptures
+// does, so a missing capture fails with ENOENT instead of being recreated.
+async function waitUnlocked(path: string, ms: number = WAIT_MS): Promise<void> {
+  const begun: number = Date.now();
+  const fd: number = openSync(path, 'r');
+  try {
+    for (;;) {
+      const probe: Bun.Subprocess = Bun.spawn(['flock', '-n', '-x', '0'], { stdin: fd, stderr: 'ignore' });
+      if ((await probe.exited) === 0) return;
+      if (Date.now() - begun > ms) throw new Error(`Timed out waiting for ${path} to be unlocked`);
+      await Bun.sleep(50);
+    }
+  } finally {
+    closeSync(fd);
+  }
+}
+
+test('the capture lock probe fails on a missing capture instead of creating it', async () => {
+  const dir: string = mkdtempSync('/tmp/akt-');
+  const missing: string = resolve(dir, 'capture-out.log');
+  try {
+    await expect(waitUnlocked(missing)).rejects.toThrow('ENOENT');
+    expect(existsSync(missing)).toBe(false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 async function waitGone(path: string, ms: number = WAIT_MS): Promise<void> {
   const begun: number = Date.now();
@@ -672,7 +699,7 @@ test.serial("a killed run-check pair refuses the leaf's non-failed phase moves u
   const implDir: string = resolve(leafDir, 'implementation');
   const cap: RealCap = spawnReal(
     f,
-    ['run-check', '--name', 'gatekill', '--', 'sh', '-c', `trap '' TERM; touch "${out}/ready"; sleep 30`],
+    ['run-check', '--name', 'gatekill', '--', 'sh', '-c', `trap '' TERM; touch "${out}/ready"; sleep 300`],
     worktree,
     { RUN_UNITS_OUT: out, AKROGON_RUN_SLICE: slice },
   );
@@ -701,32 +728,26 @@ test.serial("a killed run-check pair refuses the leaf's non-failed phase moves u
     // Live holder, live unit: a non-failed move stays open for the leaf.
     const live: SpawnResult = await spawnReal(f, ['phase', 'gatekill', 'check.review', '--check'], f.root).result;
     expect(live.code, `stdout: ${live.stdout} stderr: ${live.stderr}`).toBe(0);
+    // The guard stops the scope once the wrapper dies; frozen, it cannot, so the
+    // TERM-proof payload alone holds the pair until the test thaws it.
+    const guard: string = unit.replace(/\.scope$/, '-guard.service');
+    await waitActive(guard);
+    expect((await sysctl('freeze', guard)).code).toBe(0);
     cap.proc.kill('SIGKILL');
     const result: SpawnResult = await cap.result;
     expect(result.signalCode).toBe('SIGKILL');
     const cgroupProcs: string = resolve(unitDir('/sys/fs/cgroup', slice, unit), 'cgroup.procs');
-    // The started payload ignores TERM, so it outlives the dead wrapper inside
-    // the real scope until the guard's stop drains the cgroup — the interval
-    // where the pair stays live on the holder's inherited stdout fd alone.
-    const drainDeadline: number = Date.now() + 10000;
-    let held: boolean = false;
-    let refusedResult: SpawnResult | undefined;
-    while (Date.now() < drainDeadline) {
-      const holderLive: boolean = existsSync(cgroupProcs) && readFileSync(cgroupProcs, 'utf8').trim() !== '';
-      const probe: SpawnResult = await spawnReal(f, ['phase', 'gatekill', 'check.review', '--check'], f.root).result;
-      if (probe.code !== 0) {
-        refusedResult = probe;
-        break;
-      }
-      held ||= holderLive && result.signalCode === 'SIGKILL';
-      await Bun.sleep(100);
-    }
-    expect(held, 'never saw a live holder with the wrapper dead and the move still open').toBe(true);
-    expect(refusedResult, 'the pair never refused after the unit drained').toBeDefined();
+    expect(readFileSync(cgroupProcs, 'utf8').trim()).not.toBe('');
+    const held: SpawnResult = await spawnReal(f, ['phase', 'gatekill', 'check.review', '--check'], f.root).result;
+    expect(held.code, `the move closed with the wrapper dead and the payload live: ${held.stderr}`).toBe(0);
+    expect((await sysctl('thaw', guard)).code).toBe(0);
+    await waitGone(cgroupProcs);
+    await waitUnlocked(outLog);
+    const refused: SpawnResult = await spawnReal(f, ['phase', 'gatekill', 'check.review', '--check'], f.root).result;
+    expect(refused.code).not.toBe(0);
     // Wrapper and last fd holder are gone: the pair is abandoned and refuses.
     expect(existsSync(outLog)).toBe(true);
     expect(existsSync(errLog)).toBe(true);
-    const refused: SpawnResult = refusedResult as SpawnResult;
     const refusal: string = refused.stdout + refused.stderr;
     expect(refusal).toContain(outLog);
     expect(refusal).toContain(errLog);
@@ -961,21 +982,13 @@ test.serial('a stale run record and unit are swept by the next run start', async
   const f: Fixture = await fixture();
   const slice: string = testSlice();
   let stale: Bun.Subprocess | undefined;
+  const staleRun: string = `stale-${randomUUID()}`;
+  const staleUnit: string = `akrogon-run-${staleRun}.scope`;
   try {
     const worktree: string = await leafWorktree(f, 'sweeper');
     // A real stale scope under the test slice plus a record with a dead pid.
     stale = Bun.spawn(
-      [
-        'systemd-run',
-        '--user',
-        '--scope',
-        '--quiet',
-        `--slice=${slice}`,
-        '--unit=akrogon-run-stale0',
-        '--',
-        'sleep',
-        '300',
-      ],
+      ['systemd-run', '--user', '--scope', '--quiet', `--slice=${slice}`, `--unit=${staleUnit}`, '--', 'sleep', '300'],
       {
         env: {
           ...process.env,
@@ -984,6 +997,7 @@ test.serial('a stale run record and unit are swept by the next run start', async
         },
       },
     );
+    await waitActive(staleUnit);
     const recordsDir: string = resolve(f.home, 'runs');
     mkdirSync(recordsDir, { recursive: true });
     const dead: Bun.Subprocess = Bun.spawn(['true']);
@@ -1001,10 +1015,10 @@ test.serial('a stale run record and unit are swept by the next run start', async
         check: 'old',
         state: 'live',
         since: new Date().toISOString(),
-        run: 'stale0',
+        run: staleRun,
         slice,
         scope: 'gone.scope',
-        unit: 'akrogon-run-stale0.scope',
+        unit: staleUnit,
       }),
     );
     writeFileSync(resolve(recordsDir, 'corrupt.yaml'), 'not: [yaml');
@@ -1012,14 +1026,14 @@ test.serial('a stale run record and unit are swept by the next run start', async
       AKROGON_RUN_SLICE: slice,
     }).result;
     expect(result.code).toBe(0);
-    await waitInactive('akrogon-run-stale0.scope');
+    await waitInactive(staleUnit);
     const left: string[] = readdirSync(recordsDir).filter((name) => name.endsWith('.yaml'));
     expect(left).toEqual([]);
   } finally {
     if (stale !== undefined) {
       // The sleep is a systemd-owned scope member, not a descendant of the
       // systemd-run child: the kill cannot reach it, so stop the scope.
-      await sysctl('stop', 'akrogon-run-stale0.scope');
+      await sysctl('stop', staleUnit);
       if (stale.exitCode === null) stale.kill('SIGKILL');
       await stale.exited;
     }
@@ -1189,16 +1203,20 @@ test.serial(
     rewriteConfig(f, {
       setup: 'mkdir -p node_modules',
       env: [],
-      checks: { test: `sleep 4 && touch ${quote(resolve(out, 'check-done'))}` },
+      checks: {
+        test: `while ! test -f ${quote(resolve(out, 'release'))}; do sleep 0.05; done; touch ${quote(resolve(out, 'check-done'))}`,
+      },
     });
     const cap: RealCap = spawnScoped(f, 'callerA.scope', ['verify'], worktree, {
       AKROGON_RUN_SLICE: slice,
     });
     try {
-      await waitCheckRecord(f, 'test');
+      // The check holds until the release file, so the caller dies mid-check.
+      await waitActive((await waitCheckRecord(f, 'test')).unit as string);
       killTree(cap.proc);
       const result: SpawnResult = await cap.result;
       expect(result.signalCode).toBe('SIGKILL');
+      writeFileSync(resolve(out, 'release'), '');
       const deadline: number = Date.now() + WAIT_MS;
       let receipt: VerifyRun | undefined;
       while (receipt === undefined || receipt.end === undefined) {

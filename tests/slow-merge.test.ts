@@ -16,7 +16,8 @@ import {
 } from './helpers';
 import { command, quote, type Result } from '../src/shell';
 import { readRepo } from '../src/config';
-import { requireGreenReceipt, verifyRunSchema, type VerifyRun } from '../src/verify';
+import { recordLock, requireGreenReceipt, verifyRunSchema, type VerifyRun } from '../src/verify';
+import { withLock } from '../src/state';
 import {
   blockNotices,
   hcCore,
@@ -31,6 +32,19 @@ import { noticeId } from '../src/notice';
 stopCoresAfterFile();
 
 const LEDGER: string = 'issues/verify-runs.jsonl';
+// A pass started by heldCli waits in setup while the hold file sits in the repo's git dir, which
+// every verify checkout shares; backdate removes it once the pass's receipt is rewritten.
+const SETUP: string =
+  'while test -f "$(git rev-parse --git-common-dir)/slow-hold"; do sleep 0.02; done; mkdir -p node_modules';
+
+function holdFile(f: Fixture): string {
+  return resolve(f.root, '.git', 'slow-hold');
+}
+
+function heldCli(f: Fixture, args: string[], cwd: string, env: NodeJS.ProcessEnv): Promise<Result> {
+  writeFileSync(holdFile(f), '');
+  return cli(f, args, cwd, env);
+}
 
 function records(f: Fixture): VerifyRun[] {
   const file: string = resolve(f.root, LEDGER);
@@ -121,26 +135,33 @@ async function bump(direct: string, file: string): Promise<string> {
 
 // The pass appends its receipt before checkout and rewrites it at the end,
 // keeping `start`: backdating that start mid-pass gives the run a real wall
-// time of about `ms` without waiting. Returns the appended run's id.
+// time of about `ms` without waiting. The rewrite holds the pass's own ledger
+// lock, then releases the pass held by heldCli. Returns the appended run's id.
 async function backdate(f: Fixture, ms: number, sha?: string): Promise<string> {
   const file: string = resolve(f.root, LEDGER);
+  const lock: string = await recordLock(readRepo(f.repo, f.root));
   const deadline: number = Date.now() + WAIT_MS;
   while (Date.now() < deadline) {
-    const lines: string[] = existsSync(file)
-      ? readFileSync(file, 'utf8')
-          .split('\n')
-          .filter((line) => line.trim() !== '')
-      : [];
-    const index: number = lines.findIndex((line) => {
-      const row: { scope: string; end?: string; sha: string } = JSON.parse(line);
-      return row.scope === 'merge' && row.end === undefined && (sha === undefined || row.sha === sha);
-    });
-    if (index !== -1) {
+    const run: string | undefined = await withLock(lock, async () => {
+      const lines: string[] = existsSync(file)
+        ? readFileSync(file, 'utf8')
+            .split('\n')
+            .filter((line) => line.trim() !== '')
+        : [];
+      const index: number = lines.findIndex((line) => {
+        const row: { scope: string; end?: string; sha: string } = JSON.parse(line);
+        return row.scope === 'merge' && row.end === undefined && (sha === undefined || row.sha === sha);
+      });
+      if (index === -1) return undefined;
       const row = JSON.parse(lines[index]) as { run: string; start: string };
       if (Date.parse(row.start) > Date.now() - ms) row.start = new Date(Date.now() - ms).toISOString();
       lines[index] = JSON.stringify(row);
       writeFileSync(file, lines.join('\n') + '\n');
       return row.run;
+    });
+    if (run !== undefined) {
+      rmSync(holdFile(f), { force: true });
+      return run;
     }
     await Bun.sleep(10);
   }
@@ -157,7 +178,7 @@ test('a slow merge run is flagged, recorded, printed and notified once', async (
   const core: HcCore = await hcCore(f);
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), {
-      setup: 'mkdir -p node_modules',
+      setup: SETUP,
       checks: { unit: 'echo unit' },
       grounding: 'none',
     });
@@ -172,7 +193,7 @@ test('a slow merge run is flagged, recorded, printed and notified once', async (
     expect(noticeFiles(core)).toEqual([]);
 
     await bump(direct, 'code.ts');
-    const pendingB: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
+    const pendingB: Promise<Result> = heldCli(f, ['verify', '--holder', holder], direct, env);
     const bId: string = await backdate(f, 600000);
     const resultB: Result = await pendingB;
     expect(resultB.code).toBe(0);
@@ -202,7 +223,7 @@ test('only eligible rows enter the normal and checked bounds follow the design',
   try {
     const env: NodeJS.ProcessEnv = coreEnv(f, core);
     yaml(resolve(f.root, 'issues/config.yaml'), {
-      setup: 'mkdir -p node_modules',
+      setup: SETUP,
       checks: { unit: 'echo unit' },
       grounding: 'none',
     });
@@ -227,7 +248,7 @@ test('only eligible rows enter the normal and checked bounds follow the design',
     // Run 2 sees 5 eligible rows: the ineligible kinds at 5500ms never count.
     await bump(direct, 'second.ts');
     const secondId: string = await (async () => {
-      const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
+      const pending: Promise<Result> = heldCli(f, ['verify', '--holder', holder], direct, env);
       const id: string = await backdate(f, 1000);
       const result: Result = await pending;
       expect(result.code).toBe(0);
@@ -244,13 +265,13 @@ test('only eligible rows enter the normal and checked bounds follow the design',
     await command(['git', 'commit', '-m', 'add failing check'], f.root);
     await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
     yaml(resolve(f.root, 'issues/config.yaml'), {
-      setup: 'mkdir -p node_modules',
+      setup: SETUP,
       checks: { unit: 'sh check.sh' },
       grounding: 'none',
     });
     // The known-red head must hold check.sh: verify the pushed main tip.
     await command(['git', 'checkout', '-b', 'kr', 'origin/main'], direct);
-    const pendingKr: Promise<Result> = cli(f, ['verify', '--holder', holder, '--known-red'], direct, env);
+    const pendingKr: Promise<Result> = heldCli(f, ['verify', '--holder', holder, '--known-red'], direct, env);
     const headId: string = await backdate(f, 600000);
     const knownRed: Result = await pendingKr;
     expect(knownRed.code).toBe(0);
@@ -275,7 +296,7 @@ test('an open episode pins the normal, cites its first run, notifies once and re
   try {
     const env: NodeJS.ProcessEnv = coreEnv(f, core);
     yaml(resolve(f.root, 'issues/config.yaml'), {
-      setup: 'mkdir -p node_modules',
+      setup: SETUP,
       checks: { unit: 'echo unit', extra: 'echo extra' },
       grounding: 'none',
     });
@@ -297,7 +318,7 @@ test('an open episode pins the normal, cites its first run, notifies once and re
     });
 
     const aId: string = await (async () => {
-      const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
+      const pending: Promise<Result> = heldCli(f, ['verify', '--holder', holder], direct, env);
       const id: string = await backdate(f, 600000);
       const result: Result = await pending;
       expect(result.code).toBe(0);
@@ -352,14 +373,14 @@ function setEpisodeNotice(f: Fixture, notice: string): void {
 }
 
 async function slowRun(f: Fixture, direct: string, holder: string, env: NodeJS.ProcessEnv): Promise<VerifyRun> {
-  const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
+  const pending: Promise<Result> = heldCli(f, ['verify', '--holder', holder], direct, env);
   const id: string = await backdate(f, 600000);
   expect((await pending).code).toBe(0);
   return records(f).find((run) => run.run === id)!;
 }
 
 test('a failed slow notice is retried by the next in-episode run; a pending one covers, waiting or shown', async () => {
-  const config = { setup: 'mkdir -p node_modules', checks: { unit: 'echo unit' }, grounding: 'none' };
+  const config = { setup: SETUP, checks: { unit: 'echo unit' }, grounding: 'none' };
   {
     const f: Fixture = await fixture();
     const core: HcCore = await hcCore(f);
@@ -417,7 +438,7 @@ test('the last 20 eligible runs inside the episode close it accepted', async () 
   const core: HcCore = await hcCore(f);
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), {
-      setup: 'mkdir -p node_modules',
+      setup: SETUP,
       checks: { unit: 'echo unit' },
       grounding: 'none',
     });
@@ -428,7 +449,7 @@ test('the last 20 eligible runs inside the episode close it accepted', async () 
       seedMerge(f, 500000, {
         slow: { ms: 500000, normal_ms: 300000, first: { run: episode, leaf: 'firstleaf' } },
       });
-    const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, coreEnv(f, core));
+    const pending: Promise<Result> = heldCli(f, ['verify', '--holder', holder], direct, coreEnv(f, core));
     const id: string = await backdate(f, 600000);
     const result: Result = await pending;
     expect(result.code).toBe(0);
@@ -450,7 +471,7 @@ test('the twentieth eligible episode run closes accepted', async () => {
   const f: Fixture = await fixture();
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), {
-      setup: 'mkdir -p node_modules',
+      setup: SETUP,
       checks: { unit: 'echo unit' },
       grounding: 'none',
     });
@@ -460,7 +481,7 @@ test('the twentieth eligible episode run closes accepted', async () => {
       seedMerge(f, 500000, {
         slow: { ms: 500000, normal_ms: 300000, first: { run: episode, leaf: 'firstleaf' } },
       });
-    const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, mergeEnv(f));
+    const pending: Promise<Result> = heldCli(f, ['verify', '--holder', holder], direct, mergeEnv(f));
     const id: string = await backdate(f, 600000);
     expect((await pending).code).toBe(0);
     const row: VerifyRun = records(f).find((run) => run.run === id)!;
@@ -474,7 +495,7 @@ test('an unflagged run whose full check was blocked still closes the episode acc
   const f: Fixture = await fixture();
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), {
-      setup: 'mkdir -p node_modules',
+      setup: SETUP,
       checks: { unit: 'echo unit', extra: 'exit 4' },
       full: ['unit'],
       grounding: 'none',
@@ -530,7 +551,7 @@ test('the carried normal opens an episode where the rolling median stays silent'
   const f: Fixture = await fixture();
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), {
-      setup: 'mkdir -p node_modules',
+      setup: SETUP,
       checks: { unit: 'echo unit' },
       grounding: 'none',
     });
@@ -540,7 +561,7 @@ test('the carried normal opens an episode where the rolling median stays silent'
     // Each step is under 1.5x the rolling median at its point, so today's
     // code never flags; the rolling median lands on 449000.
     for (let i = 0; i < 11; i++) seedMerge(f, 449000, { slow: { ms: 449000, normal_ms: 300000 } });
-    const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
+    const pending: Promise<Result> = heldCli(f, ['verify', '--holder', holder], direct, env);
     const id: string = await backdate(f, 600000);
     const result: Result = await pending;
     expect(result.code).toBe(0);
@@ -560,7 +581,7 @@ test('the carried normal ratchets down to a lower rolling median', async () => {
   const f: Fixture = await fixture();
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), {
-      setup: 'mkdir -p node_modules',
+      setup: SETUP,
       checks: { unit: 'echo unit' },
       grounding: 'none',
     });
@@ -570,7 +591,7 @@ test('the carried normal ratchets down to a lower rolling median', async () => {
     for (let i = 0; i < 11; i++) seedMerge(f, 200000, { slow: { ms: 200000, normal_ms: 300000 } });
     // Rolling median is 200000, below the carried 300000: the next run's
     // normal is 200000.
-    const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
+    const pending: Promise<Result> = heldCli(f, ['verify', '--holder', holder], direct, env);
     const id: string = await backdate(f, 10000);
     expect((await pending).code).toBe(0);
     const row: VerifyRun = records(f).find((run) => run.run === id)!;
@@ -585,7 +606,7 @@ test('an episode does not recover while its own eligible median is over', async 
   const f: Fixture = await fixture();
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), {
-      setup: 'mkdir -p node_modules',
+      setup: SETUP,
       checks: { unit: 'echo unit' },
       grounding: 'none',
     });
@@ -596,7 +617,7 @@ test('an episode does not recover while its own eligible median is over', async 
     // The run under test is eligible and under the threshold, but the
     // episode's own median (7 rows: opener, 5x500000, me) is 500000, over
     // 1.5x the pinned 300000 plus 2 minutes: no close.
-    const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
+    const pending: Promise<Result> = heldCli(f, ['verify', '--holder', holder], direct, env);
     const id: string = await backdate(f, 3000);
     expect((await pending).code).toBe(0);
     const row: VerifyRun = records(f).find((run) => run.run === id)!;
@@ -611,7 +632,7 @@ test('an episode recovers once its own eligible median is back under', async () 
   const f: Fixture = await fixture();
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), {
-      setup: 'mkdir -p node_modules',
+      setup: SETUP,
       checks: { unit: 'echo unit' },
       grounding: 'none',
     });
@@ -626,7 +647,7 @@ test('an episode recovers once its own eligible median is back under', async () 
     // The episode's own window is opener + 4 stamped + me = 6 rows with
     // median 450000, not over 1.5x300000: recovered. The pre-episode 900000
     // rows never enter that median, and me tips the median under.
-    const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
+    const pending: Promise<Result> = heldCli(f, ['verify', '--holder', holder], direct, env);
     const id: string = await backdate(f, 3000);
     expect((await pending).code).toBe(0);
     const row: VerifyRun = records(f).find((run) => run.run === id)!;
@@ -640,7 +661,7 @@ test('an episode with under five eligible runs does not recover', async () => {
   const f: Fixture = await fixture();
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), {
-      setup: 'mkdir -p node_modules',
+      setup: SETUP,
       checks: { unit: 'echo unit' },
       grounding: 'none',
     });
@@ -651,7 +672,7 @@ test('an episode with under five eligible runs does not recover', async () => {
     seedInEpisode(f, episode, 300000);
     // In-episode eligible rows: opener + two stamped + me = four, one short of
     // the recovery gate, even though their median 300000 is under the threshold.
-    const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
+    const pending: Promise<Result> = heldCli(f, ['verify', '--holder', holder], direct, env);
     const id: string = await backdate(f, 300000);
     expect((await pending).code).toBe(0);
     const row: VerifyRun = records(f).find((run) => run.run === id)!;
@@ -666,7 +687,7 @@ test('an episode median counts only its own last 20 eligible runs', async () => 
   const f: Fixture = await fixture();
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), {
-      setup: 'mkdir -p node_modules',
+      setup: SETUP,
       checks: { unit: 'echo unit' },
       grounding: 'none',
     });
@@ -679,7 +700,7 @@ test('an episode median counts only its own last 20 eligible runs', async () => 
     // so the episode stays open. An all-episode median would see the early fast
     // rows and read 300000 — under the threshold — and wrongly recover. me is
     // unflagged and the episode is nowhere near 14 days old.
-    const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
+    const pending: Promise<Result> = heldCli(f, ['verify', '--holder', holder], direct, env);
     const id: string = await backdate(f, 300000);
     expect((await pending).code).toBe(0);
     const row: VerifyRun = records(f).find((run) => run.run === id)!;
@@ -695,7 +716,7 @@ test('an episode under 14 days old does not close accepted', async () => {
   const core: HcCore = await hcCore(f);
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), {
-      setup: 'mkdir -p node_modules',
+      setup: SETUP,
       checks: { unit: 'echo unit' },
       grounding: 'none',
     });
@@ -705,7 +726,7 @@ test('an episode under 14 days old does not close accepted', async () => {
     for (let i = 0; i < 19; i++) seedInEpisode(f, episode, 500000);
     // 21 episode-eligible runs, the last-20 window all inside, but the
     // opener ended 13 days ago: no accepted close.
-    const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
+    const pending: Promise<Result> = heldCli(f, ['verify', '--holder', holder], direct, env);
     const id: string = await backdate(f, 500000);
     const result: Result = await pending;
     expect(result.code).toBe(0);
@@ -724,7 +745,7 @@ test('an accepted close sends its notice and the next run takes the window media
   const core: HcCore = await hcCore(f);
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), {
-      setup: 'mkdir -p node_modules',
+      setup: SETUP,
       checks: { unit: 'echo unit' },
       grounding: 'none',
     });
@@ -733,7 +754,7 @@ test('an accepted close sends its notice and the next run takes the window media
     const episode: string = seedEpisode(f, 0, { end: new Date(Date.now() - 15 * DAYS).toISOString() });
     for (let i = 0; i < 18; i++) seedInEpisode(f, episode, 500000);
     // me is the 20th eligible episode run, all inside, opener 15 days old.
-    const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
+    const pending: Promise<Result> = heldCli(f, ['verify', '--holder', holder], direct, env);
     const id: string = await backdate(f, 500000);
     const result: Result = await pending;
     expect(result.code).toBe(0);
@@ -756,7 +777,7 @@ test('an accepted close sends its notice and the next run takes the window media
     expect(files[0].body).toContain(`first seen at firstleaf ${episode}`);
     // The run after the close takes the closing window's median, 500000.
     await bump(direct, 'after.ts');
-    const after: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
+    const after: Promise<Result> = heldCli(f, ['verify', '--holder', holder], direct, env);
     const afterId: string = await backdate(f, 300000);
     expect((await after).code).toBe(0);
     const next: VerifyRun = records(f).find((run) => run.run === afterId)!;
@@ -773,7 +794,7 @@ test('a failed accepted notice is retried by the next checked run', async () => 
   const core: HcCore = await hcCore(f);
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), {
-      setup: 'mkdir -p node_modules',
+      setup: SETUP,
       checks: { unit: 'echo unit' },
       grounding: 'none',
     });
@@ -782,7 +803,7 @@ test('a failed accepted notice is retried by the next checked run', async () => 
     const episode: string = seedEpisode(f, 0, { end: new Date(Date.now() - 15 * DAYS).toISOString() });
     for (let i = 0; i < 18; i++) seedInEpisode(f, episode, 500000);
     const unblock: () => void = blockNotices(core);
-    const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
+    const pending: Promise<Result> = heldCli(f, ['verify', '--holder', holder], direct, env);
     const id: string = await backdate(f, 500000);
     expect((await pending).code).toBe(0);
     const closing = (): VerifyRun => records(f).find((run) => run.run === id)!;
@@ -816,7 +837,7 @@ test('an intervening leaf verify does not cause a delivered accepted notice to b
   const core: HcCore = await hcCore(f);
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), {
-      setup: 'mkdir -p node_modules',
+      setup: SETUP,
       checks: { unit: 'echo unit' },
       grounding: 'none',
     });
@@ -824,7 +845,7 @@ test('an intervening leaf verify does not cause a delivered accepted notice to b
     const { direct, holder } = await mergeCaller(f);
     const episode: string = seedEpisode(f, 0, { end: new Date(Date.now() - 15 * DAYS).toISOString() });
     for (let i = 0; i < 18; i++) seedInEpisode(f, episode, 500000);
-    const closing: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
+    const closing: Promise<Result> = heldCli(f, ['verify', '--holder', holder], direct, env);
     const closingId: string = await backdate(f, 500000);
     expect((await closing).code).toBe(0);
     expect(records(f).find((run) => run.run === closingId)?.slow?.accepted_notice).toBe('pending');
@@ -857,7 +878,7 @@ test('an overlapping merge verify uses the median from the accepted close', asyn
   const pending: Promise<Result>[] = [];
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), {
-      setup: 'mkdir -p node_modules',
+      setup: SETUP,
       checks: {
         unit: `gate=${quote(releaseClose)}; if test -f overlap-late.ts; then gate=${quote(releaseLate)}; fi; while ! test -f "$gate"; do sleep 0.02; done`,
       },
@@ -904,7 +925,7 @@ test('an aged episode does not close accepted while a pre-episode run sits in th
   const f: Fixture = await fixture();
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), {
-      setup: 'mkdir -p node_modules',
+      setup: SETUP,
       checks: { unit: 'echo unit' },
       grounding: 'none',
     });
@@ -915,7 +936,7 @@ test('an aged episode does not close accepted while a pre-episode run sits in th
     for (let i = 0; i < 17; i++) seedInEpisode(f, episode, 500000);
     // 20 eligible runs total: me makes the window full, but the window holds
     // the one pre-episode row and the episode counts only 19: no accepted.
-    const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
+    const pending: Promise<Result> = heldCli(f, ['verify', '--holder', holder], direct, env);
     const id: string = await backdate(f, 500000);
     expect((await pending).code).toBe(0);
     const row: VerifyRun = records(f).find((run) => run.run === id)!;
@@ -930,7 +951,7 @@ test('a ledger with no stored normal starts as today', async () => {
   const f: Fixture = await fixture();
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), {
-      setup: 'mkdir -p node_modules',
+      setup: SETUP,
       checks: { unit: 'echo unit' },
       grounding: 'none',
     });
@@ -942,7 +963,7 @@ test('a ledger with no stored normal starts as today', async () => {
     expect((await cli(f, ['verify', '--holder', holder], direct, env)).code).toBe(0);
     expect(records(f).at(-1)!.slow).toBeUndefined();
     await bump(direct, 'fifth.ts');
-    const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
+    const pending: Promise<Result> = heldCli(f, ['verify', '--holder', holder], direct, env);
     const id: string = await backdate(f, 300000);
     expect((await pending).code).toBe(0);
     expect(records(f).find((run) => run.run === id)!.slow).toMatchObject({ normal_ms: 300000 });
@@ -955,7 +976,7 @@ test('a stored normal applies before five eligible rows', async () => {
   const f: Fixture = await fixture();
   try {
     yaml(resolve(f.root, 'issues/config.yaml'), {
-      setup: 'mkdir -p node_modules',
+      setup: SETUP,
       checks: { unit: 'echo unit' },
       grounding: 'none',
     });
@@ -964,7 +985,7 @@ test('a stored normal applies before five eligible rows', async () => {
     for (let i = 0; i < 3; i++) seedMerge(f, 300000, { slow: { ms: 300000, normal_ms: 250000 } });
     // Fewer than 5 eligible rows, but the ledger stores normal_ms 250000:
     // the run flags against the carried value, not a rolling median.
-    const pending: Promise<Result> = cli(f, ['verify', '--holder', holder], direct, env);
+    const pending: Promise<Result> = heldCli(f, ['verify', '--holder', holder], direct, env);
     const id: string = await backdate(f, 500000);
     expect((await pending).code).toBe(0);
     const row: VerifyRun = records(f).find((run) => run.run === id)!;
@@ -981,7 +1002,7 @@ test('a row whose command was rerun stays out of the normal', async () => {
   try {
     const env: NodeJS.ProcessEnv = coreEnv(f, core);
     yaml(resolve(f.root, 'issues/config.yaml'), {
-      setup: 'mkdir -p node_modules',
+      setup: SETUP,
       checks: { unit: 'echo unit' },
       grounding: 'none',
     });

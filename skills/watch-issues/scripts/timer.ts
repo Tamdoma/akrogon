@@ -72,6 +72,7 @@ let nextBoundary: number = Date.now() + intervalMs;
 console.log(`[watch-timer] up: due 1 at ${new Date(nextBoundary).toISOString()}`);
 let effectiveTranscript: string | null = args.transcript;
 let transcriptMiss: number = 0;
+let accepted: boolean = false;
 
 // The timer's own akrogon.watch-due label. A missing label and a failed read are distinct.
 async function receipt(): Promise<string | null> {
@@ -124,6 +125,10 @@ async function poll(): Promise<'exit' | 'stay'> {
   const now: number = Date.now();
   const watcher = await readWatcher();
   if (typeof watcher === 'string') return watcher;
+  if (!accepted) {
+    accepted = true;
+    console.log(`[watch-timer] accepted watcher ${args.watcher} pinned to ${args.pinPid}`);
+  }
 
   let resolved: string | null;
   try {
@@ -134,8 +139,10 @@ async function poll(): Promise<'exit' | 'stay'> {
     return 'stay';
   }
   if (resolved !== null) {
-    if (effectiveTranscript === null) effectiveTranscript = resolved;
-    else if (resolved !== effectiveTranscript) {
+    if (effectiveTranscript === null) {
+      effectiveTranscript = resolved;
+      console.log(`[watch-timer] latched ${resolved}`);
+    } else if (resolved !== effectiveTranscript) {
       // Require the moved path to hold for several polls: a harness can open another transcript
       // mid-conversation (sub-agent rollout, session record rewrite); that is not a reset.
       transcriptMiss += 1;

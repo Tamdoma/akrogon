@@ -74,6 +74,14 @@ const screenOf = async (core: HcCore, address: string): Promise<string> =>
   (await core.hc(['read', address, '--lines', '60'])).stdout;
 
 // The address may be live, finished or already removed: settle into a readable finished screen.
+async function waitScreen(core: HcCore, address: string, text: string): Promise<void> {
+  const deadline: number = Date.now() + WAIT_MS;
+  while (!(await screenOf(core, address)).includes(text)) {
+    if (Date.now() > deadline) throw new Error(`terminal ${address} never printed ${text}`);
+    await Bun.sleep(100);
+  }
+}
+
 async function waitFinished(core: HcCore, address: string, ms: number = WAIT_MS): Promise<void> {
   const deadline: number = Date.now() + ms;
   while (Date.now() < deadline) {
@@ -827,8 +835,7 @@ test.serial('the timer exits on a finished watcher, wrong start time and pin dea
     // Correct pin, then the pinned process dies → exit with the gone reason.
     run = await f.core.hc(timerArgv(['--pin-pid', String(shellPid), '--pin-start', startOf(shellPid)]));
     const pinDeath: string = z.object({ address: z.string() }).parse(JSON.parse(run.stdout)).address;
-    await Bun.sleep(2500);
-    expect((await f.core.hc(['get', '--json', pinDeath])).code).toBe(0); // alive while the pin lives
+    await waitScreen(f.core, pinDeath, '[watch-timer] accepted watcher');
     process.kill(shellPid, 'SIGKILL');
     await waitFinished(f.core, pinDeath);
     expect(await screenOf(f.core, pinDeath)).toContain(`pinned process ${shellPid} gone`);
@@ -995,8 +1002,8 @@ test.serial('a foreground swap and a transcript flip each end the timer', async 
     const seen = z
       .object({ sessionId: z.string(), procStart: z.string() })
       .parse(JSON.parse(readFileSync(record, 'utf8')));
-    // Latch first (one full poll), then flip the session record to a different transcript.
-    await Bun.sleep(2600);
+    // Latch first, then flip the session record to a different transcript.
+    await waitScreen(f.core, rig.timer, '[watch-timer] latched ');
     writeFileSync(
       record,
       JSON.stringify({ sessionId: 'bbbbbbbb-0000-0000-0000-000000000002', procStart: seen.procStart }),

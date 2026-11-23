@@ -32,7 +32,10 @@
 - CLI fixtures isolate machine configuration through the environment.
 - Each fixture creates a real Git repository and removes it after the test; registered temp dirs are also swept at process exit.
 - `bunfig.toml` runs every test file concurrently, and tests that share global state use `test.serial`.
-- The 30 s test timeout comes from `--timeout=30000` in the `checks` commands of `issues/config.yaml`.
+- The 120 s test timeout comes from `--timeout=120000` in the `checks` commands of `issues/config.yaml`; inner waits share `WAIT_MS` from `tests/helpers.ts`.
+- A test waits on an event (a file, a line, a unit state) bounded by `WAIT_MS`, never on a fixed sleep or a shorter window.
+- A name that is host-wide (a systemd unit, a slice, a socket) carries the pid or a random id, so two suites on one host never share it.
+- What a test starts on the host (units, slices, cores, processes), its fixture stops.
 
 ## See also
 

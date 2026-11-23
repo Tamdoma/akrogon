@@ -176,6 +176,29 @@ async function agyTask(
   return { turn };
 }
 
+function cgroupOf(pid: number): string | null {
+  try {
+    return readFileSync(`/proc/${pid}/cgroup`, 'utf8').trim();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
+// systemd-run moves the seat into its leaf scope before it execs the harness, late when the manager is
+// slow, so the start-proof window opens only after scope entry. Returns null once the seat is in its
+// scope or has ended (its /proc entry is gone; firstTask then reports the end), else the cgroup it
+// still sits in when PANE_WAIT_MS passes.
+async function scopeEntry(pid: number, scope: string): Promise<string | null> {
+  const deadline: number = Date.now() + PANE_WAIT_MS;
+  for (;;) {
+    const cgroup: string | null = cgroupOf(pid);
+    if (cgroup === null || cgroup.endsWith(scope)) return null;
+    if (Date.now() >= deadline) return cgroup;
+    await Bun.sleep(50);
+  }
+}
+
 // The first task is proven started when the seat goes working or its turn passes the turn the task
 // went in at; nothing is sent before that (start proof, plan D9).
 async function firstTask(seat: Seen, kind: string, task: string): Promise<Started> {
@@ -307,6 +330,13 @@ export async function startSeat(
     prompted: { ...s.prompted, [slot]: undefined },
     delivery_error: { ...s.delivery_error, [slot]: undefined },
   }));
+  const cgroup: string | null = await scopeEntry(z.number().parse(launched.pid), `/${slice}/${unit}`);
+  if (cgroup !== null) {
+    await end(space.session, launched.address);
+    throw new Error(
+      JSON.stringify({ seat: launched.address, error: 'seat outside its leaf scope', expected: unit, cgroup }),
+    );
+  }
   const started: Started = await firstTask(launched, harness.kind, task);
   announce(started);
   if (started.outcome === 'failed') return started;
@@ -330,13 +360,6 @@ export async function startSeat(
           },
         },
   );
-  const cgroup: string = readFileSync(`/proc/${z.number().parse(started.seat.pid)}/cgroup`, 'utf8').trim();
-  if (!cgroup.endsWith(`/${slice}/${unit}`)) {
-    await end(space.session, launched.address);
-    throw new Error(
-      JSON.stringify({ seat: launched.address, error: 'seat outside its leaf scope', expected: unit, cgroup }),
-    );
-  }
   await place(space.session, launched.address, tab, expectedTabName(readState(leaf.path)));
   return started;
 }
