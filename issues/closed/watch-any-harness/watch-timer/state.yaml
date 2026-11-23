@@ -17,7 +17,6 @@ done: []
 fix_rounds: 5
 verdict: {}
 tab: ak97a87dd1e8f228c3d53cd247106328
-worktree: /home/ivan/.akrogon/worktrees/akrogon/watch-timer
 env_names: []
 env_generation: 2
 pane: {}

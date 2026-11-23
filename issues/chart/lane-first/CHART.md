@@ -8,11 +8,13 @@ Route: direct (operator words, see lean-akrogon Autopilot breach line)
 
 ## Forks taken
 
-- [Signposts](forks/signposts.md): taken (A), copy
+- [Signposts](forks/signposts.md): taken (operator), copy
+- [Test limit](forks/test-limit.md): taken (A)
+- [Design](forks/design.md): taken (A), from B and C designs
 
 ## Open forks
 
-- design: pending final shape at chart entry
+- none
 
 ## Fog
 
@@ -24,7 +26,8 @@ See issues/chart/lean-akrogon/slots/map-merged.md "Held" and "Dropped".
 
 ## Pending steps
 
-none
+- before landing, no suite running: stop empty akrogon-l*.slice units matching no leaf of this home (design 5) Done 2026-11-23 (488 stopped earlier, 0 at landing).
+- seeds N1, N4 filed 2026-11-23: Tamdoma/tamdoma-framework#849 (N1, nested suite times out at 300 s under merge load), #850 (N4, 15 s spawn timeout under load). Done.
 
 ## Mode record
 
@@ -56,3 +59,7 @@ Landed 16c85dae 2026-11-23: the door-reset stand-in opens its transcript before 
 ## Direct attempt: flaky-three
 
 Landed f323d9fcc63ab43e802c96c82a23ff13876d1e4a 2026-11-23: door wait tests read each wait end from its code file; watch-timer stops its second core (one leaked herdr-core per run). D round 1 fix (shared reader), fixed as proposed. R1 (next.test new tab scratch: an outside slice stop) still open, stopper not found.
+
+## Direct attempts
+
+- 2026-11-23 landed 079d4447 (D rounds 1-15, ready at round 15, cgroup-truth redesign from round 10); deployed; `akrogon install` linked akrogon-land.slice.

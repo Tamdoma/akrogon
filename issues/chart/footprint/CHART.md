@@ -51,3 +51,7 @@ Landed 0c677ab501043e556e75442b4cec4ec6af174cbd 2026-11-23: pinned hc 0.1.22 sch
 ## Direct attempt: bun-run-cache
 
 Landed 33c119848ff329160b08f226b8a1e673568d4e19 2026-11-23: checks keep Bun transpiler cache in their run root (B,C,D picked per-run; seats unchanged, measure growth after a day). D round 1 ready.
+
+## Direct attempt: hc-follow
+
+Landed c689573b23b0adfd543783719673ab32c5c11424 2026-11-23: operator D1 O1 drop the pinned hc schema test (B,C,D agreed); D2 O1 one shared hcReader classifies stream lines by hc discriminators, reads missed as a snapshot, drops events at or below the latest snapshot seq, skips unread kinds. D rounds 1-4, ready at round 4.

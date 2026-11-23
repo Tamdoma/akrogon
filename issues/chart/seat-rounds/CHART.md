@@ -8,11 +8,12 @@ Route: direct (operator words, see lean-akrogon Autopilot breach line)
 
 ## Forks taken
 
-- [Signposts](forks/signposts.md): taken (A), copy
+- [Signposts](forks/signposts.md): taken (operator), copy
+- [Design](forks/design.md): taken (A), from B and C designs; C dissent on X1 recorded
 
 ## Open forks
 
-- design: pending final shape at chart entry
+- none
 
 ## Fog
 
@@ -36,3 +37,7 @@ none
 - consultant: B t350, C t351
 - signposts: A, original in issues/chart/lean-akrogon
 - route: direct
+
+## Direct attempts
+
+- 2026-11-23 landed dd61e865 (rebased from ada6d3ca, D ready); deployed.

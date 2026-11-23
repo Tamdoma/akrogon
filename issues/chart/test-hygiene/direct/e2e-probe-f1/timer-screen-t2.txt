@@ -1,0 +1,4 @@
+[watch-timer] up: due 1 at 2026-11-23T10:19:25.788Z
+[watch-timer] due=1 sent (attempt 1, turn=2)
+[watch-timer] due=2 sent (attempt 1, turn=3)
+[watch-timer] due=3 sent (attempt 1, turn=4)

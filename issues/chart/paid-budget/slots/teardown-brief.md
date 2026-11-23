@@ -1,0 +1,9 @@
+# Brief: paid-budget deadline teardown, rounds 7-8 keep finding races
+
+Read: /home/ivan/Work/infra/akrogon/issues/chart/paid-budget/forks/design.md ("Deadline classification"), D rounds /home/ivan/Work/infra/akrogon/issues/chart/paid-budget/slots/review-D-paid-7.md and review-D-paid-8.md. Branch worktree /home/ivan/.akrogon/worktrees/akrogon/paid-budget at 1b978eef (tests/e2e/watch-consults.e2e.ts, tests/e2e/watch-tier.ts, tests/hc-daemon.ts).
+
+Problem: the paid e2e test (exclusive hc session akr-e2e-watch, real `hc run` launches, a watcher) must stop everything at its deadline. Each round patches one race between the deadline stop, teardown, a pending launch that auto-starts a new core, and a stop client that ignores SIGTERM. Round 8: F10 timer cleared before teardown lists terminals; F11 socket block lands after a pending launch can reconnect; F12 stop client survives SIGTERM; F13 a failed deadline stop replaces a selected red.
+
+Question: what design removes this race class instead of patching it? A's candidate (judge it, do not just agree): run the test body and everything it spawns (hc clients, any auto-started core, watchers) inside one transient systemd scope or cgroup; the deadline does `systemctl --user kill --signal=SIGKILL` (or cgroup.kill) on it, which ends pending launches and SIGTERM-ignoring clients at once; teardown then only confirms the cgroup is empty and removes state; outcome kept, teardown failure appended. Check whether a core started by `hc run` stays in the caller's cgroup or is moved out (e.g. by systemd activation), and how the existing tier code starts the core. Give your own pick with file:line evidence, what it removes, what it could break.
+
+Write /home/ivan/Work/infra/akrogon/issues/chart/paid-budget/slots/teardown-<your letter>.md, then hc send t126 "done <letter>: <path>".

@@ -8,11 +8,12 @@ Route: direct (operator words, see lean-akrogon Autopilot breach line)
 
 ## Forks taken
 
-- [Signposts](forks/signposts.md): taken (A), copy
+- [Signposts](forks/signposts.md): taken (operator), copy
+- [Design](forks/design.md): taken (A), from B and C designs
 
 ## Open forks
 
-- design: pending final shape at chart entry
+- none
 
 ## Fog
 
@@ -36,3 +37,7 @@ none
 - consultant: B t350, C t351
 - signposts: A, original in issues/chart/lean-akrogon
 - route: direct
+
+## Direct attempts
+
+- 2026-11-23 landed e214179c (D rounds 1-6, ready at round 6); deployed; red-records.jsonl removed on main (akrogon 1001cf8b, framework cd021adb3d). First wake pass over 11 repos' logs 98-134 ms, later passes under 0.4 ms.

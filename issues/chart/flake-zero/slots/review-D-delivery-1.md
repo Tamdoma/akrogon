@@ -1,0 +1,14 @@
+# Slot D delivery-flakes review
+
+Verdict **fix**. Reviewed `e7e8b058` merged cleanly onto requested base `079d4447` in a disposable checkout. The commit's recorded parent is `ddff2ddc`.
+
+## Findings
+
+- **F1. A slow recovery read can turn a timely event into a timeout.** `follow` waits for its callback before consuming the next frame. The new heartbeat lookup therefore blocks a later terminal event. The document reader similarly queues a real document event behind the heartbeat lookup. With the heartbeat response held for 650 ms, a matching event arrived in about 200 ms and both new waits expired at about 327 ms. Both parent waits completed on the same event in 191–204 ms. The terminal replay also called its predicate after timeout, which matters because the agy predicate can send keys or a task. The fixture wait has the same inline lookup. Let ordinary events progress while recovery is in flight, and discard a recovery result after settlement or when newer state supersedes it. See `src/hc.ts:456–461,523–534,562–573`, `src/seat.ts:142–158`, and `tests/hc-fixture.ts:383–388`.
+- **F2. The default placement timeout expires before heartbeat recovery can run.** On the installed hc 0.1.22, the real subscription yielded its snapshot after 1 ms and first heartbeat after 15,002 ms. `place` gives `waitForDoc` 15,000 ms from stream startup, then ends the seat if it still appears missing. A placement change omitted at subscription startup can still end a correctly placed seat. Recovery needs to run within the caller's existing deadline. See `src/seat.ts:43,243–253` and `src/hc.ts:571–575`.
+
+## Evidence
+
+- The supplied stress logs show 9 failures in 48 copies before the fix and 0 in 104 plus 0 in 32 after it. Three real fixture rereads changed cached working turn 0 to idle turn 1. A controlled seq-5 snapshot and seq-7 heartbeat replay reproduced the failure and showed the recovery working when its read returned promptly. My separate 300-subscription real-core overlap probe saw no dropped event, so the exact live startup interleaving remains unconfirmed in my run.
+- In the replay, an already-matching snapshot completed in 13 ms on both revisions. A matching event with no recovery read pending completed in 121–123 ms. These paths have no heartbeat delay. The seat readiness and pane placement waits are the production consumers. The listener separately enqueues a resume on each snapshot and ignores heartbeat rereads. In a controlled replay a missing turn after the resume stayed unwoken until a later turn event. This shows what the listener can recover, while the live startup ordering between that resume and a dropped event remains unproven. See `src/listen.ts:84–99`.
+- The merged tree passed typecheck and 62 focused tests. The supplied verify log shows 1,393 suite passes and 75 repeat passes.

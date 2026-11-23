@@ -1,0 +1,6 @@
+watch-issues /var/tmp/akr-e2e-rHv5om/akr-e2e-watch-standin-root
+watch-issues /var/tmp/akr-e2e-rHv5om/akr-e2e-watch-standin-root
+watch-issues tick timer=t2 pid=387643 due=1 /var/tmp/akr-e2e-rHv5om/akr-e2e-watch-standin-root
+watch-issues tick timer=t2 pid=387643 due=2 /var/tmp/akr-e2e-rHv5om/akr-e2e-watch-standin-root
+watch-issues tick timer=t2 pid=387643 due=4 /var/tmp/akr-e2e-rHv5om/akr-e2e-watch-standin-root
+watch-issues tick timer=t2 pid=387643 due=5 /var/tmp/akr-e2e-rHv5om/akr-e2e-watch-standin-root

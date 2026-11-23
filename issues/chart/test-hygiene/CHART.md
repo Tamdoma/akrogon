@@ -8,11 +8,12 @@ Route: direct (operator words, see lean-akrogon Autopilot breach line)
 
 ## Forks taken
 
-- [Signposts](forks/signposts.md): taken (A), copy
+- [Signposts](forks/signposts.md): taken (operator), copy
+- [Design](forks/design.md): taken (A), B and C designs agree
 
 ## Open forks
 
-- design: pending final shape at chart entry
+- none
 
 ## Fog
 
@@ -24,7 +25,7 @@ See issues/chart/lean-akrogon/slots/map-merged.md "Held" and "Dropped".
 
 ## Pending steps
 
-none
+- done 2026-11-23: systemctl --user stop akrogon-test.slice (design 3)
 
 ## Mode record
 
@@ -36,3 +37,7 @@ none
 - consultant: B t350, C t351
 - signposts: A, original in issues/chart/lean-akrogon
 - route: direct
+
+## Direct attempts
+
+- 2026-11-23 landed 14774a0e (clean rebase of 8186737d onto 079d4447, D ready); deployed.

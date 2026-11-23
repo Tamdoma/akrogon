@@ -38,3 +38,7 @@ Commit 2 is parked on branch run-scratch-ram (6396e3a6) and needs a redesign bef
 - F2/F4. Resolve run_root with realpath at parse time, and refuse a symlink or any path that resolves inside the retired or leaf temp root.
 - F3. The flat sweep must treat an entry that vanished between listing and stat as gone.
 - F5. A moved or removed run_root strands its roots. Either the host step also sweeps the last used root, recorded in the host state, or the docs state the hand cleanup.
+
+## Redesign (A, autopilot, 2026-11-23, after slots/redesign-B.md, slots/redesign-C.md)
+Both picked O4 (B,C): the run root and its record (.owner, out.log, refusal.json, AKROGON_EVIDENCE) stay under the leaf temp; only the command's TMPDIR and BUN_RUNTIME_TRANSPILER_CACHE_PATH move to one mkdtemp folder under run_root when set. F1-F5 disappear because nothing sweeps run_root and the record never moves.
+Cleanup taken from B: the run's guard unit gets ExecStopPost `chmod -R u+w <folder>; rm -rf <folder>`, so every way a run ends (finally, stop-run, cancelled admission, slice stop, SIGKILL) removes it; reconcile does not read run_root. C's alternative (path in .owner, reconcile removes it) not taken: more akrogon code for the same coverage. Carry B R3 (stop scope before guard), R4 (run_root limited to plain path characters), R5 (nested runs without a guard stay on disk).

@@ -26,7 +26,7 @@ See issues/chart/lean-akrogon/slots/map-merged.md "Held" and "Dropped".
 
 ## Pending steps
 
-none
+- set run_root on this host and measure (V1-V4 in slots/redesign-B.md)
 
 ## Mode record
 
@@ -38,3 +38,7 @@ none
 - consultant: B t350, C t351
 - signposts: A, original in issues/chart/lean-akrogon
 - route: direct
+
+## Direct attempt: run-ram
+
+Landed 814a23877275ff8530c825243c9e3920f6ff4520 2026-11-23: with run_root set a check's TMPDIR and Bun cache live in one RAM folder the guard unit removes on stop; the record stays under leaf temp. Redesign O4 (B,C), cleanup from B. D rounds 1-2 fix (F4,F6,F7,F8); F8 fixed with D's tested form. Parked branch run-scratch-ram deleted.

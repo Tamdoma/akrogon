@@ -1,0 +1,172 @@
+3 2026-11-23T12:44:19.337Z test a working seat gets no send; a send that never starts is recorded, not resent, and resettled once the turn moves
+1 2026-11-23T12:44:19.337Z test the blocked notice lands in the session holding the repo space
+2 2026-11-23T12:19:27.716Z test a manual next ignores an inherited HC_TERMINAL_ID
+1 2026-11-23T11:13:30.673Z test a foreground swap and a transcript flip each end the timer
+1 2026-11-23T11:04:03.907Z test a pass keeps the starting caller scope as owner of its check runs, so plain stop-run still reaches them
+1 2026-11-23T00:14:27.382Z test agy: the reset helper runs its stages in order and fresh A gets the start prompt on a new transcript
+15 2026-11-22T19:17:47.644Z test agy: the reset helper runs its stages in order and fresh A gets the start prompt on a new transcript
+2 2026-11-22T18:52:56.351Z test next recovers only merge-phase work by ancestry against a non-default remote target
+2 2026-11-22T18:52:56.351Z test next --resume re-prompts allocated idle leaves in every registered repo without allocating new work
+3 2026-11-22T18:52:56.351Z test named target equivalence: owner epic-e matches folder path issues/open/epic-e from root
+3 2026-11-22T18:52:56.351Z test named target equivalence: owner epic-e matches folder path issues/open/epic-e from sub
+3 2026-11-22T18:52:56.351Z test named target equivalence: owner epic-e matches folder path issues/open/epic-e from worktree
+3 2026-11-22T18:52:56.351Z test named target equivalence: owner n1 matches folder path issues/open/epic-e/n1 from root
+3 2026-11-22T18:52:56.351Z test named target equivalence: owner n1 matches folder path issues/open/epic-e/n1 from sub
+4 2026-11-22T18:52:56.351Z test named target equivalence: owner n1 matches folder path issues/open/epic-e/n1 from worktree
+3 2026-11-22T18:52:56.351Z test named target equivalence: owner top-t matches folder path issues/open/top-t from root
+3 2026-11-22T18:52:56.351Z test named target equivalence: owner top-t matches folder path issues/open/top-t from sub
+4 2026-11-22T18:52:56.351Z test named target equivalence: owner top-t matches folder path issues/open/top-t from worktree
+5 2026-11-22T18:52:56.351Z test dispatch never adopts another session terminal after the repo core changes
+4 2026-11-22T18:52:56.351Z test an open episode pins the normal, cites its first run, notifies once and recovers
+2 2026-11-22T18:52:56.351Z test completing a leaf via targeted next starts only same-repo dependents
+2 2026-11-22T18:52:56.351Z test machine-wide capacity includes another registered repo and folder selection respects it
+2 2026-11-22T18:52:56.351Z test merged leaves do not reserve capacity for other waiting leaves
+2 2026-11-22T18:52:56.351Z test a worktree parked mid-rebase is still dispatched
+2 2026-11-22T18:52:56.351Z test a live merge retains its completion call after pushing, including a peer retry
+2 2026-11-22T18:52:56.351Z test seat names support identical repo-local slugs and long numeric-leading slugs
+1 2026-11-22T18:52:56.351Z test a finished seat restarts with its task and the surviving slot keeps its terminal
+1 2026-11-22T18:52:56.351Z test uncommitted work in a merge worktree exits to check.repair with the edit intact
+1 2026-11-22T18:52:56.351Z test next awaits sourced completion after a failed rename before removing the worktree
+1 2026-11-22T18:52:56.351Z test missing registration is isolated during startup
+1 2026-11-22T18:52:56.351Z test missing registration is isolated during cwd
+1 2026-11-22T18:52:56.351Z test bad YAML and invalid states reserve occupancy at capacity 3
+1 2026-11-22T18:52:56.351Z test bad YAML and invalid states reserve occupancy at capacity 4
+1 2026-11-22T18:52:56.351Z test dirty merged worktree is kept after its tab closes, then removed once clean
+1 2026-11-22T18:52:56.351Z test bare next from inside the repo cleans up its merged leaves
+1 2026-11-22T18:52:56.351Z test busy seats persist, warn strictly after an hour, retry a failed notice and clear on an idle turn
+1 2026-11-22T18:52:56.351Z test foreign leaves do not consume capacity while healthy leaves in both repos dispatch
+1 2026-11-22T18:52:56.351Z test merged foreign leaves survive cleanup with worktree branch and tab intact
+1 2026-11-22T18:52:56.351Z test two repos summarize once per repo on every invocation
+1 2026-11-22T18:52:56.351Z test malformed timing forms reject before migrating an empty state home
+2 2026-11-22T17:50:27.114Z test next --all, --resume and manual next record the registered or selected repos before dispatch
+1 2026-11-22T17:50:27.114Z test stopping the holder of an applied batch builds no second batch and prompts no merge seat
+1 2026-11-22T17:50:27.114Z test a leaf waiting in merge does not count toward max_active when its repo session is refused
+1 2026-11-22T17:50:27.114Z test a linked pair fails to satisfy requireGreenReceipt with unnamed or unlinked failing work
+1 2026-11-22T17:50:27.114Z test requireGreenReceipt accepts a covered merge head and refuses uncovered and resolved ones
+1 2026-11-22T17:50:27.114Z test the incident resolves only on green evidence at or after the red on landed main
+5 2026-11-22T17:11:17.619Z test no session, several sessions and an unreadable session refuse with today’s reasons, and a stale socket starts no core
+3 2026-11-22T17:11:17.619Z test two simultaneous base runs produce one notice file
+2 2026-11-22T16:52:33.619Z test a wake after tab loss re-dispatches seats into the same slice and the next pass keeps it
+1 2026-11-22T16:42:30.878Z test a dependent whose seat start takes longer than 3 s is counted once
+2 2026-11-21T23:01:42.879Z test dispatch recreates a deleted .env file in a reused worktree once its tab is gone
+2 2026-11-21T21:33:36.953Z test a replaced blocked seat gets a fresh notice
+1 2026-11-21T20:16:09.019Z test slot B starts under the live A, so the sidebar indents it, and outlives it; with no live A it starts parentless
+3 2026-11-21T18:46:23.772Z test new tab keeps existing scratch for checks that outlive their tab, and seats disable the node compile cache
+2 2026-11-21T13:09:00.742Z test a live tab freezes .env while a dead tab lets the next dispatch rewrite it
+1 2026-11-21T12:49:45.153Z test stop-run cancels a waiting run and the next waiter takes its place
+1 2026-11-20T18:41:56.220Z test the listener subscribes before its catch-up, wakes on turn end, blocked and exit of labelled terminals only, and folds queued wakes
+1 2026-11-16T16:11:51.671Z test a re-armed wait ignores the report it already woke on and ends on the next consultant news
+2 2026-11-09T15:02:05.905Z test merged phase closes tab on typed next and starts the dependent
+5 2026-11-08T07:48:55.432Z test a verify pass survives its caller being SIGKILLed mid-check and finishes like an uninterrupted run
+1 2026-11-08T07:39:59.823Z test next dispatches an explicit worktree path
+1 2026-11-08T07:39:59.823Z test next dispatches an explicit leaf folder
+1 2026-11-08T07:39:59.823Z test next creates one worktree/tab under concurrent passes and starts configured A with the leaf task
+1 2026-11-08T03:50:48.649Z test empty untracked folders are removed before a solo merge prompt
+1 2026-11-08T03:50:48.649Z test an edit arriving after the move status read survives the Git reset
+1 2026-11-08T03:50:48.649Z test a failed removal stops the merge prompt
+1 2026-11-08T03:50:48.649Z test unreadable ignored folders do not stop empty-folder cleanup before merge
+1 2026-11-08T03:50:48.649Z test late holder dirt during initial apply is isolated and survives cleanup
+1 2026-11-08T03:50:48.649Z test a failed published holder receives one recovery notice across repeated passes
+1 2026-11-08T03:50:48.649Z test holder-seat commits survive the check.fix handoff
+1 2026-11-08T03:50:48.649Z test an applied holder retains its checked integration head on red
+1 2026-11-08T03:50:48.649Z test a landed candidate moves the holder once, clears the record, and the next pass wakes dependents
+1 2026-11-08T03:50:48.649Z test cleanup retains a merged holder worktree while publication recovery is blocked
+1 2026-11-08T03:50:48.649Z test holder-seat commits survive the failed handoff
+1 2026-11-08T03:50:48.649Z test empty untracked folders are removed before an applied merge prompt
+1 2026-11-08T03:50:48.649Z test a green merge clears the record once the holder lands
+2 2026-11-08T03:49:13.880Z test a failed leaf with its tab still open does not count toward max_active
+1 2026-11-08T03:49:13.880Z test a refused push restacks only the holder while another leaf waits
+1 2026-11-08T03:49:13.880Z test a push reported lost but landed moves only the holder to merged once
+1 2026-11-08T03:49:13.880Z test a red verify with another leaf waiting moves the holder to check.fix
+1 2026-10-26T12:16:47.381Z test the holder gets a batch record rebased onto the remote and only the holder is prompted
+1 2026-10-26T12:16:47.381Z test next resumes interrupted tab creation, then retries every failing pass without failing
+1 2026-10-26T12:16:47.381Z test unknown panes wait, warn after an hour and keep busy observations
+1 2026-10-26T12:16:47.381Z test a merged leaf with its tab still open does not count toward max_active
+1 2026-10-26T12:16:47.381Z test a closed tab hook from a merged leaf starts the dependent
+1 2026-10-26T12:16:47.381Z test completing a leaf via targeted starts only same-repo dependents
+1 2026-10-26T12:16:47.381Z test completing a leaf via tab_closed starts only same-repo dependents
+1 2026-10-26T12:16:47.381Z test a stale prompt never re-prompts a busy or done seat, and repeated delivery failures keep the leaf in phase
+1 2026-10-26T12:16:47.381Z test busy seats persist, warn strictly after an hour, retry delivery and clear independent episodes
+1 2026-10-26T12:16:47.381Z test merge, check.fix, check.repair and post-repair review dispatch to their swapped seats
+1 2026-10-26T12:16:47.381Z test startup retries closure before cleanup and retains failed owners with their worktree and branch while the tab closes
+1 2026-10-26T12:16:47.381Z test typed next from a leaf pane sweeps and removes merged worktrees
+1 2026-10-26T12:16:47.381Z test a failed leaf does not reserve capacity in the unreadable branch
+1 2026-10-26T12:16:47.381Z test three consecutive prompt failures keep the leaf in phase, record each error, and retry on the next pass
+1 2026-10-26T12:16:47.381Z test a successful prompt between failures resets attempts
+1 2026-10-26T12:16:47.381Z test a record appended after a timeout is recognized by the next pass without resending
+1 2026-10-26T12:16:47.381Z test retryable agent start failures keep the leaf in phase until a start succeeds
+1 2026-10-26T12:16:47.381Z test a session replacement after a timeout resends the prompt instead of settling from the old offset
+1 2026-10-26T12:16:47.381Z test a non-retryable prompt code records the error without failing, the leaf retries, and siblings still dispatch
+1 2026-10-26T12:16:47.381Z test next resolves seats from EPIC.md front matter and falls back per seat
+1 2026-10-26T12:16:47.381Z test next prefers ISSUE.md seats over EPIC.md and applies a standalone issue block
+1 2026-10-26T12:16:47.381Z test sweep scratch catch-up deletes open and closed folders with no live panes
+1 2026-10-26T12:16:47.381Z test sweep scratch catch-up keeps sentinel with live panes then deletes on later sweep
+1 2026-10-26T12:16:47.381Z test fixture temp root isolates every TMPDIR and envs carry override
+1 2026-10-26T12:16:47.381Z test only the earlier-stamped merge leaf is prompted while the waiting leaf keeps its tab and panes
+1 2026-10-26T12:16:47.381Z test an ineligible merge leaf never holds the turn (blocked-by)
+1 2026-10-26T12:16:47.381Z test the seat merged holder exit wakes the next merge leaf without a manual next
+1 2026-10-26T12:16:47.381Z test the seat check.fix holder exit wakes the next merge leaf without a manual next
+1 2026-10-26T12:16:47.381Z test the seat failed holder exit wakes the next merge leaf without a manual next
+1 2026-10-26T12:16:47.381Z test the prompt delivery fault holder exit wakes the next merge leaf without a manual next
+1 2026-10-26T12:16:47.381Z test the operator merged holder exit wakes the next merge leaf without a manual next
+1 2026-10-26T12:16:47.381Z test a leaf re-entering merge queues behind the two leaves stamped earlier
+1 2026-10-26T12:16:47.381Z test a merge seat consumes one delivery attempt per pass and retries instead of failing
+1 2026-10-26T12:16:47.381Z test an idle hook retries a faulted merge holder before its waiter
+1 2026-10-26T12:16:47.381Z test unstamped merge dispatch uses log order and refuses unreadable history
+2 2026-10-24T20:08:30.254Z test the holder gets a batch record rebased onto the remote and only the holder is prompted
+2 2026-10-24T20:08:30.254Z test an interrupted build is discarded and rebuilt under a new attempt
+2 2026-10-24T20:08:30.254Z test a dirty holder worktree drops the batch to solo and keeps its branch
+2 2026-10-24T20:08:30.254Z test empty untracked folders are removed before an applied merge prompt
+2 2026-10-24T20:08:30.254Z test empty untracked folders are removed before a solo merge prompt
+2 2026-10-24T20:08:30.254Z test unreadable ignored folders do not stop empty-folder cleanup before merge
+2 2026-10-24T20:08:30.254Z test a failed removal stops the merge prompt
+2 2026-10-24T20:08:30.254Z test a failed holder with a landed candidate is told to move back, then reconciles without run or push
+2 2026-10-24T20:08:30.254Z test a holder that cannot be rebased takes a solo turn with nothing stacked
+2 2026-10-24T20:08:30.254Z test a landed candidate moves the holder once, clears the record, and the next pass wakes dependents
+2 2026-10-24T20:08:30.254Z test a waiting leaf stays out of the holder turn and lands in its own turn
+2 2026-10-24T19:57:36.899Z test merged and failed leaf slices with gone tabs are stopped and their processes end
+2 2026-10-24T19:57:36.899Z test next --resume re-prompts allocated idle leaves in every registered repo without allocating new work
+4 2026-10-24T19:57:36.899Z test a leaf re-entering merge queues behind the two leaves stamped earlier
+3 2026-10-24T19:57:36.899Z test named target equivalence: owner name matches folder path from root, subfolder and worktree
+1 2026-10-24T19:57:36.899Z test a fetch failure keeps the record, moves nothing and reports the error
+1 2026-10-24T19:57:36.899Z test a green merge clears the record once the holder lands
+1 2026-10-24T19:57:36.899Z test cleanup retains a merged holder worktree while publication recovery is blocked
+1 2026-10-24T19:57:36.899Z test a failed published holder receives one recovery notice across repeated passes
+1 2026-10-24T19:57:36.899Z test holder-seat commits survive the check.fix handoff
+1 2026-10-24T19:57:36.899Z test holder-seat commits survive the failed handoff
+1 2026-10-24T19:57:36.899Z test late holder dirt during initial apply is isolated and survives cleanup
+1 2026-10-24T19:57:36.899Z test an edit arriving after the move status read survives the Git reset
+1 2026-10-24T19:57:36.899Z test an applied holder retains its checked integration head on red
+1 2026-10-24T19:57:36.899Z test a red verify with another leaf waiting moves the holder to check.fix
+1 2026-10-24T19:57:36.899Z test a refused push restacks only the holder while another leaf waits
+1 2026-10-24T19:57:36.899Z test a push reported lost but landed moves only the holder to merged once
+1 2026-10-24T19:57:36.899Z test the merge path builds no stack and starts no merge seat for a stopped leaf
+1 2026-10-24T19:57:36.899Z test stopping the holder of an applied batch builds no second batch and prompts no merge seat
+1 2026-10-24T19:57:36.899Z test a stopped leaf is not dispatched by an automatic pass, and a picked manual pass names start
+1 2026-10-24T19:57:36.899Z test stop --all stops every allocated leaf, reports each, and one failure does not block the others
+1 2026-10-24T19:57:36.899Z test start removes the stopped record and runs the targeted pass, and refuses a leaf that is not stopped
+1 2026-10-24T19:57:36.899Z test start runs the targeted pass for a leaf whose issue shares its name
+1 2026-10-24T19:57:36.899Z test next recovers only merge-phase work by ancestry against a non-default remote target
+1 2026-10-24T19:57:36.899Z test merge, check.fix, check.repair and post-repair review dispatch to their swapped seats
+1 2026-10-24T19:57:36.899Z test startup retries closure before cleanup and retains failed owners with their worktree and branch while the tab closes
+1 2026-10-24T19:57:36.899Z test retryable agent start failures keep the leaf in phase until a start succeeds
+1 2026-10-24T19:57:36.899Z test a session replacement after a timeout resends the prompt instead of settling from the old offset
+1 2026-10-24T19:57:36.899Z test a non-retryable prompt code records the error without failing, the leaf retries, and siblings still dispatch
+1 2026-10-24T19:57:36.899Z test non-JSON prompt stderr records a delivery error with exit code and trimmed message
+1 2026-10-24T19:57:36.899Z test a successful prompt clears delivery_error and resets attempts
+1 2026-10-24T19:57:36.899Z test next prefers ISSUE.md seats over EPIC.md and applies a standalone issue block
+5 2026-10-24T17:58:20.996Z test overview reads multiple repos outside git, retains hierarchy and recorded fields without writes
+1 2026-10-24T17:02:40.138Z test (log gone)
+3 2026-10-24T15:54:42.319Z test the prompt delivery fault holder exit wakes the next merge leaf without a manual next
+2 2026-10-24T15:31:30.017Z test the seat check.fix holder exit wakes the next merge leaf without a manual next
+2 2026-10-24T15:31:30.017Z test the seat failed holder exit wakes the next merge leaf without a manual next
+2 2026-10-24T15:31:30.017Z test a merge seat consumes one delivery attempt per pass and retries instead of failing
+2 2026-10-24T15:31:30.017Z test an idle hook retries a faulted merge holder before its waiter
+1 2026-10-24T15:26:05.208Z test merge leaf with landed branch re-prompts its idle seat instead of auto-recovering
+1 2026-10-24T15:26:05.208Z test typed next from a leaf pane sweeps and removes merged worktrees
+1 2026-10-24T15:26:05.208Z test a failed leaf does not reserve capacity in the unreadable branch
+1 2026-10-24T15:26:05.208Z test three consecutive prompt failures keep the leaf in phase, record each error, and retry on the next pass
+1 2026-10-24T15:26:05.208Z test the seat merged holder exit wakes the next merge leaf without a manual next
+1 2026-10-24T15:26:05.208Z test the operator merged holder exit wakes the next merge leaf without a manual next
+1 2026-10-24T15:26:05.208Z test unstamped merge dispatch uses log order and refuses unreadable history
+1 2026-10-17T19:49:10.085Z test two simultaneous base runs produce one notification
