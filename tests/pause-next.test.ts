@@ -8,6 +8,7 @@ import {
   cli,
   entry,
   fakeSystemctl,
+  holding,
   killTree,
   leaf,
   leafTempRoot,
@@ -619,6 +620,58 @@ test("a repo's max_active refuses a new leaf under the machine cap and the start
       unknown
     >;
     expect(config).toMatchObject({ max_active: 9, repo_max_active: 1 });
+  } finally {
+    await f.clean();
+  }
+});
+
+test("a repo's leaves waiting in merge hold back a new leaf at its cap, never a resume or check.repair", async () => {
+  const f: DispatchFixture = await hcFixture();
+  try {
+    capMachine(f, 9);
+    capRepo(f.root, 3);
+    const running: string = leaf(f, 'running', 'plan.synthesis');
+    const resumed: string = leaf(f, 'resumed', 'plan.synthesis');
+    const repair: string = leaf(f, 'repair', 'plan.synthesis');
+    for (const slug of ['running', 'resumed', 'repair']) expect((await next(f, [slug])).code).toBe(0);
+    for (const path of [resumed, repair]) {
+      expect(readState(path).worktree).toBeDefined();
+      for (const seat of await f.core.terminals({ 'akrogon.leaf': readState(path).slug }, false)) {
+        await f.core.hc(['kill', seat.address]);
+        expect((await f.core.hc(['rm', seat.address])).code).toBe(0);
+      }
+    }
+    saveState(repair, { ...readState(repair), phase: 'check.repair' });
+    leaf(f, 'landing', 'merge', holding(f));
+    for (const slug of ['wait-1', 'wait-2']) leaf(f, slug, 'merge', { merge_stamp: '2026-10-19T00:00:00.000Z' });
+    // One live leaf plus two waiters behind the landing one fill the cap of 3 for a new leaf.
+    const fresh: string = leaf(f, 'fresh', 'plan.synthesis');
+    await next(f, ['fresh']);
+    expect(readState(fresh).worktree).toBeUndefined();
+    const refused: Result = await cli(f, ['seat', 'fresh', 'A'], f.root, f.env);
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain(`No free seat capacity: ${f.repo} max_active 3 reached`);
+    expect(refused.stderr).not.toContain('not counted');
+    for (const slug of ['resumed', 'repair']) {
+      expect((await next(f, [slug])).code).toBe(0);
+      expect(await f.core.terminals({ 'akrogon.leaf': slug }, false)).not.toEqual([]);
+    }
+    expect(readState(running).tab).toBeDefined();
+  } finally {
+    await f.clean();
+  }
+});
+
+test('merge waiters blocked on an unstarted prerequisite do not hold that prerequisite back', async () => {
+  const f: DispatchFixture = await hcFixture();
+  try {
+    capMachine(f, 9);
+    capRepo(f.root, 1);
+    for (const slug of ['after-1', 'after-2'])
+      leaf(f, slug, 'merge', { merge_stamp: '2026-10-19T00:00:00.000Z', 'blocked-by': ['prerequisite'] });
+    const prerequisite: string = leaf(f, 'prerequisite', 'plan.synthesis');
+    expect((await next(f, ['prerequisite'])).code).toBe(0);
+    expect(readState(prerequisite).tab).toBeDefined();
   } finally {
     await f.clean();
   }

@@ -70,7 +70,8 @@ Install creates these links:
 
 - `~/.local/bin/akrogon`, the command.
 - Each skill folder into `~/.claude/skills`, `~/.agents/skills`, `~/.codex/skills`, `~/.pi/agent/skills` and `~/.gemini/config/skills`, so every supported agent CLI finds the same skills.
-- `~/.config/systemd/user/akrogon.slice`, the systemd slice that holds everything Akrogon runs. Install then reloads the systemd user manager.
+- `~/.config/systemd/user/akrogon.slice`, the systemd slice that holds everything Akrogon runs. It slows Akrogon's processes at half of the machine's RAM and kills them at three quarters, so the desktop keeps its memory. Install then reloads the systemd user manager.
+- `~/.config/systemd/user/akrogon-land.slice`, when the release ships it. A land attempt's verify pass and checks run there, inside `akrogon.slice`, with ten times a leaf's CPU share.
 - `~/.config/systemd/user/akrogon-listener.service`, when the release ships the listener unit. Install then enables and restarts it.
 
 The listener unit runs `akrogon listen`, which follows hc events from the seats and starts the next pass, so seats get their next prompt without you. Install also removes stale Akrogon links, such as the old Tasks board link in `~/.config/herdr-app/mods`, and leaves every other entry there. On a fresh install, the links go through `~/.akrogon/current`, which points at your checkout.

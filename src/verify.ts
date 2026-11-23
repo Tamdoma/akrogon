@@ -33,7 +33,7 @@ import { noticeFolder, noticeId, noticeState, writeNotice, type Notice } from '.
 import { allLeaves, withLock, worktreeLock, type Leaf } from './state';
 import { isAncestor } from './batch';
 import { callerScope } from './admission';
-import { sessionBusAddress } from './scope';
+import { runSlice, sessionBusAddress, sessionBusEnv } from './scope';
 import {
   bootId,
   listPassRecords,
@@ -924,19 +924,20 @@ const passForwarded: readonly string[] = [
 
 async function launchPass(repo: Repo, record: PassRecord, dir: string): Promise<void> {
   const names: string[] = [...new Set([...passForwarded, ...repo.config.env, ...repo.config.pass_env])];
+  const env: NodeJS.ProcessEnv = sessionBusEnv();
   const argv: string[] = [
     'systemd-run',
     '--user',
     '--quiet',
     `--unit=${record.unit_name}`,
-    '--slice=akrogon.slice',
+    `--slice=${runSlice('akrogon.slice')}`,
     '-p',
     'CollectMode=inactive-or-failed',
     '-p',
     'TimeoutStopSec=5',
     `--working-directory=${record.root}`,
     `--setenv=DBUS_SESSION_BUS_ADDRESS=${sessionBusAddress()}`,
-    ...names.filter((name) => process.env[name] !== undefined).map((name) => `--setenv=${name}=${process.env[name]}`),
+    ...names.filter((name) => env[name] !== undefined).map((name) => `--setenv=${name}=${env[name]}`),
     '--setenv=NODE_DISABLE_COMPILE_CACHE=1',
     '--',
     'env',
@@ -948,7 +949,7 @@ async function launchPass(repo: Repo, record: PassRecord, dir: string): Promise<
   ];
   const result: SpawnResult = await spawnCaptured(argv, {
     cwd: record.root,
-    env: { ...process.env, DBUS_SESSION_BUS_ADDRESS: sessionBusAddress() },
+    env,
   });
   if (result.code !== 0) throw new CommandError(argv, record.root, result);
 }

@@ -29,12 +29,12 @@ import { repoInventory, RepoMismatchError, readState, type Inventory, type Leaf,
 import { command, type Result } from './shell';
 import { RUN_CHECK_USAGE } from './usage';
 import { appendTiming } from './timing';
-import { callerScope, withAdmission } from './admission';
+import { callerScope, runCancelled, withAdmission } from './admission';
 import { reserve } from './budget';
 import { locate, type LogTarget } from './evidence';
 import { FlockError, flockHold } from './flock';
 import { captureAncestry } from './pack';
-import { leafSlice, runSlice, runUnitArgv, runUnitBase, sessionBusAddress, startRunGuard, stopRunUnits } from './scope';
+import { leafSlice, runSlice, runUnitArgv, runUnitBase, runtimeDir, sessionBusAddress, startRunGuard } from './scope';
 import { type Phase } from './routing';
 
 const forbidden: readonly string[] = [
@@ -433,21 +433,30 @@ export async function checkedRun(
                     const runParent: string | undefined = ensureRunRoot();
                     const tmp: string | undefined =
                       runParent === undefined ? undefined : mkdtempSync(resolve(runParent, 'run-'));
-                    await startRunGuard(slice, run, process.pid, admission.record_path, tmp);
+                    await startRunGuard(slice, run, process.pid, tmp);
                     try {
+                      if (await runCancelled(admission.record_path, repo.name))
+                        throw new Error(`run ${run} cancelled by akrogon stop`);
                       return await spawnLogged(
-                        ['flock', '-s', lockPath, ...runUnitArgv(slice, run, argv, env.DBUS_SESSION_BUS_ADDRESS)],
+                        [
+                          'flock',
+                          '-s',
+                          lockPath,
+                          ...runUnitArgv(slice, run, argv, env.DBUS_SESSION_BUS_ADDRESS, env.XDG_RUNTIME_DIR),
+                        ],
                         cwd,
                         {
                           ...env,
                           ...(tmp === undefined ? {} : scratchEnv(tmp)),
                           DBUS_SESSION_BUS_ADDRESS: sessionBusAddress(),
+                          XDG_RUNTIME_DIR: runtimeDir(),
                         },
                         { out: captureOut, outFd: capFd, err: captureErr },
                       );
                     } finally {
-                      admission.release();
-                      await stopRunUnits(runUnit, `${runUnitBase(run)}-guard.service`);
+                      // The record stays until the scope is gone, so work left draining in it
+                      // keeps holding what the run held.
+                      await admission.end();
                     }
                   })();
             process.stdout.write(result.stdout);

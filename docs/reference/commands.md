@@ -4,12 +4,12 @@ Every `akrogon` command, one line each. Run commands from the registered reposit
 
 ## Set up
 
-| Invocation                                                          | Effect                                                                                                                                                                                                 |
-| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `akrogon install`                                                   | Link the `akrogon` command, the skills, `akrogon.slice` and the `akrogon-listener.service` unit, then reload the systemd user manager and enable and restart the listener. Runs from any directory.    |
-| `akrogon init [--from <proposal.yaml>] [--toolkit <lang>=<runner>]` | Register the current repository and write its `issues/config.yaml`, `learnings/LESSONS.md` and ignore rules. The [init-akrogon](../../skills/init-akrogon/SKILL.md) skill writes the proposal for you. |
-| `akrogon config`                                                    | Print the effective configuration for the current repository.                                                                                                                                          |
-| `akrogon preflight`                                                 | Check that the configured base branch exists on the remote and print its commit.                                                                                                                       |
+| Invocation                                                          | Effect                                                                                                                                                                                                                    |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `akrogon install`                                                   | Link the `akrogon` command, the skills, `akrogon.slice`, `akrogon-land.slice` and the `akrogon-listener.service` unit, then reload the systemd user manager and enable and restart the listener. Runs from any directory. |
+| `akrogon init [--from <proposal.yaml>] [--toolkit <lang>=<runner>]` | Register the current repository and write its `issues/config.yaml`, `learnings/LESSONS.md` and ignore rules. The [init-akrogon](../../skills/init-akrogon/SKILL.md) skill writes the proposal for you.                    |
+| `akrogon config`                                                    | Print the effective configuration for the current repository.                                                                                                                                                             |
+| `akrogon preflight`                                                 | Check that the configured base branch exists on the remote and print its commit.                                                                                                                                          |
 
 ## Run work
 
@@ -26,14 +26,14 @@ Every `akrogon` command, one line each. Run commands from the registered reposit
 
 ## Control work
 
-| Invocation                           | Effect                                                                                                                                 |
-| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `akrogon pause`                      | Stop automatic dispatch for the current repository.                                                                                    |
-| `akrogon unpause`                    | Turn automatic dispatch back on and run one pass.                                                                                      |
-| `akrogon stop <slug> \| --all`       | Mark a leaf stopped and end every process in its panes. With `--all`, it stops every leaf in the repository that has work in progress. |
-| `akrogon start <slug>`               | Clear a leaf's stopped mark and run `next` for that leaf.                                                                              |
-| `akrogon park <issue>... \| --all`   | Move whole issues out of the open queue into `issues/parked/`. Running work is refused.                                                |
-| `akrogon unpark <issue>... \| --all` | Move parked issues back into the open queue.                                                                                           |
+| Invocation                           | Effect                                                                                                                                                                                          |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `akrogon pause`                      | Stop automatic dispatch for the current repository.                                                                                                                                             |
+| `akrogon unpause`                    | Turn automatic dispatch back on and run one pass.                                                                                                                                               |
+| `akrogon stop <slug> \| --all`       | Mark a leaf stopped and end every process in its panes, its check runs and its verify passes, a land's included. With `--all`, it stops every leaf in the repository that has work in progress. |
+| `akrogon start <slug>`               | Clear a leaf's stopped mark and run `next` for that leaf.                                                                                                                                       |
+| `akrogon park <issue>... \| --all`   | Move whole issues out of the open queue into `issues/parked/`. Running work is refused.                                                                                                         |
+| `akrogon unpark <issue>... \| --all` | Move parked issues back into the open queue.                                                                                                                                                    |
 
 ## Inspect
 

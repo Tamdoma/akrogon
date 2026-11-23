@@ -15,7 +15,8 @@ import {
   stopCoresAfterFile,
 } from './hc-fixture';
 import { readState } from '../src/state';
-import { leafSlice } from '../src/scope';
+import { ownLive } from '../src/admission';
+import { leafSlice, unitPopulated } from '../src/scope';
 import { readTimings, type TimingEvent } from '../src/timing';
 import { finishCaptured, spawnCaptured, spawnFiles, type Result, type SpawnResult } from '../src/shell';
 
@@ -160,7 +161,19 @@ test('one silent turn end is counted once, including a pass where the redelivery
   }
 });
 
-type RunRecordRow = { state: string; repo: string; leaf: string; check: string; pid: number };
+const runRecordRow = z.object({
+  state: z.string(),
+  repo: z.string(),
+  leaf: z.string(),
+  check: z.string(),
+  pid: z.number(),
+  start_time: z.string(),
+  boot_id: z.string(),
+  slice: z.string(),
+  unit: z.string(),
+  run: z.string(),
+});
+type RunRecordRow = z.infer<typeof runRecordRow>;
 
 // The admission records a run-check leaves in the fixture's AKROGON_HOME while it runs.
 function runRecords(f: Fixture): RunRecordRow[] {
@@ -169,11 +182,7 @@ function runRecords(f: Fixture): RunRecordRow[] {
   if (!existsSync(dir)) return records;
   for (const name of readdirSync(dir)) {
     if (!name.endsWith('.yaml')) continue;
-    records.push(
-      z
-        .object({ state: z.string(), repo: z.string(), leaf: z.string(), check: z.string(), pid: z.number() })
-        .parse(Bun.YAML.parse(readFileSync(resolve(dir, name), 'utf8'))),
-    );
+    records.push(runRecordRow.parse(Bun.YAML.parse(readFileSync(resolve(dir, name), 'utf8'))));
   }
   return records;
 }
@@ -207,18 +216,21 @@ function spawnRunCheck(f: Fixture, args: string[], env: NodeJS.ProcessEnv): Live
   return { proc: child, result: finishCaptured(child, captured) };
 }
 
-function alive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
+// What liveRuns() sees: live or waiting records whose writer still runs or whose scope or guard
+// still holds a process.
+function liveRecords(f: Fixture): RunRecordRow[] {
+  const boot: string = readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim();
+  return runRecords(f).filter(
+    (record) => (record.state === 'live' || record.state === 'waiting') && ownLive(record, boot),
+  );
 }
 
-// What liveRuns() sees: live or waiting records whose recorded pid still runs.
-function liveRecords(f: Fixture): RunRecordRow[] {
-  return runRecords(f).filter((record) => (record.state === 'live' || record.state === 'waiting') && alive(record.pid));
+async function waitUntil(done: () => boolean, failure: string): Promise<void> {
+  const deadline: number = Date.now() + WAIT_MS;
+  while (!done()) {
+    if (Date.now() > deadline) throw new Error(failure);
+    await Bun.sleep(50);
+  }
 }
 
 test('a live or waiting run-check record suppresses counting and redelivery until it is gone', async () => {
@@ -239,6 +251,9 @@ test('a live or waiting run-check record suppresses counting and redelivery unti
     );
     const live: RunRecordRow = await waitRunRecord(f, 'live');
     expect(live).toMatchObject({ repo: f.repo, leaf: 'hd-runs', check: 'held' });
+    // The scope starts only after its guard is up, so once it holds a process no unit launch of
+    // the held run is still pending when the run is killed below.
+    await waitUntil(() => unitPopulated(live.slice, live.unit), 'held scope never started');
     await core.waitFor(address, idleAfter(1));
     // The seat's turn ended silently, but its own run is live: no count, no prompt.
     expect((await cli(f, ['next', 'hd-runs'], f.root, core.env)).code).toBe(0);
@@ -254,13 +269,11 @@ test('a live or waiting run-check record suppresses counting and redelivery unti
     expect((await cli(f, ['next', 'hd-runs'], f.root, core.env)).code).toBe(0);
     expect(readState(path).attempts).toEqual({ A: 0, B: 0 });
     expect(core.tasks(address)).toHaveLength(1);
-    killTree(held.proc);
+    // The queued run goes first, so it is never promoted into a unit launch when the held run ends.
     killTree(queued.proc);
-    const deadline: number = Date.now() + WAIT_MS;
-    while (liveRecords(f).length > 0) {
-      if (Date.now() > deadline) throw new Error('run records never cleared');
-      await Bun.sleep(50);
-    }
+    await waitUntil(() => liveRecords(f).every((record) => record.check !== 'queued'), 'queued run never ended');
+    killTree(held.proc);
+    await waitUntil(() => liveRecords(f).length === 0, 'run records never cleared');
     // With the record gone, the ended turn counts and the seat is re-prompted once.
     expect((await cli(f, ['next', 'hd-runs'], f.root, core.env)).code).toBe(0);
     expect(readState(path).attempts).toEqual({ A: 1, B: 0 });

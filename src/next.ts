@@ -74,7 +74,15 @@ import { readLog } from './log';
 import { isPaused, readPaused } from './pause';
 import { isStopped } from './stop';
 import { selfUpdate } from './self-update';
-import { blockDetail, dependentCounts, mergeQueue, twinConflict, type DepDetail, type QueueEntry } from './turn';
+import {
+  blockDetail,
+  dependentCounts,
+  mergeQueue,
+  twinConflict,
+  unmergedDeps,
+  type DepDetail,
+  type QueueEntry,
+} from './turn';
 import { appendTiming, capacityWaits, currentVisit, recordWait, wakeRows, type WaitReason } from './timing';
 import { closeMergedTab, leafSeats, reconcile, reconcileHost, reconcileNeedsPanes, type Seats } from './reconcile';
 
@@ -372,13 +380,17 @@ export async function emitEnvFile(repo: Repo, worktree: string, names: string[])
   renameSync(temp, link);
 }
 
-type ActiveCount = { total: number; repo: number };
+type ActiveCount = { total: number; repo: number; waiting: number };
 
-// Active leaves on the machine and in one repo, counted by the same rule.
+// Active leaves on the machine and in one repo, counted by the same rule, and
+// the repo's leaves waiting in merge behind the landing one. A waiter whose
+// prerequisites are not all merged is left out: it waits on a leaf the cap
+// would otherwise refuse.
 async function activeCount(global: GlobalConfig, repoName: string, invocation: Invocation): Promise<ActiveCount> {
   const registered: ReturnType<typeof registeredRepos> = registeredRepos(global, invocation);
   let total: number = registered.unknown ? global.max_active : 0;
   let own: number = 0;
+  let waiting: number = 0;
   const unfinished = (leaf: Leaf): boolean =>
     leaf.state.phase !== 'merged' && leaf.state.phase !== 'failed' && leaf.state.phase !== 'merge';
   const seated = (leaf: Leaf): boolean =>
@@ -403,19 +415,35 @@ async function activeCount(global: GlobalConfig, repoName: string, invocation: I
       total +=
         inventory.unreadable.length + (inventory.leaves.some(seated) ? inventory.leaves.filter(unfinished).length : 0);
     }
-    if (repo.name === repoName) own = total - before;
+    if (repo.name === repoName) {
+      own = total - before;
+      waiting = Math.max(
+        0,
+        inventory.leaves.filter(
+          (leaf) => leaf.state.phase === 'merge' && unmergedDeps(repo, leaf, inventory.leaves).length === 0,
+        ).length - 1,
+      );
+    }
   }
-  return { total, repo: own };
+  return { total, repo: own, waiting };
 }
 
-// Which cap refuses a new leaf in the repo: the machine `max_active`, then the repo's own.
-async function capRefusal(global: GlobalConfig, repo: Repo, invocation: Invocation): Promise<string | undefined> {
+// Which cap refuses a new leaf in the repo: the machine `max_active`, then the repo's own. Leaves
+// waiting in merge never count toward the machine cap; they count toward the repo's own cap only
+// for a leaf that never started, so a resume or a check.repair relaunch is never held behind them.
+async function capRefusal(
+  global: GlobalConfig,
+  repo: Repo,
+  invocation: Invocation,
+  unstarted: boolean,
+): Promise<string | undefined> {
   const count: ActiveCount = await activeCount(global, repo.name, invocation);
   const cap: number | undefined = repo.config.max_active;
+  const waiting: number = unstarted ? count.waiting : 0;
   return count.total >= global.max_active
-    ? `max_active ${global.max_active} reached`
-    : cap !== undefined && count.repo >= cap
-      ? `${repo.name} max_active ${cap} reached`
+    ? `max_active ${global.max_active} reached (leaves waiting in merge are not counted)`
+    : cap !== undefined && count.repo + waiting >= cap
+      ? `${repo.name} max_active ${cap} reached, counting ${waiting} waiting in merge`
       : undefined;
 }
 
@@ -435,7 +463,8 @@ async function allocate(
   repoPrefix(global, repo.name);
   const found: Seats = await leafSeats(place.session, repo, leaf.state);
   const live: boolean = liveSeat(found.A) || liveSeat(found.B);
-  if (!live && (await capRefusal(global, repo, invocation)) !== undefined) return null;
+  if (!live && (await capRefusal(global, repo, invocation, leaf.state.worktree === undefined)) !== undefined)
+    return null;
   const worktree: State = await ensureWorktree(repo, leaf, live);
   ensureLeafTemp(repo, worktree.slug);
   const state: State = worktree.tab === undefined ? { ...worktree, tab: leafTab(repo.name, worktree.slug) } : worktree;
@@ -1269,7 +1298,7 @@ export async function seatCommand(slug: string, slot: Slot, task: string | undef
     const allocated: Allocation | null = await allocate(global, repo, leaf, invocation);
     if (allocated === null)
       throw new Error(
-        `No free seat capacity: ${await capRefusal(global, repo, invocation)} (leaves waiting in merge are not counted)`,
+        `No free seat capacity: ${await capRefusal(global, repo, invocation, leaf.state.worktree === undefined)}`,
       );
     const started: Started = await startSeat(
       global,

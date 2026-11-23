@@ -1,5 +1,5 @@
 import { callerScope, cancelWaitingRun, liveRuns, type RunRecord } from './admission';
-import { runUnitBase, sessionBusAddress } from './scope';
+import { runUnitBase, sessionBusEnv } from './scope';
 import { CommandError, spawnCaptured, type SpawnResult } from './shell';
 import { listPassRecords, passLive, type PassRecord } from './verify-pass';
 
@@ -26,7 +26,7 @@ export async function stopRunCommand(id: string | undefined): Promise<void> {
     if (pass !== undefined) {
       const argv: string[] = ['systemctl', '--user', 'stop', pass.record.unit_name];
       const stopped: SpawnResult = await spawnCaptured(argv, {
-        env: { ...process.env, DBUS_SESSION_BUS_ADDRESS: sessionBusAddress() },
+        env: sessionBusEnv(),
       });
       if (stopped.code !== 0) throw new CommandError(argv, process.cwd(), stopped);
       return;
@@ -43,7 +43,7 @@ export async function stopRunCommand(id: string | undefined): Promise<void> {
   }
   const argv: string[] = ['systemctl', '--user', 'stop', ...matched(found)];
   const result: SpawnResult = await spawnCaptured(argv, {
-    env: { ...process.env, DBUS_SESSION_BUS_ADDRESS: sessionBusAddress() },
+    env: sessionBusEnv(),
   });
   if (result.code !== 0) throw new CommandError(argv, process.cwd(), result);
 }

@@ -280,6 +280,49 @@ test.serial(
   },
 );
 
+test.serial(
+  'a forwarded blank or missing XDG_RUNTIME_DIR still launches the run unit and reaches the command as it was',
+  async () => {
+    const f: Fixture = await fixture();
+    try {
+      fakeAkrogon(f);
+      yaml(resolve(f.root, 'issues/config.yaml'), {
+        setup: 'mkdir -p node_modules',
+        env: ['AKROGON_HOME', 'AKROGON_LEAF_TEMP_ROOT', 'RUN_UNITS_OUT', 'XDG_RUNTIME_DIR'],
+        checks: {},
+        grounding: 'none',
+      });
+      const out: string = outDir(f);
+      const worktree: string = await leafWorktree(f, 'runtime');
+      const slice: string = testSlice();
+      for (const [name, runtime] of [
+        ['blank', ''],
+        ['missing', undefined],
+      ] as const) {
+        const result: SpawnResult = await spawnReal(
+          f,
+          [
+            'run-check',
+            '--name',
+            name,
+            '--',
+            'sh',
+            '-c',
+            `echo "\${XDG_RUNTIME_DIR-none}|$DBUS_SESSION_BUS_ADDRESS" > "${out}/${name}"`,
+          ],
+          worktree,
+          { RUN_UNITS_OUT: out, AKROGON_RUN_SLICE: slice, XDG_RUNTIME_DIR: runtime },
+        ).result;
+        expect(result.code, `stdout: ${result.stdout} stderr: ${result.stderr}`).toBe(0);
+        expect(readFileSync(resolve(out, name), 'utf8').trim()).toBe(`${runtime ?? 'none'}|unix:path=/nonexistent`);
+      }
+      expect(await fixtureUnits(slice)).toEqual([]);
+    } finally {
+      f.clean();
+    }
+  },
+);
+
 test.serial('stop-run stops only the caller pane scope runs', async () => {
   const { f, slice } = await realFixture();
   const caps: RealCap[] = [];
@@ -374,7 +417,10 @@ for (const signal of ['SIGTERM', 'SIGKILL'] as const) {
       let unit: string | undefined;
       const liveDeadline: number = Date.now() + WAIT_MS;
       while (unit === undefined) {
-        const live: Record<string, unknown> | undefined = (await liveRuns(f)).find((record) => record.check === 'reap');
+        // The other signal's record stays until a sweep finds its scope empty: match this wrapper's own.
+        const live: Record<string, unknown> | undefined = (await liveRuns(f)).find(
+          (record) => record.check === 'reap' && record.pid === cap.proc.pid,
+        );
         if (live !== undefined) unit = live.unit as string;
         else if (Date.now() > liveDeadline) throw new Error('No live reap record');
         else await Bun.sleep(50);

@@ -3,10 +3,12 @@ import { basename, resolve } from 'node:path';
 import { z } from 'zod';
 import { globalHome, homePath, readGlobal, requireRepo, type Repo } from './config';
 import { HcError, repoSpace, type SpaceResolution } from './hc';
+import { cancelLeafRuns, recordUnits, type RunRecord } from './admission';
 import { endSeats } from './reconcile';
-import { leafSlice } from './scope';
-import { command, CommandError, writeYaml } from './shell';
+import { leafSlice, stopRunUnits, type RunUnit } from './scope';
+import { CommandError, writeYaml } from './shell';
 import { findLeaf, repoInventory, withLock, type Inventory, type Leaf, type LeafFailure } from './state';
+import { listPassRecords, passLive } from './verify-pass';
 
 const stopSchema = z.record(z.string().min(1), z.literal(true));
 
@@ -51,11 +53,29 @@ function writeStopped(keys: Set<string>): void {
 }
 
 // The leaf's seat terminals end before its slice stops (plan D19). A refused session is never called
-// (L2); the slice stop still ends the seat processes, which run inside it.
+// (L2); the slice stop still ends the seat processes, which run inside it. The slice stop goes first
+// and a refused one throws before any record is touched, so a live land never reads a cancelled run as
+// a red verify. A land's verify pass and its check runs sit outside the leaf slice, so they are
+// stopped after it; the land hold keeps the repo line while they run (admission live()). Every run
+// record of the leaf is cancelled before that, so a waiting run or a live one yet to launch never
+// launches, and a run of the leaf that arrives later is refused. The run scopes stop before the
+// passes: a pass's checks carry its PID, so the live pass keeps the hold while their scopes drain,
+// and a failed scope stop throws with the pass, and so the hold, left for the retry.
 async function stopLeaf(repo: Repo, leaf: Leaf): Promise<void> {
   const space: SpaceResolution = await repoSpace(repo);
   if (space.ok) await endSeats(space.session, repo, leaf.state);
-  await command(['systemctl', '--user', 'stop', leafSlice(repo, leaf.state.slug, homePath())]);
+  // A refused leaf-slice stop is never excused.
+  await stopRunUnits({ unit: leafSlice(repo, leaf.state.slug, homePath()), gone: (): boolean => false });
+  const live: RunRecord[] = await cancelLeafRuns(repo.name, leaf.state.slug);
+  // A pass holds the line through its own process, so that is what its stop must end.
+  const passes: RunUnit[] = listPassRecords()
+    .filter(
+      (entry) =>
+        entry.record.repo === repo.name && entry.record.caller.slug === leaf.state.slug && passLive(entry.record),
+    )
+    .map((entry) => ({ unit: entry.record.unit_name, gone: (): boolean => !passLive(entry.record) }));
+  await stopRunUnits(...live.filter((record: RunRecord) => record.land !== true).flatMap(recordUnits));
+  await stopRunUnits(...passes);
   console.log(`stopped: ${repo.name}/${leaf.state.slug}`);
 }
 

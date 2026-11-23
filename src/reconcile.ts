@@ -43,7 +43,7 @@ import {
   withLock,
   worktreeLock,
 } from './state';
-import { cgroupRoot, leafSlice, ownSlices, procRoot, sessionBusAddress } from './scope';
+import { cgroupRoot, leafSlice, ownSlices, procRoot, sessionBusEnv } from './scope';
 import { liveRuns, liveStartTime } from './admission';
 import { CommandError, command, run, spawnCaptured, type Result } from './shell';
 import { closeTab, end, HcError, repoSpace, terminals, windowOpen, type Seen, type SpaceResolution } from './hc';
@@ -127,7 +127,7 @@ export function readHostKept(): KeptEntry[] {
 async function systemctl(...args: string[]): Promise<Result> {
   try {
     return await spawnCaptured(['systemctl', '--user', ...args], {
-      env: { ...process.env, DBUS_SESSION_BUS_ADDRESS: sessionBusAddress() },
+      env: sessionBusEnv(),
     });
   } catch (error) {
     return { code: 1, stdout: '', stderr: error instanceof Error ? error.message : String(error) };
@@ -1263,8 +1263,8 @@ export async function reconcile(
 // One host-wide step per pass: every loaded akrogon-l*.slice across all
 // registered repos (open and closed leaf records) plus failed akrogon-run-*
 // units. A slice matching a finished leaf follows the same rule as the per-repo
-// step; a slice matching no leaf at all is stopped only when its cgroupfs
-// subtree holds no process. A leaf-matched slice is stopped only for a repo in
+// step; a slice matching no leaf at all is left alone, since it may belong to
+// another akrogon home (#151). A leaf-matched slice is stopped only for a repo in
 // `acting`, the repos this pass reconciled; leaf-tab judgements read that
 // repo's resolved session through panesForRepo while the filesystem veto keeps
 // the cross-session panesOnce union.

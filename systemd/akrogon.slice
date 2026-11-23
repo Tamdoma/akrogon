@@ -4,6 +4,6 @@ Before=slices.target
 
 [Slice]
 CPUWeight=20
-MemoryHigh=64G
-MemoryMax=96G
+MemoryHigh=50%
+MemoryMax=75%
 MemorySwapMax=0

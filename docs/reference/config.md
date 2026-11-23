@@ -67,7 +67,7 @@ Each registered checkout has `issues/config.yaml`. The [init-akrogon skill](../.
 | `default_branch` | The branch leaves start from and land on. Default `main`. |
 | `worktree_root` | Where leaf worktrees go. It must be outside the checkout. Default `~/.akrogon/worktrees/<repo-name>`. |
 | `fix_rounds` | How many repair rounds the chart door's direct route may use. Default 3. |
-| `max_active` | How many of this repo's leaves may run at once, under the machine `max_active`, which still limits the total. Counted like the machine limit. Optional, a positive whole number; absent means only the machine limit applies. `akrogon config` shows it as `repo_max_active`. Install a build that knows the key before adding it: an older build rejects the file. |
+| `max_active` | How many of this repo's leaves may run at once, under the machine `max_active`, which still limits the total. Counted like the machine limit, except that before a leaf that never started gets a seat, the repo's leaves waiting in merge, minus the one landing, count too. Optional, a positive whole number; absent means only the machine limit applies. `akrogon config` shows it as `repo_max_active`. Install a build that knows the key before adding it: an older build rejects the file. |
 | `implement` | `subagents` lets seat A hand units to worker agents. `inline` makes seat A do all the work itself. Default `subagents`. |
 | `setup` | A command that installs dependencies in each fresh checkout, such as `bun install --frozen-lockfile --backend=copyfile`. Akrogon runs it before check commands. Optional. |
 | `checks` | Named commands every leaf must pass. A red check blocks. Default empty. |

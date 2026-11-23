@@ -41,6 +41,10 @@ cd ~/.akrogon
 ln -s releases/<previous> .next-current
 mv -T .next-current current
 printf 'commit: <rolled-away-commit>\n' > release-hold.yaml
+link=~/.config/systemd/user/akrogon-land.slice
+if [ -L "$link" ] && [ ! -e releases/<previous>/systemd/akrogon-land.slice ]; then
+  case "$(readlink "$link")" in "$HOME/.akrogon/"*) rm "$link" ;; esac
+fi
 bun releases/<previous>/src/akrogon.ts install
 bun -e 'import { writeDeploySuccess } from "./releases/<previous>/src/release.ts"; writeDeploySuccess("<previous>", "<rolled-away-commit>")'
 ```
@@ -50,8 +54,9 @@ What each step does:
 1. `ln -s` makes a temporary link to the previous release.
 2. `mv -T` renames that link onto `current`, so `current` switches in one step.
 3. `release-hold.yaml` names the commit that must not deploy again.
-4. The previous release's own `install` rebuilds the command, skill and plugin links.
-5. `writeDeploySuccess` from the previous release marks it active and the release you left as previous. This keeps both from being pruned and records the rollback time.
+4. The `if` block removes the `akrogon-land.slice` link when it points into `~/.akrogon` and the previous release ships no such unit. An older `install` neither makes nor removes that link, so without this step it would point at a missing file when `install` reloads systemd.
+5. The previous release's own `install` rebuilds the command, skill and plugin links.
+6. `writeDeploySuccess` from the previous release marks it active and the release you left as previous. This keeps both from being pruned and records the rollback time.
 
 If `install` fails, it names the conflicting paths. Fix them and rerun `install` before you run the last step.
 

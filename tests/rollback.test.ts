@@ -308,3 +308,24 @@ test.serial('an hc-to-hc rollback flips and holds with no herdr on PATH', async 
     d.f.clean();
   }
 });
+
+test.serial('rollback to a release without akrogon-land.slice removes the link the newer release made', async () => {
+  const d: DeployFixture = await deployFixture();
+  try {
+    await dropPlugin(d);
+    const previous: string = await head(d);
+    expect((await cli(d.f, ['next', '--all'], d.f.root, d.env)).code).toBe(0);
+    const current: string = await pushSeed(d, () =>
+      writeFileSync(resolve(d.seed, 'systemd/akrogon-land.slice'), '[Slice]\nCPUWeight=1000\n'),
+    );
+    expect((await cli(d.f, ['next', '--all'], d.f.root, d.env)).code).toBe(0);
+    const link: string = resolve(d.home, '.config/systemd/user/akrogon-land.slice');
+    expect(realpathSync(link)).toBe(resolve(releases(d), current, 'systemd/akrogon-land.slice'));
+    const result: Result = await cli(d.f, ['rollback'], d.f.root, d.env);
+    expect(result.code).toBe(0);
+    expectRolledBack(d, previous, current, { line: result });
+    expect(lstatSync(link, { throwIfNoEntry: false })).toBeUndefined();
+  } finally {
+    d.f.clean();
+  }
+});

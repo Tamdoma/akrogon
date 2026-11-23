@@ -66,7 +66,7 @@ test('install links akrogon.slice with the ceiling values and reloads the user m
     const unit: string[] = readFileSync(link, 'utf8')
       .split('\n')
       .map((line) => line.trim());
-    for (const line of ['CPUWeight=20', 'MemoryHigh=64G', 'MemoryMax=96G', 'MemorySwapMax=0'])
+    for (const line of ['CPUWeight=20', 'MemoryHigh=50%', 'MemoryMax=75%', 'MemorySwapMax=0'])
       expect(unit).toContain(line);
     expect(unit.some((line) => line.startsWith('TasksMax'))).toBe(false);
     expect(readFileSync(resolve(f.home, 'systemctl.log'), 'utf8').trim().split('\n')).toContain(
@@ -356,6 +356,22 @@ test('install from a listener release links, enables and restarts the unit and c
     expect(realpathSync(agy)).toBe(resolve(f.home, 'release', 'skills', 'skill-one'));
     expect(sequence(f)).toEqual(listenerCalls);
     expect(calls(f)).toEqual([]);
+  } finally {
+    f.clean();
+  }
+});
+
+test('install links akrogon-land.slice only when the release ships it', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const env: NodeJS.ProcessEnv = installEnv(f);
+    currentRelease(f, { plugin: false, listener: false });
+    const link: string = resolve(f.home, '.config/systemd/user/akrogon-land.slice');
+    expect(await cli(f, ['install'], f.root, env)).toMatchObject({ code: 0 });
+    expect(lstatSync(link, { throwIfNoEntry: false })).toBeUndefined();
+    writeFileSync(resolve(f.home, 'release/systemd/akrogon-land.slice'), '[Slice]\nCPUWeight=1000\n');
+    expect(await cli(f, ['install'], f.root, env)).toMatchObject({ code: 0 });
+    expect(readlinkSync(link)).toBe(resolve(f.home, 'current', 'systemd/akrogon-land.slice'));
   } finally {
     f.clean();
   }

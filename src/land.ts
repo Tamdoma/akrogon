@@ -15,7 +15,7 @@ import {
 } from './phase';
 import { appendAttempt, readPressure, type PressureSnapshot } from './attempts';
 import { readVerifyRuns, uncoveredMainRedUnits, verify, type Unit, type VerifyRun } from './verify';
-import { leafSlice, runSlice, runUnitBase, sessionBusAddress } from './scope';
+import { leafSlice, runSlice, runUnitBase, runtimeDir, sessionBusAddress, sessionBusEnv } from './scope';
 import { callerScope, withAdmission, type AdmissionHolder } from './admission';
 import { landedWake, mergeWake, phaseWake } from './next';
 
@@ -39,9 +39,10 @@ export async function launchLand(repo: Repo, slug: string, attempt: string): Pro
     `--working-directory=${repo.root}`,
     `--setenv=PATH=${process.env.PATH ?? ''}`,
     `--setenv=HOME=${process.env.HOME ?? ''}`,
-    `--setenv=XDG_RUNTIME_DIR=${process.env.XDG_RUNTIME_DIR ?? ''}`,
+    `--setenv=XDG_RUNTIME_DIR=${runtimeDir()}`,
     `--setenv=DBUS_SESSION_BUS_ADDRESS=${sessionBusAddress()}`,
     '--setenv=NODE_DISABLE_COMPILE_CACHE=1',
+    `--setenv=AKROGON_RUN_SLICE=${runSlice('akrogon-land.slice')}`,
     ...['AKROGON_HOME', 'AKROGON_LEAF_TEMP_ROOT', 'AKROGON_RETIRED_TEMP_ROOT'].flatMap((name: string): string[] => {
       const value: string | undefined = process.env[name];
       return value === undefined ? [] : [`--setenv=${name}=${value}`];
@@ -56,14 +57,14 @@ export async function launchLand(repo: Repo, slug: string, attempt: string): Pro
   ];
   const result: SpawnResult = await spawnCaptured(argv, {
     cwd: repo.root,
-    env: { ...process.env, DBUS_SESSION_BUS_ADDRESS: sessionBusAddress() },
+    env: sessionBusEnv(),
   });
   if (result.code !== 0) throw new CommandError(argv, repo.root, result);
 }
 
 export async function landAlive(attempt: string): Promise<boolean> {
   const result: SpawnResult = await spawnCaptured(['systemctl', '--user', 'is-active', landUnit(attempt)], {
-    env: { ...process.env, DBUS_SESSION_BUS_ADDRESS: sessionBusAddress() },
+    env: sessionBusEnv(),
   });
   return result.code === 0;
 }

@@ -17,6 +17,7 @@ import { CommandError, quote, spawnCaptured, type SpawnResult } from './shell';
 export type Link = { source: string; destination: string; repoint?: boolean };
 
 const listenerUnit: string = 'akrogon-listener.service';
+const landSlice: string = 'akrogon-land.slice';
 
 export function planSkillLinks(
   home: string,
@@ -46,14 +47,11 @@ export function planSkillLinks(
         destination: resolve(home, root, skill),
       })),
     ),
-    ...(existsSync(resolve(listRoot, 'systemd', listenerUnit))
-      ? [
-          {
-            source: resolve(sourceRoot, 'systemd', listenerUnit),
-            destination: resolve(home, '.config/systemd/user', listenerUnit),
-          },
-        ]
-      : []),
+    ...[landSlice, listenerUnit].flatMap((unit: string): Link[] =>
+      existsSync(resolve(listRoot, 'systemd', unit))
+        ? [{ source: resolve(sourceRoot, 'systemd', unit), destination: resolve(home, '.config/systemd/user', unit) }]
+        : [],
+    ),
   ];
   const releases: string = releasesDir();
   const skillRoots: string[] = ownedRoots.map((root) => resolve(root, 'skills'));
@@ -82,6 +80,14 @@ export function planSkillLinks(
   };
   for (const root of roots) staleIn(resolve(home, root), sourceSkills, resolve(listRoot, 'skills'), skillRoots);
   staleIn(resolve(home, '.config/herdr-app/mods'), sourceMods, resolve(listRoot, 'herdr-app'), modRoots);
+  // A release without the land slice drops the owned link an earlier release made.
+  const landLink: string = resolve(home, '.config/systemd/user', landSlice);
+  if (
+    !plannedDestinations.has(landLink) &&
+    lstatSync(landLink, { throwIfNoEntry: false })?.isSymbolicLink() === true &&
+    ownedRoots.some((root) => within(resolve(dirname(landLink), readlinkSync(landLink)), root))
+  )
+    stale.push(landLink);
   const links: Link[] = [];
   const conflicts: Link[] = [];
   for (const link of planned) {

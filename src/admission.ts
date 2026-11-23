@@ -3,8 +3,10 @@ import { createHash, randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { globalHome } from './config';
-import { procRoot, runUnitBase, stopRunUnits } from './scope';
+import { procRoot, runUnitBase, sliceUnit, stopRunUnits, unitPopulated, type RunUnit } from './scope';
+import { CommandError } from './shell';
 import { withLock } from './state';
+import { listPassRecords, passLive } from './verify-pass';
 
 export interface AdmissionHolder {
   repo: string;
@@ -20,7 +22,7 @@ export interface AdmissionHolder {
 }
 
 export type Admission =
-  | { kind: 'held'; token: string; wait_ms: number; record_path: string; release: () => void }
+  | { kind: 'held'; token: string; wait_ms: number; record_path: string; end: () => Promise<void> }
   | { kind: 'nested'; token: string };
 
 const recordSchema = z.object({
@@ -39,6 +41,7 @@ const recordSchema = z.object({
   full: z.boolean().default(false),
   attempt: z.string().optional(),
   land: z.literal(true).optional(),
+  cancel: z.literal(true).optional(),
   since: z.iso.datetime(),
 });
 export type RunRecord = z.infer<typeof recordSchema>;
@@ -84,8 +87,44 @@ function readRecord(path: string): RunRecord | undefined {
   }
 }
 
+const writerLive = (record: Pick<RunRecord, 'pid' | 'start_time'>): boolean =>
+  liveStartTime(record.pid) === record.start_time;
+
+// The guard or the scope still holds a process. The scope requires its guard, so a scope launch
+// still pending after its writer died can only start while the guard lives. The guard is read
+// first: once it reads empty, any scope that started before it emptied shows in the scope read.
+const unitsPopulated = (record: Pick<RunRecord, 'slice' | 'unit' | 'run'>): boolean =>
+  unitPopulated(record.slice, `${runUnitBase(record.run)}-guard.service`) || unitPopulated(record.slice, record.unit);
+
+// A record is live while its writer lives or while its scope or guard still holds a process, so
+// work left draining after the writer ends holds what the run held, however its stop went.
+export const ownLive = (
+  record: Pick<RunRecord, 'boot_id' | 'pid' | 'start_time' | 'slice' | 'unit' | 'run'>,
+  boot: string,
+): boolean => record.boot_id === boot && (writerLive(record) || unitsPopulated(record));
+
+// A land hold also stays live while a verify pass or a check run of its leaf still runs, so its line
+// outlasts a land service stopped before them. Leaf, not attempt: a land that joins a live pass
+// carries no attempt in the join key. Each run counts by its own process only, never through a hold.
 const live = (record: RunRecord, boot: string): boolean =>
-  record.boot_id === boot && liveStartTime(record.pid) === record.start_time;
+  ownLive(record, boot) ||
+  (record.land === true &&
+    (listPassRecords().some(
+      ({ record: pass }) => pass.repo === record.repo && pass.caller.slug === record.leaf && passLive(pass),
+    ) ||
+      readdirSync(runsDir())
+        .filter((name) => name.endsWith('.yaml'))
+        .some((name) => {
+          const run: RunRecord | undefined = readRecord(resolve(runsDir(), name));
+          return (
+            run !== undefined &&
+            run.land !== true &&
+            run.state === 'live' &&
+            run.repo === record.repo &&
+            run.leaf === record.leaf &&
+            ownLive(run, boot)
+          );
+        })));
 
 // A run named in its repo's `full` list counts as nested only under a run that
 // itself holds its repo's line or a land run of its repo: under any other run
@@ -163,15 +202,21 @@ const POLL_MS: number = 1000;
 // until it is the oldest listed run of its repo that nothing holds. The turn
 // check and the switch to live share one exclusive lock, so two waiters of the
 // same repo never both start; a cancel write takes the same lock pair.
-async function awaitTurn(record: RunRecord): Promise<void> {
+async function awaitTurn(record: RunRecord, skip: ReadonlySet<string>): Promise<void> {
   let shown: string = '';
   for (;;) {
+    await sweepStale(skip);
     const started: boolean = await withAdmissionLock(() =>
       withLock(lineLock(record.repo), async (): Promise<boolean> => {
         const mine: RunRecord | undefined = readRecord(recordPath(record.token_hash));
         if (mine === undefined) writeRecord(record);
         else if (mine.state === 'cancelled') throw new Error(`run ${record.run} cancelled by akrogon stop-run`);
         const runs: RunRecord[] = lineRuns().filter((entry) => entry.repo === record.repo);
+        // akrogon stop marked its leaf's land hold: a run of that leaf arriving later never starts.
+        if (runs.some((hold) => hold.land === true && hold.cancel === true && hold.leaf === record.leaf)) {
+          writeRecord({ ...record, state: 'cancelled' });
+          throw new Error(`run ${record.run} cancelled by akrogon stop`);
+        }
         const held = (run: RunRecord): RunRecord | undefined => runs.find((hold) => holds(hold, run));
         // A waiting run of the holding attempt goes ahead of the line's other waiters.
         const holding = (run: RunRecord): boolean =>
@@ -214,23 +259,61 @@ export async function cancelWaitingRun(record: RunRecord): Promise<'cancelled' |
   );
 }
 
-// Records whose writer is gone (or whose file is unreadable) are stale: drop
-// the file and best-effort stop the units it left behind. Hashes in skip name
-// records the caller still owns.
+// akrogon stop's form, for every run record of one leaf, under the lock pair promotion writes
+// under: a waiting record is cancelled and leaves the line. A live record only gets a cancel mark:
+// it keeps the line and stays in liveRuns until its own end path removes it, so a stop retry still
+// finds its units. A live run that has not launched its scope yet reads the mark through
+// runCancelled and never launches; the live records are returned for the caller to stop.
+export async function cancelLeafRuns(repo: string, leaf: string): Promise<RunRecord[]> {
+  return withAdmissionLock(() =>
+    withLock(lineLock(repo), async (): Promise<RunRecord[]> => {
+      const records: RunRecord[] = liveRuns().filter((record) => record.repo === repo && record.leaf === leaf);
+      for (const record of records)
+        writeRecord(record.state === 'waiting' ? { ...record, state: 'cancelled' } : { ...record, cancel: true });
+      return records.filter((record) => record.state === 'live');
+    }),
+  );
+}
+
+// Read under the same locks cancelLeafRuns writes under, after the run's guard is
+// registered and before its scope launches.
+export async function runCancelled(record: string, repo: string): Promise<boolean> {
+  return withAdmissionLock(() =>
+    withLock(lineLock(repo), async (): Promise<boolean> => readRecord(record)?.cancel === true),
+  );
+}
+
+export const recordUnits = (record: RunRecord): RunUnit[] => [
+  sliceUnit(record.slice, record.unit),
+  sliceUnit(record.slice, `${runUnitBase(record.run)}-guard.service`),
+];
+
+// A record that is no longer live, or whose file is unreadable, goes. A scope or
+// guard left populated after its writer died is stopped, and a refused stop only
+// warns: the record goes once both are empty. The sweep never writes a record, so sweeps
+// racing each other cannot bring one back. A land hold's units are never started,
+// so they are never stopped. Hashes in skip name records the caller still owns.
 async function sweepStale(skip: ReadonlySet<string>): Promise<void> {
   const dir: string = runsDir();
   if (!existsSync(dir)) return;
   const boot: string = bootId();
-  const units: string[] = [];
   for (const name of readdirSync(dir)) {
     if (!name.endsWith('.yaml') || skip.has(name.slice(0, -'.yaml'.length))) continue;
     const path: string = resolve(dir, name);
     const record: RunRecord | undefined = readRecord(path);
-    if (record !== undefined && live(record, boot)) continue;
-    rmSync(path, { force: true });
-    if (record !== undefined) units.push(record.unit, `${runUnitBase(record.run)}-guard.service`);
+    if (record === undefined) {
+      rmSync(path, { force: true });
+      continue;
+    }
+    if (record.land !== true && !(record.boot_id === boot && writerLive(record)) && unitsPopulated(record))
+      await stopRunUnits(...recordUnits(record)).catch((error: unknown): void => {
+        if (!(error instanceof CommandError)) throw error;
+        process.stderr.write(
+          `${JSON.stringify({ warning: 'stale run units refused their stop', run: record.run, error: error.message })}\n`,
+        );
+      });
+    if (!live(record, boot)) rmSync(path, { force: true });
   }
-  await stopRunUnits(...units);
 }
 
 export function callerScope(): string {
@@ -264,12 +347,10 @@ export async function withAdmission<T>(holder: AdmissionHolder, fn: (admission: 
   mkdirSync(runsDir(), { recursive: true });
   const token: string = randomUUID();
   const ownHash: string = createHash('sha256').update(token).digest('hex');
-  await sweepStale(
-    new Set([
-      ownHash,
-      ...(inherited === undefined || inherited === '' ? [] : [createHash('sha256').update(inherited).digest('hex')]),
-    ]),
-  );
+  const skip: ReadonlySet<string> = new Set([
+    ownHash,
+    ...(inherited === undefined || inherited === '' ? [] : [createHash('sha256').update(inherited).digest('hex')]),
+  ]);
   const record: RunRecord = {
     token_hash: ownHash,
     pid: process.pid,
@@ -281,20 +362,19 @@ export async function withAdmission<T>(holder: AdmissionHolder, fn: (admission: 
   };
   const begun: number = Date.now();
   try {
-    await awaitTurn(record);
+    await awaitTurn(record, skip);
     process.stderr.write(`run ${holder.run}\n`);
-    let ended: boolean = false;
     return await fn({
       kind: 'held',
       token,
       wait_ms: Date.now() - begun,
       record_path: recordPath(record.token_hash),
-      release: () => {
-        if (!ended) writeRecord({ ...record, state: 'ended' });
-        ended = true;
-      },
+      // The run's units stop before its record says ended, so work left draining
+      // in the scope keeps the record live. A refused stop leaves the record as it is.
+      end: () => stopRunUnits(...recordUnits(record)).then(() => writeRecord({ ...record, state: 'ended' })),
     });
   } finally {
-    rmSync(recordPath(record.token_hash), { force: true });
+    // A record whose scope or guard still holds a process stays and holds, until a sweep finds both empty.
+    if (!unitsPopulated(record)) rmSync(recordPath(record.token_hash), { force: true });
   }
 }

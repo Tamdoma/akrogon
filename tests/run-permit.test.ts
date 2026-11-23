@@ -343,7 +343,7 @@ test('a listed run waits for the holder record to be removed, not just the holde
     mkdirSync(delayBin, { recursive: true });
     writeFileSync(
       resolve(delayBin, 'systemctl'),
-      `#!/bin/sh\nif [ "$2" = 'stop' ]; then\n  while [ ! -e '${dir}/unstop' ]; do sleep 0.05; done\n  exit 0\nfi\n${real === '' ? 'exit 0' : `exec ${real} "$@"`}\n`,
+      `#!/bin/sh\nif [ "$2" = 'stop' ]; then\n  touch '${dir}/stopping'\n  while [ ! -e '${dir}/unstop' ]; do sleep 0.05; done\n  exit 0\nfi\n${real === '' ? 'exit 0' : `exec ${real} "$@"`}\n`,
       { mode: 0o755 },
     );
     const a: Cap = run(f, ['run-check', '--name', 'test', '--', ...hold(dir, 'a')], first, {
@@ -356,16 +356,11 @@ test('a listed run waits for the holder record to be removed, not just the holde
     await waitForText(b, new RegExp(`waiting for ${f.repo}/`));
     const aId: string = ((await a.text()).match(/run ([0-9a-f-]+)/) ?? [])[1] as string;
     writeFileSync(resolve(dir, 'release'), '');
-    // a's command is done and its record is ended, but the shim holds its unit
-    // stop — and so its record removal — until flagged.
-    const deadline: number = Date.now() + WAIT_MS;
-    for (;;) {
-      const record: Record<string, unknown> | undefined = (await runRecords(f)).find((entry) => entry.run === aId);
-      if (record !== undefined && record.state === 'ended') break;
-      if (Date.now() > deadline) throw new Error('holder record never reached ended');
-      await Bun.sleep(20);
-    }
-    // The holder's record is ended and still present: b must not start yet.
+    // a's command is done, but the shim holds its unit stop — and so its record
+    // removal — until flagged. The record stays live while its unit stops.
+    await waitFor(resolve(dir, 'stopping'));
+    expect((await runRecords(f)).find((entry) => entry.run === aId)?.state).toBe('live');
+    // The holder's record is still present: b must not start yet.
     // Outwait one promotion poll so an implementation that promotes over an
     // ended record shows dir/b before this assert, not after it.
     await Bun.sleep(1500);
@@ -834,7 +829,7 @@ test('a land holds its repo: later runs wait, earlier, own-attempt and other-rep
   }
 });
 
-test('a dead land stops holding even while its own check lives, and stop-run cancels a held-back run', async () => {
+test('a dead land holds its repo until its own check ends, and stop-run cancels a held-back run', async () => {
   const f: Fixture = await fixture();
   const caps: Cap[] = [];
   try {
@@ -863,11 +858,13 @@ test('a dead land stops holding even while its own check lives, and stop-run can
     await waitForText(after, new RegExp(`waiting for ${f.repo}/landing land`));
     killTree(held.proc);
     await held.proc.exited;
-    // The land's own check still runs; the later run starts anyway.
-    expect(await after.proc.exited).toBe(0);
-    expect(existsSync(resolve(dir, 'after'))).toBe(true);
+    // The land's own check still runs, so the later run keeps waiting until it ends.
+    await Bun.sleep(2500);
+    expect(existsSync(resolve(dir, 'after'))).toBe(false);
     writeFileSync(resolve(dir, 'release'), '');
     expect(await check.proc.exited).toBe(0);
+    expect(await after.proc.exited).toBe(0);
+    expect(existsSync(resolve(dir, 'after'))).toBe(true);
   } finally {
     stop(caps);
     f.clean();

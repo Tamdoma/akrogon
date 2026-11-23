@@ -44,7 +44,7 @@ import { lineRuns, type RunRecord } from './admission';
 import { readVerifyRuns, type VerifyRun } from './verify';
 import { docGet, repoSpace, type SpaceResolution } from './hc';
 import { expectedTabName } from './seat';
-import { sessionBusAddress } from './scope';
+import { sessionBusEnv } from './scope';
 import { spawnCaptured, type SpawnResult } from './shell';
 
 type ScannedLeaf = Leaf & {
@@ -724,7 +724,7 @@ async function unnamedTabs(repo: Repo, leaves: Leaf[]): Promise<Set<string>> {
 
 async function listenerLine(): Promise<string> {
   const result: SpawnResult = await spawnCaptured(['systemctl', '--user', 'is-active', 'akrogon-listener.service'], {
-    env: { ...process.env, DBUS_SESSION_BUS_ADDRESS: sessionBusAddress() },
+    env: sessionBusEnv(),
   });
   return `Listener: ${result.code === 0 ? 'live' : 'down'}`;
 }
