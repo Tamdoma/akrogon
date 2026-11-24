@@ -37,9 +37,14 @@ async function active(slice: string): Promise<string> {
 test.serial('a refused slice stop keeps the core queued and a later stop finishes it', async () => {
   const f: Fixture = await fixture();
   const core: HcCore = await hcCore(f);
-  const slice: string = `akrogon-retry-${core.session}.slice`;
+  // Each `-` in a slice name nests it under a parent slice that stopping it leaves active, so the session's
+  // `-` goes: a per-session parent would stay behind after every run.
+  const slice: string = `akrogon-retry-${core.session.replace('-', '_')}.slice`;
   const path: string | undefined = process.env.PATH;
   try {
+    // Recorded before it exists, as core-bin's systemd-run does, so a test killed during the run leaves
+    // the slice to the abandoned sweep.
+    writeFileSync(resolve(core.runtime, 'core/slices'), `${slice}\n`);
     const made: SpawnResult = await spawnCaptured([
       ...userBus,
       'systemd-run',
@@ -51,7 +56,6 @@ test.serial('a refused slice stop keeps the core queued and a later stop finishe
       'true',
     ]);
     expect(made.code, made.stderr).toBe(0);
-    writeFileSync(resolve(core.runtime, 'core/slices'), `${slice}\n`);
     // A systemctl that refuses, ahead of the real one only for the first stop.
     const refuse: string = resolve(f.home, 'refuse-bin');
     mkdirSync(refuse);
