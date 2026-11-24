@@ -357,7 +357,7 @@ function readProc<T>(read: () => T): T | undefined {
     return read();
   } catch (error) {
     const code: string | undefined = (error as NodeJS.ErrnoException).code;
-    if (code !== 'ENOENT' && code !== 'EACCES' && code !== 'EPERM') throw error;
+    if (code !== 'ENOENT' && code !== 'EACCES' && code !== 'EPERM' && code !== 'ESRCH') throw error;
     return undefined;
   }
 }
