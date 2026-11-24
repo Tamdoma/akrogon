@@ -23,3 +23,4 @@ Destination: no flaky test in akrogon's suite, and a mechanism that keeps new or
 - 2026-11-24 landed ff1b1dab reconcile-914 (readProc skips ESRCH from a process reaped mid-scan; one line, no test, evidence in message; D ready round 1); deployed.
 - 2026-11-24 landed e9158fe0 holder-relative (pass errors reach the caller, status written in finally; --holder must be absolute; S2 dropped; D ready round 2); deployed.
 - 2026-11-24 landed 768ae7e5 flock-orphans (killTree lists children first; blocking loops end with the fixture home; dead subreaper sweep deleted; +9 -84; B+C chose O2; D ready round 2); deployed.
+- 2026-11-24 landed 89da5ed4 watch-concurrent (watch-timer tests drop test.serial, 118 s to 30 s; timer accrues on the late clock, resend keeps poll-start; suite wall 172 s to 116 s; B+C chose it over a split; D ready round 3); deployed.
