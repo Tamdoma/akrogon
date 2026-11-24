@@ -12,17 +12,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { dlopen, FFIType } from 'bun:ffi';
 
-const PR_SET_CHILD_SUBREAPER: number = 36;
 const libc = dlopen('libc.so.6', {
-  prctl: {
-    args: [FFIType.i32, FFIType.i32, FFIType.i32, FFIType.i32, FFIType.i32],
-    returns: FFIType.i32,
-  },
   setenv: { args: [FFIType.cstring, FFIType.cstring, FFIType.i32], returns: FFIType.i32 },
-  waitpid: { args: [FFIType.i32, FFIType.ptr, FFIType.i32], returns: FFIType.i32 },
 });
-if (libc.symbols.prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) !== 0)
-  throw new Error('prctl(PR_SET_CHILD_SUBREAPER) failed');
 
 // bun test never runs process 'exit' handlers, so each worker removes the roots of workers that have exited.
 function alive(pid: number): boolean {
@@ -114,29 +106,3 @@ export function descendantsOf(root: number = process.pid): number[] {
   }
   return found.sort((a, b) => b.depth - a.depth).map((entry) => entry.pid);
 }
-
-export function sweepSuite(): void {
-  for (let pass: number = 0; pass < 2; pass += 1) {
-    for (const pid of descendantsOf()) {
-      try {
-        process.kill(pid, 'SIGKILL');
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
-      }
-      // Reap if it is our child: adopted orphans and killed children become zombies under
-      // this subreaper and otherwise survive in /proc. ECHILD for non-children is ignored.
-      libc.symbols.waitpid(pid, null, 0);
-    }
-  }
-  const survivors: number[] = descendantsOf();
-  if (survivors.length > 0) throw new Error(`sweepSuite: descendants survived SIGKILL: ${survivors.join(', ')}`);
-}
-
-process.on('exit', () => {
-  try {
-    sweepSuite();
-  } catch (error) {
-    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-  }
-  rmSync(suiteRoot, { recursive: true, force: true });
-});

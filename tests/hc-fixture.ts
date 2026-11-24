@@ -22,7 +22,7 @@ export const coreBin: string = resolve(import.meta.dir, 'core-bin');
 const realHc: string | null = Bun.which('hc');
 let serial: number = 0;
 
-// A core detaches from the test process, so the suite's subreaper never sees it: every file that starts
+// A core detaches from the test process, so no process teardown reaches it: every file that starts
 // cores calls this at its top level, so the cores it started are stopped after its tests, and cores left
 // by a worker that died are stopped here. A worker runs its files one after another and keeps its own
 // set, so a file's cleanup stops only that file's cores.

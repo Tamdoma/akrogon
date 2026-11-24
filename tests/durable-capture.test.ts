@@ -67,7 +67,7 @@ function blocking(f: Fixture, name: string): string {
     `echo MARKER-${name}-OUT`,
     `echo MARKER-${name}-ERR >&2`,
     `touch '${f.home}/ready-${name}'`,
-    `while [ ! -e '${f.home}/release-${name}' ]; do sleep 0.05; done`,
+    `while [ -d '${f.home}' ] && [ ! -e '${f.home}/release-${name}' ]; do sleep 0.05; done`,
     `echo DONE-${name}-OUT`,
     `echo DONE-${name}-ERR >&2`,
   ].join('; ');

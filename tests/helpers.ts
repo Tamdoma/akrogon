@@ -138,9 +138,12 @@ export async function cli(
     throw new Error(JSON.stringify({ args, timeout, signal: result.signalCode, code, stdout, stderr }));
   return { code, stdout: stdout.trim(), stderr: stderr.trim() };
 }
+// Listed before the kill, since the killed root's children move away from it, and killed parents
+// first, so a shell cannot start another child after its current one dies.
 export function killTree(proc: Bun.Subprocess): void {
+  const tree: number[] = descendantsOf(proc.pid).reverse();
   if (proc.exitCode === null && proc.signalCode === null) proc.kill('SIGKILL');
-  for (const pid of descendantsOf(proc.pid)) {
+  for (const pid of tree) {
     try {
       process.kill(pid, 'SIGKILL');
     } catch {
