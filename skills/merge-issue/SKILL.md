@@ -1,6 +1,6 @@
 ---
 name: merge-issue
-description: The command-owned merge turn and land run — the batch record, the verify, gates and push, each exit into check.repair or failed, and how the operator lands a held leaf or intervenes. Merge holds no seat: no prompt names merge-issue and no phase call takes a slot.
+description: The command-owned merge turn and land run — the batch record, the verify, gates and push, each exit into check.repair or failed, and how the operator lands a held leaf or intervenes. Merge holds no seat — no prompt names merge-issue and no phase call takes a slot.
 ---
 
 # Merge issue
