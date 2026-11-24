@@ -340,7 +340,7 @@ const directEnv = (f: HcFixture, bin: string): NodeJS.ProcessEnv => ({
 });
 
 // Criteria 1, 2, 9: start shape, verification, conflicts and refusals.
-test.serial('start runs the check and claims the labelled timer; refusals and conflicts hold', async () => {
+test('start runs the check and claims the labelled timer; refusals and conflicts hold', async () => {
   const f: HcFixture = await hcFixture();
   try {
     const rig: Rig = await watchUp(f, { interval: '3600' });
@@ -433,7 +433,7 @@ test.serial('start runs the check and claims the labelled timer; refusals and co
   }
 });
 
-test.serial('a start reports the verified timer claimed after its first list', async () => {
+test('a start reports the verified timer claimed after its first list', async () => {
   const f: HcFixture = await hcFixture();
   const bin: string = resolve(f.home, 'watch-logbin');
   const gate: string = resolve(f.home, 'hold-list');
@@ -487,7 +487,7 @@ fi
 });
 
 // Criteria 3, 4, 8: per-due delivery with receipt before the check, busy dues, paused repo.
-test.serial('each due runs one check with its receipt first; busy dues coalesce to the latest', async () => {
+test('each due runs one check with its receipt first; busy dues coalesce to the latest', async () => {
   const f: HcFixture = await hcFixture();
   try {
     leaf(f, 'watch-leaf', 'plan.synthesis');
@@ -563,7 +563,7 @@ test.serial('each due runs one check with its receipt first; busy dues coalesce 
   }
 });
 
-test.serial('an unreceipted due is resent once then dropped while later dues continue', async () => {
+test('an unreceipted due is resent once then dropped while later dues continue', async () => {
   const f: HcFixture = await hcFixture();
   try {
     const rig: Rig = await watchUp(f, { mode: 'idle' }); // hook never runs: no receipt, no check
@@ -594,7 +594,7 @@ test.serial('an unreceipted due is resent once then dropped while later dues con
   }
 });
 
-test.serial('a receipt without a watcher turn does not suppress the one resend', async () => {
+test('a receipt without a watcher turn does not suppress the one resend', async () => {
   const f: HcFixture = await hcFixture();
   try {
     const rig: Rig = await watchUp(f, { mode: 'idle' });
@@ -612,7 +612,7 @@ test.serial('a receipt without a watcher turn does not suppress the one resend',
 });
 
 // Criteria 5, 6: stop from any terminal, restart, refusal forms.
-test.serial('stop kills the verified timer; stale and forged ticks run nothing', async () => {
+test('stop kills the verified timer; stale and forged ticks run nothing', async () => {
   const f: HcFixture = await hcFixture();
   try {
     const rig: Rig = await watchUp(f);
@@ -705,7 +705,7 @@ test.serial('stop kills the verified timer; stale and forged ticks run nothing',
 });
 
 // Criterion 7: every exit key ends the timer and frees the name, without sending.
-test.serial('the timer reports a failed hc receipt read', async () => {
+test('the timer reports a failed hc receipt read', async () => {
   const f: HcFixture = await hcFixture();
   const bin: string = resolve(f.home, 'watch-logbin');
   const failedRead: string = resolve(f.home, 'failed-receipt-read');
@@ -726,19 +726,13 @@ exec '${hc}' "$@"
     const rig: Rig = await watchUp(f);
     const timer: string = await started(rig);
     writeFileSync(failedRead, timer);
-    const reason: string = 'receipt read failed: unavailable';
-    let screen: string = await screenOf(f.core, timer);
-    for (let n: number = 0; n < 30 && !screen.includes(reason); n += 1) {
-      await Bun.sleep(100);
-      screen = await screenOf(f.core, timer);
-    }
-    expect(screen).toContain(reason);
+    await waitScreen(f.core, timer, 'receipt read failed: unavailable');
   } finally {
     await f.clean();
   }
 });
 
-test.serial('the timer exits on a finished watcher, wrong start time and pin death', async () => {
+test('the timer exits on a finished watcher, wrong start time and pin death', async () => {
   const f: HcFixture = await hcFixture();
   try {
     const rig: Rig = await watchUp(f, { interval: '3600' });
@@ -880,7 +874,7 @@ test.serial('the timer exits on a finished watcher, wrong start time and pin dea
   }
 });
 
-test.serial('a foreground swap and a transcript flip each end the timer', async () => {
+test('a foreground swap and a transcript flip each end the timer', async () => {
   const f: HcFixture = await hcFixture();
   try {
     // Shell watcher: run a stand-in in the shell so foreground=standin, pin it, then suspend
@@ -1016,7 +1010,7 @@ test.serial('a foreground swap and a transcript flip each end the timer', async 
 });
 
 // Criteria 3 and 5: a root containing a space works through start, tick and stop.
-test.serial('a root containing a space works through start, tick and stop', async () => {
+test('a root containing a space works through start, tick and stop', async () => {
   const f: HcFixture = await hcFixture();
   try {
     const sroot: string = `${f.root} sp`;
@@ -1080,7 +1074,7 @@ test.serial('a root containing a space works through start, tick and stop', asyn
 // watch-consults criterion 4: while the watcher works through tick boundaries the timer
 // keeps any sent due plus at most one unsent due updated to the latest boundary; the idle
 // watcher receives that one latest due and tick.ts accepts it (a due above the receipt).
-test.serial('dues queued behind a busy watcher coalesce to the latest boundary', async () => {
+test('dues queued behind a busy watcher coalesce to the latest boundary', async () => {
   const f: HcFixture = await hcFixture();
   try {
     const rig: Rig = await watchUp(f);
@@ -1102,7 +1096,7 @@ test.serial('dues queued behind a busy watcher coalesce to the latest boundary',
   }
 });
 
-test.serial('dues queued during an idle timer gap coalesce when the watcher works', async () => {
+test('dues queued during an idle timer gap coalesce when the watcher works', async () => {
   const f: HcFixture = await hcFixture();
   try {
     const rig: Rig = await watchUp(f);
@@ -1141,7 +1135,7 @@ test.serial('dues queued during an idle timer gap coalesce when the watcher work
 // Boundaries that pass after the timer's last busy poll but before it sees the head due's turn
 // done belong to the same backlog: the next send is the latest due (brief C4). Source: verify run
 // 1795335431683 under host load sent due 5 while due 6 was already queued.
-test.serial('boundaries missed while the head due finishes coalesce to the latest', async () => {
+test('boundaries missed while the head due finishes coalesce to the latest', async () => {
   const f: HcFixture = await hcFixture();
   try {
     const rig: Rig = await watchUp(f);
@@ -1226,7 +1220,7 @@ async function consultTerm(
 // then this watch's verified consultant, printing `stopped <timer>` first and
 // `stopped consultant <address>` only when one was closed; an absent consultant counts as
 // closed and a foreign one is not the watch's.
-test.serial('stop closes the watch consultant after the timer, tolerating none', async () => {
+test('stop closes the watch consultant after the timer, tolerating none', async () => {
   const f: HcFixture = await hcFixture();
   try {
     const rig: Rig = await watchUp(f);
@@ -1271,7 +1265,7 @@ test.serial('stop closes the watch consultant after the timer, tolerating none',
   }
 });
 
-test.serial('stop waits for an admitted consultant launch and removes the consultant', async () => {
+test('stop waits for an admitted consultant launch and removes the consultant', async () => {
   const f: HcFixture = await hcFixture();
   try {
     const rig: Rig = await watchUp(f, { interval: '3600' });
@@ -1312,7 +1306,7 @@ test.serial('stop waits for an admitted consultant launch and removes the consul
 // the timer's own exit also kills and removes that watch's verified consultant; a
 // foreign-repo consultant is not the watch's and survives. The verified consultant is
 // outlive-parent so hc's parent-end handling cannot do the sweep for the timer.
-test.serial('a dying watcher makes the timer exit sweep its consultant', async () => {
+test('a dying watcher makes the timer exit sweep its consultant', async () => {
   const f: HcFixture = await hcFixture();
   try {
     // --keep: the watcher terminal survives its pinned program, the shape criterion 6
@@ -1339,7 +1333,7 @@ test.serial('a dying watcher makes the timer exit sweep its consultant', async (
 
 // Criterion 10: the skill and the human docs describe the timer watch for all four harnesses,
 // name the stated limits, keep the compaction rule, and carry no cron wording.
-test.serial('docs describe the timer watch for all harnesses with no cron wording', () => {
+test('docs describe the timer watch for all harnesses with no cron wording', () => {
   const files: string[] = [
     resolve(import.meta.dir, '../skills/watch-issues/SKILL.md'),
     resolve(import.meta.dir, '../docs/use/watch-while-away.md'),

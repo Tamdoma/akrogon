@@ -176,7 +176,9 @@ async function poll(): Promise<'exit' | 'stay'> {
     const obsolete: number = dues.length - firstUnsent - 1;
     if (obsolete > 0) dues.splice(firstUnsent, obsolete);
   }
-  while (nextBoundary <= now) {
+  // The clock after the hc reads, so a poll that stalls in them still counts every boundary passed;
+  // the resend gate below keeps the poll-start clock its reads were taken under.
+  while (nextBoundary <= Date.now()) {
     dueCount += 1;
     const pending: Due | undefined = working ? dues.at(-1) : undefined;
     if (pending?.sent === null) pending.n = dueCount;
