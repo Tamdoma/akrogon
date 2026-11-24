@@ -19,7 +19,7 @@ import { cpSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, wr
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { realRuntime, required, reservedSessions } from './tier';
-import { absent, holdSession, killSlice, session, slice, stopAndRemove } from './watch-tier';
+import { absent, holdSession, killSlice, session, slice, startLine, stopAndRemove } from './watch-tier';
 
 await holdSession();
 
@@ -56,15 +56,6 @@ function verdict(control: string, ended: number | 'deadline'): Error | null {
   );
 }
 
-// paid-starts.jsonl: a line per launch request, written before the request goes out; a line with the
-// address it got (or `failed` when it got none) under the same id; and a line per consultant terminal
-// the core reported. Every request counts, and so does a reported terminal no request got.
-const startLine = z.union([
-  z.object({ id: z.string(), role: z.enum(['watcher', 'consultant']) }),
-  z.object({ id: z.string(), address: z.string() }),
-  z.object({ id: z.string(), failed: z.literal(true) }),
-  z.object({ event: z.string() }),
-]);
 type Usage = { watcher: string | null; consultants: (string | null)[]; sessions: number };
 
 function usage(control: string): Usage {

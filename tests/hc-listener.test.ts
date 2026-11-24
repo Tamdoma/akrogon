@@ -6,7 +6,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, watch, writeFil
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { entry, fixture, killTree, unitBin, WAIT_MS, type Fixture } from './helpers';
-import { hcCore, type HcCore, type Terminal, stopCoresAfterFile } from './hc-fixture';
+import { hcCore, type HcCore, procFile, type Terminal, stopCoresAfterFile } from './hc-fixture';
 import { deployFixture, deployRecord, pushSeed, type DeployFixture } from './deploy-fixture';
 
 stopCoresAfterFile();
@@ -247,7 +247,8 @@ test('a hung pass is killed at its deadline with the commands it started, and re
 if [ "$*" = 'next --resume' ] && mkdir '${resolve(f.home, 'hang.done')}' 2>/dev/null; then
   echo "hang $*" >> '${shim.log}'
   sleep 300 &
-  echo $! > '${pidFile}'
+  echo $! > '${pidFile}.tmp'
+  mv '${pidFile}.tmp' '${pidFile}'
   wait
 fi
 exec '${resolve(shim.bin, 'akrogon')}' "$@"
@@ -258,7 +259,9 @@ exec '${resolve(shim.bin, 'akrogon')}' "$@"
     ...core.env,
     PATH: `${bin}:${shim.bin}:${core.env.PATH}`,
     AKROGON_LISTEN_RETRY_MS: '300',
-    AKROGON_PASS_DEADLINE_MS: '500',
+    // Every pass, its launch included, runs under the deadline: half of WAIT_MS lets each ordinary pass
+    // finish under load and leaves the other half for the retry, while the hung pass sleeps far past it.
+    AKROGON_PASS_DEADLINE_MS: String(WAIT_MS / 2),
   });
   try {
     await until(shim.log, () => passes(shim).includes('end next --resume'));
@@ -269,9 +272,11 @@ exec '${resolve(shim.bin, 'akrogon')}' "$@"
       'start next --resume',
       'end next --resume',
     ]);
-    // Killed: gone, or a zombie its new parent has not reaped yet.
-    const stat: string = resolve('/proc', readFileSync(pidFile, 'utf8').trim(), 'stat');
-    expect(existsSync(stat) ? readFileSync(stat, 'utf8').split(') ')[1][0] : 'gone').toMatch(/^(Z|gone)$/);
+    // Killed: gone, or a zombie its new parent has not reaped yet. The retry ran, so the hung pass is
+    // gone and its pid was published whole by then or never will be.
+    const pid: number = z.coerce.number().int().positive().parse(readFileSync(pidFile, 'utf8'));
+    const stat: string | null = procFile(pid, 'stat');
+    expect(stat === null ? 'gone' : stat.split(') ')[1][0]).toMatch(/^(Z|gone)$/);
     expect(listener.exitCode).toBeNull();
   } finally {
     killTree(listener);

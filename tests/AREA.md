@@ -34,6 +34,7 @@
 - `bunfig.toml` runs every test file concurrently, and tests that share global state use `test.serial`.
 - The 120 s test timeout comes from `--timeout=120000` in the `checks` commands of `issues/config.yaml`; inner waits share `WAIT_MS` from `tests/helpers.ts`.
 - A test waits on an event (a file, a line, a unit state) bounded by `WAIT_MS`, never on a fixed sleep or a shorter window.
+- A marker another process reads is published by write-then-rename, and its reader waits on its content (`readMarker`), never on its existence.
 - A name that is host-wide (a systemd unit, a slice, a socket) carries the pid or a random id, so two suites on one host never share it.
 - What a test starts on the host (units, slices, cores, processes), its fixture stops.
 

@@ -27,6 +27,7 @@ import {
   seedStat,
   storeDir,
   yaml,
+  readMarker,
   WAIT_MS,
   type Fixture,
 } from './helpers';
@@ -676,13 +677,13 @@ test.serial(
           '--',
           'sh',
           '-c',
-          `${readOnlyTmp}; printf %s "$TMPDIR" > "${marker}"; exec sleep 60`,
+          `${readOnlyTmp}; printf %s "$TMPDIR" > "${marker}.tmp"; mv "${marker}.tmp" "${marker}"; exec sleep 60`,
         ],
         worktree,
         { AKROGON_RUN_SLICE: slice },
       );
       try {
-        await waitPath(marker);
+        const tmp: string = await readMarker(marker);
         const record: Record<string, unknown> | undefined = (await liveRuns(f)).find((row) => row.check === 'ram-stop');
         if (record === undefined) throw new Error('No live ram-stop record');
         const unit: string = record.unit as string;
@@ -691,7 +692,6 @@ test.serial(
         // guard's rm from running while the command is still dying.
         const after: Result = await sysctl('show', unit, '-p', 'After');
         expect(after.stdout).toContain(unit.replace(/\.scope$/, '-guard.service'));
-        const tmp: string = readFileSync(marker, 'utf8');
         expect(dirname(tmp)).toBe(runRoot);
         const stopped: SpawnResult = await spawnScoped(f, 'ramStop.scope', ['stop-run', record.run as string], worktree)
           .result;
@@ -722,17 +722,16 @@ test.serial('with run_root set, a SIGKILL of the wrapper still drops the RAM fol
         '--',
         'sh',
         '-c',
-        `${readOnlyTmp}; printf %s "$TMPDIR" > "${marker}"; exec sleep 60`,
+        `${readOnlyTmp}; printf %s "$TMPDIR" > "${marker}.tmp"; mv "${marker}.tmp" "${marker}"; exec sleep 60`,
       ],
       worktree,
       { AKROGON_RUN_SLICE: slice },
     );
     try {
-      await waitPath(marker);
+      const tmp: string = await readMarker(marker);
       const record: Record<string, unknown> | undefined = (await liveRuns(f)).find((row) => row.check === 'ram-kill');
       if (record === undefined) throw new Error('No live ram-kill record');
       await waitActive(record.unit as string);
-      const tmp: string = readFileSync(marker, 'utf8');
       expect(dirname(tmp)).toBe(runRoot);
       cap.proc.kill('SIGKILL');
       expect((await cap.result).signalCode).toBe('SIGKILL');

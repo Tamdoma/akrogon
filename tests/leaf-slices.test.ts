@@ -14,6 +14,7 @@ import {
   procRoot,
   storeDir,
   yaml,
+  readMarker,
   WAIT_MS,
   type Fixture,
 } from './helpers';
@@ -327,11 +328,10 @@ async function sleeper(f: SliceFixture, sliceName: string): Promise<number> {
     'sh',
     '-c',
     // systemd-run eats one $$ pair per specifier pass, so $$$$ reaches sh as $$.
-    `echo $$$$ > ${pidFile}; exec sleep 300`,
+    `echo $$$$ > ${pidFile}.tmp; mv ${pidFile}.tmp ${pidFile}; exec sleep 300`,
   );
   expect(finished.code, `${finished.stdout} | ${finished.stderr}`).toBe(0);
-  for (let i: number = 0; i < 100 && !existsSync(pidFile); i++) await Bun.sleep(50);
-  const pid: number = Number(readFileSync(pidFile, 'utf8').trim());
+  const pid: number = Number((await readMarker(pidFile)).trim());
   expect(pidAlive(pid)).toBe(true);
   return pid;
 }

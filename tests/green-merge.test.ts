@@ -20,6 +20,7 @@ import {
   unitBin,
   fixture,
   leaf,
+  readMarker,
   seedRun,
   WAIT_MS,
   yaml,
@@ -1011,6 +1012,7 @@ async function refusedScope(kill: boolean): Promise<void> {
   const f: Fixture = await fixture();
   const holder = Bun.spawn(['sleep', '300']);
   const worker: string = resolve(f.home, 'worker.pid');
+  let workerPid: number | null = null;
   try {
     const systemctl: SystemctlFixture = fakeSystemctl(f);
     cgroupRunner(f);
@@ -1065,7 +1067,7 @@ async function refusedScope(kill: boolean): Promise<void> {
           '--',
           'sh',
           '-c',
-          `echo $$ > '${worker}'; exec sleep 300`,
+          `echo $$ > '${worker}.tmp'; mv '${worker}.tmp' '${worker}'; exec sleep 300`,
         ],
         {
           cwd: f.root,
@@ -1084,10 +1086,11 @@ async function refusedScope(kill: boolean): Promise<void> {
           stderr: 'ignore',
         },
       );
-      while (!existsSync(worker)) {
-        if (Date.now() > deadline) throw new Error('bb check never ran');
-        await Bun.sleep(50);
-      }
+      workerPid = z.coerce
+        .number()
+        .int()
+        .positive()
+        .parse(await readMarker(worker));
       check.kill('SIGKILL');
       await check.exited;
     } else {
@@ -1107,7 +1110,7 @@ async function refusedScope(kill: boolean): Promise<void> {
     expect((await queued).code).toBe(0);
   } finally {
     holder.kill('SIGKILL');
-    if (existsSync(worker)) process.kill(Number(readFileSync(worker, 'utf8')), 'SIGKILL');
+    if (workerPid !== null) process.kill(workerPid, 'SIGKILL');
     f.clean();
   }
 }

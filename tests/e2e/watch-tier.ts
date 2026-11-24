@@ -73,6 +73,16 @@ const realBus: Record<string, string> = {
 const entry: string = resolve(import.meta.dir, '../../src/akrogon.ts');
 const tests: string = resolve(import.meta.dir, '..');
 
+// paid-starts.jsonl: a line per launch request, written before the request goes out; a line with the
+// address it got (or `failed` when it got none) under the same id; and a line per consultant terminal
+// the core reported. Every request counts, and so does a reported terminal no request got.
+export const startLine = z.union([
+  z.object({ id: z.string(), role: z.enum(['watcher', 'consultant']) }),
+  z.object({ id: z.string(), address: z.string() }),
+  z.object({ id: z.string(), failed: z.literal(true) }),
+  z.object({ event: z.string() }),
+]);
+
 export type WatchTier = {
   root: string;
   runtime: string;

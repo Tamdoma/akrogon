@@ -6,7 +6,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, utimesSync, watch 
 import { randomUUID } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
-import { fixture, WAIT_MS, type Fixture } from './helpers';
+import { fixture, readMarker, WAIT_MS, type Fixture } from './helpers';
 import { hcCore, type HcCore, stopCoresAfterFile } from './hc-fixture';
 import { spawnCaptured, type SpawnResult } from '../src/shell';
 
@@ -340,7 +340,7 @@ test('claude: a session the record names wins over an older label even before it
     appendFileSync(old, '{}\n');
     // A claude stand-in: its record names conversation "new", whose file does not exist yet.
     const record: string =
-      'printf \'{"sessionId":"new","procStart":"%s"}\' "$(awk \'{print $22}\' /proc/$$/stat)" > "$HOME/.claude/sessions/$$.json"; exec sleep 300';
+      'printf \'{"sessionId":"new","procStart":"%s"}\' "$(awk \'{print $22}\' /proc/$$/stat)" > "$HOME/.claude/sessions/$$.json.tmp"; mv "$HOME/.claude/sessions/$$.json.tmp" "$HOME/.claude/sessions/$$.json"; exec sleep 300';
     const started: SpawnResult = await core.hc([
       'run',
       '--bg',
@@ -359,13 +359,7 @@ test('claude: a session the record names wins over an older label even before it
     const a: string = z.object({ address: z.string() }).parse(JSON.parse(started.stdout)).address;
     const pid: number = z.number().parse((await core.get(a)).pid);
     const recordPath: string = resolve(f.home, '.claude/sessions', `${pid}.json`);
-    await new Promise<void>((done) => {
-      const poll = (): unknown =>
-        existsSync(recordPath) && readFileSync(recordPath, 'utf8').includes('procStart')
-          ? done()
-          : setTimeout(poll, 20);
-      poll();
-    });
+    await readMarker(recordPath);
     expect((await core.hc(['label', a, `akrogon.transcript=${old}`])).code).toBe(0);
     const lookup = async (): Promise<string> =>
       (

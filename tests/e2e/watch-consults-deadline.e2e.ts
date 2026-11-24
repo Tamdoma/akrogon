@@ -15,7 +15,7 @@ import { z } from 'zod';
 import { flockHold } from '../../src/flock';
 import { spawnCaptured, type SpawnResult } from '../../src/shell';
 import { realHome, realRuntime, required } from './tier';
-import { absent, parseSessionName, SessionNameError, sessionPaths, type SessionPaths } from './watch-tier';
+import { absent, parseSessionName, SessionNameError, sessionPaths, startLine, type SessionPaths } from './watch-tier';
 
 // A private session for this file's child judges: they hold its lock, not the grant's, so a paid run
 // beside this proof keeps its session, slice and ledger. Everything seeded and checked here is its own.
@@ -372,13 +372,14 @@ test('a refused consultant seat, a started one and a direct consultant launch ea
   idleWatcher(bin, '');
   writeFileSync(join(bin, 'agy'), '#!/bin/sh\nexec sleep 180\n', { mode: 0o755 });
   // The first seat request is refused, the second starts a consultant, and a third consultant is
-  // launched past akrogon seat under the same label.
+  // launched past akrogon seat under the same label. The deadline can kill pi before it writes what
+  // it was told, so the case reads only the ledger the judge wrote.
   writeFileSync(
     join(bin, 'pi'),
     `#!/bin/sh
 akrogon seat --watch-consultant --slot x >/dev/null 2>&1
-akrogon seat --watch-consultant > '${join(root, 'seated')}' 2>&1
-hc run --bg --json --name direct --label akrogon.watch-consult=akre2e -- sleep 180 > '${join(root, 'direct')}'
+akrogon seat --watch-consultant >/dev/null 2>&1
+hc run --bg --json --name direct --label akrogon.watch-consult=akre2e -- sleep 180 >/dev/null
 exec sleep 180
 `,
     { mode: 0o755 },
@@ -386,14 +387,27 @@ exec sleep 180
   try {
     const result: SpawnResult = await consults(bin, root);
     expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
-    const seated: string = readFileSync(join(root, 'seated'), 'utf8').trim();
-    const direct: string = z
-      .object({ address: z.string() })
-      .parse(JSON.parse(readFileSync(join(root, 'direct'), 'utf8'))).address;
+    // The judge's launch record: the first seat request was refused, the second got an address, and
+    // the direct launch is the one created terminal no request got.
+    const starts: z.infer<typeof startLine>[] = readFileSync(join(root, 'evidence', 'paid-starts.jsonl'), 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map((line: string) => startLine.parse(JSON.parse(line)));
+    const requests: string[] = starts.flatMap((s) => ('role' in s && s.role === 'consultant' ? [s.id] : []));
+    expect(requests).toHaveLength(2);
+    const [refused, seat]: string[] = requests;
+    expect(starts).toContainEqual({ id: refused, failed: true });
+    const addressed: string[] = starts.flatMap((s) => ('address' in s ? [s.address] : []));
+    const seated: string[] = starts.flatMap((s) => ('address' in s && s.id === seat ? [s.address] : []));
+    const direct: string[] = [
+      ...new Set(starts.flatMap((s) => ('event' in s && !addressed.includes(s.event) ? [s.event] : []))),
+    ];
+    expect(seated).toHaveLength(1);
+    expect(direct).toHaveLength(1);
     const usage = z
-      .object({ watcher: z.string().nullable(), consultants: z.array(z.string().nullable()), sessions: z.number() })
+      .object({ consultants: z.array(z.string().nullable()), sessions: z.number() })
       .parse(JSON.parse(readFileSync(join(root, 'evidence', 'paid-sessions.json'), 'utf8')));
-    expect(usage.consultants).toEqual([null, seated, direct]);
+    expect(usage.consultants).toEqual([null, ...seated, ...direct]);
     expect(usage.sessions).toBe(4);
     expect(absent(own.session)).toEqual([]);
   } finally {

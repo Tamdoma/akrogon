@@ -9,7 +9,7 @@ import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { command, spawnCaptured, type Result, type SpawnResult } from '../src/shell';
 import { withLock } from '../src/state';
-import { cli, leaf, leafTempRoot, WAIT_MS } from './helpers';
+import { cli, leaf, leafTempRoot, readMarker, WAIT_MS } from './helpers';
 import { hcCore, hcFixture, type HcCore, type HcFixture, stopCoresAfterFile } from './hc-fixture';
 
 stopCoresAfterFile();
@@ -960,7 +960,8 @@ test.serial('a foreground swap and a transcript flip each end the timer', async 
     // The watcher's foreground is bash until the agent execs: wait for a foreground whose
     // claude session record exists (the record proves the agent pid and config dir).
     let wPid: number | null = null;
-    for (let n: number = 0; n < 80 && wPid === null; n += 1) {
+    const fgDeadline: number = Date.now() + WAIT_MS;
+    while (wPid === null && Date.now() < fgDeadline) {
       const fg: number | undefined = (await get(f.core, rig.watcher)).foreground?.pid;
       if (fg !== undefined && existsSync(resolve(claudeDir, 'sessions', `${fg}.json`))) wPid = fg;
       else await Bun.sleep(200);
@@ -998,10 +999,7 @@ test.serial('a foreground swap and a transcript flip each end the timer', async 
     expect(txRun.code).toBe(0);
     rig.timer = z.object({ address: z.string() }).parse(JSON.parse(txRun.stdout)).address;
     const record: string = resolve(claudeDir, 'sessions', `${pid}.json`);
-    for (let n: number = 0; n < 80 && !existsSync(record); n += 1) await Bun.sleep(200);
-    const seen = z
-      .object({ sessionId: z.string(), procStart: z.string() })
-      .parse(JSON.parse(readFileSync(record, 'utf8')));
+    const seen = z.object({ sessionId: z.string(), procStart: z.string() }).parse(JSON.parse(await readMarker(record)));
     // Latch first, then flip the session record to a different transcript.
     await waitScreen(f.core, rig.timer, '[watch-timer] latched ');
     writeFileSync(

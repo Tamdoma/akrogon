@@ -14,7 +14,8 @@ if [ -n "${WATCH_AGENT_CLAUDE:-}" ]; then
 	mkdir -p "$WATCH_AGENT_CLAUDE/sessions" "$WATCH_AGENT_CLAUDE/projects/p"
 	st=$(sed 's/.*) //' /proc/$$/stat | awk '{print $20}')
 	sid="aaaaaaaa-0000-0000-0000-000000000001"
-	printf '{"sessionId":"%s","procStart":"%s"}' "$sid" "$st" > "$WATCH_AGENT_CLAUDE/sessions/$$.json"
+	printf '{"sessionId":"%s","procStart":"%s"}' "$sid" "$st" > "$WATCH_AGENT_CLAUDE/sessions/$$.json.tmp"
+	mv "$WATCH_AGENT_CLAUDE/sessions/$$.json.tmp" "$WATCH_AGENT_CLAUDE/sessions/$$.json"
 	: > "$WATCH_AGENT_CLAUDE/projects/p/$sid.jsonl"
 	export CLAUDE_CONFIG_DIR="$WATCH_AGENT_CLAUDE"
 fi

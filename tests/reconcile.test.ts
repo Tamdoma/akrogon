@@ -25,7 +25,7 @@ import {
   procRoot,
   registerTemp,
   storeDir,
-  WAIT_MS,
+  readMarker,
   type Fixture,
 } from './helpers';
 import { readState, saveState } from '../src/state';
@@ -575,11 +575,7 @@ test('failed leaf scratch preserves an actual running verify command', async () 
     const path: string = await dispatchLeaf(f, 'running-base');
     const running: Promise<Result> = cli(f, ['verify'], readState(path).worktree!, env);
     try {
-      // The marker appears whole by rename, so a seen marker always holds the path.
-      const end: number = Date.now() + WAIT_MS;
-      while (!existsSync(marker) && Date.now() < end) await Bun.sleep(10);
-      expect(existsSync(marker)).toBe(true);
-      const runRoot: string = readFileSync(marker, 'utf8');
+      const runRoot: string = await readMarker(marker);
       await closeTab(f, readState(path).tab!);
       saveState(path, {
         ...readState(path),

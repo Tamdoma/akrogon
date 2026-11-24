@@ -20,6 +20,16 @@ import { descendantsOf, SUITE_TIMEOUT_MS } from './isolation';
 
 export const entry: string = resolve(import.meta.dir, '../src/akrogon.ts');
 export const WAIT_MS: number = SUITE_TIMEOUT_MS - 30_000;
+// Waits for a marker another process publishes by write-then-rename and returns its content.
+export async function readMarker(path: string, ms: number = WAIT_MS): Promise<string> {
+  const deadline: number = Date.now() + ms;
+  for (;;) {
+    const content: string = existsSync(path) ? readFileSync(path, 'utf8') : '';
+    if (content !== '') return content;
+    if (Date.now() > deadline) throw new Error(`Timed out waiting for marker ${path}`);
+    await Bun.sleep(20);
+  }
+}
 const tempDirs: Set<string> = new Set();
 export function registerTemp(path: string): string {
   tempDirs.add(path);
