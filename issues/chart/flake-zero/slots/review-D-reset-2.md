@@ -1,0 +1,10 @@
+# Slot D reset-flake review, round 2
+
+Verdict **fix** for `9d10fff9` on `34742d42`.
+
+- **F5 · fails in normal use.** The wait returns when events win, but the losing `hc get` keeps running and can call the predicate after the wait has returned. With a one-second hold, the event path returned in 5 ms and a separate deadline path returned `null` in 251 ms. Both Bun processes stayed alive for about a second and called the predicate again after returning. In a real door-reset replay, the helper sent the start prompt but its `--rm` terminal stayed live until I released the held lookup. A slow client can delay successful helper exit until the 60 s CLI timeout. The new slow-lookup test calls `process.exit(0)`, which hides this. Stop the outstanding lookup when the event path settles and suppress predicate calls after settlement. See `src/hc.ts:94–105,627–647`, `tests/hc-identity.test.ts:310–313,548–563`, and `skills/chart-issues/scripts/door-reset.ts:144–152`.
+- **F6 · minor.** In the test fixture, a synchronous throw from the predicate on a fresh reply rejects the promise stored in `readers`. The second argument to `.then` handles only rejection of `get`. In my replay, main rejected the outward wait with the predicate error. This revision timed out the wait and produced an unhandled rejection in Bun. Route predicate errors through the same rejection and cleanup path as the streamed predicate. See `tests/hc-fixture.ts:367–379,400–417`.
+
+F1–F3 are closed in the product wait. Queued events only update the sequenced record, idle wins while the fresh read is held, and `not_found` leaves the finished event available. The fresh read still recovers an idle transition missing from the subscription. `waitFor` itself matches main, including the path used by agy. The fixture also keeps its streamed state separate from the read. The design accepts F4 and the two remaining ordering limits recorded by B.
+
+All 35 focused hc-identity and door-reset tests passed, along with typecheck and diff check. The lifecycle and fixture error probes used disposable checkouts. I relied on the supplied full verify, stress, and injected-loss door-reset results.

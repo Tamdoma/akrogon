@@ -1,0 +1,17 @@
+# Orphan B: flake-zero
+
+Read at main 7aafd2eb. (H) marks what I ran on this host on 2026-11-24 in throwaway user units (`akr-probe-b8-*`, all gone). Nothing in the repo changed.
+
+1. Recommendation: O1, but with a transient service in place of a scope. No test code changes.
+2. Why not a scope: a scope has no main process. Kill bun and its children stay in the scope until someone stops it, so the rule "stop the scope" must never be forgotten. The product needs a second unit, the guard, for exactly this (`src/scope.ts:83-116`).
+3. Why a service: it ends when its main process exits, and systemd then kills everything left in its cgroup. Verify already relies on this (`src/verify.ts:924-948`). Any kill of bun then cleans up, with no rule to remember.
+4. Probe (H): a service whose main process I killed with SIGKILL, with a child in its own session that ignores SIGTERM and SIGHUP and spins. The cgroup was gone 5.2 s later, which is `TimeoutStopSec=5`. `bun test tests/cli-help.test.ts` ran through the same command and passed 7 of 7 in 2.4 s.
+5. The command: `systemd-run --user --quiet --collect --pipe --wait --same-dir --slice=akrogon-test.slice -p TimeoutStopSec=5 -E PATH -E HOME -- bun test ...`. Put it in one place, the `test` script of `package.json` (`:6`). Verify does not use that script (`issues/config.yaml:9` calls `bun test` itself). `tests/AREA.md` and the stress workflow then say: run ad-hoc suites with `bun run test`, and stop them with `systemctl --user stop akrogon-test.slice`.
+6. Q2: I found nothing simpler. I know of no bunfig setting for it, and I did not check Bun's docs. The preload's `prctl` (`tests/isolation.ts:15-25`) makes the runner a subreaper, which only helps while the runner lives. `PDEATHSIG` is set per child and is cleared on fork, so it means wrapping every spawn, which is O3. A pid namespace (`unshare --pid --kill-child`) kills everything with the runner, but tests would then see other pids than systemd does.
+7. O2 and O3 are not needed. O4 is point 2 again: a scope still needs something that stops it when the runner dies.
+8. Q3: no, the retry slices need their own handle. Such a slice is made on the real bus outside the runner's cgroup and it is empty, so there is no process to kill. Its handle exists already: the ledger that `sweepAbandoned` stops (`tests/hc-fixture.ts:46-55, :176-184`).
+9. One window I can see there: the test makes the slice before it writes the ledger (`tests/hc-fixture-retry.test.ts:42-54`). Writing the ledger first closes it, because stopping a slice that was never made exits 0 (H). I did not look for other causes. The 101 slices left now all sit under `akrogon-retry.slice`, so one stop of that slice removes them when no run is active.
+10. Main risk, R1: killing the `systemd-run` client does not stop the service (H). A helper that kills what it started leaves the run going to its normal end, and only then are the children killed. A runner that hangs stays until someone stops the slice. `-p RuntimeMaxSec=<s>` would bound that.
+11. R2: the service gets the user manager's environment (191 variables here), not the caller's. A variable set in the shell for one run must be passed with `-E NAME`.
+12. R3: a bare `bun test` is still possible. The preload could refuse to run outside a test unit, but that needs a marker that verify sets too. I would add it only if the rule is skipped again.
+13. R4: children that leave the cgroup are not covered, such as hc cores in `hc-serve-*` units. They keep their own sweep.

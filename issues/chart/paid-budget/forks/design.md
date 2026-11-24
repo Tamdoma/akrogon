@@ -58,3 +58,11 @@ B and C both picked a kernel lock (slots/ownership-B.md, ownership-C.md). Decisi
 3. The slice name is fixed (`akrogon-e2ewatch.slice`). One cleanup function (kill and stop the slice and the ledger leaf slices, remove coreState and coreRuntime) runs at the start under the lock, for a dead run's leftovers, and again at the end. absent() runs at the end under the lock.
 4. <out> is removed and then written as one set.
 Accepted: B R1, a judge killed after its body starts can let the body start about one more session in the second before the next judge's start cleanup kills it. That session is not counted.
+
+## Every owner recovers and contains the same way (D round 12, F24-F26)
+B and C both agree (slots/owners-B.md, owners-C.md). Decision by A: B's mechanism, with C's traps.
+1. F25 containment: startWatchTier starts the core inside the session slice (`systemd-run --user --scope --quiet --slice=<slice> -- hc server start`), so the core and everything it starts is in the slice for every owner. B measured (H) that one cgroup.kill emptied it in 2 ms, including a program ignoring SIGTERM/SIGHUP. The consults body is already in the slice and must not scope twice (C). coreEnv.AKROGON_RUN_SLICE is the slice.
+2. F25 recovery: slice, cgroup, killSlice and stopAndRemove move into watch-tier.ts. holdSession() = lock, killSlice, stopAndRemove. stopWatchTier's body becomes killSlice + stopAndRemove, so listening, the socket probe, server stop and the tail --pid wait are deleted. No socket, pid or server-stop recovery (they can refuse, hang or start a new core: rounds 7-8).
+3. F24: one function maps a session name to its paths (runtime, socket, state, lock, slice), with one slice formula for every name and no special case. The module constants apply it to the session name. The deadline file passes a private name with its pid to its child judges, uses the same function for what it seeds and checks, and removes its lock file after. Watch the ESM import order (C). Paid commands never set the name, so they keep akr-e2e-watch.
+4. F26: holdSession caches its promise, so it runs once per process.
+Accepted: B L1 (a SIGKILLed watch-live/watch-stop's child akrogon call outside run-check may land in the next run), B L3 (owners end by SIGKILL; transcripts are read before the stop), and C's leftover 0-byte private lock file after a SIGKILLed deadline run.

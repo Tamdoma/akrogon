@@ -1,0 +1,11 @@
+# Slot D paid-budget round 13
+
+Verdict **fix** for `4a7b803b` on `92a6d736`. Reviewed `git diff cedcd2a2 4a7b803b` against the round-12 findings and A's ownership decision.
+
+- **F27 · fails in normal use.** The F24 regression takes the real grant lock and unconditionally removes the grant runtime in its `finally`, even when the initial absence assertion failed before the test created anything. I seeded a predecessor's ledger under a disposable substitute for the grant name. The assertion failed and the test deleted that ledger. The next real owner would lose the list of leaf slices it needs to recover. The watchdog can also release the grant lock before the unconditional removal. Exercise the same isolation with a second private session and clean only state the test created while it owns the lock. See `tests/e2e/watch-consults-deadline.e2e.ts:497–526`.
+- **F28 · fails in normal use.** A blank `AKROGON_E2E_SESSION` resolves the cleanup targets to the user's entire runtime and Herdr core state directories. A value of `..` makes the state target the user's entire `.local/state`. The lock path still resolves to a file in the user runtime, and `holdSession` runs recursive removal before hc can validate the session name. I reproduced the path calculations only. Restrict the override to the default name and generated private names before deriving or using cleanup paths. See `tests/e2e/watch-tier.ts:25–45,88–115`.
+- **F29 · minor.** The two-owner regression only checks the child signal and session absence. I replaced the second owner's module-level hold with a throw, and the regression still passed. Assert that both module loads reached their hold so an import error cannot stand in for successful lock reuse. See `tests/e2e/watch-consults-deadline.e2e.ts:583–604`.
+
+The private deadline judge preserved a held lock and its ledger in the ordinary replay. The next owner killed a contained predecessor's core and removed its state, and the two real owner modules loaded in one process without deadlocking. These three replays used stand-ins and private session names. The accepted races were outside this pass.
+
+Typecheck and diff check passed. The supplied logs show 17 deadline passes, 1,403 suite passes and 485 repeat passes. I ran the three ownership cases independently, shortening the deadline in the isolation replay.

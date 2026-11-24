@@ -37,3 +37,7 @@ none
 - switch-on: operator, 2026-11-23 "Full autopilot mode, I want to do the signposts myself."
 - signposts: operator, original in issues/chart/paid-budget
 - route: direct
+
+## Direct attempts
+
+- 2026-11-24 landed 387d6d6f + 34742d42 (agent-decided paid budgets; one owner path for akr-e2e-watch; D ready after 14 rounds); paid_budget removed from config; deployed.
