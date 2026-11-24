@@ -2,6 +2,8 @@
 
 Each leaf has a `state.yaml` file in its folder. It says which phase the leaf is in and holds the records the commands keep while seats work. This page lists every phase, who moves it, and every field in the file. The exact shapes live in [src/state.ts](../../src/state.ts) and [src/routing.ts](../../src/routing.ts).
 
+The commands write `state.yaml` read-only, so an agent's edit tool fails on it and the agent has to use the command. To edit it by hand on purpose, run `chmod u+w <path>` first.
+
 ![Leaf phases from plan.synthesis through merged. A leaf starts at plan.synthesis. A fix verdict in check.review loops through check.repair and check.fix back to check.review. Any boxed phase can stop in failed.](../pictures/phases.svg)
 
 ## Phases

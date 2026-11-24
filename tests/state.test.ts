@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { repoSchema, type Repo } from '../src/config';
@@ -34,6 +34,26 @@ test('canonical states parse and save without retired fields and retain defaults
     saveState(path, state);
     expect(readState(path)).toEqual(state);
     expect(readFileSync(resolve(path, 'state.yaml'), 'utf8')).not.toMatch(/^(priority|slot):/m);
+  } finally {
+    f.clean();
+  }
+});
+
+test('a saved state is read-only to plain writes while the next save still replaces it', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const path: string = leaf(f, 'example', 'implement');
+    const file: string = resolve(path, 'state.yaml');
+    saveState(path, stateSchema.parse(canonical));
+    expect(statSync(file).mode & 0o777).toBe(0o444);
+    const saved: string = readFileSync(file, 'utf8');
+    expect(() => writeFileSync(file, 'phase: ready-for-solve\n')).toThrow(expect.objectContaining({ code: 'EACCES' }));
+    const redirect = Bun.spawnSync(['sh', '-c', 'echo "phase: ready-for-solve" > "$0"', file]);
+    expect(redirect.exitCode).not.toBe(0);
+    expect(readFileSync(file, 'utf8')).toBe(saved);
+    saveState(path, stateSchema.parse({ ...canonical, phase: 'check.review' }));
+    expect(readState(path).phase).toBe('check.review');
+    expect(statSync(file).mode & 0o777).toBe(0o444);
   } finally {
     f.clean();
   }
@@ -173,6 +193,7 @@ test('failure record round-trips and rejects unknown keys', async () => {
       slot: 'B',
       reason: 'waiting',
     });
+    chmodSync(resolve(path, 'state.yaml'), 0o644);
     yaml(resolve(path, 'state.yaml'), {
       ...canonical,
       phase: 'failed',

@@ -38,7 +38,7 @@ The command then records the reason in the leaf's `failure` field, shows a deskt
 
 `akrogon next <slug>` on a leaf still in failed refuses with `Leaf is failed and needs phase recovery`. Do step 3 first.
 
-Do not edit `state.yaml` by hand to clear a failure. The commands own those fields. See [State and phases](../reference/state-and-phases.md) for every phase and field, and [phase.ts](../../src/phase.ts) for the moves.
+Do not edit `state.yaml` by hand to clear a failure. The commands own those fields. The file is read-only for that reason. See [State and phases](../reference/state-and-phases.md) for every phase and field, and [phase.ts](../../src/phase.ts) for the moves.
 
 ## Other refusals
 

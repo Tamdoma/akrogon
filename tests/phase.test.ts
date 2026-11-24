@@ -199,6 +199,21 @@ test('review fix routes to check.repair, B hands to A past the configured count,
   }
 });
 
+test('a leaf whose state a command left read-only still moves through phase', async () => {
+  const f: Fixture = await fixture();
+  try {
+    procFixture(f);
+    const path: string = leaf(f, 'read-only', 'plan.synthesis');
+    saveState(path, readState(path));
+    expect(statSync(resolve(path, 'state.yaml')).mode & 0o777).toBe(0o444);
+    const moved: Result = await cli(f, ['phase', 'read-only', 'implement', '--slot', 'A']);
+    expect(moved.stdout).toBe('moved implement');
+    expect(readState(path).phase).toBe('implement');
+  } finally {
+    f.clean();
+  }
+});
+
 test('a failed move logs the state failure object while a moved record omits failure and prints in status', async () => {
   const f: Fixture = await fixture();
   try {

@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { fixture, cli, leaf, yaml, storeDir, holding, type Fixture } from './helpers';
@@ -182,6 +182,7 @@ test('a bad leaf is never dispatched or queued but stays owned: reconcile keeps 
     expect((await next(f, ['bad-leaf'])).code).toBe(0);
     const badWorktree: string = readState(badPath).worktree!;
     const badTab: string = readState(badPath).tab!;
+    chmodSync(resolve(badPath, 'state.yaml'), 0o644);
     writeFileSync(resolve(badPath, 'state.yaml'), 'slug: [');
 
     // Capacity: the bad leaf holds a slot at max_active 1.

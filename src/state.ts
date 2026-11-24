@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, type Dirent } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, type Dirent } from 'node:fs';
 import { basename, dirname, relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import { historicalPhaseSchema, phaseSchema, slotSchema, verdictSchema } from './routing';
@@ -210,8 +210,11 @@ export function readState(path: string): State {
   }
 }
 
+// Read-only so a seat's hand edit fails in its own turn; the rename in writeYaml still replaces it.
 export function saveState(path: string, state: State): void {
-  writeYaml(resolve(path, 'state.yaml'), state);
+  const file: string = resolve(path, 'state.yaml');
+  writeYaml(file, state);
+  chmodSync(file, 0o444);
 }
 
 export function validateLeafDepth(areaRoot: string, leafPath: string): void {
