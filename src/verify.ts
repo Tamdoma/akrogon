@@ -1094,16 +1094,16 @@ export async function verifyPassCommand(dir: string): Promise<void> {
   };
   patch(process.stdout, resolve(dir, 'out'));
   patch(process.stderr, resolve(dir, 'err'));
-  const repo: Repo = readRepo(record.repo, record.root);
-  let status: number;
+  let status: number = 2;
   try {
-    status = reportRun(record.scope, await runOnce(repo, record));
+    status = reportRun(record.scope, await runOnce(readRepo(record.repo, record.root), record));
   } catch (error) {
-    status = 2;
-    writeFileSync(resolve(dir, 'status'), `${status}\n`);
+    // The service's own uncaught-error print reaches only the journal; the waiter replays the tee.
+    process.stderr.write(`${Bun.inspect(error)}\n`);
     throw error;
+  } finally {
+    writeFileSync(resolve(dir, 'status'), `${status}\n`);
   }
-  writeFileSync(resolve(dir, 'status'), `${status}\n`);
 }
 
 export async function verify(

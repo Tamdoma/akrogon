@@ -13,7 +13,7 @@ import {
 } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
-import { basename, dirname, join, relative, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { parse } from 'shell-quote';
 import {
   base,
@@ -178,6 +178,7 @@ export async function leafTarget(
   leafOverride: string | undefined,
   holder: string | undefined,
 ): Promise<LeafTarget> {
+  if (holder !== undefined && !isAbsolute(holder)) throw new Error(`--holder takes an absolute path, got ${holder}`);
   if (leafOverride !== undefined) {
     const state: State = readState(resolve(cwd, leafOverride));
     return { ...leafFields(state, 'leaf'), target: resolve(cwd, leafOverride, 'implementation') };
@@ -206,7 +207,7 @@ export async function leafTarget(
   ].find((f) => basename(f.path) === basename(top));
   if (failure !== undefined) throw new Error(`Invalid state ${resolve(failure.path, 'state.yaml')}: ${failure.error}`);
   if (holder === undefined) throw new Error('No leaf worktree matches cwd; pass --leaf or --holder');
-  return { slug: 'checkout', target: resolve(cwd, holder), scope: 'leaf' };
+  return { slug: 'checkout', target: resolve(holder), scope: 'leaf' };
 }
 
 export async function runCheck(

@@ -1251,6 +1251,27 @@ test.serial('a repeat verify during checkout removal joins the live pass and ret
   }
 });
 
+test.serial('a verify pass that throws prints its error to the caller with exit 2', async () => {
+  const { f, slice } = await realFixture();
+  const worktree: string = await leafWorktree(f, 'pass-throws');
+  // A tree of its own: an earlier test's green receipt on the shared tree would be reused.
+  writeFileSync(resolve(worktree, 'pass-throws'), 'pass-throws\n');
+  await command(['git', 'add', 'pass-throws'], worktree);
+  await command(['git', 'commit', '-qm', 'pass-throws'], worktree);
+  const marker: string = resolve(f.home, '.akrogon/package.json');
+  writeFileSync(marker, '{}\n');
+  try {
+    const result: SpawnResult = await spawnReal(f, ['verify'], worktree, { AKROGON_RUN_SLICE: slice }).result;
+    expect(result.code, `stdout: ${result.stdout} stderr: ${result.stderr}`).toBe(2);
+    expect(result.stderr).toContain(`Refusing location: canonical ancestor ${realpathSync(dirname(marker))}`);
+    const run: string | undefined = /^run ([0-9a-f-]{36})$/m.exec(result.stderr)?.[1];
+    expect(run).toBeDefined();
+    await waitInactive(`akrogon-verify-${run}.service`);
+  } finally {
+    rmSync(marker);
+  }
+});
+
 test.serial(
   'a verify pass survives its caller being SIGKILLed mid-check and finishes like an uninterrupted run',
   async () => {

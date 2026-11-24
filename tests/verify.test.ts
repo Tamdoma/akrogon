@@ -268,6 +268,22 @@ test('a non-leaf caller with --holder verifies at merge scope and logs into the 
   }
 });
 
+test('a relative --holder is refused by name before any pass starts', async () => {
+  const f: Fixture = await fixture();
+  try {
+    config(f, { checks: { unit: 'echo unit' } });
+    const direct: string = resolve(storeDir(f), 'direct');
+    await command(['git', 'worktree', 'add', direct, '-b', 'direct'], f.root);
+    await commitIn(direct, 'code.ts');
+    const result: Result = await verify(f, ['--holder', 'issues/chart/c/direct'], direct);
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain('--holder takes an absolute path, got issues/chart/c/direct');
+    expect(records(f)).toEqual([]);
+  } finally {
+    f.clean();
+  }
+});
+
 // Owner completion can delete a published log before its row is written; the names come from the
 // captured output. A git wrapper deletes the published log on the first git call after it lands,
 // which comes before any reader could open it: resolving a recorded log path itself runs git.
