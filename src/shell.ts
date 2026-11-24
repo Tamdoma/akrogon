@@ -28,6 +28,7 @@ export function spawnFiles(
     stdin?: string;
     timeout?: number;
     killSignal?: NodeJS.Signals;
+    signal?: AbortSignal;
     captureRoot?: string;
   } = {},
 ): { child: Bun.Subprocess; captured: Captured } {
@@ -43,6 +44,7 @@ export function spawnFiles(
       stderr: Bun.file(captured.errPath),
       timeout: options.timeout,
       killSignal: options.killSignal,
+      signal: options.signal,
     });
     launched = true;
     return { child, captured };
@@ -72,6 +74,7 @@ export async function spawnCaptured(
     stdin?: string;
     timeout?: number;
     killSignal?: NodeJS.Signals;
+    signal?: AbortSignal;
     captureRoot?: string;
   } = {},
 ): Promise<SpawnResult> {

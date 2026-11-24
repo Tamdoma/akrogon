@@ -1,7 +1,7 @@
 // Criteria 6 and 12 (state half): the repo's space by name across running hc sessions,
 // refusals, prefixes, the first-switch inventory and "state predates hc".
 import { test, expect } from 'bun:test';
-import { lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { connect } from 'node:net';
 import { resolve } from 'node:path';
@@ -292,6 +292,13 @@ function fakeHc(dir: string, body: string[]): void {
     { mode: 0o755 },
   );
 }
+// A fake hc turn event, and a fake hc branch that answers `hc get` with the record after `hold` seconds.
+function fakeTurn(seq: number, turn: number): object {
+  return { method: 'event', params: { type: 'turn', terminal: 't1', seq, data: { turn } } };
+}
+function fakeGet(record: object, hold: number = 0): string {
+  return `if [ "$1" = get ]; then ${hold > 0 ? `sleep ${hold}; ` : ''}printf '%s\n' '${JSON.stringify(record)}'; exit 0; fi`;
+}
 function fakeLines(lines: object[]): string {
   return `printf '%s\n' ${lines.map((line: object) => `'${JSON.stringify(line)}'`).join(' ')}`;
 }
@@ -478,6 +485,129 @@ test.each([['undefined'], ['Object.create(null)']])(
   },
 );
 
+// hc 0.1.22 can drop a change made while a stream starts from its events and its snapshot both: here
+// the snapshot shows the terminal working, no event follows, and only a read shows it idle.
+test('a wait on a running terminal passes on a read of the terminal its events missed', async () => {
+  const dir: string = mkdtempSync(resolve(tmpdir(), 'akr-stale-'));
+  try {
+    fakeHc(dir, [
+      `if [ "$1" = events ]; then ${fakeLines([{ seq: 5, terminals: [fakeRecord(0, 'working')] }])}; exec sleep 600; fi`,
+      fakeGet(fakeRecord(1, 'idle')),
+    ]);
+    const stale: SpawnResult = await inProcess(dir, [
+      `import { waitForTerminal } from ${JSON.stringify(resolve(import.meta.dir, '../src/hc.ts'))};`,
+      `const t = await waitForTerminal('s', 't1', (t) => t.status?.state === 'idle', ${WAIT_MS});`,
+      'console.log(JSON.stringify({ turn: t?.turn, state: t?.status?.state }));',
+    ]);
+    expect({ code: stale.code, stderr: stale.code === 0 ? '' : stale.stderr }).toEqual({ code: 0, stderr: '' });
+    expect(JSON.parse(stale.stdout)).toEqual({ turn: 1, state: 'idle' });
+    expect(fakeCalls(dir)).toEqual(['events', 'get']);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// The read shows turn 1 working while turn-0 reports are still queued. Merged onto the read they would
+// compose turn 1 idle, a state that never happened, and the rename wait would pass on it.
+test('a wait on a running terminal never merges queued events onto its read', async () => {
+  const dir: string = mkdtempSync(resolve(tmpdir(), 'akr-merge-'));
+  try {
+    const queued: object[] = [
+      { seq: 5, terminals: [fakeRecord(0, 'idle')] },
+      fakeReport(6, 'idle'),
+      fakeReport(7, 'working'),
+      fakeReport(8, 'blocked'),
+      fakeTurn(9, 1),
+      fakeReport(10, 'working'),
+      fakeReport(11, 'done'),
+    ];
+    fakeHc(dir, [
+      `if [ "$1" = events ]; then ${fakeLines(queued)}; exec sleep 600; fi`,
+      fakeGet(fakeRecord(1, 'working')),
+    ]);
+    const merged: SpawnResult = await inProcess(dir, [
+      `import { waitForTerminal } from ${JSON.stringify(resolve(import.meta.dir, '../src/hc.ts'))};`,
+      'const asked = [];',
+      'const renamed = (t) => { asked.push(`${t.turn} ${t.status?.state}`); return t.turn > 0 && ["idle", "done"].includes(t.status?.state); };',
+      `const t = await waitForTerminal('s', 't1', renamed, ${WAIT_MS});`,
+      'console.log(JSON.stringify({ turn: t?.turn, state: t?.status?.state, asked }));',
+    ]);
+    expect({ code: merged.code, stderr: merged.code === 0 ? '' : merged.stderr }).toEqual({ code: 0, stderr: '' });
+    const report = z
+      .object({ turn: z.number(), state: z.string(), asked: z.array(z.string()) })
+      .parse(JSON.parse(merged.stdout));
+    expect({ turn: report.turn, state: report.state }).toEqual({ turn: 1, state: 'done' });
+    expect(report.asked).not.toContain('1 idle');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// A slow read holds back no event: the read suspends itself (SIGSTOP) before it would answer with a record
+// no event shows, and the idle report that follows the snapshot ends the wait first. The wait then kills the
+// read, which a suspended process holds SIGTERM against, so the process exits without the read answering and
+// the predicate is not asked after the wait returns. The process reports at exit, without process.exit, so a
+// live read holds it open until the WAIT_MS bound. The idle report comes only once the read is suspended.
+test('a wait on a running terminal reads its events while the read is slow, and kills the suspended read', async () => {
+  const dir: string = mkdtempSync(resolve(tmpdir(), 'akr-slow-'));
+  const pid: string = resolve(dir, 'pid');
+  try {
+    fakeHc(dir, [
+      `if [ "$1" = events ]; then ${fakeLines([{ seq: 5, terminals: [fakeRecord(0, 'working')] }])}; until [ -s '${pid}' ] && grep -q '^State:[[:space:]]*T' /proc/$(cat '${pid}')/status; do sleep 0.01; done; ${fakeLines([fakeReport(6, 'idle')])}; exec sleep 600; fi`,
+      `if [ "$1" = get ]; then printf '%s' $$ > '${pid}.new'; mv '${pid}.new' '${pid}'; kill -STOP $$; touch '${dir}/answered'; printf '%s\\n' '${JSON.stringify(fakeRecord(7, 'idle'))}'; exit 0; fi`,
+    ]);
+    const script: string = [
+      `import { existsSync, readFileSync } from 'node:fs';`,
+      `import { waitForTerminal } from ${JSON.stringify(resolve(import.meta.dir, '../src/hc.ts'))};`,
+      'let returned = false;',
+      'let late = 0;',
+      'let seen = null;',
+      `process.on('exit', () => console.log(JSON.stringify({ ...seen, late, answered: existsSync(${JSON.stringify(resolve(dir, 'answered'))}), alive: existsSync('/proc/' + readFileSync(${JSON.stringify(pid)}, 'utf8')) })));`,
+      `const t = await waitForTerminal('s', 't1', (t) => { if (returned) late += 1; return t.status?.state === 'idle'; }, ${WAIT_MS});`,
+      'returned = true;',
+      'seen = { turn: t?.turn, state: t?.status?.state };',
+    ].join('\n');
+    const slow: SpawnResult = await spawnCaptured(['bun', '-e', script], {
+      env: { ...process.env, PATH: `${dir}:${process.env.PATH}` },
+      timeout: WAIT_MS,
+    });
+    expect({ code: slow.code, stderr: slow.code === 0 ? '' : slow.stderr }).toEqual({ code: 0, stderr: '' });
+    expect(JSON.parse(slow.stdout)).toEqual({ turn: 0, state: 'idle', late: 0, answered: false, alive: false });
+  } finally {
+    // Only a lookup still running this test's fake hc is killed: once it has exited, its pid may be reused.
+    const lookup: string = existsSync(pid) ? readFileSync(pid, 'utf8') : '';
+    const cmdline: string = `/proc/${lookup}/cmdline`;
+    if (lookup !== '' && existsSync(cmdline) && readFileSync(cmdline, 'utf8').includes(resolve(dir, 'hc')))
+      process.kill(Number(lookup), 'SIGKILL');
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// A terminal removed after its snapshot listed it: the read's not_found leaves the wait to the events, whose
+// finished event ends it, and nothing is logged. The finished event comes only once the read has exited.
+test('a wait on a running terminal returns the finished record when its read finds no terminal', async () => {
+  const dir: string = mkdtempSync(resolve(tmpdir(), 'akr-gone-'));
+  try {
+    const finished: object = { method: 'event', params: { type: 'finished', terminal: 't1', seq: 6, data: null } };
+    fakeHc(dir, [
+      `if [ "$1" = events ]; then ${fakeLines([{ seq: 5, terminals: [fakeRecord(0, 'working')] }])}; while [ ! -e '${dir}/read' ]; do sleep 0.01; done; ${fakeLines([finished])}; exec sleep 600; fi`,
+      `if [ "$1" = get ]; then (while kill -0 $$ 2>/dev/null; do sleep 0.01; done; touch '${dir}/read') >/dev/null 2>&1 & printf '%s\n' '{"error":{"kind":"not_found","message":"no terminal t1"}}' >&2; exit 3; fi`,
+    ]);
+    const gone: SpawnResult = await inProcess(dir, [
+      `import { waitForTerminal } from ${JSON.stringify(resolve(import.meta.dir, '../src/hc.ts'))};`,
+      'const warnings = [];',
+      'console.warn = (line) => { warnings.push(line); };',
+      `const t = await waitForTerminal('s', 't1', (t) => t.status?.state === 'idle' || t.state === 'finished', ${WAIT_MS});`,
+      'console.log(JSON.stringify({ state: t?.state, warnings }));',
+    ]);
+    expect({ code: gone.code, stderr: gone.code === 0 ? '' : gone.stderr }).toEqual({ code: 0, stderr: '' });
+    expect(JSON.parse(gone.stdout)).toEqual({ state: 'finished', warnings: [] });
+    expect(fakeCalls(dir)).toEqual(['events', 'get']);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // The caller's bound covers the subscription: a snapshot that comes after it is never read.
 test('a wait on a running terminal ends at its bound while the snapshot is late', async () => {
   const dir: string = mkdtempSync(resolve(tmpdir(), 'akr-late-'));
@@ -498,9 +628,9 @@ test('a wait on a running terminal ends at its bound while the snapshot is late'
   }
 });
 
-// The fixture's wait reads the terminal when the snapshot lists it; a read that returns after the wait
+// The fixture's wait also reads the terminal when the snapshot lists it; a read that returns after the wait
 // rejected asks the predicate nothing. Here `hc get` holds until the rejection, then returns the terminal,
-// and the predicate count is read once the fixture's reader has taken that reply.
+// and the asks since the rejection are counted once the fixture's reader has taken that reply.
 test('the fixture wait asks its predicate nothing after it rejects', async () => {
   const dir: string = mkdtempSync(resolve(tmpdir(), 'akr-fixture-wait-'));
   try {
@@ -529,11 +659,12 @@ test('the fixture wait asks its predicate nothing after it rejects', async () =>
       "  const address = JSON.parse((await core.hc(['run', '--bg', '--json', 'sleep', '60'])).stdout).address;",
       '  let asked = 0;',
       '  const rejected = await core.waitFor(address, () => { asked += 1; return false; }, 3000).then(() => false, () => true);',
+      '  const atRejection = asked;',
       `  const read = existsSync(${JSON.stringify(resolve(dir, 'get'))});`,
       `  writeFileSync(${JSON.stringify(resolve(dir, 'go'))}, '');`,
       '  await core.reading();',
       `  const got = readFileSync(${JSON.stringify(resolve(dir, 'got'))}, 'utf8').trim();`,
-      "  console.log(JSON.stringify({ rejected, read, asked, looked: got !== '' && JSON.parse(got).address === address }));",
+      "  console.log(JSON.stringify({ rejected, read, late: asked - atRejection, looked: got !== '' && JSON.parse(got).address === address }));",
       '} finally {',
       '  await core.stop();',
       '  f.clean();',
@@ -543,7 +674,54 @@ test('the fixture wait asks its predicate nothing after it rejects', async () =>
       env: { ...process.env, PATH: `${dir}:${process.env.PATH}` },
     });
     expect(result.code).toBe(0);
-    expect(JSON.parse(result.stdout)).toEqual({ rejected: true, read: true, asked: 0, looked: true });
+    expect(JSON.parse(result.stdout)).toEqual({ rejected: true, read: true, late: 0, looked: true });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// A predicate that throws on the fixture's read rejects the wait with its error, as one that throws on the
+// stream does, and leaves no rejected reader behind. The read's reply carries a turn no stream record has,
+// and the predicate throws only on that turn.
+test('the fixture wait rejects with a predicate error thrown on its read', async () => {
+  const dir: string = mkdtempSync(resolve(tmpdir(), 'akr-fixture-throw-'));
+  const READ_TURN: number = 4242;
+  try {
+    writeFileSync(
+      resolve(dir, 'hc'),
+      [
+        '#!/bin/sh',
+        'if [ "$1" = get ]; then',
+        `  out=$(${JSON.stringify(Bun.which('hc'))} "$@"); code=$?`,
+        `  printf '%s\\n' "$out" | sed 's/"turn": *[0-9][0-9]*/"turn":${READ_TURN}/'`,
+        '  exit $code',
+        'fi',
+        `exec ${JSON.stringify(Bun.which('hc'))} "$@"`,
+      ].join('\n') + '\n',
+      { mode: 0o755 },
+    );
+    const script: string = [
+      `import { fixture } from ${JSON.stringify(resolve(import.meta.dir, 'helpers.ts'))};`,
+      `import { hcCore } from ${JSON.stringify(resolve(import.meta.dir, 'hc-fixture.ts'))};`,
+      'const f = await fixture();',
+      'const core = await hcCore(f);',
+      'try {',
+      "  const address = JSON.parse((await core.hc(['run', '--bg', '--json', 'sleep', '60'])).stdout).address;",
+      '  const outcome = await core',
+      `    .waitFor(address, (t) => { if (t.turn === ${READ_TURN}) throw new Error('thrown on the read'); return false; })`,
+      "    .then(() => 'passed', (error) => error.message);",
+      '  await core.reading();',
+      '  console.log(JSON.stringify({ outcome }));',
+      '} finally {',
+      '  await core.stop();',
+      '  f.clean();',
+      '}',
+    ].join('\n');
+    const result: SpawnResult = await spawnCaptured(['bun', '-e', script], {
+      env: { ...process.env, PATH: `${dir}:${process.env.PATH}` },
+    });
+    expect({ code: result.code, stderr: result.code === 0 ? '' : result.stderr }).toEqual({ code: 0, stderr: '' });
+    expect(JSON.parse(result.stdout)).toEqual({ outcome: 'thrown on the read' });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

@@ -94,13 +94,15 @@ const HC_DEADLINE_MS: number = 60_000;
 export async function hc(
   session: string,
   args: string[],
-  opts: { stdin?: string; deadlineMs?: number } = {},
+  opts: { stdin?: string; deadlineMs?: number; signal?: AbortSignal; killSignal?: NodeJS.Signals } = {},
 ): Promise<string> {
   const argv: string[] = ['hc', ...args];
   const result: SpawnResult = await spawnCaptured(argv, {
     env: hcEnv(session),
     stdin: opts.stdin,
     timeout: opts.deadlineMs ?? HC_DEADLINE_MS,
+    signal: opts.signal,
+    killSignal: opts.killSignal,
   });
   if (result.code !== 0) throw new HcError(errorKind(result), argv, result, opts.stdin);
   return result.stdout;
@@ -280,8 +282,13 @@ export async function terminals(
   return listed.terminals.map((t: Terminal) => seen(session, t));
 }
 
-export async function terminal(session: string, address: string): Promise<Seen> {
-  return seen(session, terminalSchema.parse(JSON.parse(await hc(session, ['get', '--json', address]))));
+// `signal` stops the lookup: its aborted call fails like a killed one. The kill is SIGKILL, since a
+// suspended lookup holds SIGTERM until it is continued and would keep this process alive.
+export async function terminal(session: string, address: string, signal?: AbortSignal): Promise<Seen> {
+  return seen(
+    session,
+    terminalSchema.parse(JSON.parse(await hc(session, ['get', '--json', address], { signal, killSignal: 'SIGKILL' }))),
+  );
 }
 
 export function screen(session: string, address: string): Promise<string> {
@@ -610,18 +617,46 @@ export async function waitFor(
 }
 
 // A wait on a terminal that already runs, over a stream of its own; `ms` bounds the subscription too.
+// hc 0.1.22 can drop the events of a change made while the stream starts and leave it out of the
+// snapshot too, so the terminal is also read once the snapshot has arrived. The read is an observation
+// of its own, never merged with queued events: it ends the wait when it passes, else the events decide.
+// A read that fails leaves the wait to the events, with a warning unless the terminal is gone. Once the
+// wait settles, the read is stopped and nothing asks `until` again.
 export async function waitForTerminal(
   session: string,
   address: string,
-  until: (t: Seen, line: HcLine) => boolean | Promise<boolean>,
+  until: (t: Seen) => boolean,
   ms: number,
 ): Promise<Seen | null> {
   const deadline: number = Date.now() + ms;
   const stream: Stream | null = await open(session, ['--terminal', address], deadline);
   if (stream === null) return null;
+  let settled: boolean = false;
+  const ask = (t: Seen): boolean => !settled && until(t);
+  const lookup: AbortController = new AbortController();
   try {
-    return await waitFor(stream, address, null, until, deadline - Date.now());
+    const events: Promise<Seen | null> = waitFor(stream, address, null, ask, deadline - Date.now());
+    const read: Promise<Seen | null> = terminal(session, address, lookup.signal).then(
+      (t: Seen) => (ask(t) ? t : events),
+      (error: unknown) => {
+        if (!settled && !(error instanceof HcError && error.kind === 'not_found'))
+          console.warn(
+            JSON.stringify({
+              warning: 'terminal read failed',
+              session,
+              address,
+              ...(error instanceof Error
+                ? { error: error.name, message: error.message }
+                : { error: Bun.inspect(error) }),
+            }),
+          );
+        return events;
+      },
+    );
+    return await Promise.race([events, read]);
   } finally {
+    settled = true;
+    lookup.abort();
     stream.stop();
   }
 }

@@ -377,6 +377,13 @@ export async function hcCore(
         child.kill();
         done(t);
       };
+      // A predicate or read that throws, on the stream or on the read, rejects the wait the same way.
+      const abort = (error: unknown): void => {
+        settled = true;
+        clearTimeout(timer);
+        child.kill();
+        fail(error);
+      };
       const reading: Promise<void> = (async (): Promise<void> => {
         let buffer: string = '';
         const reader = hcReader(new Set(['status', 'turn']));
@@ -389,15 +396,23 @@ export async function hcCore(
             if (read === null) continue;
             const message = z.record(z.string(), z.unknown()).parse('snapshot' in read ? read.snapshot : read.event);
             // A snapshot can miss a change made while the stream started, whose events hc 0.1.22 can drop:
-            // the terminal is read when the snapshot arrives.
-            if (Array.isArray(message.terminals))
-              current = z
-                .array(terminalSchema)
-                .parse(message.terminals)
-                .some((t: Terminal) => t.address === address)
-                ? await get(address)
-                : null;
-            else if (current !== null) {
+            // the terminal is also read when the snapshot arrives. The read is an observation of its own,
+            // never merged with queued events, and the stream keeps being read while it runs.
+            if (Array.isArray(message.terminals)) {
+              current =
+                z
+                  .array(terminalSchema)
+                  .parse(message.terminals)
+                  .find((t: Terminal) => t.address === address) ?? null;
+              if (current !== null)
+                readers.push(
+                  get(address)
+                    .then((t: Terminal): void => {
+                      if (!settled && until(t)) finish(t);
+                    })
+                    .catch(abort),
+                );
+            } else if (current !== null) {
               const params = z
                 .object({ type: z.string(), data: z.record(z.string(), z.unknown()) })
                 .parse(message.params);
@@ -407,7 +422,7 @@ export async function hcCore(
             if (current !== null && until(current)) return finish(current);
           }
         }
-      })().catch(fail);
+      })().catch(abort);
       readers.push(reading);
     });
   const tasks = (address: string): string[] => {
