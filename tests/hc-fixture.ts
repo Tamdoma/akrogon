@@ -81,16 +81,49 @@ async function readProcFile(pid: number, name: string): Promise<string | null> {
   }
 }
 
-// The /proc start time of a running pid; null once it exited (gone or a zombie). It tells a daemon
-// from a later process that reuses its pid.
-function startTime(pid: number): string | null {
-  const line: string | null = procFile(pid, 'stat');
-  if (line === null) return null;
-  const fields: string[] = line.slice(line.lastIndexOf(')') + 2).split(' ');
-  return fields[0] === 'Z' ? null : fields[19];
+// The /proc/<pid>/stat fields after the command name (state first), or null once the pid is hidden.
+function statFields(pid: number, name: string = 'stat'): string[] | null {
+  const line: string | null = procFile(pid, name);
+  return line === null ? null : line.slice(line.lastIndexOf(')') + 2).split(' ');
+}
+
+// The thread ids of a pid, empty once it is hidden.
+function tasks(pid: number): string[] {
+  try {
+    return readdirSync(resolve('/proc', String(pid), 'task'));
+  } catch (error) {
+    if (hidden(error)) return [];
+    throw error;
+  }
+}
+
+// Whether a thread of the pid still runs. The leader reads 'Z' as soon as it exits, while its other
+// threads may still be exiting and holding the process's sockets and files; a thread drops them before
+// it reads 'Z' or 'X' or leaves /proc/<pid>/task.
+export function threadsRunning(pid: number): boolean {
+  return tasks(pid).some((tid: string): boolean => {
+    const state: string | undefined = statFields(pid, `task/${tid}/stat`)?.[0];
+    return state !== undefined && state !== 'Z' && state !== 'X';
+  });
+}
+
+// A process file of the pid as its leader read it, else as the first of its threads reads it: a zombie
+// leader's cmdline reads empty and its environ is hidden while its other threads still run, and a thread
+// that exits meanwhile reads empty or hidden too.
+function processFile(pid: number, name: string, leader: string | null): string | null {
+  return leader !== null && leader !== ''
+    ? leader
+    : (tasks(pid)
+        .map((tid: string): string | null => procFile(pid, `task/${tid}/${name}`))
+        .find((read: string | null): boolean => read !== null && read !== '') ?? leader);
 }
 
 type Daemon = { pid: number; start: string };
+
+// A daemon has exited once its pid holds a later process or none of its threads runs.
+function daemonRunning(d: Daemon): boolean {
+  return statFields(d.pid)?.[19] === d.start && threadsRunning(d.pid);
+}
 
 // The running hc daemons of a session, read from /proc: a daemon runs `<binary> serve` with the
 // HC_SESSION of its `hc server start`, so one is found however far its start got before the worker
@@ -99,15 +132,17 @@ async function daemons(session: string): Promise<Daemon[]> {
   const pids: number[] = readdirSync('/proc')
     .filter((entry: string) => /^\d+$/.test(entry))
     .map(Number);
-  const argvs: (string | null)[] = await Promise.all(pids.map((pid: number) => readProcFile(pid, 'cmdline')));
+  const argvs: (string | null)[] = await Promise.all(
+    pids.map(async (pid: number) => processFile(pid, 'cmdline', await readProcFile(pid, 'cmdline'))),
+  );
   return pids
     .filter((_pid: number, i: number) => (argvs[i] ?? '').split('\0')[1] === 'serve')
     .flatMap((pid: number): Daemon[] => {
       // Another user's environ is unreadable, so only this user's daemons match. `hc server start`
       // gives the daemon HC_RUNTIME=1, which no terminal program carries.
-      const environ: string[] = (procFile(pid, 'environ') ?? '').split('\0');
-      const start: string | null = startTime(pid);
-      return environ.includes(`HC_SESSION=${session}`) && environ.includes('HC_RUNTIME=1') && start !== null
+      const environ: string[] = (processFile(pid, 'environ', procFile(pid, 'environ')) ?? '').split('\0');
+      const start: string | undefined = statFields(pid)?.[19];
+      return environ.includes(`HC_SESSION=${session}`) && environ.includes('HC_RUNTIME=1') && start !== undefined
         ? [{ pid, start }]
         : [];
     });
@@ -126,7 +161,7 @@ async function stopDaemon(session: string, coreRuntime: string, ms: number): Pro
     // A suspended client never acts on SIGTERM.
     killSignal: 'SIGKILL',
   });
-  while (running.some((d: Daemon) => startTime(d.pid) === d.start)) {
+  while (running.some(daemonRunning)) {
     if (Date.now() > deadline)
       throw new Error(
         `hc daemon still running after server stop: ${JSON.stringify({ session, running, ms, ...down })}`,

@@ -17,7 +17,7 @@ import {
 import { z } from 'zod';
 import { resolve } from 'node:path';
 import { fixture, type Fixture } from './helpers';
-import { hcCore, procFile, sweepAbandoned, type HcCore, stopCoresAfterFile } from './hc-fixture';
+import { hcCore, procFile, sweepAbandoned, threadsRunning, type HcCore, stopCoresAfterFile } from './hc-fixture';
 import { spawnCaptured, type SpawnResult } from '../src/shell';
 
 stopCoresAfterFile();
@@ -90,13 +90,6 @@ test('a core whose daemon outlives hc server stop stays queued and a later stop 
   }
 });
 
-// The daemon's state letter from ps: empty once it has gone, Z while a zombie.
-async function daemonState(pid: number): Promise<string> {
-  return (await spawnCaptured(['ps', '-o', 'stat=', '-p', String(pid)])).stdout.trim();
-}
-
-const exited = (state: string): boolean => /^(Z.*)?$/.test(state);
-
 type Abandoned = { root: string; name: string; runtime: string; socket: string; pid: number };
 
 // A worker that died right after `hc server start` returned: a live daemon under a dead worker's
@@ -126,7 +119,7 @@ async function abandonedDaemon(f: Fixture, bin: string): Promise<Abandoned> {
 }
 
 async function discard(f: Fixture, gone: Abandoned): Promise<void> {
-  if (!exited(await daemonState(gone.pid))) process.kill(gone.pid);
+  if (threadsRunning(gone.pid)) process.kill(gone.pid);
   rmSync(gone.root, { recursive: true, force: true });
   f.clean();
 }
@@ -140,10 +133,10 @@ test('the abandoned-core sweep stops a reachable daemon of a dead worker that re
   chmodSync(bin, 0o755);
   const gone: Abandoned = await abandonedDaemon(f, bin);
   try {
-    expect(exited(await daemonState(gone.pid))).toBe(false);
+    expect(threadsRunning(gone.pid)).toBe(true);
     await sweepAbandoned(undefined, gone.root);
     expect(existsSync(gone.runtime)).toBe(false);
-    expect(exited(await daemonState(gone.pid))).toBe(true);
+    expect(threadsRunning(gone.pid)).toBe(false);
   } finally {
     await discard(f, gone);
   }
@@ -160,7 +153,7 @@ test('the abandoned-core sweep keeps a runtime whose daemon outlives hc server s
     renameSync(aside, gone.socket);
     await sweepAbandoned(undefined, gone.root);
     expect(existsSync(gone.runtime)).toBe(false);
-    expect(exited(await daemonState(gone.pid))).toBe(true);
+    expect(threadsRunning(gone.pid)).toBe(false);
   } finally {
     if (existsSync(aside)) renameSync(aside, gone.socket);
     await discard(f, gone);

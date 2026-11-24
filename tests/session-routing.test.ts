@@ -2,7 +2,18 @@ import { test, expect } from 'bun:test';
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { connect } from 'node:net';
 import { resolve } from 'node:path';
-import { fixture, cli, entry, leaf, procFixture, storeDir, yaml, type Fixture, type ProcFixture } from './helpers';
+import {
+  fixture,
+  cli,
+  entry,
+  leaf,
+  procFixture,
+  storeDir,
+  yaml,
+  WAIT_MS,
+  type Fixture,
+  type ProcFixture,
+} from './helpers';
 import { readState, saveState, type State } from '../src/state';
 import { command, spawnCaptured, type Result } from '../src/shell';
 import { z } from 'zod';
@@ -41,12 +52,18 @@ async function hcSetup(occupiedPrefix?: string): Promise<Fixture> {
   setSeat(f, 'a', 'fake', 'work');
   return f;
 }
-// A core killed without cleanup: its socket stays, so discovery lists it as stopped.
+// A core killed without cleanup: its socket stays, so discovery lists it as stopped. SIGKILL lands
+// asynchronously: the socket accepts until the core's last thread exits.
 async function stoppedCore(f: Fixture, repo?: string): Promise<HcCore> {
   const core: HcCore = await hcCore(f, { repo });
   const status = await core.hc(['server', 'status', '--json']);
-  process.kill(z.object({ pid: z.number() }).parse(JSON.parse(status.stdout)).pid, 'SIGKILL');
-  for (let tries: number = 0; (await listening(core.socket)) && tries < 50; tries += 1) await Bun.sleep(20);
+  const pid: number = z.object({ pid: z.number() }).parse(JSON.parse(status.stdout)).pid;
+  process.kill(pid, 'SIGKILL');
+  const begun: number = Date.now();
+  while (await listening(core.socket)) {
+    if (Date.now() - begun > WAIT_MS) throw new Error(`core ${pid} still accepts after SIGKILL`);
+    await Bun.sleep(50);
+  }
   return core;
 }
 // A running core whose herdr-app document cannot be parsed: its space list is unreadable.
