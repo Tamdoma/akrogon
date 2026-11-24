@@ -25,6 +25,7 @@ import {
   procRoot,
   registerTemp,
   storeDir,
+  WAIT_MS,
   type Fixture,
 } from './helpers';
 import { readState, saveState } from '../src/state';
@@ -566,7 +567,7 @@ test('failed leaf scratch preserves an actual running verify command', async () 
     const release: string = resolve(f.home, 'release');
     yaml(resolve(f.root, 'issues/config.yaml'), {
       checks: {
-        test: `printf "%s" "$TMPDIR" > ${marker}; while [ ! -f ${release} ]; do sleep 0.01; done; test -d "$TMPDIR"`,
+        test: `printf "%s" "$TMPDIR" > ${marker}.tmp; mv ${marker}.tmp ${marker}; while [ ! -f ${release} ]; do sleep 0.01; done; test -d "$TMPDIR"`,
       },
       grounding: 'none',
       setup: 'mkdir -p node_modules',
@@ -574,7 +575,9 @@ test('failed leaf scratch preserves an actual running verify command', async () 
     const path: string = await dispatchLeaf(f, 'running-base');
     const running: Promise<Result> = cli(f, ['verify'], readState(path).worktree!, env);
     try {
-      for (let i: number = 0; i < 500 && !existsSync(marker); i++) await Bun.sleep(10);
+      // The marker appears whole by rename, so a seen marker always holds the path.
+      const end: number = Date.now() + WAIT_MS;
+      while (!existsSync(marker) && Date.now() < end) await Bun.sleep(10);
       expect(existsSync(marker)).toBe(true);
       const runRoot: string = readFileSync(marker, 'utf8');
       await closeTab(f, readState(path).tab!);
