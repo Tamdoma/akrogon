@@ -3,6 +3,7 @@
 ## Commands
 
 - `bun test` runs the command suite rooted at `tests/` by `bunfig.toml`.
+- `bun run test` runs the same suite boxed in a transient user service under `akrogon-test.slice` (it needs the user bus; arguments pass through to `bun test` unexpanded). When the service's `bun` exits or is killed, systemd kills every process left in the service, so an interrupted run leaves no process; killing only the `systemd-run` client leaves the run going until it ends or hits its one-hour cap, and `systemctl --user stop akrogon-test.slice` stops every boxed run. Ad-hoc and stress runs use it. The service gets the user manager's environment plus `PATH` and `HOME`, so a run that needs another caller variable, or runs without the user bus, uses direct `bun test`; verify already runs `bun test` inside its own `akrogon-verify-<id>` service, and processes in other units (hc cores) keep their own sweep.
 - `bun test tests/phase.test.ts` isolates lifecycle transition scenarios.
 
 ## Key files

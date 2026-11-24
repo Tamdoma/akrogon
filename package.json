@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "bun test --timeout=120000",
+    "test": "systemd-run --user --quiet --collect --pipe --wait --same-dir --slice=akrogon-test.slice --expand-environment=no -p TimeoutStopSec=5 -p RuntimeMaxSec=3600 -E PATH -E HOME -- bun test --timeout=120000",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write src tests skills/chart-issues/scripts"
   },
