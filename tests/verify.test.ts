@@ -3150,7 +3150,8 @@ test('the receipt schema pins timeouts and durations invariants', () => {
   expect(verifyRunSchema.safeParse(row({ durations: [{ name: 'alpha', ms: 1.5 }] })).success).toBe(false);
   expect(verifyRunSchema.safeParse(row({ durations: [{ name: 'alpha', ms: -1 }] })).success).toBe(false);
   expect(verifyRunSchema.safeParse(row({ durations: [{ name: 'alpha', ms: 4 }, { name: 'alpha', ms: 7 }] })).success).toBe(false);
-  expect(verifyRunSchema.safeParse(row({ attempt: 'att-1' })).success).toBe(true);
+  const runRow: object = { ...row({}), attempt: 'att-1' };
+  expect(verifyRunSchema.safeParse(runRow).success).toBe(true);
   const rerunEntry: object = {
     rerun: { exit: 1, log: '/tmp/first.log', failures: ['alpha'], timeouts: ['alpha'], durations: [{ name: 'alpha', ms: 4 }] },
   };
