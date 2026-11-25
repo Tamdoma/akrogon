@@ -181,6 +181,8 @@ test('run-check builds an allowlisted env, copies declared names and omits undec
       'AKROGON_EVIDENCE',
       'AKROGON_RUN',
       'AKROGON_HOME',
+      'AKROGON_LEAF_TEMP_ROOT',
+      'AKROGON_RETIRED_TEMP_ROOT',
       'AKROGON_CAPTURES',
       'DBUS_SESSION_BUS_ADDRESS',
       'LANG',

@@ -60,6 +60,10 @@ const copied: readonly string[] = [
   // An akrogon invocation inside a checked command shares the caller's state
   // home; without it a nested call resolves HOME/.akrogon and can re-cutover.
   'AKROGON_HOME',
+  // A nested akrogon call resolves the same leaf temp roots as its caller;
+  // without them it falls back to the default root and leaves its leaf dir there.
+  'AKROGON_LEAF_TEMP_ROOT',
+  'AKROGON_RETIRED_TEMP_ROOT',
   ...displayEnv,
 ];
 
