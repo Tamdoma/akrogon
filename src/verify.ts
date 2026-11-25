@@ -754,8 +754,7 @@ async function commandRow(
   const secondScan: BunScan = scanBunOutput(second.output);
   const again: string[] = second.code === 0 ? [] : secondScan.names;
   const still: string[] = failures.filter((name) => again.includes(name));
-  const finalFailures: string[] | undefined =
-    second.code === 0 ? undefined : still.length > 0 ? still : failures;
+  const finalFailures: string[] | undefined = second.code === 0 ? undefined : still.length > 0 ? still : failures;
   const firstTimeouts: CommandRow['timeouts'] = timeoutsFor(scan, failures);
   const firstDurations: CommandRow['durations'] = durationsFor(scan, failures, mergeScope);
   const timeouts: CommandRow['timeouts'] = timeoutsFor(secondScan, finalFailures);

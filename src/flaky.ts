@@ -73,8 +73,7 @@ export function scanBunOutput(text: string): BunScan {
       if (attached !== undefined && !timeouts.includes(attached)) timeouts.push(attached);
       continue;
     }
-    if (/^.+\| Exited with code (?!0\b)\d+\s*$/.test(line))
-      exited.push(chain(line.slice(0, line.lastIndexOf('|'))));
+    if (/^.+\| Exited with code (?!0\b)\d+\s*$/.test(line)) exited.push(chain(line.slice(0, line.lastIndexOf('|'))));
   }
   const leaf: string[][] = exited.filter(
     (candidate: string[]) => !exited.some((other: string[]) => prefixOf(candidate, other)),

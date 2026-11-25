@@ -2863,7 +2863,8 @@ test('a merge row records the 20 slowest durations plus every timed failure and 
     const chain: string = 'wrap | sh check-durations.sh | ';
     const lines: string[] = [chain + '(pass) untimed'];
     lines.push(chain + '(pass) dupe [1550.00ms]', chain + '(pass) dupe [1450.00ms]');
-    for (let i = 1; i <= 24; i += 1) lines.push(`${chain}(pass) t${String(i).padStart(2, '0')} [${2000 - (i - 1) * 80}.00ms]`);
+    for (let i = 1; i <= 24; i += 1)
+      lines.push(`${chain}(pass) t${String(i).padStart(2, '0')} [${2000 - (i - 1) * 80}.00ms]`);
     lines.push(
       chain + '(pass) theta [96.00ms]',
       chain + '(fail) zeta [5.00ms]',
@@ -2878,25 +2879,51 @@ test('a merge row records the 20 slowest durations plus every timed failure and 
     const { worktree } = await callerWorktree(f, 'caller', mergeLeaf('att-durations'));
     await commitIn(worktree, 'code.ts');
     expect((await verify(f, ['--attempt', 'att-durations'], worktree)).code).toBe(1);
-    const entry: VerifyRun['commands'][number] = records(f).at(-1)!.commands.find((item) => item.name === 'timed')!;
+    const entry: VerifyRun['commands'][number] = records(f)
+      .at(-1)!
+      .commands.find((item) => item.name === 'timed')!;
     expect(entry.exit).toBe(7);
     expect(entry.failures).toEqual(['zeta', '(unnamed) sh check-durations.sh', 'plain-fail']);
     const expected: { name: string; ms: number }[] = [];
     const table: [string, number][] = [
-      ['t01', 2000], ['t02', 1920], ['t03', 1840], ['t04', 1760], ['t05', 1680], ['t06', 1600],
-      ['dupe', 1550], ['t07', 1520], ['t08', 1440], ['t09', 1360], ['t10', 1280], ['t11', 1200],
-      ['t12', 1120], ['t13', 1040], ['t14', 960], ['t15', 880], ['t16', 800], ['t17', 720],
-      ['t18', 640], ['t19', 560],
+      ['t01', 2000],
+      ['t02', 1920],
+      ['t03', 1840],
+      ['t04', 1760],
+      ['t05', 1680],
+      ['t06', 1600],
+      ['dupe', 1550],
+      ['t07', 1520],
+      ['t08', 1440],
+      ['t09', 1360],
+      ['t10', 1280],
+      ['t11', 1200],
+      ['t12', 1120],
+      ['t13', 1040],
+      ['t14', 960],
+      ['t15', 880],
+      ['t16', 800],
+      ['t17', 720],
+      ['t18', 640],
+      ['t19', 560],
     ];
     for (const [name, ms] of table) expected.push({ name, ms });
-    expected.push({ name: '(unnamed) sh check-durations.sh', ms: 60 }, { name: 'zeta', ms: 7 }, { name: 'plain-fail', ms: 4 });
+    expected.push(
+      { name: '(unnamed) sh check-durations.sh', ms: 60 },
+      { name: 'zeta', ms: 7 },
+      { name: 'plain-fail', ms: 4 },
+    );
     expect(entry.durations).toEqual(expected);
     expect(entry.durations!.every((item) => Number.isInteger(item.ms) && item.ms >= 0)).toBe(true);
     const names: string[] = entry.durations!.map((item) => item.name);
     expect(new Set(names).size).toBe(names.length);
     for (const absent of ['t20', 't21', 't22', 't23', 't24', 'theta', 'untimed', 'eta', 'PASS x (pass)'])
       expect(names).not.toContain(absent);
-    expect(records(f).at(-1)!.commands.find((item) => item.name === 'ok')).not.toHaveProperty('durations');
+    expect(
+      records(f)
+        .at(-1)!
+        .commands.find((item) => item.name === 'ok'),
+    ).not.toHaveProperty('durations');
     rmSync(entry.log, { force: true });
     const after: VerifyRun[] = records(f);
     expect(after.at(-1)!.commands.find((item) => item.name === 'timed')!.durations).toEqual(expected);
@@ -2942,7 +2969,9 @@ test('a red row records only stream-attached timeouts at leaf and merge scope wi
     const { worktree: merging } = await callerWorktree(f, 'merging', mergeLeaf('att-timeouts'));
     await commitIn(merging, 'mergecode.ts');
     expect((await verify(f, ['--attempt', 'att-timeouts'], merging)).code).toBe(1);
-    const mergeTimed: VerifyRun['commands'][number] = records(f).at(-1)!.commands.find((item) => item.name === 'timed')!;
+    const mergeTimed: VerifyRun['commands'][number] = records(f)
+      .at(-1)!
+      .commands.find((item) => item.name === 'timed')!;
     expect(mergeTimed.failures).toEqual(['alpha-timeout', 'beta-assert', 'gamma-thrower']);
     expect(mergeTimed.timeouts).toEqual(['alpha-timeout']);
   } finally {
@@ -2969,7 +2998,12 @@ test('a merge rerun row keeps per-leg durations and timeouts with top-level time
     await commitScript(
       f,
       'second-leg.sh',
-      [`echo '${r}(pass) rerun-pass [100.00ms]'`, `echo '${r}(fail) alpha [300.00ms]'`, `echo '${r}  ^ this test timed out after 300ms.'`, 'exit 1'].join('\n') + '\n',
+      [
+        `echo '${r}(pass) rerun-pass [100.00ms]'`,
+        `echo '${r}(fail) alpha [300.00ms]'`,
+        `echo '${r}  ^ this test timed out after 300ms.'`,
+        'exit 1',
+      ].join('\n') + '\n',
     );
     config(f, {
       checks: { unit: 'sh first-leg.sh', whole: 'echo whole' },
@@ -2980,7 +3014,9 @@ test('a merge rerun row keeps per-leg durations and timeouts with top-level time
     const { worktree } = await callerWorktree(f, 'caller', mergeLeaf('att-leg'));
     await commitIn(worktree, 'code.ts');
     expect((await verify(f, ['--attempt', 'att-leg'], worktree)).code).toBe(1);
-    const unit: VerifyRun['commands'][number] = records(f).at(-1)!.commands.find((item) => item.name === 'unit')!;
+    const unit: VerifyRun['commands'][number] = records(f)
+      .at(-1)!
+      .commands.find((item) => item.name === 'unit')!;
     expect(unit.failures).toEqual(['alpha']);
     expect(unit.rerun).toMatchObject({ exit: 1, failures: ['alpha', 'beta'] });
     expect(unit.rerun!.timeouts).toEqual(['alpha']);
@@ -2999,13 +3035,17 @@ test('a merge rerun row keeps per-leg durations and timeouts with top-level time
     // A rerun timing out a test the first leg never failed: the subset invariant drops it.
     writeFileSync(
       resolve(worktree, 'second-leg.sh'),
-      [`echo '${r}(fail) gamma-new [150.00ms]'`, `echo '${r}  ^ this test timed out after 150ms.'`, 'exit 1'].join('\n') + '\n',
+      [`echo '${r}(fail) gamma-new [150.00ms]'`, `echo '${r}  ^ this test timed out after 150ms.'`, 'exit 1'].join(
+        '\n',
+      ) + '\n',
     );
     await command(['git', 'add', 'second-leg.sh'], worktree);
     await command(['git', 'commit', '-m', 'rerun times out a new test'], worktree);
     await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
     expect((await verify(f, ['--attempt', 'att-leg'], worktree)).code).toBe(1);
-    const second: VerifyRun['commands'][number] = records(f).at(-1)!.commands.find((item) => item.name === 'unit')!;
+    const second: VerifyRun['commands'][number] = records(f)
+      .at(-1)!
+      .commands.find((item) => item.name === 'unit')!;
     expect(second.failures).toEqual(['alpha', 'beta']);
     expect(second).not.toHaveProperty('timeouts');
     expect(second.durations).toEqual([{ name: 'gamma-new', ms: 150 }]);
@@ -3149,11 +3189,26 @@ test('the receipt schema pins timeouts and durations invariants', () => {
   expect(verifyRunSchema.safeParse(row({ durations: [] })).success).toBe(false);
   expect(verifyRunSchema.safeParse(row({ durations: [{ name: 'alpha', ms: 1.5 }] })).success).toBe(false);
   expect(verifyRunSchema.safeParse(row({ durations: [{ name: 'alpha', ms: -1 }] })).success).toBe(false);
-  expect(verifyRunSchema.safeParse(row({ durations: [{ name: 'alpha', ms: 4 }, { name: 'alpha', ms: 7 }] })).success).toBe(false);
+  expect(
+    verifyRunSchema.safeParse(
+      row({
+        durations: [
+          { name: 'alpha', ms: 4 },
+          { name: 'alpha', ms: 7 },
+        ],
+      }),
+    ).success,
+  ).toBe(false);
   const runRow: object = { ...row({}), attempt: 'att-1' };
   expect(verifyRunSchema.safeParse(runRow).success).toBe(true);
   const rerunEntry: object = {
-    rerun: { exit: 1, log: '/tmp/first.log', failures: ['alpha'], timeouts: ['alpha'], durations: [{ name: 'alpha', ms: 4 }] },
+    rerun: {
+      exit: 1,
+      log: '/tmp/first.log',
+      failures: ['alpha'],
+      timeouts: ['alpha'],
+      durations: [{ name: 'alpha', ms: 4 }],
+    },
   };
   expect(verifyRunSchema.safeParse(row(rerunEntry)).success).toBe(true);
 });
