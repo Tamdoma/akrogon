@@ -5,7 +5,7 @@
 import { test, expect, afterAll } from 'bun:test';
 import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync, readdirSync, chmodSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { cli, fixture, leaf, type Fixture } from './helpers';
+import { cli, fixture, leaf, yaml, type Fixture } from './helpers';
 import { hcCore, setSeat, stopCoresAfterFile, type HcCore } from './hc-fixture';
 import { leafSlice, sliceCgroup } from '../src/scope';
 import { spawnCaptured } from '../src/shell';
@@ -198,6 +198,9 @@ async function startAndReadArgv(
 
 test.serial('the seat launch argv carries Delegate=yes, the scope env marker and the per-kind wiring', async () => {
   const f: Fixture = await fixture();
+  // Five seats start in this one fixture; the machine cap defaults to 3.
+  const global = Bun.YAML.parse(readFileSync(resolve(f.home, 'config.yaml'), 'utf8')) as object;
+  yaml(resolve(f.home, 'config.yaml'), { ...global, max_active: 6 });
   const core: HcCore = await hcCore(f);
   try {
     // pi and codex join the stand-in names the fixture already links.
