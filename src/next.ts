@@ -332,6 +332,16 @@ export async function branchReservation(
   return undefined;
 }
 
+// The due test of the setup step, shared between allocate's pre-computation and the gate in
+// ensureWorktree: the repo configures a setup and the marker at the worktree's git path is missing
+// or holds another string. A worktree that does not exist yet has no marker, so setup is due.
+async function setupDue(repo: Repo, path: string): Promise<boolean> {
+  if (repo.config.setup === undefined) return false;
+  if (!existsSync(path)) return true;
+  const marker: string = await setupMarkerPath(path);
+  return !existsSync(marker) || readFileSync(marker, 'utf8') !== repo.config.setup;
+}
+
 async function ensureWorktree(
   repo: Repo,
   leaf: Leaf,
@@ -470,8 +480,7 @@ async function ensureWorktree(
   // .env and env_names/env_generation stay in step.
   const pending: { setup: string; marker: string } | undefined =
     repo.config.setup === undefined ? undefined : { setup: repo.config.setup, marker: await setupMarkerPath(path) };
-  const due: boolean =
-    pending !== undefined && (!existsSync(pending.marker) || readFileSync(pending.marker, 'utf8') !== pending.setup);
+  const due: boolean = await setupDue(repo, path);
   if (due && busy !== null) return { busy };
   const wrote: boolean = await writeLeafEnv(repo, path, live);
   if (due && pending !== undefined) {
@@ -481,13 +490,16 @@ async function ensureWorktree(
       // never reaches the setup step leaves no sweepable directory behind.
       ensureLeafTemp(repo, slug);
       const lock: string = resolve(path, await command(['git', 'rev-parse', '--git-path', INSTALL_LOCK_FILE], path));
-      const result = await spawnCaptured(['flock', lock, 'sh', '-c', pending.setup], {
-        cwd: path,
-        env: constructedEnv(repo, leafTemp(repo, slug)),
-      });
+      // AKROGON_RUN and CLAUDECODE never reach the setup child: config env/pass_env entries can
+      // forward CLAUDECODE from the caller, and neither name belongs to a dependency install.
+      const env: Record<string, string> = constructedEnv(repo, leafTemp(repo, slug));
+      delete env.AKROGON_RUN;
+      delete env.CLAUDECODE;
+      const result = await spawnCaptured(['flock', lock, 'sh', '-c', pending.setup], { cwd: path, env });
       if (result.code !== 0) throw new CommandError(['flock', lock, 'sh', '-c', pending.setup], path, result);
       const refusal: string | null = await ownModulesRefusal(path);
-      if (refusal !== null) throw new Error(refusal);
+      if (refusal !== null)
+        throw new CommandError(['akrogon', 'guard', 'own-modules'], path, { code: 1, stdout: '', stderr: refusal });
       writeFileSync(pending.marker, pending.setup);
     } catch (error) {
       // A worktree this call created is removed on the setup failure; an existing or adopted one
@@ -680,11 +692,23 @@ async function allocate(
   repoPrefix(global, repo.name);
   const found: Seats = await leafSeats(place.session, repo, leaf.state);
   const live: boolean = liveSeat(found.A) || liveSeat(found.B);
-  if (!live && (await capRefusal(global, repo, invocation, leaf.state.worktree === undefined)) !== undefined)
-    return null;
   const busy: string | null = busyDetail(repo, leaf.state.slug, found);
+  // A leaf busy on a due setup cannot dispatch this pass at all, so the capacity question is moot
+  // for it: the capacity refusal must not mask the busy outcome the seat refusal and timings name.
+  // A due setup in a recorded worktree is maintenance owed regardless of seating, so it runs before
+  // the capacity refusal, which gates only the new seat.
+  const due: boolean = !live && (await setupDue(repo, resolve(worktreeStore(repo), leaf.state.slug)));
+  const maintenanceFirst: boolean = due && (busy !== null || leaf.state.worktree !== undefined);
+  if (
+    !live &&
+    !maintenanceFirst &&
+    (await capRefusal(global, repo, invocation, leaf.state.worktree === undefined)) !== undefined
+  )
+    return null;
   const worktree: State | { busy: string } = await ensureWorktree(repo, leaf, live, busy);
   if ('busy' in worktree) return worktree;
+  if (maintenanceFirst && (await capRefusal(global, repo, invocation, leaf.state.worktree === undefined)) !== undefined)
+    return null;
   ensureLeafTemp(repo, worktree.slug);
   const state: State = worktree.tab === undefined ? { ...worktree, tab: leafTab(repo.name, worktree.slug) } : worktree;
   saveState(leaf.path, state);
