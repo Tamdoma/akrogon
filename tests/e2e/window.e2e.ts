@@ -91,6 +91,7 @@ test('window tier: tabs by labels, names, focus kept, closed-window adoption, ap
   const slots = {
     a: { harness: 'fake', model: 'work', effort: 'low' },
     b: { harness: 'fake', model: 'work', effort: 'low' },
+    consultant: { harness: 'fake', model: 'work', effort: 'low' },
   };
   const tier: Tier = await startTier(engine, 'window', { fake: 'fake --model {model} --effort {effort}' }, slots, {
     bin: standinBin,

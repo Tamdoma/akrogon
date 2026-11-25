@@ -115,6 +115,7 @@ test('watch stop: a working seat stops on its stop key, ends idle and takes one 
     {
       a: { harness: kind, model: spec.model, effort: 'low' },
       b: { harness: kind, model: spec.model, effort: 'low' },
+      consultant: { harness: kind, model: spec.model, effort: 'low' },
     },
     { [kind]: spec.line },
   );

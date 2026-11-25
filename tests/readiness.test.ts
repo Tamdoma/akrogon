@@ -95,6 +95,7 @@ function global(f: Fixture): GlobalConfig {
     slots: {
       a: { harness: 'fake', model: 'm', effort: 'high' },
       b: { harness: 'fake', model: 'm', effort: 'medium' },
+      consultant: { harness: 'fake', model: 'm', effort: 'low' },
     },
     harnesses: { fake: 'fake --model {model}' },
     repos: { [f.repo]: f.root },

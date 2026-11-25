@@ -40,6 +40,7 @@ function installEnv(f: Fixture): NodeJS.ProcessEnv {
     slots: {
       a: { harness: 'claude', model: 'a', effort: 'high' },
       b: { harness: 'codex', model: 'b', effort: 'medium' },
+      consultant: { harness: 'pi', model: 'c', effort: 'low' },
     },
     harnesses: { claude: 'claude', codex: 'codex', pi: 'pi' },
   });

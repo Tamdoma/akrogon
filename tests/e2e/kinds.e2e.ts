@@ -121,6 +121,7 @@ test('kinds tier: first task, later send, report by hc send, transcript label, a
           slots: {
             a: { harness: kind, model: spec.model, effort: 'low' },
             b: { harness: kind, model: spec.model, effort: 'low' },
+            consultant: { harness: kind, model: spec.model, effort: 'low' },
           },
           harnesses,
           repos: { akre2e: tier.root },

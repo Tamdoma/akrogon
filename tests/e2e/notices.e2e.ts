@@ -140,6 +140,7 @@ test('notices tier: closed-window wait, toast and deletion, attention sound only
     {
       a: { harness: 'fake', model: 'none', effort: 'low' },
       b: { harness: 'fake', model: 'none', effort: 'low' },
+      consultant: { harness: 'fake', model: 'none', effort: 'low' },
     },
   );
   let window: Bun.Subprocess | null = null;

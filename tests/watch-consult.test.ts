@@ -1,7 +1,7 @@
 // Brief criteria 3-4: `akrogon seat --watch-consultant --task <text>` on a real hc core with the
 // stand-in harness starts the machine recipe named <prefix>-watch-consult, parented to the caller
 // with outlive: false and the watch labels; every refused form exits non-zero naming the conflict
-// or the missing slots.consultant key and starts nothing.
+// and starts nothing. A config without slots.consultant is refused at load (tests/config.test.ts).
 import { test, expect } from 'bun:test';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -153,33 +153,6 @@ test('seat --watch-consultant with an agy recipe answers the trust dialog then s
     expect(child.parent).toBe(caller);
     // agy takes no task in argv: ENTER answered the trust dialog, then the task went over hc send.
     expect(core.tasks(child.address)).toEqual(['ENTER', task]);
-  } finally {
-    await core.stop();
-    f.clean();
-  }
-});
-
-test('seat --watch-consultant without slots.consultant exits non-zero naming the key and starts nothing', async () => {
-  const f: Fixture = await fixture();
-  const core: HcCore = await hcCore(f);
-  try {
-    const caller: string = await startWatcher(core, f);
-    const refused: Result = await cli(f, ['seat', '--watch-consultant', '--task', 'x'], f.root, {
-      ...core.env,
-      HC_TERMINAL_ID: caller,
-    });
-    expect(refused.code).not.toBe(0);
-    expect(refused.stderr).toContain('slots.consultant');
-    expect(refused.stderr).toContain('config.yaml');
-    // The bare form criterion 4 names is refused the same way.
-    const bare: Result = await cli(f, ['seat', '--watch-consultant'], f.root, {
-      ...core.env,
-      HC_TERMINAL_ID: caller,
-    });
-    expect(bare.code).not.toBe(0);
-    expect(bare.stderr).toContain('slots.consultant');
-    expect(bare.stderr).toContain('config.yaml');
-    expect(await core.terminals({ akrogon: '1' })).toEqual([]);
   } finally {
     await core.stop();
     f.clean();

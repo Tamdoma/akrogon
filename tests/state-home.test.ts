@@ -23,6 +23,7 @@ const globalConfig: object = {
   slots: {
     a: { harness: 'fake', model: 'a', effort: 'high' },
     b: { harness: 'fake', model: 'b', effort: 'medium' },
+    consultant: { harness: 'fake', model: 'c', effort: 'low' },
   },
   harnesses: { fake: 'fake --model {model} --effort {effort}' },
   repos: {},

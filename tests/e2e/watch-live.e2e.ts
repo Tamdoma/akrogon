@@ -484,6 +484,7 @@ async function setupCell(kind: string, shape: string): Promise<Cell> {
     {
       a: { harness: 'fake', model: 'idle', effort: 'low' },
       b: { harness: 'fake', model: 'idle', effort: 'low' },
+      consultant: { harness: 'fake', model: 'idle', effort: 'low' },
     },
     { fake: 'fake --model {model} --effort {effort}' },
     { rootName },

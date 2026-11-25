@@ -97,6 +97,7 @@ export async function fixture(occupiedPrefix?: string): Promise<Fixture> {
     slots: {
       a: { harness: 'fake', model: 'strong-a', effort: 'high' },
       b: { harness: 'fake', model: 'strong-b', effort: 'medium' },
+      consultant: { harness: 'fake', model: 'strong-c', effort: 'low' },
     },
     harnesses: { fake: 'fake --model {model} --effort {effort}' },
     repos: { [identity.repo]: root },

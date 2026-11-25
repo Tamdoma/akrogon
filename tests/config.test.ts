@@ -186,6 +186,7 @@ test('config rejects invalid slots shapes and accepts empty slots', async () => 
       slots: {
         a: { harness: 'fake', model: 'x"y', effort: 'high' },
         b: { harness: 'fake', model: 'strong-b', effort: 'medium' },
+        consultant: { harness: 'fake', model: 'strong-c', effort: 'low' },
       },
       harnesses: { fake: 'fake --model {model} --effort {effort}' },
       repos: { [f.repo]: f.root },
@@ -195,6 +196,7 @@ test('config rejects invalid slots shapes and accepts empty slots', async () => 
       slots: {
         a: { harness: 'fake', model: 'strong-a', effort: 'high' },
         b: { harness: 'fake', model: ' ', effort: 'medium' },
+        consultant: { harness: 'fake', model: 'strong-c', effort: 'low' },
       },
       harnesses: { fake: 'fake --model {model} --effort {effort}' },
       repos: { [f.repo]: f.root },
@@ -353,6 +355,25 @@ test('config loads and prints a machine slots.consultant recipe', async () => {
     const outside: Result = await cli(f, ['config'], f.home);
     expect(outside.code).toBe(0);
     expect(Bun.YAML.parse(outside.stdout)).toMatchObject({ slots: recipe });
+  } finally {
+    f.clean();
+  }
+});
+
+test('config refuses a machine config without slots.consultant, naming the file and the key', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const file: string = resolve(f.home, 'config.yaml');
+    const global = z
+      .object({ slots: z.record(z.string(), z.unknown()) })
+      .passthrough()
+      .parse(Bun.YAML.parse(readFileSync(file, 'utf8')));
+    const { consultant: _recipe, ...slots } = global.slots;
+    yaml(file, { ...global, slots });
+    const refused: Result = await cli(f, ['config']);
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain(file);
+    expect(refused.stderr).toContain('consultant');
   } finally {
     f.clean();
   }
@@ -838,6 +859,7 @@ test('config prints leaf-resolved slots in a managed leaf worktree only', async 
     expect(parsed.slots).toEqual({
       a: { harness: 'fake', model: 'index-a', effort: 'low' },
       b: { harness: 'fake', model: 'strong-b', effort: 'medium' },
+      consultant: { harness: 'fake', model: 'strong-c', effort: 'low' },
     });
     expect(parsed.slots).not.toHaveProperty('source');
     mkdirSync(resolve(worktree, 'sub/dir'), { recursive: true });
@@ -1108,7 +1130,7 @@ test('repoSchema reserves AKROGON_EVIDENCE in env and pass_env', () => {
 // run_root goes into a systemd unit property, where % and quotes are read.
 test('globalSchema refuses a run_root holding anything but plain path characters', () => {
   const seat = { harness: 'claude', model: 'm', effort: 'e' };
-  const machine = { slots: { a: seat, b: seat }, harnesses: { claude: 'claude' } };
+  const machine = { slots: { a: seat, b: seat, consultant: seat }, harnesses: { claude: 'claude' } };
   expect(globalSchema.safeParse({ ...machine, run_root: '/dev/shm/akr_runs-1.d' }).success).toBe(true);
   for (const value of [
     '/dev/shm/akr runs',
@@ -1131,7 +1153,7 @@ test('globalSchema refuses a run_root whose symlinked ancestor leads into the le
     retired: process.env.AKROGON_RETIRED_TEMP_ROOT,
   };
   const seat = { harness: 'claude', model: 'm', effort: 'e' };
-  const machine = { slots: { a: seat, b: seat }, harnesses: { claude: 'claude' } };
+  const machine = { slots: { a: seat, b: seat, consultant: seat }, harnesses: { claude: 'claude' } };
   // Short on purpose: run_root is at most 40 bytes.
   const base: string = mkdtempSync('/tmp/akt-');
   try {
@@ -1170,7 +1192,7 @@ test('globalSchema accepts an absolute short run_root and refuses relative, long
     retired: process.env.AKROGON_RETIRED_TEMP_ROOT,
   };
   const seat = { harness: 'claude', model: 'm', effort: 'e' };
-  const machine = { slots: { a: seat, b: seat }, harnesses: { claude: 'claude' } };
+  const machine = { slots: { a: seat, b: seat, consultant: seat }, harnesses: { claude: 'claude' } };
   try {
     process.env.AKROGON_LEAF_TEMP_ROOT = '/var/tmp/leaf-root';
     process.env.AKROGON_RETIRED_TEMP_ROOT = '/tmp/retired-root';
