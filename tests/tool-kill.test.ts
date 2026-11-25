@@ -87,8 +87,13 @@ async function waitGone(path: string, ms: number = WAIT_MS): Promise<boolean> {
 
 const pidAlive = (pid: number): boolean => existsSync(`/proc/${pid}`);
 
+// Kill rows live in their own sibling ledger so the strict-union timings.jsonl stays parseable
+// by older releases; check rows share the shared ledger.
 function rows(f: Fixture, kind: string): Record<string, unknown>[] {
-  const file: string = resolve(f.root, 'issues/timings.jsonl');
+  const file: string = resolve(
+    f.root,
+    kind.startsWith('tool_kill') ? 'issues/timings-kill.jsonl' : 'issues/timings.jsonl',
+  );
   if (!existsSync(file)) return [];
   return readFileSync(file, 'utf8')
     .split('\n')
