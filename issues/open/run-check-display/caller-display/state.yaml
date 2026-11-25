@@ -1,0 +1,35 @@
+slug: caller-display
+phase: plan.synthesis
+created: 2026-11-25
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#155"
+busy_since:
+  A: 2026-11-25T07:12:39.862Z
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak3bfa23a241774a447ae674cae37561
+worktree: /home/ivan/.akrogon/worktrees/akrogon/caller-display
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t3q9
+prompted:
+  A:
+    turn: 0
+    address: t3q9
+prompted_at: {}
+delivery_error: {}

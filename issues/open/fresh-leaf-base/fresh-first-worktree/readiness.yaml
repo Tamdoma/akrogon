@@ -1,0 +1,25 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: git worktree remove, merge --ff-only, worktree add -B and rev-list on leftover worktrees
+    command: git 2.56.1 in a scratchpad temp bare remote, clone and worktrees (see record G1)
+    identity: local user, no account
+    target: throwaway temp repos
+    version: git 2.56.1
+    date: '2026-11-25'
+    result: remove without --force deletes a tree holding only ignored files (exit 0) and refuses modified or untracked files (exit 128); ff-only carries dirty files; -B resets an existing branch; rev-list counts 0 own commits for a branch behind
+    cleanup: temp dirs removed
+    limits: one git version; no sparse checkout in this probe
+    record: issues/chart/fresh-leaf-base/forks/leftover-worktree.md
+  - operation: git update-ref bound move and delete, branch checked out elsewhere, unborn HEAD, submodule removal
+    command: git 2.56.1 temp-repo probes by B, C and D (records G2 to G4 and the final-shape check)
+    identity: local user, no account
+    target: throwaway temp repos
+    version: git 2.56.1
+    date: '2026-11-25'
+    result: a bound update-ref refuses after the ref moved, while unbound worktree add -B overwrote it; update-ref moves and deletes a branch checked out in another worktree; a deleted checked-out branch leaves the worktree unborn with HEAD still naming it; remove refuses with initialized submodules and remove --force succeeds; remove succeeds on a clean tree holding MERGE_HEAD
+    cleanup: temp dirs removed
+    limits: one git version
+    record: issues/chart/fresh-leaf-base/forks/leftover-worktree.md

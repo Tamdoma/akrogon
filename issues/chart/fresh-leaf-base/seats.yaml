@@ -30,6 +30,14 @@ seats:
       model: meta/muse-wonder-full-1.0
       effort: high
     session: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon--/2026-11-25T00-16-40-662Z_01a2455a-e8ce-4714-820f-ab31abdf57bc.jsonl
+  - seat: A
+    address: t126
+    name: null
+    recipe:
+      harness: claude
+    session: /home/ivan/.claude/projects/-home-ivan-Work-infra-akrogon/9baf0156-26e9-4f88-84b4-84d560ea0b83.jsonl
 spans:
   - from: '2026-11-25T00:14:44Z'
     to: '2026-11-25T00:47:40Z'
+  - from: '2026-11-25T07:08:11Z'
+    to: '2026-11-25T07:09:32Z'
