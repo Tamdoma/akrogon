@@ -220,11 +220,22 @@ test('direct-drop cancels the run, stops slice and scopes, removes worktree and 
     const doorPid: number | null = (await f.core.get(door)).pid;
     const reviewerPid: number | null = (await f.core.get(reviewer)).pid;
     const worktree: string = await seedWorktree(f, 'fix-alpha');
-    const leafPath: string = seedDirectLeaf(f, 'fix-alpha', { door, reviewer }, { worktree });
-    writeFileSync(resolve(leafPath, 'plan.md'), '# Plan\n');
+    const leafPath: string = seedDirectLeaf(f, 'fix-alpha', { door, reviewer }, { worktree, phase: 'check.review' });
+    const saved: string[] = ['plan.md', 'review-B.md', 'implementation/report.md', 'implementation/check-leaf.log'];
+    mkdirSync(resolve(leafPath, 'implementation'));
+    for (const file of saved) writeFileSync(resolve(leafPath, file), file);
     const seeded = seedLiveRun(f, 'fix-alpha');
     sleeper = seeded.sleeper;
     const chart = chartFolder(f, 'chart-x');
+    mkdirSync(resolve(chart.abs, 'direct'));
+    writeFileSync(resolve(chart.abs, 'direct/check-chart.log'), 'chart capture');
+    const enclosed: Result = await cli(f, ['direct-drop', 'fix-alpha', '--chart', chart.rel], f.root, {
+      ...f.env,
+      AKROGON_CAPTURES: JSON.stringify([{ owner: resolve(leafPath, '..'), run: seeded.run }]),
+    });
+    expect(enclosed.code).not.toBe(0);
+    expect(enclosed.stderr).toContain(seeded.run);
+    await expectUntouched(f, 'fix-alpha', worktree);
     writeFileSync(f.core.shimLog, '');
     const dropped: Result = await cli(f, ['direct-drop', 'fix-alpha', '--chart', chart.rel], f.root, f.env);
     expect(dropped.code, dropped.stderr).toBe(0);
@@ -239,9 +250,10 @@ test('direct-drop cancels the run, stops slice and scopes, removes worktree and 
     expect(existsSync(worktree)).toBe(false);
     expect(await branchExists(f, 'fix-alpha')).toBe(false);
     // The owner folder moved whole: leaf state and plan beside the owner's own ISSUE.md.
-    const moved: string = resolve(chart.abs, 'direct');
+    const moved: string = resolve(chart.abs, 'direct/chart-x');
+    expect(readFileSync(resolve(chart.abs, 'direct/check-chart.log'), 'utf8')).toBe('chart capture');
     expect(existsSync(resolve(moved, 'fix-alpha/state.yaml'))).toBe(true);
-    expect(existsSync(resolve(moved, 'fix-alpha/plan.md'))).toBe(true);
+    for (const file of saved) expect(readFileSync(resolve(moved, 'fix-alpha', file), 'utf8')).toBe(file);
     expect(existsSync(resolve(moved, 'ISSUE.md'))).toBe(true);
     expect(existsSync(resolve(f.root, 'issues/open/chart-x'))).toBe(false);
     const state: Raw = readStateRaw(resolve(moved, 'fix-alpha'));
@@ -348,7 +360,7 @@ test('direct-drop refuses a merged direct leaf in issues/closed, nothing moved o
   }
 });
 
-test('direct-drop refuses when the chart direct folder already exists, nothing moved or removed', async () => {
+test('direct-drop refuses when the chart already holds that owner, nothing moved or removed', async () => {
   const f: HcFixture = await hcFixture();
   const stopAdopt: () => void = adopt(f.core);
   try {
@@ -357,7 +369,7 @@ test('direct-drop refuses when the chart direct folder already exists, nothing m
     const worktree: string = await seedWorktree(f, 'fix-alpha');
     seedDirectLeaf(f, 'fix-alpha', { door, reviewer }, { worktree });
     const chart = chartFolder(f, 'chart-x');
-    mkdirSync(resolve(chart.abs, 'direct/fix-alpha'), { recursive: true });
+    mkdirSync(resolve(chart.abs, 'direct/chart-x'), { recursive: true });
     const refused: Result = await cli(f, ['direct-drop', 'fix-alpha', '--chart', chart.rel], f.root, f.env);
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).not.toBe('');

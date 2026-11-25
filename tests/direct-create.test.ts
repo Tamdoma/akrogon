@@ -2,12 +2,22 @@
 // creates a direct leaf (state.yaml with direct: true, seat refs, worktree, .env, no tab),
 // refuses the bad shapes writing nothing, and a rerun rewrites only seats.
 import { test, expect } from 'bun:test';
-import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  unlinkSync,
+  renameSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { cli, storeDir, type Fixture } from './helpers';
 import { adopt, hcFixture, stopCoresAfterFile, type HcFixture } from './hc-fixture';
 import { command, type Result } from '../src/shell';
+import { flockHold } from '../src/flock';
 
 stopCoresAfterFile();
 
@@ -27,14 +37,13 @@ function writeRaw(path: string, data: Raw): void {
   renameSync(temp, file);
 }
 
-// The door files of a direct leaf (plan criterion 1): ISSUE.md, brief.md and design.md in the leaf
-// folder, no state.yaml; the owner folder carries its own ISSUE.md, moved with it by direct-drop.
+// The chart door writes the owner index and the three leaf draft files.
 function doorFiles(f: Fixture, owner: string, slug: string): string {
   const ownerPath: string = resolve(f.root, 'issues/open', owner);
   const leafPath: string = resolve(ownerPath, slug);
   mkdirSync(leafPath, { recursive: true });
   writeFileSync(resolve(ownerPath, 'ISSUE.md'), '# ' + owner + '\n');
-  writeFileSync(resolve(leafPath, 'ISSUE.md'), '# ' + owner + '\n');
+  writeFileSync(resolve(leafPath, 'readiness.yaml'), '{}\n');
   writeFileSync(resolve(leafPath, 'brief.md'), '# Brief: ' + slug + '\n');
   writeFileSync(resolve(leafPath, 'design.md'), '# Design: ' + slug + '\n');
   return leafPath;
@@ -466,6 +475,87 @@ test('a rerun on a merged leaf in issues/closed rewrites seats and recreates no 
     expect(strip(after)).toEqual(strip(before));
     expect(existsSync(resolve(storeDir(f), 'fix-alpha'))).toBe(false);
     expect(await branchExists(f, 'fix-alpha')).toBe(false);
+  } finally {
+    stopAdopt();
+    await f.clean();
+  }
+});
+
+test('direct refuses a missing readiness record and identities reserved by other areas or nested leaves', async () => {
+  const f: HcFixture = await hcFixture();
+  const stopAdopt: () => void = adopt(f.core);
+  try {
+    const door: string = await standin(f, 'door');
+    const reviewer: string = await standin(f, 'reviewer');
+    const attempt = (slug: string): Promise<Result> =>
+      direct(f, slug, ['--reviewer', reviewer], { HC_TERMINAL_ID: door });
+    const draft: string = doorFiles(f, 'draft', 'no-ready');
+    unlinkSync(resolve(draft, 'readiness.yaml'));
+    const missing: Result = await attempt('no-ready');
+    expect(missing.code).not.toBe(0);
+    expect(missing.stderr).toContain('readiness.yaml');
+    expect(existsSync(resolve(draft, 'state.yaml'))).toBe(false);
+    await expectNothingCreated(f, 'no-ready');
+    for (const area of ['closed', 'parked']) {
+      const slug: string = 'used-' + area;
+      const owner: string = 'owner-' + area;
+      const path: string = doorFiles(f, owner, slug);
+      mkdirSync(resolve(f.root, 'issues', area, owner), { recursive: true });
+      const reserved: Result = await attempt(slug);
+      expect(reserved.code).not.toBe(0);
+      expect(reserved.stderr).toContain(area);
+      expect(existsSync(resolve(path, 'state.yaml'))).toBe(false);
+      await expectNothingCreated(f, slug);
+    }
+    const path: string = doorFiles(f, 'fresh', 'reserved');
+    const nested: string = resolve(f.root, 'issues/open/epic/child/reserved');
+    mkdirSync(nested, { recursive: true });
+    writeRaw(nested, { slug: 'reserved', repo: f.repo, phase: 'implement', created: '2026-10-11', 'blocked-by': [] });
+    const reserved: Result = await attempt('reserved');
+    expect(reserved.code).not.toBe(0);
+    expect(reserved.stderr).toContain('reserved');
+    expect(existsSync(resolve(path, 'state.yaml'))).toBe(false);
+    await expectNothingCreated(f, 'reserved');
+  } finally {
+    stopAdopt();
+    await f.clean();
+  }
+});
+
+test('rerun waits for the phase and dispatch lock and keeps state written by its holder', async () => {
+  const f: HcFixture = await hcFixture();
+  const stopAdopt: () => void = adopt(f.core);
+  try {
+    const path: string = doorFiles(f, 'chart-x', 'fix-alpha');
+    const door: string = await standin(f, 'door');
+    const first: string = await standin(f, 'reviewer-one');
+    const second: string = await standin(f, 'reviewer-two');
+    // Seed an existing leaf, isolating rerun from the first-run validation.
+    writeRaw(path, {
+      slug: 'fix-alpha',
+      phase: 'implement',
+      created: '2026-10-11',
+      repo: f.repo,
+      'blocked-by': [],
+      direct: true,
+      seat: { A: { session: f.core.session, address: door }, B: { session: f.core.session, address: first } },
+    });
+    const lock = await flockHold(resolve(f.home, '.lock'), '-x');
+    const rerun: Promise<Result> = direct(f, 'fix-alpha', ['--reviewer', second], { HC_TERMINAL_ID: door });
+    try {
+      const blocked: boolean = await Promise.race([rerun.then(() => false), Bun.sleep(600).then(() => true)]);
+      expect(blocked).toBe(true);
+      writeRaw(path, { ...readRaw(path), phase: 'check.review', prompted: { B: { address: first, turn: 7 } } });
+    } finally {
+      await lock.release();
+      await rerun;
+    }
+    expect((await rerun).code).toBe(0);
+    expect(readRaw(path)).toMatchObject({
+      phase: 'check.review',
+      prompted: { B: { address: first, turn: 7 } },
+      seat: { B: { session: f.core.session, address: second } },
+    });
   } finally {
     stopAdopt();
     await f.clean();
