@@ -13,8 +13,8 @@ issues/chart/<chart-slug>/
   door-reset.log                # handover helper's stage lines, appended by each handover into this chart
   forks/signposts.md            # the session's signposts record (original in one chart, verbatim copy elsewhere)
   forks/<fork-slug>.md
-  slots/<pass>.md                 # peer exchanges, and direct review returns (review-B-<n>.md)
-  direct/plan.md, report.md     # only on the direct route
+  slots/<pass>.md                 # peer exchanges
+  direct/                       # charting-probe captures; a dropped direct leaf's owner folder lands here
 ```
 
 Charts stay here after handoff. They have no state.yaml or lifecycle phase. Create forks/ even for a fully settled direct item. On resume, CHART.md points to the selected fork and its context rather than requiring a full chart reread.
@@ -77,19 +77,11 @@ Every mode entry's address is A's hc terminal and its transcript path is the one
 
 ## Direct attempt
 
-<only on the direct route, written at attempt start and updated through landing; the route is fixed by the approved handoff review and a later `direct` setting change does not alter it>
+<only on the direct route, written at attempt start and updated through landing; the leaf's `state.yaml` tracks phases, seats and work>
 
-- branch: <slug, also the worktree directory name under worktree_store>
-- worktree: <path>
-- base: <sha the attempt started from, then the sha after each rebase>
-- head: <sha of the latest committed head>
-- rounds used / fix_rounds: <n / limit>
-- push attempts: <n / 2>
-- done: <criteria passing>
-- not done: <criteria open, or none>
-- trigger: <growth stop trigger, or none>
-- review files: <slots/review-B-<n>.md paths>
+- slug: <the leaf slug, naming the worktree and the owner folder `issues/open/<chart-slug>/`>
 - landed SHA: <sha pushed, after landing>
+- trigger: <growth stop trigger, or none>
 ```
 
 The CHART.md carries `## Mode record` for every chart, empty until a mode or handover entry lands — under autopilot one `- mode` line is appended per mode change (on, off, changed list, "continue autopilot") with its time, A's hc address and A's transcript path, the latest entry governing — and, under autopilot, `## Autopilot`, written as the pass goes with every line a `- ` list item so no line parses as a chart marker; it records observed states only, never "started" or "merged" without evidence. Preserve useful territory-map findings under the relevant chart section or fork. After valid handoff, append `Handed off <YYYY-MM-DD>` on its own line to CHART.md without moving it. The markers are `Handed off <YYYY-MM-DD>`, `Closed <YYYY-MM-DD>`, and `Held <YYYY-MM-DD>`, each beginning its own line, with the last marker in the file authoritative. A handed-off chart remains part of duplicate detection and a later contract change becomes new intake, not an edit to emitted contracts. A CHART.md created for a next chart with no folder holds `pending map by fresh A (<seed path, legacy path or operator note reference>)` under Destination plus the Mode record, plus a verbatim copy of the session's `forks/signposts.md` naming the chart that holds the original, and no INTAKE.md, until fresh A writes the Destination after its map. The `handover` and `continue <mode> (handover <time>)` entries are appended on a chart switch per `handover.md`, so a fresh session resumes where the switch left off — the same handed list under autopilot, the named chart under attended.
@@ -414,7 +406,7 @@ blocked-by: []
 sources: []
 ```
 
-Replace sample values with the chosen slug, creation date and registered repo key. A direct-route chart writes no leaf files or state.yaml. Every leaf gets `sources`, empty when unsourced. Attempts, done, fix_rounds, frozen, frozen_cited, verdict, pane, tab, prompted and worktree belong to the command and are not door-authored.
+Replace sample values with the chosen slug, creation date and registered repo key. On the direct route the door writes the standalone issue's `ISSUE.md`, `brief.md`, `design.md` and `readiness.yaml` under `issues/open/<chart-slug>/<slug>/`; `state.yaml` is written by `akrogon direct`, never door-authored. Every leaf gets `sources`, empty when unsourced. Attempts, done, fix_rounds, frozen, frozen_cited, verdict, pane, tab, prompted and worktree belong to the command and are not door-authored.
 
 A GitHub report has exactly one completion owner, an issue or an epic: every leaf beneath that owner carries its exact identity in sources. For an epic owner, that includes leaves of every child issue. Do not distribute one identity across unrelated completion owners. Legacy source paths stay in intake provenance, not sources. One stated exception: a report whose close depends on a step on main that can only follow a leaf's merge is withheld from `sources` of every leaf whose completion could close it; the identity stays open, mirrored by `akrogon pull`, and the door makes and verifies the edit, then runs `akrogon close <id> --by <text>` naming what delivered it.
 

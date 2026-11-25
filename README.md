@@ -14,7 +14,7 @@ It is for developers who already run an agent CLI and want a repeatable path fro
 > - One agent CLI, such as Claude Code, Codex or pi.
 > - An authenticated GitHub CLI (`gh`), only for GitHub work.
 
-![How work moves through Akrogon: a request goes to the chart door, where you and agent A settle it, then becomes a contract in issues/open, then is built, gets an independent review, is repaired if needed, is landed by the command and ends merged. A dashed side path shows the direct route, where one small settled chart keeps the charted decisions and B's review but skips the leaf handoff, and the door lands it itself.](docs/pictures/factory-overview.svg)
+![How work moves through Akrogon: a request goes to the chart door, where you and agent A settle it, then becomes a contract in issues/open, then is built, gets an independent review, is repaired if needed, is landed by the command and ends merged. A dashed side path shows the direct route, where one small settled chart keeps the charted decisions and B's review but skips the handoff to fresh seats: the door is seat A and the command lands it like any leaf.](docs/pictures/factory-overview.svg)
 
 ## Start here
 

@@ -149,17 +149,6 @@ test('a qualifying linked pair satisfies the merge gates and a non-qualifying pa
         commands: cmds.map((item) => ({ ...item, exit: 1, log: baseLog })),
       });
     };
-    const guards = async (): Promise<Result> =>
-      spawnCaptured(
-        [
-          process.execPath,
-          resolve(import.meta.dir, '../skills/chart-issues/scripts/direct-guards.ts'),
-          worktree,
-          f.repo,
-          resolve(f.home, 'chart'),
-        ],
-        { env: { ...process.env, AKROGON_HOME: f.home } },
-      );
     const headOnly: string = resolve(path, 'implementation/check-test-base.log');
     writeFileSync(headOnly, '(fail) beta\n');
     pair(headOnly);
@@ -167,7 +156,6 @@ test('a qualifying linked pair satisfies the merge gates and a non-qualifying pa
     expect(refused1.code).not.toBe(0);
     expect(refused1.stderr).toContain(`No green merge verify receipt for ${head}`);
     expect(readState(path).batch?.tested_top).toBeUndefined();
-    expect((await guards()).code).not.toBe(0);
     // A rerun row's log names only the rerun's reds; its stored failures decide the cover.
     pair(headOnly, { log: headOnly, failures: ['alpha'] });
     expect((await gateRun(f, 'landing')).code).not.toBe(0);
@@ -176,9 +164,6 @@ test('a qualifying linked pair satisfies the merge gates and a non-qualifying pa
     pair(same);
     expect((await gateRun(f, 'landing')).code).toBe(0);
     expect(readState(path).batch?.tested_top).toBe(head);
-    const passed: Result = await guards();
-    expect(passed.stderr).toBe('');
-    expect(passed.code).toBe(0);
   } finally {
     f.clean();
   }
@@ -225,17 +210,6 @@ test('merge gates accept a covered main-red head and refuse an uncovered or reso
         commands: entries(7, failures),
       });
     const file: string = resolve(f.root, 'issues/verify-runs.jsonl');
-    const guards = async (): Promise<Result> =>
-      spawnCaptured(
-        [
-          process.execPath,
-          resolve(import.meta.dir, '../skills/chart-issues/scripts/direct-guards.ts'),
-          worktree,
-          f.repo,
-          resolve(f.home, 'chart'),
-        ],
-        { env: { ...process.env, AKROGON_HOME: f.home } },
-      );
     const landPushBody: string =
       'import { landPush } from ' +
       JSON.stringify(resolve(import.meta.dir, '../src/phase.ts')) +
@@ -256,9 +230,6 @@ test('merge gates accept a covered main-red head and refuse an uncovered or reso
     redBase(['alpha']);
     expect((await gateRun(f, 'landing')).code).toBe(0);
     expect(readState(path).batch?.tested_top).toBe(head);
-    const passed: Result = await guards();
-    expect(passed.stderr).toBe('');
-    expect(passed.code).toBe(0);
     const pushed: Result = await landPushRun('landing');
     expect(pushed.stderr).toBe('');
     expect(JSON.parse(pushed.stdout.trim().split('\n').at(-1)!)).toEqual({ kind: 'landed' });
@@ -273,7 +244,6 @@ test('merge gates accept a covered main-red head and refuse an uncovered or reso
     expect(refused.code).not.toBe(0);
     expect(refused.stderr).toContain(`No green merge verify receipt for ${head}`);
     expect(readState(path2).batch?.tested_top).toBeUndefined();
-    expect((await guards()).code).not.toBe(0);
     // batchPush's tested_top guard precedes the receipt read: stamp the top the
     // way recordTested would have, so the push reaches the receipt check.
     saveState(path2, { ...readState(path2), batch: { ...readState(path2).batch!, tested_top: head } });
@@ -300,35 +270,6 @@ test('merge gates accept a covered main-red head and refuse an uncovered or reso
     const resolved: Result = await gateRun(f, 'landing3');
     expect(resolved.code).not.toBe(0);
     expect(resolved.stderr).toContain(`No green merge verify receipt for ${head}`);
-  } finally {
-    f.clean();
-  }
-});
-
-test('direct guards need a green merge receipt for the worktree HEAD under the current command set', async () => {
-  const f: Fixture = await fixture();
-  try {
-    const { worktree, head } = await branch(f, 'direct');
-    const run = async (): Promise<Result> =>
-      spawnCaptured(
-        [
-          process.execPath,
-          resolve(import.meta.dir, '../skills/chart-issues/scripts/direct-guards.ts'),
-          worktree,
-          f.repo,
-          resolve(f.home, 'chart'),
-        ],
-        { env: { ...process.env, AKROGON_HOME: f.home } },
-      );
-    const missing: Result = await run();
-    expect(missing.code).not.toBe(0);
-    expect(missing.stderr).toContain(`No green merge verify receipt for ${head}`);
-    greenReceipt(f, head, 'merge', stale);
-    expect((await run()).code).not.toBe(0);
-    greenReceipt(f, head, 'merge');
-    const passed: Result = await run();
-    expect(passed.stderr).toBe('');
-    expect(passed.code).toBe(0);
   } finally {
     f.clean();
   }

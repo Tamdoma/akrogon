@@ -18,7 +18,7 @@ One page per job.
 
 - [A working day](use/a-working-day.md): the order of the steps from request to merged, and the two other routes.
 - [Plan work](use/plan-work.md): chart a request into leaf contracts with `/chart-issues`.
-- [Quick fix](use/quick-fix.md): let the chart door build and land one small, settled change through the direct route.
+- [Quick fix](use/quick-fix.md): let the chart door build one small, settled change itself through the direct route.
 - [Autopilot](use/autopilot.md): let the chart door chart and hand off a fixed list of work without asking you each question.
 - [Write issues by hand](use/write-issues-by-hand.md): write the leaf files yourself and order leaves with `blocked-by`.
 - [Run work](use/run-work.md): start ready leaves and move running ones forward with `akrogon next`.

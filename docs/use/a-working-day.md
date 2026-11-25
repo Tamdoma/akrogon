@@ -2,7 +2,7 @@
 
 A usual day takes a request, charts it into leaves, runs the leaves and ends with the work merged on your default branch. Read this page to see the order of the steps. Each step links the page that covers it in detail.
 
-![A working day from intake to merged: intake from a local note, a GitHub issue or a pulled seed goes to /chart-issues, then handoff to issues/open, akrogon next, the seats plan, build, review and repair, the command lands it and it is merged, with watch-issues beside the run, broadcast once per finished issue, and two side paths where the direct route has the door build, B review and the door land, and autopilot charts and hands off but starts nothing.](../pictures/working-day.svg)
+![A working day from intake to merged: intake from a local note, a GitHub issue or a pulled seed goes to /chart-issues, then handoff to issues/open, akrogon next, the seats plan, build, review and repair, the command lands it and it is merged, with watch-issues beside the run, broadcast once per finished issue, and two side paths where the direct route has the door build and B review, and autopilot charts and hands off but starts nothing.](../pictures/working-day.svg)
 
 ## The usual day
 
@@ -21,7 +21,7 @@ To hold work back or stop a running leaf, see [Park, pause and stop](park-pause-
 
 ## Two other routes
 
-The direct route is for one small, settled change. The door builds it in a worktree, the first chart consultant (B) reviews it, and the door lands it on your default branch. It skips the leaf handoff and `akrogon next`. It keeps the charted decisions and B's review. The door offers it only when the chart is eligible, and you can always decline. See [Quick fix](quick-fix.md).
+The direct route is for one small, settled change. The door builds it in the leaf worktree as seat A, the first chart consultant (B) reviews it as seat B, and the merge queue lands it on your default branch like any leaf. It skips the handoff to fresh seats and keeps the charted decisions and B's review. The door offers it only when the chart is eligible, and you can always decline. See [Quick fix](quick-fix.md).
 
 Autopilot charts and hands off without asking you each question. It starts no execution. You still run `akrogon next` on the handed-off leaves. See [Autopilot](autopilot.md).
 

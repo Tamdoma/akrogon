@@ -65,7 +65,7 @@ akrogon next <slug>
 
 See [Run work](run-work.md). Optional: to keep leaves moving while you are away, see [Watch while away](watch-while-away.md).
 
-For a small eligible chart with consultant B named, the review can offer the direct route instead. It skips the leaf handoff and `akrogon next`. It keeps the charted decisions and B's review of the code. See [Quick fix](quick-fix.md).
+For a small eligible chart with consultant B named, the review can offer the direct route instead. It keeps the charted decisions and B's review of the code, with the door as seat A of the leaf instead of fresh seats. See [Quick fix](quick-fix.md).
 
 The full command list is in [commands.md](../reference/commands.md).
 

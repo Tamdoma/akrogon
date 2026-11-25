@@ -96,11 +96,11 @@ bun -e "import {readGlobal} from './src/config.ts'; import {readReadiness, gaps}
 
 `akrogon status` cannot see drafts without `state.yaml`, so this is the pre-handoff presence check; after valid writes `akrogon status` validates the emitted files.
 
-On the direct route no leaf files or `state.yaml` are written, `Closed <YYYY-MM-DD>` follows a direct landing after cleanup, and `Held <YYYY-MM-DD>` follows abandon. The door runs `akrogon pack <chart>` before appending `Closed`, `Held` or `Handed off` when `<chart>/direct` holds a log. After valid lifecycle handoff append `Handed off <YYYY-MM-DD>` on its own line to CHART.md, retaining the chart and source inputs in place; command dispatch remains the authority, so the handoff runs no `akrogon next` or chart phase transition and the door moves to the next chart as Drain states. The door makes and verifies a needed step on main during the pass when its precondition exists, and a waiting edit blocked on a leaf's merge or an unsourced chart follows the shapes.md records. The markers are `Handed off <YYYY-MM-DD>`, `Closed <YYYY-MM-DD>`, and `Held <YYYY-MM-DD>`, each beginning its own line, with the last marker in the file authoritative. The door runs the usage script again when it appends `Handed off`, `Held` or `Closed`.
+On the direct route `Closed <YYYY-MM-DD>` follows the leaf's landing and `Held <YYYY-MM-DD>` follows abandon. The door runs `akrogon pack <chart>` before appending `Closed`, `Held` or `Handed off` when `<chart>/direct` holds a log. After valid lifecycle handoff append `Handed off <YYYY-MM-DD>` on its own line to CHART.md, retaining the chart and source inputs in place; command dispatch remains the authority, so the handoff runs no `akrogon next` or chart phase transition and the door moves to the next chart as Drain states. The door makes and verifies a needed step on main during the pass when its precondition exists, and a waiting edit blocked on a leaf's merge or an unsourced chart follows the shapes.md records. The markers are `Handed off <YYYY-MM-DD>`, `Closed <YYYY-MM-DD>`, and `Held <YYYY-MM-DD>`, each beginning its own line, with the last marker in the file authoritative. The door runs the usage script again when it appends `Handed off`, `Held` or `Closed`.
 
 ## Direct route
 
-The direct route is a second ending for the handoff: the door implements one small settled chart itself in a worktree, B — the first named peer — reviews, and the door lands it on the default branch without leaf files. It needs no repo setting: the door offers it at its own discretion whenever the chart is eligible, and the operator can always decline.
+The direct route is a second ending for the handoff: the door implements one small settled chart itself in a worktree, as seat A of a real leaf the command creates, B — the first named peer — reviews, and the merge queue lands it like any leaf. It needs no repo setting: the door offers it at its own discretion whenever the chart is eligible, and the operator can always decline.
 
 Direct is not offered, and the review names the refusal in one line and the handoff goes to the lifecycle, when any of these holds:
 
@@ -109,11 +109,17 @@ Direct is not offered, and the review names the refusal in one line and the hand
 - more than one outcome or an unfinished dependency exists (door judgment);
 - a human prerequisite is pending;
 - B is not named;
+- the door is not inside hc;
 - the door is running under autopilot (`## Autopilot`).
 
-When eligible, the review asks one route question with the door's recommendation and a reply key: lifecycle or direct. The door may recommend lifecycle for a risky small job. Explicit direct authorization already given in the session is the answer. The chosen route is recorded in CHART.md as the `Route:` line. Selecting direct includes the door's push authority; push, source close and broadcast are coordination, not live calls under eligibility.
+When eligible, the review asks one route question with the door's recommendation and a reply key: lifecycle or direct. The door may recommend lifecycle for a risky small job. Explicit direct authorization already given in the session is the answer. The chosen route is recorded in CHART.md as the `Route:` line. When direct is chosen:
 
-The door reads [direct-route.md](assets/direct-route.md) when the direct route is chosen.
+1. Write `ISSUE.md` under `issues/open/<chart-slug>/` and `brief.md`, `design.md` and `readiness.yaml` under `issues/open/<chart-slug>/<slug>/`, the standalone-issue handoff shape with the chart slug as the owner.
+2. Run `akrogon direct <slug> --reviewer <B address> [--source <owner/repo#n>]...`, one `--source` per delivered identity. The command probes the caller and reviewer live, creates the unlocked worktree and writes `state.yaml` with `phase: implement` and `direct: true`, seat A the caller and seat B the reviewer, no tab. Re-running it rewrites only the two seats.
+3. Implement in the worktree with `implement-issue <slug> slot=A phase=implement leaf=issues/open/<chart-slug>/<slug>`, writing `<leaf>/plan.md` and `<leaf>/implementation/report.md` in the leaf folder, and finish each implement round with `akrogon phase <slug> check.review --slot A`.
+4. Review rounds: send B the `check-issue` `check.review` task for the leaf with `worktree=` and `base=` and the door's hc report line. On a `fix` verdict the leaf enters `check.repair`; the door moves it to `check.fix` and repairs as slot A with the implement-issue `check.fix` form, then moves it back to `check.review`. A land exit into `check.repair` either returns the leaf unedited to `merge` or takes the same `check.fix` repair.
+5. When `merge` starts, stay in the turn and recheck at a bounded interval, running `akrogon next <slug>` at each check so a dead land unit relaunches. The merge queue and land run land the leaf unchanged: they verify, push the default branch, close the leaf's sources, broadcast through B like any leaf and move the owner to `issues/closed/`. Re-entering after a lost turn, read the leaf first and run this tail on `merged`: run `akrogon pack <chart>` when `<chart>/direct` holds a log, write the landed SHA into the `Direct attempt` section and append `Closed`.
+6. Abandon or growth stop: `akrogon direct-drop <slug> --chart <chart folder>` stops the leaf's runs, removes the worktree and branch and moves the owner folder into `<chart>/direct/`. Run `akrogon pack <chart>` when `<chart>/direct` holds a log, then append `Held` for abandon. A growth stop to the lifecycle hands off a fresh slug. A task that outgrows the route mid-pass stops the leaf `failed` under implement-issue's stop rule, and the operator chooses between these continuations.
 
 ## Autopilot
 

@@ -22,7 +22,7 @@ Propose every repo key below, using inspected values or these defaults, includin
 ```yaml
 remote: origin
 default_branch: main
-fix_rounds: 3 # bounds the chart door's direct-route repair rounds
+fix_rounds: 3 # bounds leaf repair rounds
 implement: subagents
 # setup: bun install --frozen-lockfile --backend=copyfile — proposed only when a lockfile is committed in HEAD
 checks: {}

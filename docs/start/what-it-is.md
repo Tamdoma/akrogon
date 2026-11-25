@@ -4,7 +4,7 @@ Akrogon is a small software factory for people who already use a coding agent. Y
 
 You decide what to build and when to start it. Akrogon keeps track of where each piece of work is and tells the next agent what to do. It does not decide what your product needs, and it does not deploy your product.
 
-![How work moves through Akrogon: a request goes to the chart door, where you and agent A settle it, then becomes a contract in issues/open, then is built, gets an independent review, is repaired if needed, is landed by the command and ends merged. A dashed side path shows the direct route, where one small settled chart keeps the charted decisions and B's review but skips the leaf handoff, and the door lands it itself.](../pictures/factory-overview.svg)
+![How work moves through Akrogon: a request goes to the chart door, where you and agent A settle it, then becomes a contract in issues/open, then is built, gets an independent review, is repaired if needed, is landed by the command and ends merged. A dashed side path shows the direct route, where one small settled chart keeps the charted decisions and B's review but skips the handoff to fresh seats: the door is seat A and the command lands it like any leaf.](../pictures/factory-overview.svg)
 
 ## From request to merged
 
@@ -16,7 +16,7 @@ You decide what to build and when to start it. Akrogon keeps track of where each
 6. Both seats review the build without reading each other's review. When they find problems, seat B repairs most of them and hands the rest back to A.
 7. The command lands the leaf. It checks the exact commit, pushes it to your default branch and marks the leaf merged.
 
-For one small, settled change, the door can offer the direct route instead. The door builds it itself, B reviews it, and the door lands it. See [Quick fix](../use/quick-fix.md).
+For one small, settled change, the door can offer the direct route instead. The door builds it itself as seat A of the leaf, B reviews it, and the command lands it like any leaf. See [Quick fix](../use/quick-fix.md).
 
 ## The words
 

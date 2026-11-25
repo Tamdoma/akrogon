@@ -8,7 +8,7 @@ One line per term. Each term links to the page that explains it.
 - **[Check](checks.md)**: a named command under `checks` in `issues/config.yaml`, such as `test: npm test`. A red check stops a leaf from moving to review and from landing.
 - **[Consultant](../use/plan-work.md#open-a-chart)**: a helper pane (B, C, D and so on) that gives the chart door an independent view while it charts. It is not seat A or seat B.
 - **[Contract](../start/why-it-works.md#a-contract-comes-before-code)**: a leaf's `brief.md` and `design.md`. They say what to build, why, how to tell it is done, and the settled decisions the build must follow.
-- **[Direct route](../use/quick-fix.md)**: the chart door builds one small, settled change itself, B reviews it, and the door lands it. It skips the leaf handoff and `akrogon next`.
+- **[Direct route](../use/quick-fix.md)**: the chart door builds one small, settled change itself as seat A of the leaf, B reviews it, and the command lands it like any leaf. It skips the handoff to fresh seats.
 - **[Epic](files.md#issue-and-epic-files)**: a folder under `issues/open/` that groups issues. It holds `EPIC.md`.
 - **[Failed](../use/when-work-fails.md)**: the phase a leaf stops in when a seat records a reason it cannot go on. The plan, reviews and code stay, and you send the leaf back to an active phase.
 - **[Fork](../use/plan-work.md#answer-one-fork-per-round)**: one open question in a chart, sharp enough to answer. It records the answer and the reason. [Who answers depends on the mode](../use/autopilot.md).

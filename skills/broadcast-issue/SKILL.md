@@ -1,17 +1,17 @@
 ---
 name: broadcast-issue
-description: Compose and send one factual update for a completed standalone issue or epic to its configured Discord targets, run by the merge slot itself after `issue complete` or `epic complete`, or by the chart door after a direct landing.
+description: Compose and send one factual update for a completed standalone issue or epic to its configured Discord targets, run by the merge slot itself after `issue complete` or `epic complete`.
 ---
 
 At every phase prompt, re-read this file, its references and the leaf's `brief.md` and `design.md` from disk before acting, even when read earlier in this thread. After compaction, use the completed issue context supplied by the merger if its folder moved.
 
 # Broadcast issue
 
-This is the merge slot's own terminal task after `issue complete` or `epic complete`, or the chart door's after a chart-issues direct landing, never delegated, not another leaf phase. After a merge the command ran itself, the command prompts the merged leaf's B with `broadcast-issue <slug> slot=B owner=<issue|epic>:<name> closed=<folder> sha=<pushed> sources=<list|none> leaf=<path>`: B reads the owner's briefs from the `closed=` folder, sends this one broadcast and runs no phase command; one completed standalone issue, one completed epic or one direct landing produces one message delivered to its configured targets.
+This is the merge slot's own terminal task after `issue complete` or `epic complete`, never delegated, not another leaf phase. After a merge the command ran itself, the command prompts the merged leaf's B with `broadcast-issue <slug> slot=B owner=<issue|epic>:<name> closed=<folder> sha=<pushed> sources=<list|none> leaf=<path>`: B reads the owner's briefs from the `closed=` folder, sends this one broadcast and runs no phase command; one completed standalone issue or one completed epic produces one message delivered to its configured targets.
 
 ## Context and message
 
-Read the completion owner's supplied briefs (the issue's, or every leaf brief under the epic when the leaf has one; for a direct landing the door is the owner and supplies the chart's brief, the pushed SHA and the closed sources) and completion evidence plus `akrogon config` in the supplied repo worktree, taking target names from `broadcast.discord.webhook_env` without reading YAML. The sender works from supplied context alone and directs no questions elsewhere.
+Read the completion owner's supplied briefs (the issue's, or every leaf brief under the epic when the leaf has one) and completion evidence plus `akrogon config` in the supplied repo worktree, taking target names from `broadcast.discord.webhook_env` without reading YAML. The sender works from supplied context alone and directs no questions elsewhere.
 
 Ground in docs first.
 Challenge fuzzy terms.
@@ -40,7 +40,7 @@ Only the sender reads webhook values from `~/.config/akrogon/env`; missing file 
 
 Each target gets one delivery attempt and one immediate retry on failure with a warning, then the final failure is exposed with secret values redacted; successful targets are not resent because another target failed, no outcome is recorded, and a broadcast failure does not reopen the issue.
 
-The sender (the merge slot, the broadcast-only B seat after a command-run merge, or the chart door after a direct landing) does not repeat the sender after its built-in retry or run a phase command because completion already happened.
+The sender (the merge slot or the broadcast-only B seat after a command-run merge) does not repeat the sender after its built-in retry or run a phase command because completion already happened.
 
 ## Printed footer
 
