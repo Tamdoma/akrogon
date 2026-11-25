@@ -69,6 +69,23 @@ test('criterion 1: a fresh leaf runs setup once per checkout state before the fi
   }
 });
 
+test('criterion 1: env and pass_env entries cannot forward CLAUDECODE or AKROGON_RUN into setup', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    writeFileSync(resolve(f.root, '.env'), 'SETUP_PROBE=present\nCLAUDECODE=rootfile\n');
+    writeSetup(f, setupScript(f, 1), { env: ['SETUP_PROBE', 'CLAUDECODE'], pass_env: ['CLAUDECODE'] });
+    leaf(f, 'build', 'plan.synthesis');
+    // CLAUDECODE is valid in both fields by schema, so only the dispatch step itself can exclude it.
+    const result: Result = await next(f, ['build'], { AKROGON_RUN: 'token', CLAUDECODE: '1' });
+    expect(result.code).toBe(0);
+    const lines: string[] = setupLines(f);
+    expect(setupCalls(f)).toBe(1);
+    expect(lines.slice(1, 4)).toEqual(['ver=v1', 'run=unset', 'cc=unset']);
+  } finally {
+    await f.clean();
+  }
+});
+
 test('criterion 2: a first allocation adopting a worktree on a branch with own commits runs setup there', async () => {
   const f: HcFixture = await hcFixture();
   try {
@@ -181,6 +198,9 @@ test('criterion 5: the own-modules guard failure is reported and the adopted wor
     expect(first.code).not.toBe(0);
     expect(first.stderr).toContain('build');
     expect(first.stderr).toContain('node_modules');
+    // The per-leaf report names the guard's exit code: the guard verb exits 1 for this refusal,
+    // and the thrown report shape carries it as the command payload's code.
+    expect(first.stderr).toContain('\\"code\\":1');
     expect(await f.core.terminals({ 'akrogon.leaf': 'build' }, true)).toEqual([]);
     // An adopted worktree stays, without a marker: the next pass retries.
     expect(existsSync(resolve(wt, 'own'))).toBe(true);

@@ -220,6 +220,55 @@ test('criterion 4: a seat reporting error does not hold the due setup', async ()
   }
 });
 
+test('criterion 4: a live run-check holds the due setup with capacity full and no live seat', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    declareEnv(f);
+    writeHook(f);
+    writeSetup(f, setupScript(f, 1), { env: ['SETUP_PROBE'], max_active: 1 });
+    const path: string = leaf(f, 'build', 'plan.synthesis');
+    expect((await next(f, ['build'])).code).toBe(0);
+    expect(setupCallsFor(f, 'build')).toBe(1);
+    // The seat is retired and a sibling fills the repo's one capacity slot; the leaf then has no
+    // live seat, so the capacity check is the first refusal a broken ordering reaches.
+    const first: Terminal = (await f.core.terminals({ 'akrogon.leaf': 'build' }, false))[0];
+    expect((await f.core.hc(['kill', first.address])).code).toBe(0);
+    expect((await f.core.hc(['rm', first.address])).code).toBe(0);
+    writeSetup(f, setupScript(f, 2), { env: ['SETUP_PROBE'], max_active: 1 });
+    const held = spawnRunCheck(f, ['run-check', '--leaf', path, '--name', 'held', '--', 'sh', '-c', 'sleep 60']);
+    const live: RunRecordRow = await waitRunRecord(f, 'live');
+    // The leaf is already busy on the run when the sibling dispatches, so it consumes no slot:
+    // the sibling's seat fills the repo's one capacity slot beside the retired seat.
+    leaf(f, 'other', 'plan.synthesis');
+    expect((await next(f, ['other'])).code).toBe(0);
+    expect((await f.core.terminals({ 'akrogon.leaf': 'other' }, false)).length).toBe(1);
+    try {
+      // Setup is due against a live run-check with capacity full: the busy outcome comes first,
+      // so no capacity wait is recorded and no setup runs.
+      expect((await next(f, ['build'])).code).toBe(0);
+      expect(setupCallsFor(f, 'build')).toBe(1);
+      expect(
+        readTimings(f.root).filter(
+          (event) => event.kind === 'wait' && event.slug === 'build' && event.reason === 'capacity',
+        ),
+      ).toEqual([]);
+      // The manual seat refusal names the run, not the capacity.
+      const refused: Result = await cli(f, ['seat', 'build', 'A'], f.root, f.env);
+      expect(refused.code).not.toBe(0);
+      expect(refused.stderr).toContain(live.run);
+    } finally {
+      killTree(held.proc);
+      await waitUntil(() => liveRecords(f).length === 0, 'run records never cleared');
+    }
+    // With the run gone the next pass runs the due setup even though capacity stays full: the
+    // worktree is already recorded, so the leaf waits on capacity only for a new seat.
+    expect((await next(f, ['build'])).code).toBe(0);
+    expect(setupCallsFor(f, 'build')).toBe(2);
+  } finally {
+    await f.clean();
+  }
+});
+
 test('criterion 4: a live seat with a null status holds the due setup', async () => {
   const f: HcFixture = await hcFixture();
   try {
