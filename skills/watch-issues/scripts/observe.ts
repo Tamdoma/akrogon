@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { readRepo, type Repo } from '../../../src/config';
 import { repoSpace, type Seen, type SpaceResolution } from '../../../src/hc';
+import { isPaused } from '../../../src/pause';
 import { leafSeats, type Seats } from '../../../src/reconcile';
 import { transcriptFor } from '../../../src/transcript';
 import {
@@ -65,7 +66,10 @@ async function main(): Promise<void> {
   const repo: Repo = readRepo(repoKey, root);
   const resolved: SpaceResolution = await repoSpace(repo);
   if (!resolved.ok) throw new Error(resolved.reason);
+  const paused: boolean = isPaused(repoKey);
   console.log(`session=${resolved.session}`);
+  console.log(`paused=${paused}`);
+  if (paused) return;
   const inv: Inventory = repoInventory({ name: repoKey, root }, ['open']);
   const leaves: Leaf[] = inv.leaves;
   const failures: LeafFailure[] = [
