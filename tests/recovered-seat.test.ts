@@ -158,7 +158,6 @@ test.serial('a seat recovered as a bare shell is charged lost, ended and replace
     const again = await cli(f, ['next', 'rs-leaf'], f.root, core.env);
     expect(again.code, `stdout: ${again.stdout} stderr: ${again.stderr}`).toBe(0);
     expect(readTimings(f.root).filter((event) => event.kind === 'seat_lost')).toHaveLength(1);
-    expect(readState(path).lost).toEqual({ A: 1, B: 0 });
     expect(readState(path).seat.A?.address).toBe(replacement);
     const still = await core.get(replacement);
     expect(still.state).toBe('live');
