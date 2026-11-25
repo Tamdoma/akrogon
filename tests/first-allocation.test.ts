@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { cli, fixture, leaf, storeDir, yaml, type Fixture } from './helpers';
 import { delivered, hcFixture, stopCoresAfterFile, type HcFixture } from './hc-fixture';
@@ -536,6 +536,31 @@ test('criterion 1: first allocation replaces the only checkout when HOME is a sy
     expect(await command(['git', 'rev-parse', 'refs/heads/build'], f.root)).toBe(tracking);
     expect(await command(['git', 'rev-parse', 'HEAD'], resolve(aliasedStore, 'build'))).toBe(tracking);
     expect(existsSync(resolve(aliasedStore, 'build'))).toBe(true);
+  } finally {
+    await f.clean();
+  }
+});
+
+test('criterion 1: a pruned unrelated worktree registration does not block replacement', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    const { tracking } = await commitFree(f);
+    leaf(f, 'build', 'plan.synthesis');
+    const wt: string = worktreePath(f);
+    // An operator deletes an unrelated linked worktree before git prunes its registration:
+    // the porcelain list keeps the row as prunable, and any path probe on it hits ENOENT.
+    // Git's list is path-sorted; `.aaa-` sorts before the store's `.akrogon`, so row-order
+    // iteration meets the prunable row first.
+    const stale: string = resolve(f.home, '.aaa-stale-checkout');
+    await command(['git', 'worktree', 'add', '-b', 'stale-branch', stale], f.root);
+    await command(['git', 'worktree', 'add', wt, 'build'], f.root);
+    rmSync(stale, { recursive: true, force: true });
+    expect((await command(['git', 'worktree', 'list', '--porcelain'], f.root)).includes('prunable')).toBe(true);
+    const first: Result = await next(f, []);
+    expect(first.code).toBe(0);
+    expect(await command(['git', 'rev-parse', 'refs/heads/build'], f.root)).toBe(tracking);
+    expect(await command(['git', 'rev-parse', 'HEAD'], wt)).toBe(tracking);
+    expect(existsSync(wt)).toBe(true);
   } finally {
     await f.clean();
   }
