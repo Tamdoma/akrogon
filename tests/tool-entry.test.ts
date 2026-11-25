@@ -58,6 +58,13 @@ function scopeScript(): string {
     'BASH_ENV="$ENTRY/bash-env" OUT="$OUT" bash -c \'cat /proc/$$/cgroup > "$OUT/d-outer.cg"; N=d bash "$OUT/cmd.sh" > "$OUT/d.out" 2> "$OUT/d.err"; echo $? > "$OUT/d.code"\'',
     // g: /bin/sh never sources BASH_ENV — unplaced, output unchanged.
     'BASH_ENV="$ENTRY/bash-env" OUT="$OUT" N=g sh "$OUT/cmd.sh" > "$OUT/g.out" 2> "$OUT/g.err"; echo $? > "$OUT/g.code"',
+    // x: a traced shell — the user's own trace lines stay byte-identical with and without the
+    // wiring; the entry's internals must never join stderr.
+    'BASH_ENV="$ENTRY/bash-env" OUT="$OUT" N=x bash -ex "$OUT/cmd.sh" > "$OUT/x.out" 2> "$OUT/x.err"; echo $? > "$OUT/x.code"',
+    'OUT="$OUT" N=x bash -ex "$OUT/cmd.sh" > "$OUT/xref.out" 2> "$OUT/xref.err"; echo $? > "$OUT/xref.code"',
+    // w: the executed wrapper under a traced caller keeps the same stderr shape.
+    'OUT="$OUT" N=w bash -c \'set -x; exec "$ENTRY/bash" "$OUT/cmd.sh"\' > "$OUT/w.out" 2> "$OUT/w.err"; echo $? > "$OUT/w.code"',
+    'OUT="$OUT" N=w bash -c \'set -x; exec bash "$OUT/cmd.sh"\' > "$OUT/wref.out" 2> "$OUT/wref.err"; echo $? > "$OUT/wref.code"',
     'echo done > "$OUT/done"',
     'exit 0',
   ].join('\n');
@@ -146,6 +153,17 @@ test.serial('the entry places a bash tool shell exactly once at the scope root a
     expect(read('g.out')).toBe('out-g\n');
     expect(read('g.code').trim()).toBe('3');
     expect(cgOf('g')).not.toContain('/tools/t-');
+
+    // Proven-bug reproduction (review-B F5): traced shells keep byte-identical stderr with and
+    // without the wiring — the entry's internals never trace out.
+    expect(read('x.code').trim()).toBe('3');
+    expect(read('xref.code').trim()).toBe('3');
+    expect(read('x.out'), 'traced stdout unchanged').toBe(read('xref.out'));
+    expect(read('x.err'), 'traced stderr byte-identical with the wiring').toBe(read('xref.err'));
+    expect(read('w.code').trim()).toBe('3');
+    expect(read('wref.code').trim()).toBe('3');
+    expect(read('w.out'), 'wrapper traced stdout unchanged').toBe(read('wref.out'));
+    expect(read('w.err'), 'wrapper traced stderr byte-identical').toBe(read('wref.err'));
 
     // Outside the scope root entirely: the same env is inert in the test process.
     const outsideOut: string = resolve(out, 'outside.cg');

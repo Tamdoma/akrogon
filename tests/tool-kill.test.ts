@@ -615,3 +615,94 @@ function warnings(stderr: string): Record<string, unknown>[] {
     .filter((line) => line.startsWith('{') && line.includes('"tool_kill"'))
     .map((line) => JSON.parse(line) as Record<string, unknown>);
 }
+
+// Proven-bug reproduction (review-B F1): a removal that fails while the t- reads populated 0 —
+// the kernel has no processes left to reap, so the failure is no reaping race — must warn with
+// structured fields and count into the row's errors, while the move stays committed.
+test.serial('a failed removal of an empty-populated tool cgroup warns and the move stands', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), { checks: {}, grounding: 'none' });
+    const fakeRoot: string = mkdtempSync('/tmp/akr-fakecg-');
+    try {
+      const env = { AKROGON_CGROUP_ROOT: fakeRoot };
+      const leafPath: string = leaf(f, 'tk-warn-rm', 'plan.synthesis');
+      const slice: string = testSlice(f, 'tk-warn-rm');
+      const scope: string = sliceCgroup(slice).replace(/^\/sys\/fs\/cgroup/, fakeRoot) + '/wr.scope';
+      // t-13-1 reads populated 0 (default absent events) and cannot be removed:
+      // a leftover file inside makes every rmdir fail while nothing is reaping.
+      mkdirSync(resolve(scope, 'tools', 't-13-1'), { recursive: true });
+      writeFileSync(resolve(scope, 'tools', 't-13-1', 'leftover'), 'x\n');
+      const a = await cli(f, ['phase', 'tk-warn-rm', 'implement', '--slot', 'A'], f.root, env);
+      expect(a.code, `stdout: ${a.stdout} stderr: ${a.stderr}`).toBe(0);
+      expect(a.stdout).toContain('moved implement');
+      expect(readState(leafPath).phase).toBe('implement');
+      const warn = warnings(a.stderr);
+      expect(warn.length, 'a structured warning names the failed removal').toBeGreaterThanOrEqual(1);
+      expect(warn[0].leaf).toBe('tk-warn-rm');
+      expect(warn[0].unit).toBe('wr.scope');
+      expect(warn[0].t).toBe('t-13-1');
+      const rowsFor = rows(f, 'tool_kill').filter((row) => row.slug === 'tk-warn-rm');
+      expect(rowsFor).toHaveLength(1);
+      expect(Number(rowsFor[0].errors)).toBeGreaterThanOrEqual(1);
+    } finally {
+      rmSync(fakeRoot, { recursive: true, force: true });
+    }
+  } finally {
+    f.clean();
+  }
+});
+
+// Proven-bug reproduction (review-B F2): a run-check writer whose pipes stay open but unread
+// must deliver every byte of both echoes like an ordinary pipe and still exit with the command's
+// code — an open reader is no EPIPE.
+test.serial('a run-check writer with open but undrained pipes delivers the full echoes and the run code', async () => {
+  const f: Fixture = await fixture();
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), { checks: {}, grounding: 'none' });
+    const holder: string = resolve(f.home, 'slow-holder');
+    mkdirSync(holder);
+    // 1 MiB on both streams: far beyond the kernel pipe buffer, so undrained pipes fill.
+    const script: string = [
+      `head -c 1048576 /dev/zero | tr '\\0' 'o'`,
+      `head -c 1048576 /dev/zero | tr '\\0' 'e' >&2`,
+      `exit 7`,
+    ].join('; ');
+    const proc: Bun.Subprocess<'ignore', 'pipe', 'pipe'> = Bun.spawn(
+      [process.execPath, entry, 'run-check', '--holder', holder, '--name', 'slow', '--', 'sh', '-c', script],
+      {
+        cwd: f.root,
+        env: {
+          ...process.env,
+          AKROGON_HOME: f.home,
+          HOME: f.home,
+          AKROGON_RUN: '',
+          HERDR_PANE_ID: '',
+        },
+        stdin: 'ignore',
+        stdout: 'pipe',
+        stderr: 'pipe',
+      },
+    );
+    try {
+      // Neither pipe is ever read by the test: the open-but-undrained shape of the probe.
+      const code: number = await proc.exited;
+      expect(code, 'writer exits with the command code').toBe(7);
+      const kept: string[] = readdirSync(holder).filter(
+        (name) => name.startsWith('check-slow-') && name.endsWith('.log'),
+      );
+      expect(kept).toHaveLength(1);
+      expect(readFileSync(resolve(holder, kept[0]), 'utf8').length).toBe(2 * 1048576);
+      const stdout: string = await new Response(proc.stdout as ReadableStream<Uint8Array>).text();
+      const stderr: string = await new Response(proc.stderr as ReadableStream<Uint8Array>).text();
+      // The echoes deliver in full and the final summary still prints.
+      expect(stdout.length, 'full stdout echo delivered').toBe(1048576);
+      expect(stderr, 'final summary printed').toContain('check slow: 7');
+    } finally {
+      if (proc.exitCode === null) proc.kill('SIGKILL');
+      await proc.exited.catch(() => 0);
+    }
+  } finally {
+    f.clean();
+  }
+});
