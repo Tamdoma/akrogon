@@ -300,12 +300,9 @@ export async function terminal(session: string, address: string, signal?: AbortS
   );
 }
 
-// A probe that tolerates absence: the seat refs a direct leaf records name sessions outside the
-// repo's, and any of them may be stopped or never have existed. hc boots a core for any session it
-// is asked about, so the socket is probed first and an absent or dead one is null without an hc
-// call — an orphaned core's lock otherwise wedges every later probe of the same name across the
-// host. HcError from the probe itself is null the same way, matching the unobservable reading.
-export async function probeTerminal(session: string, address: string): Promise<Seen | null> {
+// A direct leaf can name a stopped or nonexistent session. Probe the socket first so an hc
+// lookup never boots a core for an absent session. Other hc errors do not prove absence.
+export async function terminalIfPresent(session: string, address: string): Promise<Seen | null> {
   const runtime: string | undefined = process.env.XDG_RUNTIME_DIR;
   if (runtime !== undefined && runtime.trim() !== '') {
     const socket: string = resolve(runtime, 'herdr-core', `${session}.sock`);
@@ -313,6 +310,15 @@ export async function probeTerminal(session: string, address: string): Promise<S
   }
   try {
     return await terminal(session, address);
+  } catch (error) {
+    if (error instanceof HcError && error.kind === 'not_found') return null;
+    throw error;
+  }
+}
+
+export async function probeTerminal(session: string, address: string): Promise<Seen | null> {
+  try {
+    return await terminalIfPresent(session, address);
   } catch (error) {
     if (error instanceof HcError) return null;
     throw error;

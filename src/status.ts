@@ -87,9 +87,7 @@ function scanRepo(name: string, registeredPath: string, global: GlobalConfig): S
     const repo: Repo = readRepo(name, registeredPath);
     const open: string = resolve(repo.root, 'issues/open');
     const inventory: Inventory = repoInventory(repo, ['open', 'closed']);
-    // The scan is open leaves plus closed leaves whose broadcast still pends: the owner rests in
-    // closed once the land moves it, but the handoff is unfinished leaf business the JSON leaves
-    // array must carry (uniform across leaf kinds). Text tables filter back to the open area.
+    // Include closed leaves while their broadcast is pending, even though the owner already moved.
     const scanned = (leaf: Leaf): boolean => leaf.path.startsWith(open + sep) || broadcastPending(leaf.state);
     const closed: Leaf[] = inventory.leaves.filter((leaf) => !scanned(leaf));
     const leaves: ScannedLeaf[] = inventory.leaves.filter(scanned).map((leaf) => {
@@ -260,12 +258,16 @@ function cells(
   ];
 }
 
+function leafGroup(repo: Repo, leaf: Leaf): string[] {
+  return relative(resolve(repo.root, 'issues'), leaf.path).split(sep).slice(1, -1);
+}
+
 function rows(scan: Scan & { ok: true }, now: number, stopped: Set<string>, unnamed: Set<string>): string[][] {
   const queue: Map<string, QueueEntry> = new Map(scan.queue.map((entry) => [entry.leaf.state.slug, entry]));
   const started: Map<string, number> = starts(scan.timings);
   let previous: string[] = [];
   return scan.leaves.flatMap((leaf) => {
-    const groups: string[] = relative(resolve(scan.repo.root, 'issues/open'), leaf.path).split(sep).slice(0, -1);
+    const groups: string[] = leafGroup(scan.repo, leaf);
     let shared: number = 0;
     while (shared < groups.length && shared < previous.length && groups[shared] === previous[shared]) shared++;
     const separator: string[][] = previous.length > 0 && shared < groups.length ? [['', '', '', '', '', '']] : [];
@@ -621,7 +623,7 @@ async function leafJson(
   const attention: string[] = leafAttention(leaf, deps, attempt, alive);
   return {
     slug: state.slug,
-    group: relative(resolve(scan.repo.root, 'issues/open'), leaf.path).split(sep).slice(0, -1),
+    group: leafGroup(scan.repo, leaf),
     phase: state.phase,
     phase_since: entry === undefined ? null : Date.parse(entry.record.ts),
     first_prompt: leafStart(state, started) ?? null,
@@ -935,16 +937,9 @@ export async function statusCommand(
       continue;
     }
     const parked: string[][] = scan.parked.map((name) => [`${indent(0)}${name}`, 'parked', '', '', '', '']);
-    // The leaf table shows the open area only: closed broadcast-pending leaves ride scan.leaves for
-    // the JSON surface, never for the text rows.
-    const openArea: string = resolve(scan.repo.root, 'issues/open') + sep;
-    const openScan: Scan & { ok: true } = {
-      ...scan,
-      leaves: scan.leaves.filter((leaf) => leaf.path.startsWith(openArea)),
-    };
-    const separator: string[][] = openScan.leaves.length > 0 && parked.length > 0 ? [['', '', '', '', '', '']] : [];
+    const separator: string[][] = scan.leaves.length > 0 && parked.length > 0 ? [['', '', '', '', '', '']] : [];
     const lines: string[][] = [
-      ...rows(openScan, now, stopped, await unnamedTabs(scan.repo, openScan.leaves)),
+      ...rows(scan, now, stopped, await unnamedTabs(scan.repo, scan.leaves)),
       ...separator,
       ...parked,
     ];

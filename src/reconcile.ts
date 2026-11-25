@@ -38,6 +38,7 @@ import {
   saveState,
   type Inventory,
   type Leaf,
+  type Prompted,
   type SeatRef,
   type State,
   withLock,
@@ -51,7 +52,7 @@ import {
   end,
   HcError,
   repoSpace,
-  probeTerminal,
+  terminalIfPresent,
   terminals,
   windowOpen,
   type Seen,
@@ -198,19 +199,25 @@ async function sliceHasProcess(slice: string): Promise<boolean> {
 }
 
 async function broadcastInProgress(state: State, live: Seen[] | null): Promise<boolean> {
-  if (broadcastPending(state)) return true;
   if (state.phase !== 'merged' || state.broadcast === undefined) return false;
-  // A direct leaf's broadcast seat is probed by its recorded ref, in the ref's own session:
-  // addresses collide across sessions and the live list scans the repo session only. A probe
-  // failure or a missing terminal is in-progress, matching the live === null keep.
+  // The repo's session list cannot identify a direct reviewer. Probe the recorded session,
+  // keeping cleanup on hold for an unreadable reviewer but not one that has gone away.
   if (state.direct === true) {
-    const ref = state.seat.B;
-    if (ref === undefined) return true;
-    const probed: Seen | null = await probeTerminal(ref.session, ref.address);
-    if (probed === null) return true;
-    return probed.status?.state !== 'idle' && probed.status?.state !== 'done';
+    const ref: SeatRef | undefined = state.seat.B;
+    if (ref === undefined) return false;
+    let seat: Seen | null;
+    try {
+      seat = await terminalIfPresent(ref.session, ref.address);
+    } catch (error) {
+      if (error instanceof HcError) return true;
+      throw error;
+    }
+    if (seat === null || seat.state === 'finished') return false;
+    const prompted: Prompted | string | undefined = state.prompted.B;
+    return typeof prompted !== 'object' || seat.turn <= prompted.turn;
   }
   return (
+    broadcastPending(state) ||
     live === null ||
     live.some(
       (t: Seen) => t.address === state.seat.B?.address && t.status?.state !== 'idle' && t.status?.state !== 'done',

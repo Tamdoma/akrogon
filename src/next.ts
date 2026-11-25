@@ -1507,21 +1507,27 @@ async function mergeTurnExit(
 
 // A direct leaf's broadcast goes straight to the recorded seat B through the ref's own session (plan
 // D14): addresses collide across sessions, so neither the repo session nor the place apply. Nothing is
-// allocated or started. A probe failure or a working, attention or unset status sends nothing and the
-// handoff stays pending; the send and its records replicate dispatchSlot: prompted.B on a confirmed
-// start, delivery_error.B otherwise, with no resend while the seat's turn stands still.
+// allocated or started. Send only when B is idle or done and has no unresolved delivery error.
+// Once an errored send's turn advances, settle it at the original turn without resending.
 async function broadcastDirect(path: string, state: State, prompt: string): Promise<void> {
   const ref: SeatRef | undefined = state.seat.B;
   if (ref === undefined) return;
-  const probed: Seen | null = await probeTerminal(ref.session, ref.address);
-  if (probed === null) return;
-  const seat: Seen = probed;
-  const status: string | null = seat.status?.state ?? null;
-  if (status !== 'idle' && status !== 'done') return;
+  const seat: Seen | null = await probeTerminal(ref.session, ref.address);
+  if (seat === null) return;
   const recorded: DeliveryError | undefined = state.delivery_error.B;
   const error: SeatDeliveryError | undefined =
     recorded !== undefined && 'address' in recorded && recorded.address === seat.address ? recorded : undefined;
-  if (error !== undefined && error.turn >= seat.turn) return;
+  if (error !== undefined) {
+    if (error.turn < seat.turn)
+      saveState(path, {
+        ...state,
+        prompted: { ...state.prompted, B: { turn: error.turn, address: seat.address } },
+        delivery_error: { ...state.delivery_error, B: undefined },
+      });
+    return;
+  }
+  const status: string | null = seat.status?.state ?? null;
+  if (status !== 'idle' && status !== 'done') return;
   const failed = (turn: number, failedStatus: string | null, capture?: string): void => {
     const base: State = readState(path);
     const errorState: SeatDeliveryError = {
@@ -1654,6 +1660,8 @@ export async function seatCommand(slug: string, slot: Slot, task: string | undef
   const invocation: Invocation = { skipped: new Set(), dispatched: new Set(), sessionRefusals: new Set() };
   await withLock(resolve(globalHome(), '.lock'), async () => {
     const leaf: Leaf = findLeaf(repo, slug);
+    if (leaf.state.direct === true)
+      throw new Error(`${slug} is a direct leaf: its seats are the recorded terminals, never managed`);
     const allocated: Allocation | null | { busy: string } = await allocate(global, repo, leaf, invocation);
     if (allocated === null)
       throw new Error(
