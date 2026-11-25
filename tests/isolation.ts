@@ -14,6 +14,7 @@ import { dlopen, FFIType } from 'bun:ffi';
 
 const libc = dlopen('libc.so.6', {
   setenv: { args: [FFIType.cstring, FFIType.cstring, FFIType.i32], returns: FFIType.i32 },
+  unsetenv: { args: [FFIType.cstring], returns: FFIType.i32 },
 });
 
 // bun test never runs process 'exit' handlers, so each worker removes the roots of workers that have exited.
@@ -67,6 +68,14 @@ const suiteRuntime: string = join(suiteRoot, 'run');
 mkdirSync(join(suiteRuntime, 'herdr-core'), { recursive: true });
 for (const name of ['bus', 'systemd']) symlinkSync(`/run/user/${process.getuid!()}/${name}`, join(suiteRuntime, name));
 setEnv('XDG_RUNTIME_DIR', suiteRuntime);
+// run-check copies the caller's DISPLAY/XAUTHORITY/WAYLAND_DISPLAY. The suite must see the
+// same display state whoever launched it (a desktop seat carries them, an SSH shell does not),
+// so the preload unsets all three; tests that need one pass it explicitly in the CLI env.
+// process.env writes alone do not reach libc getenv, so both are cleared.
+for (const name of ['DISPLAY', 'XAUTHORITY', 'WAYLAND_DISPLAY']) {
+  delete process.env[name];
+  if (libc.symbols.unsetenv(name) !== 0) throw new Error(`unsetenv(${name}) failed`);
+}
 // git starts a detached `maintenance run --auto` after commit, fetch and a push's receive-pack,
 // which adds and removes objects/maintenance.lock after the command returns. Every repo the suite
 // inits or clones copies this template's config, bare remotes included, and linked worktrees share
