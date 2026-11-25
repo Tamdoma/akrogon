@@ -26,7 +26,7 @@ import { failedTests, scanBunOutput, type BunScan } from './flaky';
 import { checkLocation } from './guard';
 import { createSparseWorktree, emitEnvFile } from './next';
 import { trackingRef } from './preflight';
-import { checkedRun, leafFields, leafTarget, refuse, type LeafTarget } from './run-check';
+import { checkedRun, displayEnv, leafFields, leafTarget, refuse, type LeafTarget } from './run-check';
 import { command, CommandError, run, spawnCaptured, type Result, type SpawnResult } from './shell';
 import { repoSpace, type SpaceResolution } from './hc';
 import { noticeFolder, noticeId, noticeState, writeNotice, type Notice } from './notice';
@@ -987,6 +987,10 @@ function reportRun(scope: VerifyScope, run: VerifyRun): number {
   return green ? 0 : 1;
 }
 
+// The display names the pass carries exactly as the caller holds them; the
+// runtime directory stays in both services pinned, so it is not among them.
+const passDisplay: readonly string[] = displayEnv.filter((name: string): boolean => name !== 'XDG_RUNTIME_DIR');
+
 // Names the service inherits from the caller: the check environment policy is
 // unchanged, these only carry what the caller's own constructedEnv and
 // overrides already select, plus the unit-level paths.
@@ -1002,6 +1006,7 @@ const passForwarded: readonly string[] = [
   'AKROGON_RUN',
   'AKROGON_CAPTURES',
   'XDG_RUNTIME_DIR',
+  ...passDisplay,
   'XDG_CACHE_HOME',
   'FAKE_SYSTEMD_RUN_LOG',
   'FAKE_SYSTEMCTL_DB',
@@ -1024,6 +1029,12 @@ async function launchPass(repo: Repo, record: PassRecord, dir: string): Promise<
     `--working-directory=${record.root}`,
     `--setenv=DBUS_SESSION_BUS_ADDRESS=${sessionBusAddress()}`,
     ...names.filter((name) => env[name] !== undefined).map((name) => `--setenv=${name}=${env[name]}`),
+    // A name the caller lacks still reaches the service through the user
+    // manager's own environment unless it is explicitly unset, so an absent
+    // display name is unset rather than silently inherited.
+    ...passDisplay
+      .filter((name: string): boolean => env[name] === undefined)
+      .flatMap((name: string): string[] => ['-p', `UnsetEnvironment=${name}`]),
     '--setenv=NODE_DISABLE_COMPILE_CACHE=1',
     '--',
     'env',

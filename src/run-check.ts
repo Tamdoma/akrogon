@@ -45,6 +45,12 @@ const forbidden: readonly string[] = [
   'CDP_BROWSER_BINARY',
 ];
 
+// The graphical-session names every checked command sees exactly as the
+// caller holds them: a headed client probes its own display. XDG_SESSION_TYPE
+// stays the client's probe and WAYLAND_SOCKET is an inherited fd number, so
+// neither is ever copied.
+export const displayEnv: readonly string[] = ['DISPLAY', 'XAUTHORITY', 'WAYLAND_DISPLAY', 'XDG_RUNTIME_DIR'];
+
 // FAKE_SYSTEMD_RUN_LOG rides along so the run-unit seam can log the scope calls a held run makes.
 const copied: readonly string[] = [
   'HOME',
@@ -54,6 +60,7 @@ const copied: readonly string[] = [
   // An akrogon invocation inside a checked command shares the caller's state
   // home; without it a nested call resolves HOME/.akrogon and can re-cutover.
   'AKROGON_HOME',
+  ...displayEnv,
 ];
 
 function bunfigs(): string[] {

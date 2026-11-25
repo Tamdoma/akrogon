@@ -16,6 +16,7 @@ import {
 import { appendAttempt, readPressure, type PressureSnapshot } from './attempts';
 import { readVerifyRuns, uncoveredMainRedUnits, verify, type Unit, type VerifyRun } from './verify';
 import { leafSlice, runSlice, runUnitBase, runtimeDir, sessionBusAddress, sessionBusEnv } from './scope';
+import { displayEnv } from './run-check';
 import { callerScope, withAdmission, type AdmissionHolder } from './admission';
 import { landedWake, mergeWake, phaseWake } from './next';
 
@@ -43,7 +44,12 @@ export async function launchLand(repo: Repo, slug: string, attempt: string): Pro
     `--setenv=DBUS_SESSION_BUS_ADDRESS=${sessionBusAddress()}`,
     '--setenv=NODE_DISABLE_COMPILE_CACHE=1',
     `--setenv=AKROGON_RUN_SLICE=${runSlice('akrogon-land.slice')}`,
-    ...['AKROGON_HOME', 'AKROGON_LEAF_TEMP_ROOT', 'AKROGON_RETIRED_TEMP_ROOT'].flatMap((name: string): string[] => {
+    ...[
+      'AKROGON_HOME',
+      'AKROGON_LEAF_TEMP_ROOT',
+      'AKROGON_RETIRED_TEMP_ROOT',
+      ...displayEnv.filter((name: string): boolean => name !== 'XDG_RUNTIME_DIR'),
+    ].flatMap((name: string): string[] => {
       const value: string | undefined = process.env[name];
       return value === undefined ? [] : [`--setenv=${name}=${value}`];
     }),
