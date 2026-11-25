@@ -234,6 +234,12 @@ test('phase moves, stop and passes never touch the direct seats of a cross-sessi
       await seatsUntouched();
     }
 
+    const unmanaged: Result = await cli(f, ['seat', 'fix-alpha', 'A', '--task', 'unexpected task'], f.root, f.env);
+    expect(unmanaged.code).not.toBe(0);
+    expect(unmanaged.stderr).toContain('direct leaf');
+    expect(yamlState(path).tab).toBeUndefined();
+    await seatsUntouched();
+
     // The legal direct move sequence: implement -> check.review -> check.repair -> check.fix ->
     // check.review -> check.repair, B alone moving the review at every round (plan, criterion 3).
     await phase(['check.review', '--slot', 'A']);

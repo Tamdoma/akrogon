@@ -1,10 +1,10 @@
 import { test, expect } from 'bun:test';
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, chmodSync, unlinkSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { cli, fakeGh, greenReceipt, leaf, leafTempRoot, storeDir, yaml, type Fixture, type GhFixture } from './helpers';
-import { hcFixture, stopCoresAfterFile, type HcFixture, type Terminal } from './hc-fixture';
+import { hcCore, hcFixture, stopCoresAfterFile, type HcCore, type HcFixture, type Terminal } from './hc-fixture';
 import { readState, type Batch, type State } from '../src/state';
 import { command, type Result, type SpawnResult } from '../src/shell';
 import { leafSlice } from '../src/scope';
@@ -164,13 +164,17 @@ function sliceStops(f: HcFixture): string[] {
     : [];
 }
 
-// The stand-in hook: a turn on the task HOLD spins working until the terminal's free-<address>
-// file exists; every other task runs through, so the broadcast turn ends on its own.
-function holdHook(f: HcFixture): void {
-  const hook: string = resolve(f.core.standin, 'hook');
+// Hold the first turn on demand and optionally hold the actual broadcast turn too.
+function holdHook(core: HcCore, holdBroadcast: boolean = false): void {
+  const hook: string = resolve(core.standin, 'hook');
+  const tasks: string = holdBroadcast ? 'HOLD|broadcast-issue*' : 'HOLD';
   writeFileSync(
     hook,
-    '#!/bin/sh\nif [ "$2" = HOLD ]; then while [ ! -e "' + f.core.standin + '/free-$1" ]; do sleep 0.05; done; fi\n',
+    '#!/bin/sh\ncase "$2" in ' +
+      tasks +
+      ') while [ ! -e "' +
+      core.standin +
+      '/free-$1" ]; do sleep 0.05; done;; esac\n',
   );
   chmodSync(hook, 0o755);
 }
@@ -178,7 +182,7 @@ function holdHook(f: HcFixture): void {
 // A stand-in terminal (fake harness, work mode) idling with no task, outside the leaf worktree so
 // no pane-inside veto ever applies to it.
 async function idleTerminal(f: HcFixture): Promise<string> {
-  holdHook(f);
+  holdHook(f.core);
   const started: SpawnResult = await f.core.hc([
     'run',
     '--bg',
@@ -200,15 +204,15 @@ async function idleTerminal(f: HcFixture): Promise<string> {
 }
 
 // A stand-in terminal whose first turn is the HOLD task: working until the release write.
-async function heldTerminal(f: HcFixture): Promise<{ address: string; release: () => void }> {
-  holdHook(f);
-  const started: SpawnResult = await f.core.hc([
+async function heldTerminal(core: HcCore, cwd: string): Promise<{ address: string; release: () => void }> {
+  holdHook(core, true);
+  const started: SpawnResult = await core.hc([
     'run',
     '--bg',
     '--json',
     '--no-parent',
     '--cwd',
-    f.home,
+    cwd,
     '--',
     'fake',
     '--model',
@@ -219,10 +223,10 @@ async function heldTerminal(f: HcFixture): Promise<{ address: string; release: (
   ]);
   expect(started.code, started.stderr).toBe(0);
   const address: string = z.object({ address: z.string() }).parse(JSON.parse(started.stdout)).address;
-  await f.core.waitFor(address, (t: Terminal) => t.status?.state === 'working');
+  await core.waitFor(address, (t: Terminal) => t.status?.state === 'working');
   return {
     address,
-    release: (): void => writeFileSync(resolve(f.core.standin, 'free-' + address), ''),
+    release: (): void => writeFileSync(resolve(core.standin, 'free-' + address), ''),
   };
 }
 
@@ -440,11 +444,15 @@ test('an idle reviewer receives the broadcast prompt after the direct land, with
   }
 });
 
-test('a working reviewer holds the broadcast, the sweep keeps temp worktree and slice, and the end of its turn releases them', async () => {
+test.each(['turn ended', 'reviewer gone'] as const)('a cross-session broadcast holds cleanup until %s', async (end) => {
   const f: LandFixture = await landFixture(true);
+  const reviewer: HcCore = await hcCore(f, { doc: false });
+  f.core.link(reviewer);
   try {
-    const held = await heldTerminal(f);
-    const { path, worktree, attempt } = await mergeable(f, 'fix-alpha', held.address);
+    const held = await heldTerminal(reviewer, f.home);
+    const { path, worktree, attempt } = await mergeable(f, 'fix-alpha', held.address, {
+      seat: { ...(await seatRefs(f, held.address)), B: { session: reviewer.session, address: held.address } },
+    });
     mkdirSync(leafTempDir(f, 'fix-alpha'), { recursive: true });
     sliceSeeded(f, 'fix-alpha');
     expect((await next(f, webhookEnv)).code).toBe(0);
@@ -453,20 +461,28 @@ test('a working reviewer holds the broadcast, the sweep keeps temp worktree and 
     expect(readState(closed).phase).toBe('merged');
     // B works: the pass sends nothing, and the reconcile pass leaves every piece of the leaf in place.
     expect((await next(f, webhookEnv)).code).toBe(0);
-    expect(f.core.tasks(held.address).filter((text) => text.startsWith('broadcast-issue'))).toEqual([]);
+    expect(reviewer.tasks(held.address).filter((text) => text.startsWith('broadcast-issue'))).toEqual([]);
     const pending: Result = await cli(f, ['status', '--json'], f.root, f.env);
     expect(pending.code, pending.stderr).toBe(0);
-    const rows: { slug: string; broadcast_pending: boolean }[] = z
+    const rows = z
       .object({
         repos: z.array(
           z.object({
-            leaves: z.array(z.object({ slug: z.string(), broadcast_pending: z.boolean() }).passthrough()),
+            leaves: z.array(
+              z.object({ slug: z.string(), broadcast_pending: z.boolean(), group: z.array(z.string()) }).passthrough(),
+            ),
           }),
         ),
       })
       .parse(JSON.parse(pending.stdout))
       .repos.flatMap((repo) => repo.leaves);
-    expect(rows.find((row) => row.slug === 'fix-alpha')?.broadcast_pending).toBe(true);
+    expect(rows.find((row) => row.slug === 'fix-alpha')).toMatchObject({
+      broadcast_pending: true,
+      group: ['chart-x'],
+    });
+    const table: Result = await cli(f, ['status'], f.root, f.env);
+    expect(table.code, table.stderr).toBe(0);
+    expect(table.stdout.split('\n').find((line) => line.includes('fix-alpha'))).toContain('broadcast pending');
     expect(readState(closed).prompted.B).toBeUndefined();
     expect(existsSync(worktree)).toBe(true);
     expect(existsSync(leafTempDir(f, 'fix-alpha'))).toBe(true);
@@ -474,15 +490,26 @@ test('a working reviewer holds the broadcast, the sweep keeps temp worktree and 
     expect(sliceStops(f).filter((line) => line.includes(sliceOf(f, 'fix-alpha')))).toEqual([]);
     // The turn ends: the pass sends the prompt now, prompted.B is its ack.
     held.release();
-    await f.core.waitFor(held.address, (t: Terminal) => t.status?.state === 'idle');
+    await reviewer.waitFor(held.address, (t: Terminal) => t.status?.state === 'idle');
+    // The next turn (broadcast) will wait for the same release file again.
+    unlinkSync(resolve(reviewer.standin, 'free-' + held.address));
     expect((await next(f, webhookEnv)).code).toBe(0);
-    expect(f.core.tasks(held.address).filter((text) => text.startsWith('broadcast-issue'))).toHaveLength(1);
+    expect(reviewer.tasks(held.address).filter((text) => text.startsWith('broadcast-issue'))).toHaveLength(1);
     const prompted: State = readState(closed);
     expect(prompted.prompted.B).toMatchObject({ address: held.address });
     const promptedTurn: number = z.object({ turn: z.number() }).parse(prompted.prompted.B).turn;
     // Once B's broadcast turn ends the leaf releases: worktree, temp and slice are swept while the
     // owner folder stays in issues/closed.
-    await f.core.waitFor(held.address, (t: Terminal) => t.turn >= promptedTurn + 1 && t.status?.state === 'idle');
+    await reviewer.waitFor(held.address, (t: Terminal) => t.turn === promptedTurn && t.status?.state === 'working');
+    expect((await next(f, webhookEnv)).code).toBe(0);
+    expect(existsSync(worktree)).toBe(true);
+    expect(existsSync(leafTempDir(f, 'fix-alpha'))).toBe(true);
+    expect(sliceLoaded(f, 'fix-alpha')).toBe(true);
+    if (end === 'reviewer gone') await reviewer.stop();
+    else {
+      held.release();
+      await reviewer.waitFor(held.address, (t: Terminal) => t.turn > promptedTurn);
+    }
     expect((await next(f, webhookEnv)).code).toBe(0);
     expect(existsSync(worktree)).toBe(false);
     expect(existsSync(leafTempDir(f, 'fix-alpha'))).toBe(false);
@@ -492,13 +519,14 @@ test('a working reviewer holds the broadcast, the sweep keeps temp worktree and 
     expect(existsSync(resolve(f.root, 'issues/closed/chart-x/fix-alpha/state.yaml'))).toBe(true);
     expect((await command(['git', 'branch', '--list', 'fix-alpha'], f.root)).trim()).toBe('');
     // B is a shared terminal: the sweep never ends it.
-    expect((await f.core.get(held.address)).state).toBe('live');
+    if (end === 'turn ended') expect((await reviewer.get(held.address)).state).toBe('live');
   } finally {
+    await reviewer.stop();
     await f.clean();
   }
 });
 
-test('a refused broadcast send records delivery_error.B and the holds survive; the turn advancing past lets the retry land and clears the error', async () => {
+test('a late broadcast delivery settles at the original turn without sending again', async () => {
   const f: LandFixture = await landFixture(true);
   try {
     const b: string = await idleTerminal(f);
@@ -529,19 +557,19 @@ test('a refused broadcast send records delivery_error.B and the holds survive; t
     expect((await next(f, webhookEnv)).code).toBe(0);
     expect(f.core.tasks(b).filter((text) => text.startsWith('broadcast-issue'))).toEqual([]);
     expect(yamlState(closed).delivery_error).toHaveProperty('B');
-    // B's turn advances past the refused send; the next pass retries, delivers and clears the error.
-    expect((await f.core.hc(['send', b, 'ping'])).code).toBe(0);
-    await f.core.waitFor(b, (t: Terminal) => t.status?.state === 'idle');
+    // Represent a send that arrived after the caller saw the error: deliver that same prompt
+    // into the real reviewer terminal and let its original turn finish.
+    const state: State = readState(closed);
+    const handoff = state.broadcast!;
+    const originalTurn: number = z.object({ turn: z.number() }).parse(state.delivery_error.B).turn;
+    const late: string = `broadcast-issue fix-alpha slot=B owner=issue:chart-x closed=${handoff.destination} sha=${handoff.pushed} sources=none leaf=${closed}`;
+    expect((await f.core.hc(['send', b, late])).code).toBe(0);
+    await f.core.waitFor(b, (t: Terminal) => t.turn > originalTurn && t.status?.state === 'idle');
     expect((await next(f, webhookEnv)).code).toBe(0);
-    const retry: string[] = f.core.tasks(b).filter((text) => text.startsWith('broadcast-issue'));
-    expect(retry).toHaveLength(1);
-    expect(retry[0]).toContain('broadcast-issue fix-alpha slot=B owner=issue:chart-x');
+    expect(f.core.tasks(b).filter((text) => text.startsWith('broadcast-issue'))).toEqual([late]);
     const settled: State = readState(closed);
     expect(settled.delivery_error.B).toBeUndefined();
-    expect(settled.prompted.B).toMatchObject({ address: b });
-    // The broadcast settles and the sweep takes the rest.
-    const promptedTurn: number = z.object({ turn: z.number() }).parse(settled.prompted.B).turn;
-    await f.core.waitFor(b, (t: Terminal) => t.turn >= promptedTurn + 1 && t.status?.state === 'idle');
+    expect(settled.prompted.B).toMatchObject({ address: b, turn: originalTurn });
     expect((await next(f, webhookEnv)).code).toBe(0);
     expect(existsSync(worktree)).toBe(false);
     expect(existsSync(leafTempDir(f, 'fix-alpha'))).toBe(false);
