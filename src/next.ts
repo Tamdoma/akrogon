@@ -84,7 +84,16 @@ import {
   type QueueEntry,
 } from './turn';
 import { appendTiming, capacityWaits, currentVisit, recordWait, wakeRows, type WaitReason } from './timing';
-import { closeMergedTab, leafSeats, reconcile, reconcileHost, reconcileNeedsPanes, type Seats } from './reconcile';
+import {
+  closeMergedTab,
+  leafSeats,
+  reconcile,
+  reconcileHost,
+  reconcileNeedsPanes,
+  registeredWorktrees,
+  worktreeRemovable,
+  type Seats,
+} from './reconcile';
 
 type Invocation = { skipped: Set<string>; dispatched: Set<string>; sessionRefusals: Set<string> };
 type DispatchOutcome = 'completed' | 'waiting' | 'skipped';
@@ -280,27 +289,110 @@ export async function createSparseWorktree(
   }
 }
 
+// Moves the leaf branch to the target sha, bound to the sha the caller proved the branch at:
+// a branch that moved or vanished since the proof fails loudly in git, never overwritten.
+export async function resetLeafBranch(repo: Repo, slug: string, target: string, expected: string): Promise<void> {
+  await command(['git', 'update-ref', `refs/heads/${slug}`, target, expected], repo.root);
+}
+
 async function ensureWorktree(repo: Repo, leaf: Leaf, live: boolean): Promise<State> {
   const path: string = resolve(worktreeStore(repo), leaf.state.slug);
+  const slug: string = leaf.state.slug;
   if (leaf.state.worktree !== undefined && leaf.state.worktree !== path)
     throw new Error(
       `Worktree path mismatch: recorded "${leaf.state.worktree}", expected "${path}". Move the worktree to the expected path and reconcile Git metadata and state.worktree, or restore the previous repository/worktree root.`,
     );
-  if (existsSync(path)) {
+  const present: boolean = existsSync(path);
+  if (present) {
     if (realpathSync(await command(['git', 'rev-parse', '--show-toplevel'], path)) !== realpathSync(path))
       throw new Error(`Not a worktree root: ${path}`);
     const expectedCommon: string | null = await commonDirectory(repo.root);
     const actualCommon: string | null = await commonDirectory(path);
     if (expectedCommon === null || expectedCommon !== actualCommon) throw new Error(`Unrelated worktree: ${path}`);
-  } else {
-    const branch: Result = await run(
-      ['git', 'show-ref', '--verify', '--quiet', `refs/heads/${leaf.state.slug}`],
-      repo.root,
-    );
-    if (branch.code !== 0 && branch.code !== 1)
-      throw new CommandError(['git', 'show-ref', leaf.state.slug], repo.root, branch);
-    await createSparseWorktree(repo, path, branch.code === 0 ? leaf.state.slug : trackingRef(repo), {
-      branch: branch.code === 0 ? undefined : leaf.state.slug,
+  }
+  const branch: Result = await run(['git', 'show-ref', '--verify', '--quiet', `refs/heads/${slug}`], repo.root);
+  if (branch.code !== 0 && branch.code !== 1) throw new CommandError(['git', 'show-ref', slug], repo.root, branch);
+  if (leaf.state.worktree === undefined) {
+    // First allocation. A leftover worth keeping is refused loudly, a commit-free leftover is
+    // replaced from the tracking ref, and only a branch with commits of its own is adopted.
+    const step: string = `inspect or save the work in ${path}, then run: git worktree remove --force ${path}`;
+    const ref: string = `refs/heads/${slug}`;
+    if (present) {
+      const symbolic: Result = await run(['git', 'symbolic-ref', '-q', 'HEAD'], path);
+      if (symbolic.code !== 0 && symbolic.code !== 1)
+        throw new CommandError(['git', 'symbolic-ref', '-q', 'HEAD'], path, symbolic);
+      if (symbolic.code === 1) {
+        const head: string = await command(['git', 'rev-parse', 'HEAD'], path);
+        throw new Error(
+          `Refusing first allocation of leaf ${slug}: ${path} is on a detached HEAD at ${head}; ` +
+            `it is never removed or adopted. Inspect ${path} and switch it back onto the leaf branch or remove it with: git worktree remove --force ${path}`,
+        );
+      }
+      if (symbolic.stdout !== ref)
+        throw new Error(
+          `Refusing first allocation of leaf ${slug}: ${path} is on branch ${symbolic.stdout.slice('refs/heads/'.length)}, not ${slug}; ` +
+            `it is never removed or adopted. Inspect ${path} and switch it back onto the leaf branch or remove it with: git worktree remove --force ${path}`,
+        );
+      if (branch.code !== 0)
+        throw new Error(
+          `Refusing first allocation of leaf ${slug}: ${path} is on the unborn branch ${slug}: HEAD names ${ref} but that ref does not exist; ` +
+            `it is never removed or adopted. Inspect ${path} and switch it back onto the leaf branch or remove it with: git worktree remove --force ${path}`,
+        );
+    }
+    if (branch.code === 0) {
+      const provenSha: string = await command(['git', 'rev-parse', `refs/heads/${slug}`], repo.root);
+      const trackingSha: string = await localBase(repo);
+      if (await isAncestor(repo.root, provenSha, trackingSha)) {
+        // Commit-free leftover: worth nothing, but only once it proves clean. Replace it
+        // through today's creation path after a bound reset, so a moved ref fails loudly.
+        const lock: string = await worktreeLock(repo.root);
+        await withLock(lock, async () => {
+          if (present) {
+            const verdict: { ok: true } | { ok: false; reason: string } = await worktreeRemovable(repo, path);
+            if (!verdict.ok) {
+              const status: Result = await run(['git', '-C', path, 'status', '--porcelain'], repo.root);
+              const files: string[] = status.code === 0 && status.stdout !== '' ? status.stdout.split('\n') : [];
+              const list: string =
+                files.length === 0
+                  ? ''
+                  : ` changed files (${files.length} total${files.length > 20 ? ', first 20' : ''}):\n${files
+                      .slice(0, 20)
+                      .map((line) => line.slice(3))
+                      .join('\n')}\n`;
+              throw new Error(
+                `Refusing first allocation of leaf ${slug}: leftover ${path} is kept: ${verdict.reason}.\n${list}${step}`,
+              );
+            }
+            const row: { locked: string | false } | undefined = (await registeredWorktrees(repo.root)).get(path);
+            if (row !== undefined && row.locked !== false)
+              throw new Error(
+                `Refusing first allocation of leaf ${slug}: leftover ${path} is locked.\n` +
+                  `Run: git worktree unlock ${path}, then: git worktree remove --force ${path}`,
+              );
+            const removal: Result = await run(['git', 'worktree', 'remove', path], repo.root);
+            if (removal.code !== 0)
+              throw new Error(
+                `Refusing first allocation of leaf ${slug}: git refused to remove ${path}: ${removal.stderr}\n` +
+                  (removal.stderr.includes('lock') ? `run: git worktree unlock ${path}, then: ` : '') +
+                  step,
+              );
+          }
+          const holder: [string, { branch?: string }] | undefined = [
+            ...(await registeredWorktrees(repo.root)).entries(),
+          ].find(([, row]) => row.branch === slug);
+          if (holder !== undefined)
+            throw new Error(
+              `Refusing first allocation of leaf ${slug}: the commit-free branch ${slug} is checked out in ${holder[0]}; ` +
+                `moving it would strand that worktree. Switch that worktree off the branch or remove it: git worktree remove ${holder[0]}`,
+            );
+          await resetLeafBranch(repo, slug, trackingSha, provenSha);
+        });
+      }
+    }
+  }
+  if (!existsSync(path)) {
+    await createSparseWorktree(repo, path, branch.code === 0 ? slug : trackingRef(repo), {
+      branch: branch.code === 0 ? undefined : slug,
     });
   }
   const wrote: boolean = await writeLeafEnv(repo, path, live);
@@ -813,6 +905,7 @@ async function dispatchLeaf(
       return end('merge_turn', turn === undefined || turn.leaf.state.slug === slug ? undefined : turn.leaf.state.slug);
     seats(global, repo, leaf.path);
     // Mirrors ensureWorktree's path: a missing worktree needs remote proof, an existing one only local.
+    // A replaced leftover passes the same local proof: the base the replace resets to is localBase itself.
     const mustCreate: boolean = !existsSync(resolve(worktreeStore(repo), slug));
     await checkBase(repo, mustCreate);
     if ((await ownPlace()) === null) return 'skipped';

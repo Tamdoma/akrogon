@@ -232,7 +232,10 @@ async function stopSlice(slice: string): Promise<string | null> {
 
 const finished = (leaf: Leaf): boolean => leaf.state.phase === 'merged' || leaf.state.phase === 'failed';
 
-async function worktreeRemovable(repo: Repo, path: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+export async function worktreeRemovable(
+  repo: Repo,
+  path: string,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
   const status: Result = await run(['git', '-C', path, 'status', '--porcelain'], repo.root);
   if (status.code !== 0) return { ok: false, reason: status.stderr || `git status exited ${status.code}` };
   if (status.stdout !== '') return { ok: false, reason: 'uncommitted changes' };

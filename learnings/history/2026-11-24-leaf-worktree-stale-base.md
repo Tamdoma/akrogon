@@ -16,3 +16,5 @@ Framework leaf mockup-content-syncs-every-string was handed off on 2026-11-24 (s
 Reusing a worktree or branch keeps its old base. A leaf that has no commits of its own yet can move to the current tracking ref at no cost, while planning on the old base plans against code the design says is gone. Leftover uncommitted files from an abandoned attempt then sit in the new attempt's tree without any record.
 
 Report: https://github.com/Tamdoma/akrogon/issues/156
+
+Applied 2026-11-25 by src/next.ts:315: the first-allocation gate replaces a commit-free leftover from the tracking ref and refuses one worth keeping, so no seat opens on a stale base.
