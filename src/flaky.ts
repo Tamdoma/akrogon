@@ -21,21 +21,61 @@ function prefixOf(short: string[], long: string[]): boolean {
   return short.length < long.length && short.every((token: string, index: number) => token === long[index]);
 }
 
-// A red log's names come only from lines Bun prints: `(fail)` titles, `(unnamed)` qualified by its
-// stream's innermost token, and `(script) <script>` for a failed script whose own stream printed no
-// `(fail)` line — the stream's wrappers dropped first, `Signaled:` and free text never naming.
-export function failureNames(text: string): string[] {
+export type BunScan = {
+  names: string[];
+  timeouts: string[];
+  durations: { name: string; ms: number }[];
+};
+
+function streamKey(tokens: string[]): string {
+  return tokens.join('\0');
+}
+
+// One ordered scan of captured Bun output. `names` is byte-identical to the historical
+// failureNames output: `(fail)` titles, `(unnamed)` qualified by its stream's innermost token,
+// and `(script) <script>` for a failed script whose own stream printed no `(fail)` line — the
+// stream's wrappers dropped first, `Signaled:` and free text never naming. `timeouts` holds the
+// names whose own chain prints `  ^ this test timed out after <n>ms.` as the next line of that
+// same chain after its `(fail)` line; lines of other chains in between do not break attachment.
+// `durations` holds every `(pass)` or `(fail)` line with a `[<n>ms]` bracket as one deduped entry
+// per name keeping its largest rounded ms; unbracketed lines store nothing.
+export function scanBunOutput(text: string): BunScan {
   const titles: string[] = [];
   const failedStreams: string[][] = [];
-  for (const match of text.matchAll(/^(?:\(fail\) |(.+?)\| \(fail\) )(.+?)(?: \[[\d.]+m?s\])?$/gm)) {
-    const title: string = match[2];
-    const stream: string[] = match[1] === undefined ? [] : chain(match[1]);
-    failedStreams.push(stream);
-    titles.push(title === '(unnamed)' && stream.length > 0 ? `(unnamed) ${stream[stream.length - 1]}` : title);
+  const exited: string[][] = [];
+  const lastFail: Map<string, string> = new Map();
+  const timeouts: string[] = [];
+  const ms: Map<string, number> = new Map();
+  for (const line of text.split('\n')) {
+    const fail: RegExpExecArray | null = /^(?:\(fail\) |(.+?)\| \(fail\) )(.+?)(?: \[([\d.]+m?s)\])?$/.exec(line);
+    const pass: RegExpExecArray | null =
+      fail === null ? /^(?:\(pass\) |(.+?)\| \(pass\) )(.+?)(?: \[([\d.]+m?s)\])?$/.exec(line) : null;
+    const result: RegExpExecArray | null = fail ?? pass;
+    if (result !== null) {
+      const stream: string[] = result[1] === undefined ? [] : chain(result[1]);
+      const title: string =
+        result[2] === '(unnamed)' && stream.length > 0 ? `(unnamed) ${stream[stream.length - 1]}` : result[2];
+      if (fail !== null) {
+        failedStreams.push(stream);
+        titles.push(title);
+        lastFail.set(streamKey(stream), title);
+      }
+      if (result[3] !== undefined && result[3].endsWith('ms')) {
+        const value: number = Math.round(Number.parseFloat(result[3]));
+        if (!ms.has(title) || ms.get(title)! < value) ms.set(title, value);
+      }
+      continue;
+    }
+    const timeout: RegExpExecArray | null = /^(?:(.+?)\| )?  \^ this test timed out after [\d.]+ms\.$/.exec(line);
+    if (timeout !== null) {
+      const tokens: string[] = timeout[1] === undefined ? [] : chain(timeout[1]);
+      const attached: string | undefined = lastFail.get(streamKey(tokens));
+      if (attached !== undefined && !timeouts.includes(attached)) timeouts.push(attached);
+      continue;
+    }
+    if (/^.+\| Exited with code (?!0\b)\d+\s*$/.test(line))
+      exited.push(chain(line.slice(0, line.lastIndexOf('|'))));
   }
-  const exited: string[][] = [...text.matchAll(/^.+\| Exited with code (?!0\b)\d+\s*$/gm)].map(
-    (match: RegExpMatchArray) => chain(match[0].slice(0, match[0].lastIndexOf('|'))),
-  );
   const leaf: string[][] = exited.filter(
     (candidate: string[]) => !exited.some((other: string[]) => prefixOf(candidate, other)),
   );
@@ -45,7 +85,15 @@ export function failureNames(text: string): string[] {
     .filter((tokens: string[]) => !failedStreams.some((stream: string[]) => sameStream(stream, tokens)))
     .map((tokens: string[]) => `(script) ${tokens[tokens.length - 1]}`);
   const all: string[] = [...new Set([...titles, ...scripts])];
-  return all.length === 0 ? ['(no test name)'] : all;
+  return {
+    names: all.length === 0 ? ['(no test name)'] : all,
+    timeouts,
+    durations: [...ms.entries()].map(([name, value]) => ({ name, ms: value })),
+  };
+}
+
+export function failureNames(text: string): string[] {
+  return scanBunOutput(text).names;
 }
 
 // A closed leaf's logs move with its records between issues/<state> owner dirs and packed archives;

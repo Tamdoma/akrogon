@@ -22,7 +22,7 @@ import {
   type Repo,
   type RepoConfig,
 } from './config';
-import { failedTests, failureNames } from './flaky';
+import { failedTests, scanBunOutput, type BunScan } from './flaky';
 import { checkLocation } from './guard';
 import { createSparseWorktree, emitEnvFile } from './next';
 import { trackingRef } from './preflight';
@@ -55,6 +55,55 @@ const failuresSchema = z
   .min(1)
   .refine((list) => new Set(list).size === list.length);
 
+const durationsSchema = z
+  .array(z.strictObject({ name: z.string(), ms: z.number().int().nonnegative() }))
+  .min(1)
+  .refine((list) => new Set(list.map((item) => item.name)).size === list.length);
+
+const commandRowSchema = z
+  .strictObject({
+    name: z.string(),
+    command: z.string(),
+    exit: z.number().int(),
+    log: z.string(),
+    reused: z.string().optional(),
+    blocked: z.string().optional(),
+    failures: failuresSchema.optional(),
+    timeouts: failuresSchema.optional(),
+    durations: durationsSchema.optional(),
+    rerun: z
+      .strictObject({
+        exit: z.number().int(),
+        log: z.string(),
+        failures: failuresSchema.optional(),
+        timeouts: failuresSchema.optional(),
+        durations: durationsSchema.optional(),
+      })
+      .optional(),
+  })
+  .superRefine((row, ctx) => {
+    if (row.timeouts !== undefined) {
+      if (row.failures === undefined)
+        ctx.addIssue({ code: 'custom', message: 'timeouts without failures', path: ['timeouts'] });
+      else
+        for (const name of row.timeouts)
+          if (!row.failures.includes(name))
+            ctx.addIssue({ code: 'custom', message: `timeout ${name} is not in failures`, path: ['timeouts'] });
+    }
+    if (row.rerun?.timeouts !== undefined) {
+      if (row.rerun.failures === undefined)
+        ctx.addIssue({ code: 'custom', message: 'rerun timeouts without failures', path: ['rerun', 'timeouts'] });
+      else
+        for (const name of row.rerun.timeouts)
+          if (!row.rerun.failures.includes(name))
+            ctx.addIssue({
+              code: 'custom',
+              message: `rerun timeout ${name} is not in rerun failures`,
+              path: ['rerun', 'timeouts'],
+            });
+    }
+  });
+
 export const verifyRunSchema = z.strictObject({
   run: z.string(),
   repo: z.string(),
@@ -66,24 +115,12 @@ export const verifyRunSchema = z.strictObject({
   patch_id: z.string().optional(),
   patch_base: z.string().optional(),
   notice: z.string().optional(),
+  attempt: z.string().optional(),
   path: z.string(),
   pid: z.number().int(),
   boot_id: z.string(),
   setup: z.number().int().optional(),
-  commands: z.array(
-    z.strictObject({
-      name: z.string(),
-      command: z.string(),
-      exit: z.number().int(),
-      log: z.string(),
-      reused: z.string().optional(),
-      blocked: z.string().optional(),
-      failures: failuresSchema.optional(),
-      rerun: z
-        .strictObject({ exit: z.number().int(), log: z.string(), failures: failuresSchema.optional() })
-        .optional(),
-    }),
-  ),
+  commands: z.array(commandRowSchema),
   slow: z
     .strictObject({
       ms: z.number().int(),
@@ -653,7 +690,30 @@ type CommandRow = VerifyRun['commands'][number];
 // A red merge command with a rerun entry and at most 3 named failures runs its rerun command once,
 // with the names in a file inside the pass folder. The row takes the rerun's exit and log, keeps the
 // first run in `rerun`, and fails only the first-run names the rerun reports again, or all of them
-// when it reports none by name.
+// when it reports none by name. Each leg's `timeouts` and `durations` are scanned from that leg's
+// own output and sit beside that leg's log.
+// The 20 slowest deduped timed tests of one leg's output plus every failure name that has a timed
+// line, sorted by ms descending. Merge scope only; leaf rows and rows with no timed line omit it.
+function durationsFor(scan: BunScan, failures: string[] | undefined, mergeScope: boolean): CommandRow['durations'] {
+  if (!mergeScope || scan.durations.length === 0) return undefined;
+  const keep: { name: string; ms: number }[] = [...scan.durations].sort((a, b) => b.ms - a.ms);
+  const slowest: { name: string; ms: number }[] = keep.slice(0, 20);
+  const named: Set<string> = new Set(slowest.map((item) => item.name));
+  const out: { name: string; ms: number }[] = slowest;
+  for (const item of keep.slice(20))
+    if (failures !== undefined && failures.includes(item.name) && !named.has(item.name)) {
+      named.add(item.name);
+      out.push(item);
+    }
+  return out.length === 0 ? undefined : out;
+}
+
+function timeoutsFor(scan: BunScan, failures: string[] | undefined): CommandRow['timeouts'] {
+  if (failures === undefined) return undefined;
+  const attached: string[] = scan.timeouts.filter((name) => failures.includes(name));
+  return attached.length === 0 ? undefined : attached;
+}
+
 async function commandRow(
   repo: Repo,
   record: PassRecord,
@@ -663,11 +723,23 @@ async function commandRow(
   first: { code: number; log: string; output: string },
 ): Promise<CommandRow> {
   // Names come from the captured output: owner completion may delete the published log first.
-  const failures: string[] | undefined = first.code === 0 ? undefined : failureNames(first.output);
+  const mergeScope: boolean = record.scope === 'merge';
+  const scan: BunScan = scanBunOutput(first.output);
+  const failures: string[] | undefined = first.code === 0 ? undefined : scan.names;
   const rerun: string | undefined =
-    record.scope === 'merge' && record.compares === undefined ? repo.config.rerun?.[item.name] : undefined;
-  if (rerun === undefined || failures === undefined || failures.includes('(no test name)') || failures.length > 3)
-    return { ...item, exit: first.code, log: first.log, ...(failures === undefined ? {} : { failures }) };
+    mergeScope && record.compares === undefined ? repo.config.rerun?.[item.name] : undefined;
+  if (rerun === undefined || failures === undefined || failures.includes('(no test name)') || failures.length > 3) {
+    const timeouts: CommandRow['timeouts'] = timeoutsFor(scan, failures);
+    const durations: CommandRow['durations'] = durationsFor(scan, failures, mergeScope);
+    return {
+      ...item,
+      exit: first.code,
+      log: first.log,
+      ...(failures === undefined ? {} : { failures }),
+      ...(timeouts === undefined ? {} : { timeouts }),
+      ...(durations === undefined ? {} : { durations }),
+    };
+  }
   const file: string = resolve(passesRoot(), record.run, `rerun-${encodeURIComponent(item.name)}.txt`);
   writeFileSync(file, failures.map((name) => `${name}\n`).join(''));
   const second: { code: number; log: string; output: string } = await checkedRun(
@@ -679,14 +751,29 @@ async function commandRow(
     target,
     file,
   );
-  const again: string[] = second.code === 0 ? [] : failureNames(second.output);
+  const secondScan: BunScan = scanBunOutput(second.output);
+  const again: string[] = second.code === 0 ? [] : secondScan.names;
   const still: string[] = failures.filter((name) => again.includes(name));
+  const finalFailures: string[] | undefined =
+    second.code === 0 ? undefined : still.length > 0 ? still : failures;
+  const firstTimeouts: CommandRow['timeouts'] = timeoutsFor(scan, failures);
+  const firstDurations: CommandRow['durations'] = durationsFor(scan, failures, mergeScope);
+  const timeouts: CommandRow['timeouts'] = timeoutsFor(secondScan, finalFailures);
+  const durations: CommandRow['durations'] = durationsFor(secondScan, finalFailures, mergeScope);
   return {
     ...item,
     exit: second.code,
     log: second.log,
-    ...(second.code === 0 ? {} : { failures: still.length > 0 ? still : failures }),
-    rerun: { exit: first.code, log: first.log, failures },
+    ...(finalFailures === undefined ? {} : { failures: finalFailures }),
+    ...(timeouts === undefined ? {} : { timeouts }),
+    ...(durations === undefined ? {} : { durations }),
+    rerun: {
+      exit: first.code,
+      log: first.log,
+      failures,
+      ...(firstTimeouts === undefined ? {} : { timeouts: firstTimeouts }),
+      ...(firstDurations === undefined ? {} : { durations: firstDurations }),
+    },
   };
 }
 
@@ -710,6 +797,7 @@ async function runOnce(repo: Repo, record: PassRecord): Promise<VerifyRun> {
     scope,
     ...(compares === undefined ? {} : { compares }),
     ...(ownBase === undefined ? {} : { patch_base: ownBase, patch_id: id }),
+    ...(caller.attempt === undefined ? {} : { attempt: caller.attempt }),
     path: target,
     pid: process.pid,
     boot_id: bootId(),
