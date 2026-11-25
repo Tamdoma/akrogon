@@ -33,7 +33,7 @@ The door may still recommend lifecycle for a small job it thinks is risky. You c
 
 ## What happens when you pick direct
 
-1. The door writes the leaf files under `issues/open/<chart-slug>/<slug>/` and runs `akrogon direct <slug> --reviewer <B address>`, which creates the worktree and the leaf record.
+1. The door writes `ISSUE.md` under `issues/open/<chart-slug>/` and `brief.md`, `design.md` and `readiness.yaml` in its `<slug>/` folder, then runs `akrogon direct <slug> --reviewer <B address>`, which creates the worktree and the leaf record.
 2. The door builds the change itself in the worktree with [implement-issue](../../skills/implement-issue/SKILL.md) as seat A, then sends the leaf to review.
 3. B reviews it with [check-issue](../../skills/check-issue/SKILL.md).
 4. On fixes the door repairs as seat A and B checks again.
@@ -46,7 +46,7 @@ You watch the leaf in `akrogon status` like any other. You do not run these comm
 
 A task that outgrows the route stops the leaf `failed`: a settled decision must change, a need the route refuses appears, a criterion cannot pass, or a second outcome shows up. You then pick one of these:
 
-- Abandon it: the door runs `akrogon direct-drop`, which stops the leaf's runs, removes the worktree and branch, moves the leaf folder back into the chart and marks the chart `Held`.
+- Abandon it: the door runs `akrogon direct-drop`, which stops the leaf's runs, removes the worktree and branch, and moves the owner folder to `<chart>/direct/<owner>` beside the chart's existing captures. The door then marks the chart `Held`.
 - Hand it to the lifecycle: the work is dropped the same way and charted as a normal leaf under a fresh slug.
 
 The full command list is in [commands.md](../reference/commands.md).

@@ -14,7 +14,8 @@ issues/chart/<chart-slug>/
   forks/signposts.md            # the session's signposts record (original in one chart, verbatim copy elsewhere)
   forks/<fork-slug>.md
   slots/<pass>.md                 # peer exchanges
-  direct/                       # charting-probe captures; a dropped direct leaf's owner folder lands here
+  direct/                       # charting-probe captures
+    <owner>/                    # dropped direct attempt's owner folder, including ISSUE.md and the leaf
 ```
 
 Charts stay here after handoff. They have no state.yaml or lifecycle phase. Create forks/ even for a fully settled direct item. On resume, CHART.md points to the selected fork and its context rather than requiring a full chart reread.
@@ -406,7 +407,7 @@ blocked-by: []
 sources: []
 ```
 
-Replace sample values with the chosen slug, creation date and registered repo key. On the direct route the door writes the standalone issue's `ISSUE.md`, `brief.md`, `design.md` and `readiness.yaml` under `issues/open/<chart-slug>/<slug>/`; `state.yaml` is written by `akrogon direct`, never door-authored. Every leaf gets `sources`, empty when unsourced. Attempts, done, fix_rounds, frozen, frozen_cited, verdict, pane, tab, prompted and worktree belong to the command and are not door-authored.
+Replace sample values with the chosen slug, creation date and registered repo key. On the direct route the door writes `ISSUE.md` under `issues/open/<chart-slug>/` and `brief.md`, `design.md` and `readiness.yaml` in its `<slug>/` folder. `akrogon direct` writes `state.yaml`, never the door. Every leaf gets `sources`, empty when unsourced. Attempts, done, fix_rounds, frozen, frozen_cited, verdict, pane, tab, prompted and worktree belong to the command and are not door-authored.
 
 A GitHub report has exactly one completion owner, an issue or an epic: every leaf beneath that owner carries its exact identity in sources. For an epic owner, that includes leaves of every child issue. Do not distribute one identity across unrelated completion owners. Legacy source paths stay in intake provenance, not sources. One stated exception: a report whose close depends on a step on main that can only follow a leaf's merge is withheld from `sources` of every leaf whose completion could close it; the identity stays open, mirrored by `akrogon pull`, and the door makes and verifies the edit, then runs `akrogon close <id> --by <text>` naming what delivered it.
 

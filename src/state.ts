@@ -224,9 +224,7 @@ export function parseLeafState(data: unknown): State {
   return stateSchema.parse(data);
 }
 
-// The folders <owner>/<slug> under issues/open and issues/closed, depth two exactly, matched by
-// directory name whether or not they hold a state yet: a direct leaf is always its owner's direct
-// child, and the create verb's scan runs before any state exists.
+// Open drafts and existing leaves at depth two: a direct leaf is always its owner's direct child.
 export function slugLeafFolders(repo: Pick<Repo, 'root'>, slug: string): string[] {
   const found: string[] = [];
   for (const area of ['open', 'closed']) {
@@ -234,29 +232,29 @@ export function slugLeafFolders(repo: Pick<Repo, 'root'>, slug: string): string[
     if (!existsSync(root)) continue;
     for (const owner of readdirSync(root)) {
       const candidate: string = resolve(root, owner, slug);
-      if (statSync(candidate, { throwIfNoEntry: false })?.isDirectory() === true) found.push(candidate);
+      if (
+        statSync(candidate, { throwIfNoEntry: false })?.isDirectory() === true &&
+        (area === 'open' || existsSync(resolve(candidate, 'state.yaml')))
+      )
+        found.push(candidate);
     }
   }
   return found;
 }
 
-// The raw direct marker of an existing state.yaml: the one check the direct verb's rerun scan
-// needs before deciding the rewrite, read here so no other module parses leaf state.
-export function hasDirectMarker(leafPath: string): boolean {
-  const raw: Record<string, unknown> = z
-    .record(z.string(), z.unknown())
-    .parse(Bun.YAML.parse(readFileSync(resolve(leafPath, 'state.yaml'), 'utf8')));
-  return raw.direct === true;
+function readRawLeafState(file: string): Record<string, unknown> {
+  return z.record(z.string(), z.unknown()).parse(Bun.YAML.parse(readFileSync(file, 'utf8')));
 }
 
-// The direct verb's rerun rewrite: byte-preserving, so it never round-trips through the schema,
-// which would materialize defaults and reorder content. Only the two seat refs change, plus a
-// changed slot's delivery_error key drops.
+export function hasDirectMarker(leafPath: string): boolean {
+  return readRawLeafState(resolve(leafPath, 'state.yaml')).direct === true;
+}
+
+// Called under the global state lock. Read the current state without materializing schema defaults.
 export function rewriteSeatRefs(leafPath: string, caller: SeatRef, reviewer: SeatRef): void {
   const file: string = resolve(leafPath, 'state.yaml');
-  const raw: Record<string, unknown> = z
-    .record(z.string(), z.unknown())
-    .parse(Bun.YAML.parse(readFileSync(file, 'utf8')));
+  const raw: Record<string, unknown> = readRawLeafState(file);
+  if (raw.direct !== true) throw new Error(`${basename(leafPath)} is not a direct leaf`);
   const oldRefs = z.object({ A: z.unknown().optional(), B: z.unknown().optional() }).parse(raw.seat);
   const changed = (slot: 'A' | 'B', next: SeatRef): boolean => {
     const old = seatRefSchema.safeParse(oldRefs[slot]);
@@ -415,8 +413,8 @@ export function closedLeaf(repo: Pick<Repo, 'name' | 'root'>, slug: string): Lea
   return leaves.find((leaf) => leaf.state.repo === repo.name && leaf.state.slug === slug);
 }
 
-export function hasLeafFolder(repo: Repo, slug: string): boolean {
-  return slugFolders(repo, slug).length > 0;
+export function hasLeafFolder(repo: Repo, slug: string, exceptPath?: string): boolean {
+  return slugFolders(repo, slug).some((path) => path !== exceptPath);
 }
 
 export function missingLeafMessage(repo: Repo, slug: string): string {

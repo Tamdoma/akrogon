@@ -2,15 +2,18 @@
 // charting terminal itself (the door) with the reviewer as seat B: no tab, no seats started, no
 // setup run. Every refusal of the create flow runs before any write; a rerun on an existing direct
 // leaf rewrites only the two seat refs.
-import { existsSync, realpathSync, renameSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, realpathSync, renameSync, statSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
-import { readGlobal, requireRepo, ensureLeafTemp, within, worktreeStore, type Repo } from './config';
+import { globalHome, readGlobal, requireRepo, ensureLeafTemp, within, worktreeStore, type Repo } from './config';
+import { flockHold } from './flock';
 import { HcError, sessions, terminal } from './hc';
+import { enclosingCapture } from './pack';
 import { checkBase } from './preflight';
 import { command } from './shell';
 import {
   findLeaf,
   hasDirectMarker,
+  hasLeafFolder,
   leafFolders,
   parseLeafState,
   rewriteSeatRefs,
@@ -18,6 +21,7 @@ import {
   slugLeafFolders,
   worktreeLock,
   withLock,
+  type Leaf,
   type SeatRef,
 } from './state';
 import { createSparseWorktree, writeLeafEnv } from './next';
@@ -43,6 +47,15 @@ async function probeExactlyOne(address: string, label: string): Promise<SeatRef>
   );
 }
 
+function directLeafPath(repo: Repo, slug: string): string {
+  const folders: string[] = slugLeafFolders(repo, slug);
+  if (folders.length === 0) throw new Error(`Missing leaf folder for ${slug} under issues/open and issues/closed`);
+  if (folders.length > 1) throw new Error(`Ambiguous leaf slug ${slug}: ${folders.join(' and ')} both hold it`);
+  const path: string = folders[0];
+  if (hasLeafFolder(repo, slug, path)) throw new Error(`Leaf slug ${slug} is already taken`);
+  return path;
+}
+
 export async function directCommand(
   slug: string,
   reviewerAddress: string,
@@ -54,24 +67,29 @@ export async function directCommand(
   if (callerAddress === undefined || callerAddress.trim() === '')
     throw new Error('akrogon direct runs inside an hc terminal: HC_TERMINAL_ID is not set');
   const caller: SeatRef = await probeExactlyOne(callerAddress, `HC_TERMINAL_ID ${callerAddress}`);
-  const folders: string[] = slugLeafFolders(repo, slug);
-  if (folders.length === 0) throw new Error(`Missing leaf folder for ${slug} under issues/open and issues/closed`);
-  if (folders.length > 1) throw new Error(`Ambiguous leaf slug ${slug}: ${folders.join(' and ')} both hold it`);
-  const leafPath: string = folders[0];
-  const stateFile: string = resolve(leafPath, 'state.yaml');
-  if (existsSync(stateFile)) {
+  const leafPath: string = directLeafPath(repo, slug);
+  if (existsSync(resolve(leafPath, 'state.yaml'))) {
     if (!hasDirectMarker(leafPath)) throw new Error(`${slug} is not a direct leaf`);
     const reviewer: SeatRef = await probeExactlyOne(reviewerAddress, `the reviewer address ${reviewerAddress}`);
-    rewriteSeatRefs(leafPath, caller, reviewer);
-    console.log(`leaf: ${realpathSync(leafPath)}`);
+    const currentPath: string = await withLock(resolve(globalHome(), '.lock'), async () => {
+      const path: string = directLeafPath(repo, slug);
+      rewriteSeatRefs(path, caller, reviewer);
+      return realpathSync(path);
+    });
+    console.log(`leaf: ${currentPath}`);
     return;
   }
-  for (const file of ['ISSUE.md', 'brief.md', 'design.md'])
-    if (!existsSync(resolve(leafPath, file)))
-      throw new Error(
-        `${leafPath} lacks ${file}: the chart door writes ISSUE.md, brief.md and design.md before akrogon direct`,
-      );
   const ownerPath: string = dirname(leafPath);
+  for (const file of [
+    resolve(ownerPath, 'ISSUE.md'),
+    ...['brief.md', 'design.md', 'readiness.yaml'].map((name) => resolve(leafPath, name)),
+  ])
+    if (statSync(file, { throwIfNoEntry: false })?.isFile() !== true)
+      throw new Error(`Missing ${file}: the chart door writes it before akrogon direct`);
+  for (const area of ['closed', 'parked']) {
+    const reserved: string = resolve(repo.root, 'issues', area, basename(ownerPath));
+    if (existsSync(reserved)) throw new Error(`Refusing to create ${slug}: owner already exists at ${reserved}`);
+  }
   const siblings: string[] = leafFolders(ownerPath).filter((path) => path !== leafPath);
   if (siblings.length > 0)
     throw new Error(
@@ -114,22 +132,35 @@ export async function directCommand(
 
 export async function directDropCommand(slug: string, chart: string, cwd: string): Promise<void> {
   const repo: Repo = await requireRepo(readGlobal(), cwd);
-  const leaf = findLeaf(repo, slug);
-  if (leaf.state.direct !== true) throw new Error(`${slug} is not a direct leaf`);
-  if (leaf.state.phase === 'merge' || leaf.state.phase === 'merged')
-    throw new Error(`Refusing to drop ${slug}: phase ${leaf.state.phase} is not an unmerged attempt`);
-  if (!within(leaf.path, resolve(repo.root, 'issues/open')))
-    throw new Error(`Refusing to drop ${slug}: the leaf is not under issues/open`);
-  if (!existsSync(resolve(cwd, chart))) throw new Error(`Not a chart folder: ${chart}`);
-  const chartPath: string = realpathSync(resolve(cwd, chart));
-  if (!statSync(chartPath).isDirectory()) throw new Error(`Not a chart folder: ${chartPath}`);
-  const destination: string = resolve(chartPath, 'direct');
-  if (existsSync(destination)) throw new Error(`Refusing to drop ${slug}: ${destination} already exists`);
-  const worktree: string = resolve(worktreeStore(repo), slug);
-  await stopLeafWork(repo, slug);
-  const lock: string = await worktreeLock(repo.root);
-  await withLock(lock, () => command(['git', 'worktree', 'remove', '--force', worktree], repo.root));
-  await command(['git', 'update-ref', '-d', `refs/heads/${slug}`], repo.root);
-  renameSync(dirname(leaf.path), destination);
-  console.log(`moved: ${destination}`);
+  await withLock(resolve(globalHome(), '.lock'), async () => {
+    const leaf: Leaf = findLeaf(repo, slug);
+    if (leaf.state.direct !== true) throw new Error(`${slug} is not a direct leaf`);
+    if (leaf.state.phase === 'merge' || leaf.state.phase === 'merged')
+      throw new Error(`Refusing to drop ${slug}: phase ${leaf.state.phase} is not an unmerged attempt`);
+    if (!within(leaf.path, resolve(repo.root, 'issues/open')))
+      throw new Error(`Refusing to drop ${slug}: the leaf is not under issues/open`);
+    if (!existsSync(resolve(cwd, chart))) throw new Error(`Not a chart folder: ${chart}`);
+    const chartPath: string = realpathSync(resolve(cwd, chart));
+    if (!statSync(chartPath).isDirectory()) throw new Error(`Not a chart folder: ${chartPath}`);
+    const owner: string = dirname(leaf.path);
+    const parent: string = resolve(chartPath, 'direct');
+    const destination: string = resolve(parent, basename(owner));
+    if (existsSync(destination)) throw new Error(`Refusing to drop ${slug}: ${destination} already exists`);
+    const enclosing: string | undefined = enclosingCapture(owner);
+    if (enclosing !== undefined) throw new Error(`Refusing to drop ${owner}: inside run-check run ${enclosing}`);
+    mkdirSync(parent, { recursive: true });
+    // Stop live runs before waiting for their shared lock to drain. Abandoned capture pairs move with the owner.
+    await stopLeafWork(repo, slug);
+    const holder: { release: () => Promise<void> } = await flockHold(resolve(owner, '.lock'), '-x');
+    try {
+      const worktree: string = resolve(worktreeStore(repo), slug);
+      const lock: string = await worktreeLock(repo.root);
+      await withLock(lock, () => command(['git', 'worktree', 'remove', '--force', worktree], repo.root));
+      await command(['git', 'update-ref', '-d', `refs/heads/${slug}`], repo.root);
+      renameSync(owner, destination);
+    } finally {
+      await holder.release();
+    }
+    console.log(`moved: ${destination}`);
+  });
 }
