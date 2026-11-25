@@ -189,7 +189,7 @@ function refuseEnclosingCompletion(
       failure: {
         cause: 'blocked',
         phase: recorded.phase,
-        slot: slot ?? requiredSlots(recorded.phase, recorded.fix_rounds)[0],
+        slot: slot ?? requiredSlots(recorded.phase, recorded.fix_rounds, recorded.direct === true)[0],
         reason,
       },
     });
@@ -354,10 +354,13 @@ export function ownerCompletion(repo: Repo, leaf: Leaf, after: State): Completed
 // A command-run merge: no seat moves the leaf, and a completing owner leaves its broadcast handoff in the same save.
 export async function commandMerged(repo: Repo, holder: Leaf, pushed: string): Promise<void> {
   const completed: CompletedOwner | null = ownerCompletion(repo, holder, { ...holder.state, phase: 'merged' });
+  // The handoff is recorded only when the repo configures at least one target: configuration
+  // presence, never a process.env read — the webhook urls resolve at send time (plan D8).
+  const targeted: boolean = (repo.config.broadcast?.discord.webhook_env.length ?? 0) > 0;
   await commitMove(
     repo,
     holder,
-    completed === null ? holder.state : { ...holder.state, broadcast: { ...completed, pushed } },
+    completed === null || !targeted ? holder.state : { ...holder.state, broadcast: { ...completed, pushed } },
     'merged',
     null,
   );
@@ -479,7 +482,7 @@ export async function transition(
     );
   if (requested === 'failed' && reason === undefined) throw new Error('Failed requires --reason');
   if (requested !== 'failed' && reason !== undefined) throw new Error('--reason is only valid for failed');
-  const required: readonly Slot[] = requiredSlots(state.phase, state.fix_rounds);
+  const required: readonly Slot[] = requiredSlots(state.phase, state.fix_rounds, state.direct === true);
   const slot: Slot | undefined = explicitSlot ?? (required.length === 1 ? required[0] : undefined);
   if (state.phase !== 'failed' && required.length === 0 && explicitSlot !== undefined)
     throw new Error(`A seat cannot make ${state.phase} calls: ${requested} --slot ${explicitSlot}`);
@@ -512,8 +515,17 @@ export async function transition(
   if (state.phase === 'check.repair' && requested === 'merge' && state.worktree !== undefined) {
     const head: string = await command(['git', 'rev-parse', 'HEAD'], state.worktree);
     // A red-exited leaf returning unedited already holds its merge-scope proof.
-    if (!(state.merge_exit?.reason === 'red' && state.merge_exit.top === head))
+    const uneditedRed: boolean = state.merge_exit?.reason === 'red' && state.merge_exit.top === head;
+    if (!uneditedRed) {
+      // A direct leaf repairs straight back to merge only as the unedited return after a red
+      // exit; every other shape goes through check.fix (plan D7). Lifecycle keeps the
+      // green-receipt acceptance unchanged.
+      if (state.direct === true)
+        throw new Error(
+          'Illegal move check.repair -> merge: a direct leaf accepts only the unedited return after a red merge exit; edited work goes through check.fix',
+        );
       await requireGreenReceipt(repo, head, 'leaf');
+    }
   }
   if ((state.phase === 'check.review') !== (verdict !== undefined))
     throw new Error('Review requires --verdict; other phases forbid it');

@@ -163,14 +163,19 @@ function checkPairs(
   });
 }
 
-function visitGaps(events: TimingEvent[], slug: string, visit: Visit): string[] {
+// Direct seats are never prompted and never record seat_done, so those gap kinds are
+// meaningless for a direct leaf and suppressed by kind (plan D12); check_end pairing is untouched.
+function visitGaps(events: TimingEvent[], slug: string, visit: Visit, direct: boolean): string[] {
   if (visit.end === null || visit.failed) return [];
   const missing: string[] = [];
-  const slots: readonly Slot[] = visit.seatless ? [] : historicalSlots(visit.phase, visit.rounds);
-  const present: Slot[] = slots.filter((slot) => delivered(events, slug, visit, slot));
-  if (slots.length > 0 && present.length === 0) missing.push('prompt');
-  else for (const slot of slots.filter((slot) => !present.includes(slot))) missing.push(`prompt:${slot}`);
+  const slots: readonly Slot[] = visit.seatless ? [] : historicalSlots(visit.phase, visit.rounds, direct);
+  if (!direct) {
+    const present: Slot[] = slots.filter((slot) => delivered(events, slug, visit, slot));
+    if (slots.length > 0 && present.length === 0) missing.push('prompt');
+    else for (const slot of slots.filter((slot) => !present.includes(slot))) missing.push(`prompt:${slot}`);
+  }
   if (
+    !direct &&
     visit.phase === 'check.review' &&
     visit.rounds === 0 &&
     !events.some(
@@ -210,7 +215,7 @@ function duration(msValue: number): string {
   return parts.join('');
 }
 
-function visitLines(events: TimingEvent[], slug: string, visit: Visit): string[] {
+function visitLines(events: TimingEvent[], slug: string, visit: Visit, direct: boolean): string[] {
   if (visit.end === null) return [`${visit.phase} #${visit.visit} open`];
   const waits: Map<WaitKind | 'none', number> = waitTotals(events, slug, visit.start, visit.end);
   const prompted: number = promptedTotal(events, slug, visit);
@@ -226,16 +231,27 @@ function visitLines(events: TimingEvent[], slug: string, visit: Visit): string[]
     );
   const none: number = Math.max(0, (waits.get('none') ?? 0) - prompted);
   if (none > 0) lines.push(`  wait none ${duration(none)}`);
-  for (const name of visitGaps(events, slug, visit)) lines.push(`  incomplete ${name}`);
+  for (const name of visitGaps(events, slug, visit, direct)) lines.push(`  incomplete ${name}`);
   return lines;
+}
+
+// The direct marker rides on the leaf state, so gap suppression reads the leaf inventory
+// across every area: a merged leaf already rests in closed (plan D12).
+function directSlugs(repo: Repo): Set<string> {
+  return new Set(
+    repoInventory(repo, ['open', 'closed', 'parked']).leaves
+      .filter((leaf) => leaf.state.direct === true)
+      .map((leaf) => leaf.state.slug),
+  );
 }
 
 function slugReport(repo: Repo, slug: string): void {
   const timings: TimingEvent[] = readTimings(repo.root);
   const log: LogRecord[] = readLog(repo.root);
+  const direct: boolean = directSlugs(repo).has(slug);
   console.log(
     visitsOf(slug, timings, log)
-      .flatMap((visit) => visitLines(timings, slug, visit))
+      .flatMap((visit) => visitLines(timings, slug, visit, direct))
       .join('\n'),
   );
 }
@@ -260,7 +276,14 @@ type Member = {
   gaps: string[];
 };
 
-function memberOf(slug: string, joined: number, timings: TimingEvent[], log: LogRecord[], now: number): Member {
+function memberOf(
+  slug: string,
+  joined: number,
+  timings: TimingEvent[],
+  log: LogRecord[],
+  now: number,
+  direct: boolean,
+): Member {
   const moves: Move[] = movesOf(log, slug);
   const merge: Move | undefined = moves.find((record) => record.to === 'merged');
   const merged: number | null = merge === undefined ? null : ms(merge.ts);
@@ -282,7 +305,7 @@ function memberOf(slug: string, joined: number, timings: TimingEvent[], log: Log
     f: merged === null ? null : merged - joined - implPrompted,
     waits: waitTotals(timings, slug, joined, Math.max(outcome, joined)),
     gaps: visits.flatMap((visit) =>
-      visitGaps(timings, slug, visit).map((name) => `${visit.phase}#${visit.visit} ${name}`),
+      visitGaps(timings, slug, visit, direct).map((name) => `${visit.phase}#${visit.visit} ${name}`),
     ),
   };
 }
@@ -354,7 +377,10 @@ function cohortReport(repo: Repo, since: string): void {
     .filter((attempt) => attempt.outcome === 'ejected' || attempt.outcome === 'red')
     .filter((attempt) => memberSet.has(attempt.holder)).length;
   const now: number = Date.now();
-  const members: Member[] = joiners.map((slug) => memberOf(slug, firstPlan.get(slug)!, timings, log, now));
+  const direct: Set<string> = directSlugs(repo);
+  const members: Member[] = joiners.map((slug) =>
+    memberOf(slug, firstPlan.get(slug)!, timings, log, now, direct.has(slug)),
+  );
   console.log(verdict(members, ejections));
   for (const member of members) console.log(memberLine(member));
 }

@@ -619,7 +619,7 @@ async function leafJson(
     stopped: stopped.has(`${scan.repo.name}/${state.slug}`),
     blocked_by: deps,
     attention,
-    waits_on: requiredSlots(state.phase, state.fix_rounds).filter(
+    waits_on: requiredSlots(state.phase, state.fix_rounds, state.direct === true).filter(
       (seat) => !state.done.includes(seat) && state.busy_since[seat] === undefined,
     ),
     broadcast_pending: broadcastPending(state),

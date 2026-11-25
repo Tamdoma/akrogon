@@ -46,7 +46,19 @@ export const routing: Record<Phase, Route> = {
   },
 };
 
-export function requiredSlots(phase: Phase, rounds: number): readonly Slot[] {
+// Direct leaves have no allocated seats: implement/repair/fix/merge/failed are the door's own work
+// and the reviewer alone owns check.review at every round, round 0 included (plan D6).
+const directSlots: Partial<Record<Phase, readonly Slot[]>> = {
+  implement: ['A'],
+  'check.review': ['B'],
+  'check.repair': ['A'],
+  'check.fix': ['A'],
+  merge: ['A'],
+  failed: ['A'],
+};
+
+export function requiredSlots(phase: Phase, rounds: number, direct: boolean = false): readonly Slot[] {
+  if (direct) return directSlots[phase] ?? routing[phase].slots;
   return phase === 'check.review' && rounds > 0 ? ['B'] : routing[phase].slots;
 }
 
@@ -55,6 +67,8 @@ const retiredSlots: Record<RetiredPhase, readonly Slot[]> = {
   'plan.rebuttal': ['A', 'B'],
 };
 
-export function historicalSlots(phase: HistoricalPhase, rounds: number): readonly Slot[] {
-  return phase === 'plan.positions' || phase === 'plan.rebuttal' ? retiredSlots[phase] : requiredSlots(phase, rounds);
+export function historicalSlots(phase: HistoricalPhase, rounds: number, direct: boolean = false): readonly Slot[] {
+  return phase === 'plan.positions' || phase === 'plan.rebuttal'
+    ? retiredSlots[phase]
+    : requiredSlots(phase, rounds, direct);
 }

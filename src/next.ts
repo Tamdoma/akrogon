@@ -1084,7 +1084,7 @@ async function dispatchLeaf(
     // Setup is due and a busy seat or live run-check holds the leaf: the leaf simply waits for the
     // next pass — no capacity row, no error, no skipped record.
     if ('busy' in allocated) return end('none');
-    for (const slot of requiredSlots(allocated.state.phase, allocated.state.fix_rounds)) {
+    for (const slot of requiredSlots(allocated.state.phase, allocated.state.fix_rounds, allocated.state.direct === true)) {
       const delivery: string = `${repo.name}/${slug}/${allocated.state.phase}/${slot}`;
       if (invocation.dispatched.has(delivery)) continue;
       invocation.dispatched.add(delivery);
