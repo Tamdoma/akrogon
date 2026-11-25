@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, realpathSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, relative, resolve, sep } from 'node:path';
 import { parseEnv } from 'node:util';
 import { z } from 'zod';
@@ -14,10 +14,13 @@ import {
   seats,
   worktreeStore,
   ensureLeafTemp,
+  leafTemp,
   repoPrefix,
   type Repo,
   type GlobalConfig,
   canonicalPath,
+  setupMarkerPath,
+  INSTALL_LOCK_FILE,
 } from './config';
 import {
   readState,
@@ -44,7 +47,7 @@ import {
   worktreeLock,
 } from './state';
 import { requiredSlots, routing, type Phase, type Slot } from './routing';
-import { command, quote, run, CommandError, type Result } from './shell';
+import { command, quote, run, spawnCaptured, CommandError, type Result } from './shell';
 import {
   docGet,
   end,
@@ -63,9 +66,10 @@ import {
 } from './hc';
 import { expectedTabName, startSeat, type Place, type Started } from './seat';
 import { liveRuns } from './admission';
+import { constructedEnv } from './run-check';
 import { transcriptFor } from './transcript';
 import { checkBase, localBase, trackingRef } from './preflight';
-import { checkLocation } from './guard';
+import { checkLocation, ownModulesRefusal } from './guard';
 import { attemptId, applyTop, branchSha, buildStack, isAncestor, memberBase, removeEmptyUntrackedDirs } from './batch';
 import { clearBlockedNotices, clearBusyNotices, commandMerged, commitMove, completeOwner, repoNotices } from './phase';
 import { noticeId, noticeState, removeNotice, writeNotice } from './notice';
@@ -328,7 +332,7 @@ export async function branchReservation(
   return undefined;
 }
 
-async function ensureWorktree(repo: Repo, leaf: Leaf, live: boolean): Promise<State> {
+async function ensureWorktree(repo: Repo, leaf: Leaf, live: boolean, busy: string | null): Promise<State | { busy: string }> {
   const path: string = resolve(worktreeStore(repo), leaf.state.slug);
   const slug: string = leaf.state.slug;
   if (leaf.state.worktree !== undefined && leaf.state.worktree !== path)
@@ -450,12 +454,45 @@ async function ensureWorktree(repo: Repo, leaf: Leaf, live: boolean): Promise<St
       }
     }
   }
-  if (!existsSync(path)) {
+  const preexisting: boolean = existsSync(path);
+  if (!preexisting) {
     await createSparseWorktree(repo, path, branch.code === 0 ? slug : trackingRef(repo), {
       branch: branch.code === 0 ? undefined : slug,
     });
   }
+  // The setup step: the configured setup runs once per checkout state in the leaf worktree, keyed
+  // by the marker at the worktree's git path. Due and busy returns here, before writeLeafEnv, so
+  // .env and env_names/env_generation stay in step.
+  const pending: { setup: string; marker: string } | undefined =
+    repo.config.setup === undefined
+      ? undefined
+      : { setup: repo.config.setup, marker: await setupMarkerPath(path) };
+  const due: boolean =
+    pending !== undefined && (!existsSync(pending.marker) || readFileSync(pending.marker, 'utf8') !== pending.setup);
+  if (due && busy !== null) return { busy };
   const wrote: boolean = await writeLeafEnv(repo, path, live);
+  if (due && pending !== undefined) {
+    try {
+      rmSync(pending.marker, { force: true });
+      const lock: string = resolve(path, await command(['git', 'rev-parse', '--git-path', INSTALL_LOCK_FILE], path));
+      const result = await spawnCaptured(['flock', lock, 'sh', '-c', pending.setup], {
+        cwd: path,
+        env: constructedEnv(repo, leafTemp(repo, slug)),
+      });
+      if (result.code !== 0) throw new CommandError(['flock', lock, 'sh', '-c', pending.setup], path, result);
+      const refusal: string | null = await ownModulesRefusal(path);
+      if (refusal !== null) throw new Error(refusal);
+      writeFileSync(pending.marker, pending.setup);
+    } catch (error) {
+      // A worktree this call created is removed on the setup failure; an existing or adopted one
+      // is kept unmarked. saveState never runs, so no worktree: is recorded either way.
+      if (!preexisting) {
+        const removalLock: string = await worktreeLock(repo.root);
+        await withLock(removalLock, () => command(['git', 'worktree', 'remove', '--force', path], repo.root));
+      }
+      throw error;
+    }
+  }
   const state: State = {
     ...leaf.state,
     worktree: path,
@@ -601,6 +638,28 @@ async function capRefusal(
 
 type Allocation = { state: State; place: Place; seats: Seats };
 
+// A recorded seat live with status working, blocked or null holds a due setup; the detail names the
+// seat's slot, address and status (no status when null) for the refusal akrogon seat throws.
+function busySeat(found: Seats): string | null {
+  for (const slot of ['A', 'B'] as const) {
+    const t: Seen | undefined = found[slot];
+    if (!liveSeat(t)) continue;
+    const status: string | null = t.status?.state ?? null;
+    if (status === 'working' || status === 'blocked' || status === null)
+      return `seat ${slot} at ${t.address} (${status ?? 'no status'})`;
+  }
+  return null;
+}
+
+// The busy detail for a due setup: a recorded busy seat, or else a live or waiting run-check of the
+// leaf named by its check and run id.
+function busyDetail(repo: Repo, slug: string, found: Seats): string | null {
+  const seat: string | null = busySeat(found);
+  if (seat !== null) return seat;
+  const record = liveRuns().find((run) => run.repo === repo.name && run.leaf === slug);
+  return record === undefined ? null : `run-check ${record.check} (run ${record.run})`;
+}
+
 // One allocation for dispatch and the start verb (plan I2): the repo's space, a capacity check when
 // the leaf holds no live seat, the worktree with its .env, the leaf temp folder and the leaf's tab id.
 async function allocate(
@@ -608,7 +667,7 @@ async function allocate(
   repo: Repo,
   leaf: Leaf,
   invocation: Invocation,
-): Promise<Allocation | null> {
+): Promise<Allocation | null | { busy: string }> {
   refusePredatesHc(leaf.state);
   const place: Place | null = await placeFor(invocation, repo, leaf.path, leaf.state.slug);
   if (place === null) throw new Error(`Session refused for repo ${repo.name}`);
@@ -617,8 +676,10 @@ async function allocate(
   const live: boolean = liveSeat(found.A) || liveSeat(found.B);
   if (!live && (await capRefusal(global, repo, invocation, leaf.state.worktree === undefined)) !== undefined)
     return null;
-  const worktree: State = await ensureWorktree(repo, leaf, live);
-  ensureLeafTemp(repo, worktree.slug);
+  const busy: string | null = busyDetail(repo, leaf.state.slug, found);
+  ensureLeafTemp(repo, leaf.state.slug);
+  const worktree: State | { busy: string } = await ensureWorktree(repo, leaf, live, busy);
+  if ('busy' in worktree) return worktree;
   const state: State = worktree.tab === undefined ? { ...worktree, tab: leafTab(repo.name, worktree.slug) } : worktree;
   saveState(leaf.path, state);
   return { state, place, seats: found };
@@ -969,8 +1030,11 @@ async function dispatchLeaf(
     const mustCreate: boolean = !existsSync(resolve(worktreeStore(repo), slug));
     await checkBase(repo, mustCreate);
     if ((await ownPlace()) === null) return 'skipped';
-    const allocated: Allocation | null = await allocate(global, repo, { path: leaf.path, state }, invocation);
+    const allocated: Allocation | null | { busy: string } = await allocate(global, repo, { path: leaf.path, state }, invocation);
     if (allocated === null) return end('capacity');
+    // Setup is due and a busy seat or live run-check holds the leaf: the leaf simply waits for the
+    // next pass — no capacity row, no error, no skipped record.
+    if ('busy' in allocated) return end('none');
     for (const slot of requiredSlots(allocated.state.phase, allocated.state.fix_rounds)) {
       const delivery: string = `${repo.name}/${slug}/${allocated.state.phase}/${slot}`;
       if (invocation.dispatched.has(delivery)) continue;
@@ -1362,8 +1426,8 @@ async function broadcastPass(global: GlobalConfig, repo: Repo, invocation: Invoc
         );
         if (fresh === undefined || fresh.state.broadcast === undefined || !broadcastPending(fresh.state)) return;
         const handoff: Broadcast = fresh.state.broadcast;
-        const allocated: Allocation | null = await allocate(global, repo, fresh, invocation);
-        if (allocated === null) return;
+        const allocated: Allocation | null | { busy: string } = await allocate(global, repo, fresh, invocation);
+        if (allocated === null || 'busy' in allocated) return;
         const sources: string = handoff.sources.length === 0 ? 'none' : handoff.sources.join(',');
         await dispatchSlot(
           global,
@@ -1448,11 +1512,13 @@ export async function seatCommand(slug: string, slot: Slot, task: string | undef
   const invocation: Invocation = { skipped: new Set(), dispatched: new Set(), sessionRefusals: new Set() };
   await withLock(resolve(globalHome(), '.lock'), async () => {
     const leaf: Leaf = findLeaf(repo, slug);
-    const allocated: Allocation | null = await allocate(global, repo, leaf, invocation);
+    const allocated: Allocation | null | { busy: string } = await allocate(global, repo, leaf, invocation);
     if (allocated === null)
       throw new Error(
         `No free seat capacity: ${await capRefusal(global, repo, invocation, leaf.state.worktree === undefined)}`,
       );
+    if ('busy' in allocated)
+      throw new Error(`Refusing akrogon seat ${slug} ${slot}: setup is due in the worktree and ${allocated.busy} holds the leaf`);
     const started: Started = await startSeat(
       global,
       repo,

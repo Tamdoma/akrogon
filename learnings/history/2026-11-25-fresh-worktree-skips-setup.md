@@ -15,3 +15,5 @@ framework leaf photo-rule-judges-anatomy, plan.synthesis pass, slot A, 2026-11-2
 A repo whose hooks import its own dependencies cannot take a seat in a fresh worktree until its `setup` has run. Running `setup` only inside `checks` covers the checks but not the seat's own hooks, its tests run outside `checks`, or its typecheck. The required state is "configured `setup` has run in the worktree" before the first seat dispatch.
 
 Report: https://github.com/Tamdoma/akrogon/issues/158
+
+Applied 2026-11-25 by src/next.ts:ensureWorktree:478: the dispatch-time setup step runs the configured setup in the leaf worktree before the first delivery and before every delivery a changed checkout state makes due, so a fresh worktree no longer reaches a seat without its setup.

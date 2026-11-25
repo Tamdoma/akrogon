@@ -34,12 +34,20 @@ export async function guard(cwd: string, positionals: string[]): Promise<number>
     }
     return 0;
   }
-  const own: string = join(top, 'node_modules');
-  if (existsSync(join(top, 'package.json')) && !existsSync(own)) {
-    console.error(
-      `missing own node_modules: ${own}; set setup in issues/config.yaml to install dependencies in each fresh checkout`,
-    );
+  const refusal: string | null = await ownModulesRefusal(cwd);
+  if (refusal !== null) {
+    console.error(refusal);
     return 1;
   }
   return 0;
+}
+
+// The own-modules refusal text, or null when the checkout carries its node_modules. The guard
+// verb prints it and the dispatch-time setup step throws it: one message, one place.
+export async function ownModulesRefusal(cwd: string): Promise<string | null> {
+  const top: string = realpathSync(await command(['git', 'rev-parse', '--show-toplevel'], cwd));
+  const own: string = join(top, 'node_modules');
+  if (existsSync(join(top, 'package.json')) && !existsSync(own))
+    return `missing own node_modules: ${own}; set setup in issues/config.yaml to install dependencies in each fresh checkout`;
+  return null;
 }

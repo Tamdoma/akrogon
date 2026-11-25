@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync } from 'node:fs';
 import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { createHash } from 'node:crypto';
@@ -468,10 +468,22 @@ export async function base(repo: Repo, cwd: string): Promise<string> {
   return command(['git', 'merge-base', 'HEAD', trackingRef(repo)], cwd);
 }
 
+export const INSTALL_LOCK_FILE: string = 'akrogon-install.lock';
+export const SETUP_MARKER_FILE: string = 'akrogon-setup';
+
+// The per-worktree marker recording the setup string the worktree's checkout state installed.
+export async function setupMarkerPath(worktree: string): Promise<string> {
+  return resolve(worktree, await command(['git', 'rev-parse', '--git-path', SETUP_MARKER_FILE], worktree));
+}
+
+export async function deleteSetupMarker(worktree: string): Promise<void> {
+  rmSync(await setupMarkerPath(worktree), { force: true });
+}
+
 export function setupCommand(config: RepoConfig, cmd: string): string {
   return config.setup === undefined
     ? `akrogon guard own-modules && sh -c ${quote(cmd)}`
-    : `flock "$(git rev-parse --git-path akrogon-install.lock)" sh -c ${quote(config.setup)} && akrogon guard own-modules && sh -c ${quote(cmd)}`;
+    : `flock "$(git rev-parse --git-path ${INSTALL_LOCK_FILE})" sh -c ${quote(config.setup)} && akrogon guard own-modules && sh -c ${quote(cmd)}`;
 }
 
 export function withSetup(config: RepoConfig): RepoConfig {

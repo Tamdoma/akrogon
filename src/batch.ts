@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, rmdirSync, rmSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { dirname, resolve, sep } from 'node:path';
-import { worktreeStore, type Repo } from './config';
+import { deleteSetupMarker, worktreeStore, type Repo } from './config';
 import { checkLocation } from './guard';
 import { withLock, worktreeLock, type Leaf } from './state';
 import { command, run, CommandError, type Result } from './shell';
@@ -128,6 +128,8 @@ export async function move(repo: Repo, slug: string, target: string, leaf: Leaf)
       await command(['git', 'update-ref', 'refs/heads/' + slug, target], repo.root);
       return { moved: 'dirty-ref' };
     }
+    // The checkout state changes under the reset: the recorded setup no longer matches it.
+    await deleteSetupMarker(leaf.state.worktree);
     await command(['git', '-C', leaf.state.worktree, 'reset', '--keep', target], repo.root);
     const remaining: string = await command(['git', '-C', leaf.state.worktree, 'status', '--porcelain'], repo.root);
     return { moved: remaining === '' ? 'worktree' : 'dirty-ref' };
