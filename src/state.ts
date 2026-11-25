@@ -151,6 +151,7 @@ export const stateSchema = z
     merge_exit: mergeExitSchema.optional(),
     batch: batchSchema.optional(),
     broadcast: broadcastSchema.optional(),
+    direct: z.boolean().optional(),
     frozen: z.record(z.string(), z.string().nullable()).optional(),
     frozen_cited: z.array(z.string()).optional(),
   })

@@ -46,7 +46,7 @@ try {
     options: verb === undefined ? {} : optionsFor(verb),
     allowPositionals: true,
     strict: true,
-  }));
+  }) as { values: Record<string, string | boolean | undefined>; positionals: string[] });
 } catch (error) {
   if (error instanceof TypeError && 'code' in error && error.code === 'ERR_PARSE_ARGS_UNKNOWN_OPTION') {
     const flag: string = /Unknown option '([^']+)'/.exec(error.message)?.[1] ?? '';
@@ -126,6 +126,27 @@ switch (verb) {
   case 'land': {
     const [slug]: [string] = z.tuple([z.string()]).parse(positionals);
     await (await import('./land')).landCommand(slug, z.string().trim().min(1).parse(values.attempt));
+    break;
+  }
+  case 'direct': {
+    const [slug]: [string] = z.tuple([z.string()]).parse(positionals);
+    if (typeof values.reviewer !== 'string' || values.reviewer.trim() === '')
+      throw new Error('Usage: akrogon direct <slug> --reviewer <address> [--source <owner/repo#n>]...');
+    await (
+      await import('./direct')
+    ).directCommand(
+      slug,
+      values.reviewer,
+      z.array(z.string().regex(sourcePattern)).parse(values.source ?? []),
+      process.cwd(),
+    );
+    break;
+  }
+  case 'direct-drop': {
+    const [slug]: [string] = z.tuple([z.string()]).parse(positionals);
+    if (typeof values.chart !== 'string' || values.chart.trim() === '')
+      throw new Error('Usage: akrogon direct-drop <slug> --chart <chart>');
+    await (await import('./direct')).directDropCommand(slug, values.chart, process.cwd());
     break;
   }
   case 'next':

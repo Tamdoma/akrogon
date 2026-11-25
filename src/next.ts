@@ -541,7 +541,7 @@ async function ensureWorktree(
   return state;
 }
 
-async function writeLeafEnv(repo: Repo, worktree: string, live: boolean): Promise<boolean> {
+export async function writeLeafEnv(repo: Repo, worktree: string, live: boolean): Promise<boolean> {
   const link: string = resolve(worktree, '.env');
   const tracked: Result = await run(['git', 'ls-files', '--error-unmatch', '.env'], worktree);
   if (tracked.code === 0) throw new Error(`Refusing .env write at ${link}: path is tracked by git`);

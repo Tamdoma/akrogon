@@ -14,6 +14,8 @@ const contracts: Record<string, string> = {
   preflight: '',
   phase: '<slug> <phase> --slot <A|B> [--verdict <verdict>] [--reason <text>] [--check] [--attempt <id>]',
   land: '<slug> --attempt <id>',
+  direct: '<slug> --reviewer <address> [--source <owner/repo#n>]',
+  'direct-drop': '<slug> --chart <chart>',
   next: '[<slug>|<path>|--all|--resume|--wake]',
   pull: '[--all]',
   close: '<owner/repo#n> --by <text>',

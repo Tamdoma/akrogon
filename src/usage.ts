@@ -1,4 +1,4 @@
-export type FlagSpec = { type: 'string' | 'boolean' };
+export type FlagSpec = { type: 'string' | 'boolean'; multiple?: boolean };
 
 export const VERB_OPTIONS: Record<string, Record<string, FlagSpec>> = {
   install: {},
@@ -14,6 +14,8 @@ export const VERB_OPTIONS: Record<string, Record<string, FlagSpec>> = {
     attempt: { type: 'string' },
   },
   land: { attempt: { type: 'string' } },
+  direct: { reviewer: { type: 'string' }, source: { type: 'string', multiple: true } },
+  'direct-drop': { chart: { type: 'string' } },
   next: { all: { type: 'boolean' }, resume: { type: 'boolean' }, wake: { type: 'boolean' } },
   seat: {
     task: { type: 'string' },

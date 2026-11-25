@@ -52,30 +52,33 @@ function writeStopped(keys: Set<string>): void {
   writeYaml(stopFile(), Object.fromEntries([...keys].map((key: string): [string, true] => [key, true])));
 }
 
-// The leaf's seat terminals end before its slice stops (plan D19). A refused session is never called
-// (L2); the slice stop still ends the seat processes, which run inside it. The slice stop goes first
-// and a refused one throws before any record is touched, so a live land never reads a cancelled run as
-// a red verify. A land's verify pass and its check runs sit outside the leaf slice, so they are
-// stopped after it; the land hold keeps the repo line while they run (admission live()). Every run
-// record of the leaf is cancelled before that, so a waiting run or a live one yet to launch never
-// launches, and a run of the leaf that arrives later is refused. The run scopes stop before the
-// passes: a pass's checks carry its PID, so the live pass keeps the hold while their scopes drain,
-// and a failed scope stop throws with the pass, and so the hold, left for the retry.
-async function stopLeaf(repo: Repo, leaf: Leaf): Promise<void> {
-  const space: SpaceResolution = await repoSpace(repo);
-  if (space.ok) await endSeats(space.session, repo, leaf.state);
+// The slice stop goes first and a refused one throws before any record is touched, so a live
+// land never reads a cancelled run as a red verify. A land's verify pass and its check runs sit
+// outside the leaf slice, so they are stopped after it; the land hold keeps the repo line while they
+// run (admission live()). Every run record of the leaf is cancelled before that, so a waiting run or
+// a live one yet to launch never launches, and a run of the leaf that arrives later is refused. The
+// run scopes stop before the passes: a pass's checks carry its PID, so the live pass keeps the hold
+// while their scopes drain, and a failed scope stop throws with the pass, and so the hold, left for
+// the retry. Seats are not part of the work: this is the sequence direct-drop shares, and stopLeaf
+// ends the seats itself first.
+export async function stopLeafWork(repo: Repo, slug: string): Promise<void> {
   // A refused leaf-slice stop is never excused.
-  await stopRunUnits({ unit: leafSlice(repo, leaf.state.slug, homePath()), gone: (): boolean => false });
-  const live: RunRecord[] = await cancelLeafRuns(repo.name, leaf.state.slug);
+  await stopRunUnits({ unit: leafSlice(repo, slug, homePath()), gone: (): boolean => false });
+  const live: RunRecord[] = await cancelLeafRuns(repo.name, slug);
   // A pass holds the line through its own process, so that is what its stop must end.
   const passes: RunUnit[] = listPassRecords()
-    .filter(
-      (entry) =>
-        entry.record.repo === repo.name && entry.record.caller.slug === leaf.state.slug && passLive(entry.record),
-    )
+    .filter((entry) => entry.record.repo === repo.name && entry.record.caller.slug === slug && passLive(entry.record))
     .map((entry) => ({ unit: entry.record.unit_name, gone: (): boolean => !passLive(entry.record) }));
   await stopRunUnits(...live.filter((record: RunRecord) => record.land !== true).flatMap(recordUnits));
   await stopRunUnits(...passes);
+}
+
+// The leaf's seat terminals end before its slice stops (plan D19). A refused session is never called
+// (L2); the slice stop still ends the seat processes, which run inside it.
+async function stopLeaf(repo: Repo, leaf: Leaf): Promise<void> {
+  const space: SpaceResolution = await repoSpace(repo);
+  if (space.ok) await endSeats(space.session, repo, leaf.state);
+  await stopLeafWork(repo, leaf.state.slug);
   console.log(`stopped: ${repo.name}/${leaf.state.slug}`);
 }
 
@@ -100,7 +103,8 @@ export async function stopCommand(target: string | undefined, all: boolean, cwd:
     inv !== null
       ? inv.leaves.filter(
           (leaf: Leaf) =>
-            (leaf.state.tab !== undefined || leaf.state.batch !== undefined) && leaf.state.phase !== 'merged',
+            (leaf.state.tab !== undefined || leaf.state.batch !== undefined || leaf.state.direct === true) &&
+            leaf.state.phase !== 'merged',
         )
       : [findLeaf(repo, z.string().parse(target))];
   await withLock(resolve(globalHome(), '.lock'), async () => {
