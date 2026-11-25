@@ -17,6 +17,7 @@ import {
   type Fixture,
 } from './helpers';
 import { command, finishCaptured, spawnCaptured, spawnFiles, type Result } from '../src/shell';
+import { displayEnv } from '../src/run-check';
 import { readRepo, setupCommand } from '../src/config';
 import { readState, saveState } from '../src/state';
 import { readTimings, type TimingEvent } from '../src/timing';
@@ -165,6 +166,10 @@ test('run-check builds an allowlisted env, copies declared names and omits undec
     const { code, names } = await envNames(f, worktree, baseEnv(f, { CHECK_TOKEN: 'declared-value' }));
     expect(code).toBe(0);
     const allowed: Set<string> = new Set([
+      // The display names reach the payload when the caller holds them; under
+      // the suite's preload the caller always holds the pinned XDG_RUNTIME_DIR
+      // and never the other three.
+      ...displayEnv,
       'HOME',
       'PATH',
       'XDG_CACHE_HOME',
@@ -188,6 +193,7 @@ test('run-check builds an allowlisted env, copies declared names and omits undec
     expect(names.has('TMPDIR')).toBe(true);
     expect(names.has('AKROGON_BASE')).toBe(true);
     expect(names.has('AKROGON_CAPTURES')).toBe(true);
+    expect(names.has('XDG_RUNTIME_DIR')).toBe(true);
   } finally {
     f.clean();
   }
