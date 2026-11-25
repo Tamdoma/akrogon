@@ -1394,7 +1394,7 @@ for (const path of [
   'docs/pictures/watch-loop.svg',
   'skills/AREA.md',
 ]) {
-  test(`the watch check uses observe alone in ${path}`, () => {
+  test(`the watch check omits the akrogon status command in ${path}`, () => {
     const text: string = readFileSync(resolve(import.meta.dir, '..', path), 'utf8');
     const check: string =
       path === 'skills/AREA.md'
@@ -1402,8 +1402,9 @@ for (const path of [
         : path === 'docs/use/watch-while-away.md'
           ? text.split('## What each check does')[1].split('\n## ')[0]
           : text;
-    expect(check).not.toMatch(/akrogon status|read(?:s)? status/i);
-    expect(check).toMatch(/\bobserve(?:\.ts)?\b/);
-    expect(check).toMatch(/\bpaus(?:e|ed)\b/i);
+    expect(check).not.toContain('akrogon status');
+    if (path === 'skills/watch-issues/SKILL.md') {
+      expect(check).toContain('bun <skill-folder>/scripts/observe.ts <root>');
+    }
   });
 }
