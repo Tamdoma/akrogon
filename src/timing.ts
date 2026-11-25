@@ -117,10 +117,14 @@ type DistOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
 export type TimingEvent = z.infer<typeof timingEventSchema>;
 export type TimingInput = DistOmit<TimingEvent, 'ts' | 'repo'>;
 
+// The kill kinds hold their own ledger: timings.jsonl stays parseable by every older reader
+// of the shared file, whose strict union fails the whole ledger on one unknown kind.
+const killLedgerKinds: ReadonlySet<string> = new Set(['tool_kill', 'tool_kill_deferred']);
+
 export function appendTiming(repo: Repo, event: TimingInput): void {
   try {
     appendFileSync(
-      resolve(repo.root, 'issues/timings.jsonl'),
+      resolve(repo.root, killLedgerKinds.has(event.kind) ? 'issues/timings-kill.jsonl' : 'issues/timings.jsonl'),
       JSON.stringify({ ...event, ts: new Date().toISOString(), repo: repo.name }) + '\n',
     );
   } catch (error) {
@@ -128,16 +132,30 @@ export function appendTiming(repo: Repo, event: TimingInput): void {
   }
 }
 
+// Each line parses on its own: a bad or newer-than-the-reader line is skipped with one warning,
+// so a ledger holding kinds this build predates still yields its valid rows. Only an absent or
+// unreadable file reads as empty.
 export function readTimings(root: string): TimingEvent[] {
+  const path: string = resolve(root, 'issues/timings.jsonl');
+  let content: string;
   try {
-    const issues: string = resolve(root, 'issues');
-    if (!readdirSync(issues).includes('timings.jsonl')) return [];
-    const content: string = readFileSync(resolve(issues, 'timings.jsonl'), 'utf8').replace(/(?:\r?\n)+$/, '');
-    return content === '' ? [] : content.split('\n').map((text) => timingEventSchema.parse(JSON.parse(text)));
+    if (!readdirSync(resolve(root, 'issues')).includes('timings.jsonl')) return [];
+    content = readFileSync(path, 'utf8').replace(/(?:\r?\n)+$/, '');
   } catch (error) {
     console.warn(`timing read failed: ${error instanceof Error ? error.message : String(error)}`);
     return [];
   }
+  if (content === '') return [];
+  return content.split('\n').flatMap((line) => {
+    const skip = (error: string): TimingEvent[] => {
+      console.warn(JSON.stringify({ warning: 'timing line skipped', path, line, error }));
+      return [];
+    };
+    const json: { value: unknown } | SyntaxError = jsonOf(line);
+    if (json instanceof SyntaxError) return skip(json.message);
+    const row: z.ZodSafeParseResult<TimingEvent> = timingEventSchema.safeParse(json.value);
+    return row.success ? [row.data] : skip(row.error.message);
+  });
 }
 
 // The rows a wake reads: waits, prompts and visit starts. Other kinds pass unchecked.
