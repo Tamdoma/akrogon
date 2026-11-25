@@ -26,6 +26,8 @@ Task-specific exclusions with why each matters and its actual exception, includi
 
 Every brief also carries the standing exclusion: the worker never runs any `git stash` subcommand, because every worktree of a repo shares one stash and a pop can lift a sibling worker's edit; to check behaviour on the base it uses a second worktree of the base instead. A delegated leaf brief adds one replacement for setting work aside: commit it as a WIP commit and, before returning, `git reset --soft <creation commit>` and make the unit's returned commit once, so A's cherry-pick of that one commit carries all the work. A standalone brief carries no reset step.
 
+Every brief also carries the standing exclusion that the worker runs commands unattended: it writes no command that waits on a human; it writes no poll or sleep loop, and runs a slow command once in the foreground with the tool timeout set above its expected run time, waiting on its exit inside its turn; it re-expresses a harness denial of a command inside the same grant and identity (a simpler single command, the configured runner, its own read or edit tool), never around a secret, `.env` or grant rule, and when no permitted formulation answers, returns a mismatch to A with the denial text verbatim; it names no env file path on a command line, and a value it needs that is not declared is a mismatch, not a formulation to work around. The reason is that no human answers a seat's command, and a worker reads only its brief, so the rule reaches it only here; there is no exception.
+
 End this section by restating the reasons and exceptions so they remain attached to the exclusions.
 
 ## 6. Ordered steps

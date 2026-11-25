@@ -1,6 +1,6 @@
 # Lifecycle rules
 
-The five rules below are held once for the plan-issue, implement-issue and check-issue seats. Each skill reaches this file through a `lifecycle-rules.md` link inside its own folder and states beside that link what is its own: its seat's record file, its red-check command form and any seat-only clauses. "The seat's record file" and "the seat's operator-blocker stop" below mean the file and the stop its own skill names. This file holds no relative links: a file or section it names, such as seed-issue's `## Lifecycle filing` section, is found through the skill that holds it.
+The six rules below are held once for the plan-issue, implement-issue and check-issue seats; `## Unattended commands` also reaches implement workers through the standing exclusion in implement-issue's `brief-template.md` § 5. Each skill reaches this file through a `lifecycle-rules.md` link inside its own folder and states beside that link what is its own: its seat's record file, its red-check command form and any seat-only clauses. "The seat's record file" and "the seat's operator-blocker stop" below mean the file and the stop its own skill names. This file holds no relative links: a file or section it names, such as seed-issue's `## Lifecycle filing` section, is found through the skill that holds it.
 
 ## Grant reuse and paid sessions
 
@@ -12,7 +12,7 @@ A fresh paid run is needed only when no recorded green on the current model-faci
 
 ## Environment files and producer keys
 
-A seat never opens, prints, appends to, or writes `.env` or `.env.*` with any tool: declared checks and live operations consume values only inside a run process such as `bun --env-file=<file> <script>` printing only results, never values, and presence is checked with the `Missing:` lines of `akrogon status <slug>`, where absent or empty counts as missing, ending the pass with the seat's operator-blocker stop when a required value is absent. A seat's own exception is named beside its skill's link to this file.
+A seat never opens, prints, appends to, or writes `.env` or `.env.*` with any tool: declared checks and live operations consume values only inside a run process that reads them itself, in the form `## Unattended commands` states, printing only results, never values, and presence is checked with the `Missing:` lines of `akrogon status <slug>`, where absent or empty counts as missing, ending the pass with the seat's operator-blocker stop when a required value is absent. A seat's own exception is named beside its skill's link to this file.
 
 For the plan-issue and implement-issue seats only, a producer's key is saved only through the operation recorded in `produces[].save` (entry point, inspected revision, non-secret `args`, key `name`, the `holder` repo's real file and the private `value_source`): the value passes privately to it, writes the holder repo's real `.env` file and never the worktree `.env`, never returns through seat arguments, output or artifacts, and the new key is revoked when saving fails.
 
@@ -21,6 +21,15 @@ For the plan-issue and implement-issue seats only, a producer's key is saved onl
 A seat keeps command output only through `akrogon run-check --name <label> -- <cmd>` and cites the `check <label>: <exit> <path>` line it prints to stderr; a cited log is read back with `akrogon log <path>`. Exempt: the printed `checks` commands and `akrogon verify`, which already keep logs; `akrogon phase ... merged`, which moves its own owner; and coordination commands (fetch, push), whose errors are quoted in the report as text.
 
 A run that prints `waiting for <repo>/<leaf> land` has not started: a land run holds the repo until it ends, so the wait is no failure and no hung check. Wait it out or rerun the same command.
+
+## Unattended commands
+
+This rule binds every lifecycle seat (plan-issue, implement-issue, check-issue) and every implement worker, which receives it through its brief. No seat depends on a human to let a command run.
+
+- A seat writes no command that waits on a human: no prompt, confirmation, editor or pager it would have to answer.
+- A seat writes no hand-written poll or sleep loop (`while ... sleep`, or a fixed sleep and then a log read). A slow command runs once, the exact printed command, in the foreground with the tool timeout set above its expected run time. The seat waits on its exit and status, waits again when a wait returns before the command has exited, treats the exit status as the result and never a quiet log, and never ends its turn to wait.
+- A harness denial of a command is a formulation problem, not by itself an operator blocker. The seat re-expresses the same operation inside the same grant and identity: a simpler single command, the configured runner, or the harness's own read or edit tool. It never routes around a secret, `.env` or grant rule. Only when no permitted formulation can answer the same criterion does the seat's operator-blocker stop apply, with the denial text verbatim in its record file beside the seat's judgment that no formulation answers.
+- A command line names no env file path. Values reach a command only from the process environment `akrogon run-check` passes (declared `env` and `pass_env` names) or from the leaf worktree's `.env` written from declared `env` names, which the program reads itself. A value a command needs that is not declared is a missing input under the `Missing:` rule of `## Environment files and producer keys`.
 
 ## Red check with no cause in the leaf's diff
 
