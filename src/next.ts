@@ -693,22 +693,17 @@ async function allocate(
   const found: Seats = await leafSeats(place.session, repo, leaf.state);
   const live: boolean = liveSeat(found.A) || liveSeat(found.B);
   const busy: string | null = busyDetail(repo, leaf.state.slug, found);
-  // A leaf busy on a due setup cannot dispatch this pass at all, so the capacity question is moot
-  // for it: the capacity refusal must not mask the busy outcome the seat refusal and timings name.
-  // A due setup in a recorded worktree is maintenance owed regardless of seating, so it runs before
-  // the capacity refusal, which gates only the new seat.
-  const due: boolean = !live && (await setupDue(repo, resolve(worktreeStore(repo), leaf.state.slug)));
-  const maintenanceFirst: boolean = due && (busy !== null || leaf.state.worktree !== undefined);
-  if (
-    !live &&
-    !maintenanceFirst &&
-    (await capRefusal(global, repo, invocation, leaf.state.worktree === undefined)) !== undefined
-  )
+  const due: boolean = await setupDue(repo, resolve(worktreeStore(repo), leaf.state.slug));
+  // A due setup held by a busy seat or live run-check returns before any allocation work: the leaf
+  // waits quietly for the next pass, so neither the capacity gate nor ensureWorktree's validation
+  // or .env write may mask the busy outcome. Capacity never gates it, since it dispatches nothing.
+  // For every other leaf the capacity refusal stands first: setup is owed before an eligible
+  // delivery, not before capacity exists.
+  if (busy !== null && due) return { busy };
+  if (!live && (await capRefusal(global, repo, invocation, leaf.state.worktree === undefined)) !== undefined)
     return null;
   const worktree: State | { busy: string } = await ensureWorktree(repo, leaf, live, busy);
   if ('busy' in worktree) return worktree;
-  if (maintenanceFirst && (await capRefusal(global, repo, invocation, leaf.state.worktree === undefined)) !== undefined)
-    return null;
   ensureLeafTemp(repo, worktree.slug);
   const state: State = worktree.tab === undefined ? { ...worktree, tab: leafTab(repo.name, worktree.slug) } : worktree;
   saveState(leaf.path, state);
