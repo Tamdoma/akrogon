@@ -87,9 +87,13 @@ function scanRepo(name: string, registeredPath: string, global: GlobalConfig): S
     const repo: Repo = readRepo(name, registeredPath);
     const open: string = resolve(repo.root, 'issues/open');
     const inventory: Inventory = repoInventory(repo, ['open', 'closed']);
-    const closed: Leaf[] = inventory.leaves.filter((leaf) => !leaf.path.startsWith(open + sep));
+    // The scan is open leaves plus closed leaves whose broadcast still pends: the owner rests in
+    // closed once the land moves it, but the handoff is unfinished leaf business the JSON leaves
+    // array must carry (uniform across leaf kinds). Text tables filter back to the open area.
+    const scanned = (leaf: Leaf): boolean => leaf.path.startsWith(open + sep) || broadcastPending(leaf.state);
+    const closed: Leaf[] = inventory.leaves.filter((leaf) => !scanned(leaf));
     const leaves: ScannedLeaf[] = inventory.leaves
-      .filter((leaf) => leaf.path.startsWith(open + sep))
+      .filter(scanned)
       .map((leaf) => {
         path = resolve(leaf.path, 'readiness.yaml');
         const seat = seats(global, repo, leaf.path);
@@ -933,9 +937,16 @@ export async function statusCommand(
       continue;
     }
     const parked: string[][] = scan.parked.map((name) => [`${indent(0)}${name}`, 'parked', '', '', '', '']);
-    const separator: string[][] = scan.leaves.length > 0 && parked.length > 0 ? [['', '', '', '', '', '']] : [];
+    // The leaf table shows the open area only: closed broadcast-pending leaves ride scan.leaves for
+    // the JSON surface, never for the text rows.
+    const openArea: string = resolve(scan.repo.root, 'issues/open') + sep;
+    const openScan: Scan & { ok: true } = {
+      ...scan,
+      leaves: scan.leaves.filter((leaf) => leaf.path.startsWith(openArea)),
+    };
+    const separator: string[][] = openScan.leaves.length > 0 && parked.length > 0 ? [['', '', '', '', '', '']] : [];
     const lines: string[][] = [
-      ...rows(scan, now, stopped, await unnamedTabs(scan.repo, scan.leaves)),
+      ...rows(openScan, now, stopped, await unnamedTabs(scan.repo, openScan.leaves)),
       ...separator,
       ...parked,
     ];

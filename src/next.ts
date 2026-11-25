@@ -1504,6 +1504,63 @@ async function mergeTurnExit(
   });
 }
 
+// A direct leaf's broadcast goes straight to the recorded seat B through the ref's own session (plan
+// D14): addresses collide across sessions, so neither the repo session nor the place apply. Nothing is
+// allocated or started. A probe failure or a working, attention or unset status sends nothing and the
+// handoff stays pending; the send and its records replicate dispatchSlot: prompted.B on a confirmed
+// start, delivery_error.B otherwise, with no resend while the seat's turn stands still.
+async function broadcastDirect(path: string, state: State, prompt: string): Promise<void> {
+  const ref: SeatRef | undefined = state.seat.B;
+  if (ref === undefined) return;
+  let seat: Seen;
+  try {
+    seat = await terminal(ref.session, ref.address);
+  } catch (error) {
+    if (error instanceof HcError) return;
+    throw error;
+  }
+  const status: string | null = seat.status?.state ?? null;
+  if (status !== 'idle' && status !== 'done') return;
+  const recorded: DeliveryError | undefined = state.delivery_error.B;
+  const error: SeatDeliveryError | undefined =
+    recorded !== undefined && 'address' in recorded && recorded.address === seat.address ? recorded : undefined;
+  if (error !== undefined && error.turn >= seat.turn) return;
+  const failed = (turn: number, failedStatus: string | null, capture?: string): void => {
+    const base: State = readState(path);
+    const errorState: SeatDeliveryError = {
+      code: 'not_started',
+      address: seat.address,
+      turn,
+      status: failedStatus,
+      screen: capture,
+      at: new Date().toISOString(),
+    };
+    saveState(path, {
+      ...base,
+      delivery_error: { ...base.delivery_error, B: errorState },
+    });
+  };
+  const failure = async (reply: { turn: number; status: string | null }): Promise<void> => {
+    failed(reply.turn, reply.status, await screen(ref.session, seat.address));
+  };
+  let reply: { started: boolean | null; status: string | null; turn: number };
+  try {
+    reply = await send(ref.session, seat.address, prompt);
+  } catch (thrown) {
+    if (!(thrown instanceof HcError)) throw thrown;
+    failed(seat.turn, status);
+    return;
+  }
+  if (reply.started === true) {
+    const base: State = readState(path);
+    saveState(path, {
+      ...base,
+      prompted: { ...base.prompted, B: { turn: reply.turn, address: seat.address } },
+      delivery_error: { ...base.delivery_error, B: undefined },
+    });
+  } else await failure(reply);
+}
+
 // A command-run merge leaves the completing owner's broadcast to a broadcast-only B seat; prompted.B is its ack.
 async function broadcastPass(global: GlobalConfig, repo: Repo, invocation: Invocation): Promise<void> {
   for (const pending of discover(repo, invocation, ['open', 'closed']).leaves.filter((leaf) =>
@@ -1516,15 +1573,20 @@ async function broadcastPass(global: GlobalConfig, repo: Repo, invocation: Invoc
         );
         if (fresh === undefined || fresh.state.broadcast === undefined || !broadcastPending(fresh.state)) return;
         const handoff: Broadcast = fresh.state.broadcast;
+        const sources: string = handoff.sources.length === 0 ? 'none' : handoff.sources.join(',');
+        const prompt: string = `broadcast-issue ${fresh.state.slug} slot=B owner=${handoff.kind}:${handoff.name} closed=${handoff.destination} sha=${handoff.pushed} sources=${sources} leaf=${fresh.path}`;
+        if (fresh.state.direct === true) {
+          await broadcastDirect(fresh.path, fresh.state, prompt);
+          return;
+        }
         const allocated: Allocation | null | { busy: string } = await allocate(global, repo, fresh, invocation);
         if (allocated === null || 'busy' in allocated) return;
-        const sources: string = handoff.sources.length === 0 ? 'none' : handoff.sources.join(',');
         await dispatchSlot(
           global,
           repo,
           { path: fresh.path, state: allocated.state },
           'B',
-          `broadcast-issue ${fresh.state.slug} slot=B owner=${handoff.kind}:${handoff.name} closed=${handoff.destination} sha=${handoff.pushed} sources=${sources} leaf=${fresh.path}`,
+          prompt,
           allocated,
         );
       });

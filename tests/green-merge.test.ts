@@ -37,8 +37,10 @@ import { bootId, writePassRecord } from '../src/verify-pass';
 stopCoresAfterFile();
 type GreenFixture = HcFixture & { launches: string; systemctl: SystemctlFixture };
 
-async function greenFrom(f: HcFixture, checks: Record<string, string>): Promise<GreenFixture> {
-  yaml(resolve(f.root, 'issues/config.yaml'), { checks, grounding: 'none' });
+async function greenFrom(f: HcFixture, checks: Record<string, string>, broadcast: boolean = false): Promise<GreenFixture> {
+  const config: Record<string, unknown> = { checks, grounding: 'none' };
+  if (broadcast) config.broadcast = { discord: { webhook_env: ['AKROGON_TEST_WEBHOOK'] } };
+  yaml(resolve(f.root, 'issues/config.yaml'), config);
   await command(['git', 'add', 'issues/config.yaml'], f.root);
   await command(['git', 'commit', '-m', 'checks'], f.root);
   await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
@@ -48,8 +50,8 @@ async function greenFrom(f: HcFixture, checks: Record<string, string>): Promise<
   const systemctl: SystemctlFixture = fakeSystemctl(f);
   return { ...f, env: { ...f.env, ...systemctl.env, FAKE_SYSTEMD_RUN_LOG: launches }, launches, systemctl };
 }
-async function greenFixture(checks: Record<string, string>): Promise<GreenFixture> {
-  return greenFrom(await hcFixture(), checks);
+async function greenFixture(checks: Record<string, string>, broadcast: boolean = false): Promise<GreenFixture> {
+  return greenFrom(await hcFixture(), checks, broadcast);
 }
 // Every task any seat received for one skill, removed terminals included (the stand-in's task logs
 // outlive their terminal).
@@ -373,7 +375,7 @@ test('a clean restack is verified and pushed again with no seat', async () => {
 });
 
 test('a completing push hands off exactly one broadcast seat, also after a crash', async () => {
-  const f: GreenFixture = await greenFixture({ ok: 'true' });
+  const f: GreenFixture = await greenFixture({ ok: 'true' }, true);
   try {
     const path: string = await allocated(f, 'aa', 'issue-aa');
     await commitIn(path, 'aa-file', 'aa\n');
@@ -656,7 +658,7 @@ test("stop cancels the leaf's queued check so it never launches when the line fr
 });
 
 test('next keeps a working broadcast seat until it finishes', async () => {
-  const f: GreenFixture = await greenFixture({ ok: 'true' });
+  const f: GreenFixture = await greenFixture({ ok: 'true' }, true);
   try {
     const release: () => void = holdTurns(f, 'broadcast-issue');
     const path: string = await allocated(f, 'aa', 'issue-aa');

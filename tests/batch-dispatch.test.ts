@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { cli, fakeSystemctl, leaf, leafTempRoot, editOnSecondStatus, verified } from './helpers';
+import { cli, fakeSystemctl, leaf, leafTempRoot, editOnSecondStatus, verified, yaml } from './helpers';
 import { adopt, hcFixture, noticeFiles, type HcFixture, stopCoresAfterFile } from './hc-fixture';
 import { readState, saveState, type State } from '../src/state';
 import { command, run, type Result } from '../src/shell';
@@ -258,6 +258,12 @@ test('the releasing pass leaves a merged holder fully cleaned for the next pass'
 test('a failed holder with a landed candidate is told to move back, then reconciles without run or push', async () => {
   const f: DispatchFixture = await dispatchFixture();
   try {
+    // The broadcast prompt this test counts needs a configured target: the handoff gate is config.
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      checks: { test: 'bun test' },
+      grounding: 'none',
+      broadcast: { discord: { webhook_env: ['AKROGON_TEST_WEBHOOK'] } },
+    });
     const aa: { path: string } = await allocatedLeaf(f, 'aa');
     await commitFile(f, aa.path, 'aa-file', 'aa\n');
     toMerge(aa.path, '2026-09-11T00:00:00.000Z');
