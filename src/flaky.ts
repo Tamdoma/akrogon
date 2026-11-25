@@ -36,15 +36,17 @@ function streamKey(tokens: string[]): string {
 // line terminator (CR, CRLF, U+2028, U+2029) reads the same — `(fail)` titles, `(unnamed)`
 // qualified by its stream's innermost token, and `(script) <script>` for a failed script whose
 // own stream printed no `(fail)` line. `timeouts` and `durations` come from a per-line pass
-// over the same terminator set (CRLF pairing reads as one empty segment, which neither attaches
-// nor expires). `timeouts` holds the names whose own chain prints `  ^ this test timed out
-// after <n>ms.` as the immediately preceding line of that same chain after its `(fail)` line:
-// any other line of the chain expires the candidate, a caret is consumed, and lines of other
-// chains or other streams do not break attachment. `durations` holds every `(pass)` or `(fail)`
-// line with a strict `[<n>ms]` bracket (digits with at most one dot after a leading digit, so
-// `[...ms]` never parses as NaN) as one deduped entry per name keeping its largest rounded ms.
-// An anchored line's duration title is its whole remainder even when it holds `| (fail) `;
-// chained lines keep the legacy chain extraction with `(unnamed)` normalization.
+// splitting `\r\n` as one line ending, so a genuine blank line is bare output of the empty
+// chain and expires its timeout candidate like any other bare line. `timeouts` holds the names
+// whose own chain prints `  ^ this test timed out after <n>ms.` as the immediately preceding
+// line of that same chain after its `(fail)` line: any other line of the chain expires the
+// candidate, a caret is consumed, and lines of other chains or other streams do not break
+// attachment. `durations` holds every `(pass)` or `(fail)` line with a strict `[<n>ms]` bracket
+// (digits with at most one dot after a leading digit, so `[...ms]` never parses as NaN) as one
+// deduped entry per name keeping its largest rounded ms. An anchored line's duration title is
+// its whole remainder even when it holds `| (fail) `; a chained line reads the FIRST `| (pass) `
+// or `| (fail) ` scanning left-to-right as its result marker, so a wrapper chain passing a title
+// that itself holds `| (fail) ` keeps the full title, with `(unnamed)` normalization.
 export function scanBunOutput(text: string): BunScan {
   // Names: the legacy extraction verbatim. The multiline anchors already treat \r, U+2028 and
   // U+2029 as line boundaries, so no segmenter can diverge from them.
@@ -81,28 +83,24 @@ export function scanBunOutput(text: string): BunScan {
   const timed = (line: string): { chain: string[]; title: string; bracket: string | undefined } | null => {
     const anchored: RegExpExecArray | null = /^(?:\(pass\) |\(fail\) )(.+?)(?: \[(\d+(?:\.\d+)?)ms\])?$/.exec(line);
     if (anchored !== null) return { chain: [], title: anchored[1], bracket: anchored[2] };
-    const chained: RegExpExecArray | null =
-      /^(.+?)\| \(fail\) (.+?)(?: \[(\d+(?:\.\d+)?)ms\])?$/.exec(line) ??
-      /^(.+?)\| \(pass\) (.+?)(?: \[(\d+(?:\.\d+)?)ms\])?$/.exec(line);
+    const chained: RegExpExecArray | null = /^(.+?)\| \((?:pass|fail)\) (.+?)(?: \[(\d+(?:\.\d+)?)ms\])?$/.exec(line);
     if (chained === null) return null;
     const tokens: string[] = chain(chained[1]);
     const title: string =
       chained[2] === '(unnamed)' && tokens.length > 0 ? `(unnamed) ${tokens[tokens.length - 1]}` : chained[2];
     return { chain: tokens, title, bracket: chained[3] };
   };
-  for (const line of text.split(/[\n\r\u2028\u2029]/)) {
-    if (line.length === 0) continue;
-    const fail: RegExpExecArray | null = /^(?:\(fail\) |(.+?)\| \(fail\) )(.+?)(?: \[([\d.]+m?s)\])?$/.exec(line);
-    const pass: RegExpExecArray | null =
-      fail === null ? /^(?:\(pass\) |(.+?)\| \(pass\) )(.+?)(?: \[([\d.]+m?s)\])?$/.exec(line) : null;
-    const result: RegExpExecArray | null = fail ?? pass;
+  for (const line of text.split(/\r\n|[\n\r\u2028\u2029]/)) {
+    const result: RegExpExecArray | null =
+      /^(?:\((?:pass|fail)\) |(.+?)\| \((?:pass|fail)\) )(.+?)(?: \[([\d.]+m?s)\])?$/.exec(line);
     if (result !== null) {
       const stream: string[] = result[1] === undefined ? [] : chain(result[1]);
       const title: string =
         result[2] === '(unnamed)' && stream.length > 0 ? `(unnamed) ${stream[stream.length - 1]}` : result[2];
       remember(stream);
       const key: string = streamKey(stream);
-      if (fail !== null) candidate.set(key, title);
+      if (line.slice(result[1] === undefined ? 0 : result[1].length + 2).startsWith('(fail) '))
+        candidate.set(key, title);
       else candidate.delete(key);
     } else {
       const timeout: RegExpExecArray | null = /^(?:(.+?)\| )?  \^ this test timed out after [\d.]+ms\.$/.exec(line);
