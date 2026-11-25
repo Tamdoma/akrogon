@@ -90,7 +90,7 @@ Standalone has no config or leaf reads, lifecycle state/log writes, phase call o
 
 ### Chart-door direct work
 
-Chart-issues direct-route work uses the leaf form above: after the door's `akrogon direct` creates the leaf, the door implements it with `implement-issue <slug> slot=A phase=implement leaf=<folder>` — the folder `akrogon direct` created — and repairs it with the `check.fix` form. There is no direct-only form of this skill.
+After `akrogon direct` creates the leaf, the chart door implements it with `implement-issue <slug> slot=A phase=implement leaf=<folder>` and repairs it with the `check.fix` form. The door as A moves out of `check.repair`. It sends each review to B using the Direct route section of `chart-issues`.
 
 ## Printed footer
 
@@ -99,6 +99,6 @@ Last operation: <changes, verification and observed phase result>
 Next: <skill> <slug> slot=<A|B> phase=<phase> leaf=<folder>
 ```
 
-After leaf implementation the next pass is check-issue in A and B at `check.review` (one prompt per slot); after repair it is B only, while `Next: none <reason>` covers standalone, waiting or terminal outcomes.
+For lifecycle leaves the next pass is check-issue in A and B after implementation and in B after repair. For direct leaves the chart door sends each review to B. `Next: none <reason>` covers standalone, waiting or terminal outcomes.
 
 The lines are printed only, with actual command results rather than assumed progress.

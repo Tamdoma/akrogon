@@ -38,7 +38,7 @@ The door may still recommend lifecycle for a small job it thinks is risky. You c
 3. B reviews it with [check-issue](../../skills/check-issue/SKILL.md).
 4. On fixes the door repairs as seat A and B checks again.
 5. The merge queue and the land run land the leaf like any other: they verify, push the exact tested commit, close the GitHub issues the change delivered, and post an update through [broadcast-issue](../../skills/broadcast-issue/SKILL.md) when the repo has broadcast set up.
-6. The door marks the chart `Closed`.
+6. If broadcast is configured, the door waits for the prompt to reach B and for B's broadcast turn to end before reusing the reviewer. The door then marks the chart `Closed`.
 
 You watch the leaf in `akrogon status` like any other. You do not run these commands yourself.
 

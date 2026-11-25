@@ -34,9 +34,9 @@ Chart consultants are different from seats A and B. A consultant is an hc termin
 
 ## check-issue
 
-- **Result:** a review file per seat with Fix and Nit findings and a verdict. In `check.repair`, seat B repairs most Fixes itself.
-- **When to use:** a leaf is in `check.review` or `check.repair`.
-- **Who starts it:** the command, dispatching seats A and B for the first review, and seat B alone for repair and for reviews after a repair. The chart door also starts it with seat B to review a direct-route change.
+- **Result:** a review file per reviewer with Fix and Nit findings and a verdict. In lifecycle `check.repair`, B repairs most Fixes itself.
+- **When to use:** any leaf in `check.review`, or a lifecycle leaf in `check.repair`.
+- **Who starts it:** for lifecycle leaves, the command dispatches A and B for initial review and B for `check.repair` and later reviews. For direct leaves, the chart door sends every review to B and handles `check.repair` as A.
 - **Source:** [`skills/check-issue/SKILL.md`](../../skills/check-issue/SKILL.md)
 
 ## merge-issue

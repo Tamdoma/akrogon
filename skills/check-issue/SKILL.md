@@ -7,7 +7,9 @@ At every phase prompt, re-read this file, its references and the leaf's `brief.m
 
 # Check issue
 
-The prompt is `check-issue <slug> slot=<A|B> phase=check.review leaf=<folder>` or `check-issue <slug> slot=B phase=check.repair leaf=<folder>`, where `phase=check.repair` belongs only to B; initial review has both slots, while a review after repair belongs only to B.
+For lifecycle leaves, the prompt is `check-issue <slug> slot=<A|B> phase=check.review leaf=<folder>` or `check-issue <slug> slot=B phase=check.repair leaf=<folder>`. Both slots review the first round. B handles `check.repair` and reviews after repair.
+
+For direct leaves, the door sends `check-issue <slug> slot=B phase=check.review leaf=<folder> worktree=<path> base=<ref>` with its hc report line. B reviews every round. Use `worktree=` for Git, proof and phase commands and `base=` for the initial diff. Use the repair diff below for a re-check. The door handles `check.repair` as A under the Direct route section of `chart-issues`.
 
 ## Shared context
 
@@ -32,7 +34,7 @@ An operator-only item is a finding whose fix needs something only the operator c
 
 ## check.review
 
-During initial review, both A and B work blind: do not contact or wait for the peer, or read the peer's current review. Record unresolved questions as findings in your own `review-<slot>.md` under the `leaf=` folder and account for them in your verdict under the Fix/Nit rules below. Uncertainty alone is not a Fix.
+During a lifecycle leaf's initial review, both A and B work blind: do not contact or wait for the peer, or read the peer's current review. Record unresolved questions as findings in your own `review-<slot>.md` under the `leaf=` folder and account for them in your verdict under the Fix/Nit rules below. Uncertainty alone is not a Fix.
 
 Each seat judges the whole initial diff against the plan's decisions, criteria, change list and checklist, the brief's done-criteria, the design's exclusions, the report and live contracts, following affected docs and index pointers and checking any lesson claim against its evidence.
 
@@ -116,4 +118,4 @@ Last operation: <review findings and actual phase result>
 Next: <skill> <slug> slot=<A|B> phase=<phase> leaf=<folder>
 ```
 
-`check.repair` routes to check-issue B, `check.fix` to implement-issue A, `merge` prompts no seat — the command runs its turn — an outstanding initial review to check-issue in the remaining slot, and `Next: none <reason>` covers failed or waiting outcomes.
+For lifecycle leaves, `check.repair` routes to check-issue B and an outstanding initial review routes to check-issue in the remaining slot. For direct leaves, `check.repair` goes to the chart door as A. `check.fix` routes to implement-issue A. The command runs `merge`. `Next: none <reason>` covers failed or waiting outcomes.
