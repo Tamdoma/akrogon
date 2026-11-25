@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { cli, fixture, leaf, storeDir, type Fixture } from './helpers';
+import { cli, fixture, leaf, storeDir, yaml, type Fixture } from './helpers';
 import { delivered, hcFixture, stopCoresAfterFile, type HcFixture } from './hc-fixture';
 import { readState } from '../src/state';
 import { command, run, type Result } from '../src/shell';
@@ -354,6 +354,107 @@ test('criterion 4: a branch with own commits is adopted when the store worktree 
     expect(await command(['git', 'rev-parse', 'HEAD'], wt)).toBe(ownSha);
     expect(await command(['git', 'rev-parse', 'refs/heads/build'], f.root)).toBe(ownSha);
     expect(readFileSync(resolve(wt, 'own'), 'utf8')).toBe('own work\n');
+  } finally {
+    await f.clean();
+  }
+});
+
+test('criterion 3: a rebase paused in another worktree reserves the branch', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    await commitFree(f);
+    leaf(f, 'build', 'plan.synthesis');
+    await command(['git', 'worktree', 'add', worktreePath(f), 'build'], f.root);
+    const stashed: string = await command(['git', 'rev-parse', 'refs/heads/build'], f.root);
+    const elsewhere: string = resolve(f.home, 'rebase-checkout');
+    await command(['git', 'worktree', 'add', '--force', elsewhere, 'build'], f.root);
+    // An interactive rebase pausing at an edit detaches HEAD in that worktree, so git reports it
+    // without a branch line even though the branch is reserved until the rebase finishes or aborts.
+    await command(['git', '-c', 'sequence.editor=sed -i "s/^pick/edit/"', 'rebase', '-i', '--root'], elsewhere);
+    const rebaseDir: Result = await run(['git', 'rev-parse', '--git-path', 'rebase-merge'], elsewhere);
+    expect(existsSync(resolve(elsewhere, rebaseDir.stdout))).toBe(true);
+    const first: Result = await next(f, []);
+    expect(first.code).not.toBe(0);
+    expect(first.stderr).toContain('rebase in progress');
+    expect(first.stderr).toContain(elsewhere);
+    expect(await command(['git', 'rev-parse', 'refs/heads/build'], f.root)).toBe(stashed);
+    expect(existsSync(resolve(elsewhere, rebaseDir.stdout))).toBe(true);
+    expect(existsSync(worktreePath(f))).toBe(true);
+    await command(['git', 'rebase', '--abort'], elsewhere);
+    await command(['git', 'worktree', 'remove', '--force', elsewhere], f.root);
+  } finally {
+    await f.clean();
+  }
+});
+
+test('criterion 3: a forced second checkout is refused before the store worktree is removed', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    await commitFree(f);
+    leaf(f, 'build', 'plan.synthesis');
+    await command(['git', 'worktree', 'add', worktreePath(f), 'build'], f.root);
+    const stashed: string = await command(['git', 'rev-parse', 'refs/heads/build'], f.root);
+    const elsewhere: string = resolve(f.home, 'force-checkout');
+    await command(['git', 'worktree', 'add', '--force', elsewhere, 'build'], f.root);
+    const first: Result = await next(f, []);
+    expect(first.code).not.toBe(0);
+    expect(first.stderr).toContain('is checked out');
+    expect(first.stderr).toContain(elsewhere);
+    expect(existsSync(worktreePath(f))).toBe(true);
+    expect(existsSync(elsewhere)).toBe(true);
+    expect(await command(['git', 'rev-parse', 'refs/heads/build'], f.root)).toBe(stashed);
+    expect(await command(['git', 'rev-parse', 'HEAD'], worktreePath(f))).toBe(stashed);
+    await command(['git', 'worktree', 'remove', '--force', elsewhere], f.root);
+  } finally {
+    await f.clean();
+  }
+});
+
+test('criterion 2: a dirty locked leftover names the unlock step and the changed file', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    await commitFree(f);
+    leaf(f, 'build', 'plan.synthesis');
+    const wt: string = worktreePath(f);
+    await command(['git', 'worktree', 'add', wt, 'build'], f.root);
+    writeFileSync(resolve(wt, 'uncommitted.txt'), 'work in progress\n');
+    await command(['git', 'worktree', 'lock', wt], f.root);
+    const first: Result = await next(f, []);
+    expect(first.code).not.toBe(0);
+    expect(first.stderr).toContain('kept');
+    expect(first.stderr).toContain('uncommitted.txt');
+    expect(first.stderr).toContain('git worktree unlock');
+    expect(existsSync(resolve(wt, 'uncommitted.txt'))).toBe(true);
+    await command(['git', 'worktree', 'unlock', wt], f.root);
+  } finally {
+    await f.clean();
+  }
+});
+
+test('criterion 2: the unlock step for a locked leftover runs verbatim in a store path with spaces', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    const spacedStore: string = resolve(f.home, 'checkout store');
+    const wt: string = resolve(spacedStore, 'build');
+    yaml(resolve(f.root, 'issues/config.yaml'), {
+      checks: { test: 'bun test' },
+      worktree_root: spacedStore,
+      grounding: 'none',
+    });
+    mkdirSync(spacedStore);
+    await command(['git', 'branch', 'build'], f.root);
+    await command(['git', 'worktree', 'add', wt, 'build'], f.root);
+    await command(['git', 'worktree', 'lock', wt], f.root);
+    leaf(f, 'build', 'plan.synthesis');
+    const first: Result = await next(f, []);
+    expect(first.code).not.toBe(0);
+    expect(first.stderr).toContain('locked');
+    const unlock: RegExpMatchArray | null = first.stderr.match(/git worktree unlock '[^']+'/);
+    expect(unlock).not.toBeNull();
+    expect((await run(['sh', '-c', unlock![0]], f.root)).code).toBe(0);
+    expect((await command(['git', 'worktree', 'list', '--porcelain'], f.root)).includes('locked')).toBe(false);
+    expect(existsSync(wt)).toBe(true);
+    await command(['git', 'worktree', 'remove', '--force', wt], f.root);
   } finally {
     await f.clean();
   }
