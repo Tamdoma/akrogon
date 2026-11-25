@@ -43,7 +43,7 @@ import {
   worktreeLock,
 } from './state';
 import { requiredSlots, routing, type Phase, type Slot } from './routing';
-import { command, run, CommandError, type Result } from './shell';
+import { command, quote, run, CommandError, type Result } from './shell';
 import {
   docGet,
   end,
@@ -295,6 +295,31 @@ export async function resetLeafBranch(repo: Repo, slug: string, target: string, 
   await command(['git', 'update-ref', `refs/heads/${slug}`, target, expected], repo.root);
 }
 
+// The first worktree besides the store that reserves the leaf branch, either by a symbolic
+// checkout or by a paused rebase, which detaches HEAD in that worktree while git keeps the
+// branch reserved until the rebase finishes or aborts.
+export async function branchReservation(
+  root: string,
+  slug: string,
+  store: string,
+): Promise<{ path: string; rebase: boolean } | undefined> {
+  const rows: [string, { branch?: string }][] = [...(await registeredWorktrees(root)).entries()].filter(
+    ([p]) => p !== store,
+  );
+  const holder: [string, { branch?: string }] | undefined = rows.find(([, row]) => row.branch === slug);
+  if (holder !== undefined) return { path: holder[0], rebase: false };
+  for (const [p] of rows) {
+    if (!existsSync(resolve(p, '.git'))) continue;
+    for (const dir of ['rebase-merge', 'rebase-apply']) {
+      const probe: string = await command(['git', 'rev-parse', '--git-path', dir], p);
+      const name: string = resolve(p, probe, 'head-name');
+      if (existsSync(name) && readFileSync(name, 'utf8').trim() === `refs/heads/${slug}`)
+        return { path: p, rebase: true };
+    }
+  }
+  return undefined;
+}
+
 async function ensureWorktree(repo: Repo, leaf: Leaf, live: boolean): Promise<State> {
   const path: string = resolve(worktreeStore(repo), leaf.state.slug);
   const slug: string = leaf.state.slug;
@@ -315,7 +340,7 @@ async function ensureWorktree(repo: Repo, leaf: Leaf, live: boolean): Promise<St
   if (leaf.state.worktree === undefined) {
     // First allocation. A leftover worth keeping is refused loudly, a commit-free leftover is
     // replaced from the tracking ref, and only a branch with commits of its own is adopted.
-    const step: string = `inspect or save the work in ${path}, then run: git worktree remove --force ${path}`;
+    const step: string = `inspect or save the work in ${path}, then run: git worktree remove --force ${quote(path)}`;
     const ref: string = `refs/heads/${slug}`;
     if (present) {
       const symbolic: Result = await run(['git', 'symbolic-ref', '-q', 'HEAD'], path);
@@ -325,18 +350,18 @@ async function ensureWorktree(repo: Repo, leaf: Leaf, live: boolean): Promise<St
         const head: string = await command(['git', 'rev-parse', 'HEAD'], path);
         throw new Error(
           `Refusing first allocation of leaf ${slug}: ${path} is on a detached HEAD at ${head}; ` +
-            `it is never removed or adopted. Inspect ${path} and switch it back onto the leaf branch or remove it with: git worktree remove --force ${path}`,
+            `it is never removed or adopted. Inspect ${path} and switch it back onto the leaf branch or remove it with: git worktree remove --force ${quote(path)}`,
         );
       }
       if (symbolic.stdout !== ref)
         throw new Error(
           `Refusing first allocation of leaf ${slug}: ${path} is on branch ${symbolic.stdout.slice('refs/heads/'.length)}, not ${slug}; ` +
-            `it is never removed or adopted. Inspect ${path} and switch it back onto the leaf branch or remove it with: git worktree remove --force ${path}`,
+            `it is never removed or adopted. Inspect ${path} and switch it back onto the leaf branch or remove it with: git worktree remove --force ${quote(path)}`,
         );
       if (branch.code !== 0)
         throw new Error(
           `Refusing first allocation of leaf ${slug}: ${path} is on the unborn branch ${slug}: HEAD names ${ref} but that ref does not exist; ` +
-            `it is never removed or adopted. Inspect ${path} and switch it back onto the leaf branch or remove it with: git worktree remove --force ${path}`,
+            `it is never removed or adopted. Inspect ${path} and switch it back onto the leaf branch or remove it with: git worktree remove --force ${quote(path)}`,
         );
     }
     if (branch.code === 0) {
@@ -347,7 +372,29 @@ async function ensureWorktree(repo: Repo, leaf: Leaf, live: boolean): Promise<St
         // through today's creation path after a bound reset, so a moved ref fails loudly.
         const lock: string = await worktreeLock(repo.root);
         await withLock(lock, async () => {
+          // Every check runs before the first mutation: a refusal never leaves the store
+          // worktree removed or the branch moved.
+          const refuseReservation = async (): Promise<void> => {
+            const reserved: { path: string; rebase: boolean } | undefined = await branchReservation(
+              repo.root,
+              slug,
+              path,
+            );
+            if (reserved === undefined) return;
+            if (reserved.rebase)
+              throw new Error(
+                `Refusing first allocation of leaf ${slug}: the commit-free branch ${slug} is reserved by a rebase in progress in ${reserved.path}; ` +
+                  `moving it would corrupt that rebase. Finish or abort the rebase there (git rebase --continue or git rebase --abort), or remove that worktree: git worktree remove --force ${quote(reserved.path)}`,
+              );
+            throw new Error(
+              `Refusing first allocation of leaf ${slug}: the commit-free branch ${slug} is checked out in ${reserved.path}; ` +
+                `moving it would strand that worktree. Switch that worktree off the branch or remove it: git worktree remove ${quote(reserved.path)}`,
+            );
+          };
           if (present) {
+            const row: { locked: string | false } | undefined = (await registeredWorktrees(repo.root)).get(path);
+            const locked: boolean = row !== undefined && row.locked !== false;
+            const unlock: string = `git worktree unlock ${quote(path)}`;
             const verdict: { ok: true } | { ok: false; reason: string } = await worktreeRemovable(repo, path);
             if (!verdict.ok) {
               const status: Result = await run(['git', '-C', path, 'status', '--porcelain'], repo.root);
@@ -360,31 +407,29 @@ async function ensureWorktree(repo: Repo, leaf: Leaf, live: boolean): Promise<St
                       .map((line) => line.slice(3))
                       .join('\n')}\n`;
               throw new Error(
-                `Refusing first allocation of leaf ${slug}: leftover ${path} is kept: ${verdict.reason}.\n${list}${step}`,
+                `Refusing first allocation of leaf ${slug}: leftover ${path} is kept: ${verdict.reason}.\n${list}` +
+                  `${locked ? `The worktree is locked. Run: ${unlock}, then: ` : ''}${step}`,
               );
             }
-            const row: { locked: string | false } | undefined = (await registeredWorktrees(repo.root)).get(path);
-            if (row !== undefined && row.locked !== false)
+            if (locked)
               throw new Error(
                 `Refusing first allocation of leaf ${slug}: leftover ${path} is locked.\n` +
-                  `Run: git worktree unlock ${path}, then: git worktree remove --force ${path}`,
+                  `Run: ${unlock}, then: git worktree remove --force ${quote(path)}`,
               );
+            await refuseReservation();
             const removal: Result = await run(['git', 'worktree', 'remove', path], repo.root);
             if (removal.code !== 0)
               throw new Error(
                 `Refusing first allocation of leaf ${slug}: git refused to remove ${path}: ${removal.stderr}\n` +
-                  (removal.stderr.includes('lock') ? `run: git worktree unlock ${path}, then: ` : '') +
+                  (removal.stderr.includes('lock') ? `run: ${unlock}, then: ` : '') +
                   step,
               );
+          } else {
+            await refuseReservation();
           }
-          const holder: [string, { branch?: string }] | undefined = [
-            ...(await registeredWorktrees(repo.root)).entries(),
-          ].find(([, row]) => row.branch === slug);
-          if (holder !== undefined)
-            throw new Error(
-              `Refusing first allocation of leaf ${slug}: the commit-free branch ${slug} is checked out in ${holder[0]}; ` +
-                `moving it would strand that worktree. Switch that worktree off the branch or remove it: git worktree remove ${holder[0]}`,
-            );
+          // Re-read after the removal: a checkout appearing during it is caught before the
+          // bound reset, which itself still fails loudly on a moved or vanished ref.
+          await refuseReservation();
           await resetLeafBranch(repo, slug, trackingSha, provenSha);
         });
       }
