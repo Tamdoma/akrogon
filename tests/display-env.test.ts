@@ -44,32 +44,39 @@ function landArgv(log: string): string[] {
   return lands[0].split(' ');
 }
 
-test('run-check copies each display variable the caller holds, empty included, and none the caller lacks', async () => {
-  const f: Fixture = await fixture();
-  try {
-    const { worktree } = await leafWorktree(f, 'disp-copy');
-    const result: Result = await cli(f, ['run-check', '--', ...sh(probe)], worktree, {
-      DISPLAY: ':66',
-      XAUTHORITY: '',
-      WAYLAND_DISPLAY: 'wly-9',
-      XDG_RUNTIME_DIR: undefined,
-      XDG_SESSION_TYPE: 'wayland',
-      WAYLAND_SOCKET: '41',
-    });
-    expect(result.code, result.stderr).toBe(0);
-    const values: Record<string, string> = probeValues(result.stdout);
-    // Pre-existing conditions first, so a violation red lands on its own assertion.
-    expect(values.bus).toBe('unix:path=/nonexistent');
-    expect(values.sess).toBe('<unset>');
-    expect(values.wsock).toBe('<unset>');
-    expect(values.disp).toBe(':66');
-    expect(values.xauth).toBe('');
-    expect(values.wly).toBe('wly-9');
-    expect(values.xdg).toBe('<unset>');
-  } finally {
-    f.clean();
-  }
-});
+test.each([
+  ['unset', undefined],
+  ['empty', ''],
+  ['nonempty', '/run/user/4242'],
+] as const)(
+  'run-check copies each display variable the caller holds, empty included, and none the caller lacks (%s runtime directory)',
+  async (_state: string, runtime: string | undefined) => {
+    const f: Fixture = await fixture();
+    try {
+      const { worktree } = await leafWorktree(f, 'disp-copy');
+      const result: Result = await cli(f, ['run-check', '--', ...sh(probe)], worktree, {
+        DISPLAY: ':66',
+        XAUTHORITY: '',
+        WAYLAND_DISPLAY: 'wly-9',
+        XDG_RUNTIME_DIR: runtime,
+        XDG_SESSION_TYPE: 'wayland',
+        WAYLAND_SOCKET: '41',
+      });
+      expect(result.code, result.stderr).toBe(0);
+      const values: Record<string, string> = probeValues(result.stdout);
+      // Pre-existing conditions first, so a violation red lands on its own assertion.
+      expect(values.bus).toBe('unix:path=/nonexistent');
+      expect(values.sess).toBe('<unset>');
+      expect(values.wsock).toBe('<unset>');
+      expect(values.disp).toBe(':66');
+      expect(values.xauth).toBe('');
+      expect(values.wly).toBe('wly-9');
+      expect(values.xdg).toBe(runtime ?? '<unset>');
+    } finally {
+      f.clean();
+    }
+  },
+);
 
 test('a repo listing the display names in pass_env still loads and its run-check copies the same caller values', async () => {
   const f: Fixture = await fixture();
