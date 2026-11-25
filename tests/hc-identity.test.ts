@@ -829,4 +829,3 @@ test('terminal() never starts a core for an absent session: it fails fast and le
     rmSync(runtime, { recursive: true, force: true });
   }
 });
-
