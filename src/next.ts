@@ -477,6 +477,9 @@ async function ensureWorktree(
   if (due && pending !== undefined) {
     try {
       rmSync(pending.marker, { force: true });
+      // The leaf temp the setup inherits as TMPDIR, created here and not earlier: a pass that
+      // never reaches the setup step leaves no sweepable directory behind.
+      ensureLeafTemp(repo, slug);
       const lock: string = resolve(path, await command(['git', 'rev-parse', '--git-path', INSTALL_LOCK_FILE], path));
       const result = await spawnCaptured(['flock', lock, 'sh', '-c', pending.setup], {
         cwd: path,
@@ -680,9 +683,9 @@ async function allocate(
   if (!live && (await capRefusal(global, repo, invocation, leaf.state.worktree === undefined)) !== undefined)
     return null;
   const busy: string | null = busyDetail(repo, leaf.state.slug, found);
-  ensureLeafTemp(repo, leaf.state.slug);
   const worktree: State | { busy: string } = await ensureWorktree(repo, leaf, live, busy);
   if ('busy' in worktree) return worktree;
+  ensureLeafTemp(repo, worktree.slug);
   const state: State = worktree.tab === undefined ? { ...worktree, tab: leafTab(repo.name, worktree.slug) } : worktree;
   saveState(leaf.path, state);
   return { state, place, seats: found };
