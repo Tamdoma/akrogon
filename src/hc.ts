@@ -293,7 +293,17 @@ export async function terminals(
 
 // `signal` stops the lookup: its aborted call fails like a killed one. The kill is SIGKILL, since a
 // suspended lookup holds SIGTERM until it is continued and would keep this process alive.
+// A probe of a session whose socket is absent or dead must never reach hc: hc boots a core for any
+// session it is asked about, and an orphaned core's lock wedges every later probe of the same name
+// across the host. Absent is not_found, the same kind the core itself returns for a missing address.
 export async function terminal(session: string, address: string, signal?: AbortSignal): Promise<Seen> {
+  const runtime: string | undefined = process.env.XDG_RUNTIME_DIR;
+  const argv: string[] = ['hc', 'get', '--json', address];
+  if (runtime !== undefined && runtime.trim() !== '') {
+    const socket: string = resolve(runtime, 'herdr-core', `${session}.sock`);
+    if (!existsSync(socket) || !(await listening(socket)))
+      throw new HcError('not_found', argv, { code: 3, stdout: '', stderr: '' });
+  }
   return seen(
     session,
     terminalSchema.parse(JSON.parse(await hc(session, ['get', '--json', address], { signal, killSignal: 'SIGKILL' }))),
