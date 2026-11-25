@@ -27,6 +27,7 @@ import {
   type Inventory,
   type Leaf,
   type LeafFailure,
+  type SeatRef,
   type State,
 } from './state';
 import { readLog, type LogRecord } from './log';
@@ -162,6 +163,12 @@ function starts(timings: TimingEvent[]): Map<string, number> {
   );
 }
 
+// When work on the leaf began: a direct leaf starts at creation since no seat prompt
+// is ever delivered for it, a lifecycle leaf at its first delivered prompt.
+export function leafStart(state: State, started: Map<string, number>): number | undefined {
+  return state.direct === true ? Date.parse(state.created) : started.get(state.slug);
+}
+
 function note(state: State, now: number, seatSources: { a: string; b: string }): string {
   const busy: string[] =
     state.phase === 'failed' || state.phase === 'merged'
@@ -267,7 +274,7 @@ function rows(scan: Scan & { ok: true }, now: number, stopped: Set<string>, unna
       cells(
         leaf,
         scan.log,
-        started.get(leaf.state.slug),
+        leafStart(leaf.state, started),
         now,
         indent(groups.length),
         queue,
@@ -615,7 +622,7 @@ async function leafJson(
     group: relative(resolve(scan.repo.root, 'issues/open'), leaf.path).split(sep).slice(0, -1),
     phase: state.phase,
     phase_since: entry === undefined ? null : Date.parse(entry.record.ts),
-    first_prompt: started.get(state.slug) ?? null,
+    first_prompt: leafStart(state, started) ?? null,
     stopped: stopped.has(`${scan.repo.name}/${state.slug}`),
     blocked_by: deps,
     attention,
@@ -766,15 +773,28 @@ export async function statusCommand(
     console.log('History:');
     console.log(log.length === 0 ? 'unavailable' : log.map((entry) => entry.text).join('\n'));
     console.log(resolve(leaf.path, 'plan.md'));
-    const resolved: { a: SlotConfig; b: SlotConfig; source: { a: string; b: string } } = seats(global, repo, leaf.path);
-    console.log('Seats for the next agent start:');
-    console.log(
-      Bun.YAML.stringify(
-        { a: { ...resolved.a, source: resolved.source.a }, b: { ...resolved.b, source: resolved.source.b } },
-        null,
-        2,
-      ).trimEnd(),
-    );
+    if (leaf.state.direct === true) {
+      const ref = (slot: 'A' | 'B'): string | undefined => {
+        const seat: SeatRef | undefined = leaf.state.seat[slot];
+        return seat === undefined ? undefined : `${seat.session}/${seat.address}`;
+      };
+      console.log('Seats:');
+      console.log(Bun.YAML.stringify({ a: ref('A'), b: ref('B') }, null, 2).trimEnd());
+    } else {
+      const resolved: { a: SlotConfig; b: SlotConfig; source: { a: string; b: string } } = seats(
+        global,
+        repo,
+        leaf.path,
+      );
+      console.log('Seats for the next agent start:');
+      console.log(
+        Bun.YAML.stringify(
+          { a: { ...resolved.a, source: resolved.source.a }, b: { ...resolved.b, source: resolved.source.b } },
+          null,
+          2,
+        ).trimEnd(),
+      );
+    }
     return;
   }
   const now: number = Date.now();
@@ -798,7 +818,7 @@ export async function statusCommand(
               ({ record }) => record.slug === leaf.state.slug && record.to === 'merged',
             );
             const merged: number | null = record === undefined ? null : Date.parse(record.record.ts);
-            const first: number | undefined = started.get(leaf.state.slug);
+            const first: number | undefined = leafStart(leaf.state, started);
             return {
               repo: scan.repo.name,
               slug: leaf.state.slug,
