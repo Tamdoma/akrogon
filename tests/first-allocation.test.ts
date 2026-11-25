@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { cli, fixture, leaf, storeDir, yaml, type Fixture } from './helpers';
 import { delivered, hcFixture, stopCoresAfterFile, type HcFixture } from './hc-fixture';
@@ -455,6 +455,87 @@ test('criterion 2: the unlock step for a locked leftover runs verbatim in a stor
     expect((await command(['git', 'worktree', 'list', '--porcelain'], f.root)).includes('locked')).toBe(false);
     expect(existsSync(wt)).toBe(true);
     await command(['git', 'worktree', 'remove', '--force', wt], f.root);
+  } finally {
+    await f.clean();
+  }
+});
+
+test('criterion 3: an active bisect in another worktree reserves the branch', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    await commitFree(f);
+    leaf(f, 'build', 'plan.synthesis');
+    await command(['git', 'worktree', 'add', worktreePath(f), 'build'], f.root);
+    const stashed: string = await command(['git', 'rev-parse', 'refs/heads/build'], f.root);
+    const elsewhere: string = resolve(f.home, 'bisect-checkout');
+    await command(['git', 'worktree', 'add', '--force', elsewhere, 'build'], f.root);
+    // Bisect detaches HEAD in that worktree while git keeps the branch reserved: native
+    // `git worktree add` refuses it as already in use.
+    // Bisect detaches HEAD in that worktree while git keeps the branch reserved: native
+    // `git worktree add` refuses it as already in use. An own commit on the branch gives the
+    // bisect real divergence to walk while the ref stays behind main's tip.
+    writeFileSync(resolve(elsewhere, 'bisect-target'), 'own\n');
+    await command(['git', 'add', 'bisect-target'], elsewhere);
+    await command(['git', 'commit', '-m', 'bisect-target'], elsewhere);
+    await command(['git', 'update-ref', 'refs/heads/build', stashed], f.root);
+    // A second advance leaves two revisions between the branch tip and main: the bisect pauses
+    // mid-range with HEAD detached instead of concluding on the spot.
+    writeFileSync(resolve(f.root, 'advanced2'), 'advance2\n');
+    await command(['git', 'add', 'advanced2'], f.root);
+    await command(['git', 'commit', '-m', 'advance2'], f.root);
+    await command(['git', 'push', 'origin', 'main'], f.root);
+    await command(['git', 'bisect', 'start', 'refs/remotes/origin/main', 'build'], elsewhere);
+    expect((await run(['git', 'symbolic-ref', '-q', 'HEAD'], elsewhere)).code).toBe(1);
+    const first: Result = await next(f, []);
+    expect(first.code).not.toBe(0);
+    expect(first.stderr).toContain('bisect');
+    expect(first.stderr).toContain(elsewhere);
+    expect(await command(['git', 'rev-parse', 'refs/heads/build'], f.root)).toBe(stashed);
+    expect(existsSync(worktreePath(f))).toBe(true);
+    await command(['git', 'bisect', 'reset'], elsewhere);
+    await command(['git', 'worktree', 'remove', '--force', elsewhere], f.root);
+  } finally {
+    await f.clean();
+  }
+});
+
+test('criterion 3: the rebase refusal offers no force removal that would delete active work', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    await commitFree(f);
+    leaf(f, 'build', 'plan.synthesis');
+    await command(['git', 'worktree', 'add', worktreePath(f), 'build'], f.root);
+    const elsewhere: string = resolve(f.home, 'rebase-edited-checkout');
+    await command(['git', 'worktree', 'add', '--force', elsewhere, 'build'], f.root);
+    await command(['git', '-c', 'sequence.editor=sed -i "s/^pick/edit/"', 'rebase', '-i', '--root'], elsewhere);
+    appendFileSync(resolve(elsewhere, 'f'), 'uncommitted edit\n');
+    const first: Result = await next(f, []);
+    expect(first.code).not.toBe(0);
+    expect(first.stderr).toContain('rebase in progress');
+    expect(first.stderr).not.toContain('git worktree remove');
+    await command(['git', 'rebase', '--abort'], elsewhere);
+    await command(['git', 'worktree', 'remove', '--force', elsewhere], f.root);
+  } finally {
+    await f.clean();
+  }
+});
+
+test('criterion 1: first allocation replaces the only checkout when HOME is a symlink', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    await commitFree(f);
+    leaf(f, 'build', 'plan.synthesis');
+    const aliasedHome: string = resolve(f.home, '..', `home-alias-${f.repo}`);
+    symlinkSync(f.home, aliasedHome);
+    const aliasedStore: string = resolve(aliasedHome, '.akrogon/worktrees', f.repo);
+    mkdirSync(resolve(f.home, '.akrogon/worktrees', f.repo), { recursive: true });
+    await command(['git', 'worktree', 'add', resolve(f.home, '.akrogon/worktrees', f.repo, 'build'), 'build'], f.root);
+    const first: Result = await cli(f, ['next'], f.root, { ...f.env, HOME: aliasedHome });
+    expect(first.code).toBe(0);
+    const tracking: string = await command(['git', 'rev-parse', 'refs/remotes/origin/main'], f.root);
+    expect(await command(['git', 'rev-parse', 'refs/heads/build'], f.root)).toBe(tracking);
+    expect(await command(['git', 'rev-parse', 'HEAD'], resolve(aliasedStore, 'build'))).toBe(tracking);
+    expect(existsSync(resolve(aliasedStore, 'build'))).toBe(true);
   } finally {
     await f.clean();
   }
