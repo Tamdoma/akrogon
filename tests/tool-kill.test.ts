@@ -63,8 +63,8 @@ function cap(argv: string[], options: { cwd?: string; env?: NodeJS.ProcessEnv } 
   return {
     proc,
     exited: proc.exited,
-    stdout: new Response(proc.stdout).text(),
-    stderr: new Response(proc.stderr).text(),
+    stdout: new Response(proc.stdout as ReadableStream<Uint8Array>).text(),
+    stderr: new Response(proc.stderr as ReadableStream<Uint8Array>).text(),
   };
 }
 
