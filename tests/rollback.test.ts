@@ -144,6 +144,12 @@ test.serial('the roll-back page manual steps roll a broken release back using th
     await command(['ln', '-s', resolve(releases(d), base), '.next-current'], d.home);
     await command(['mv', '-T', '.next-current', 'current'], d.home);
     writeFileSync(resolve(d.home, 'release-hold.yaml'), `commit: ${bad}\n`);
+    // The pinned predecessor predates slots.consultant and its strict slots schema refuses the key.
+    const machine = Bun.YAML.parse(readFileSync(resolve(d.home, 'config.yaml'), 'utf8')) as {
+      slots: Record<string, unknown>;
+    };
+    const { consultant: _recipe, ...slots } = machine.slots;
+    writeFileSync(resolve(d.home, 'config.yaml'), Bun.YAML.stringify({ ...machine, slots }));
     const install: SpawnResult = await spawnCaptured(
       [process.execPath, resolve(prevDir, 'src/akrogon.ts'), 'install'],
       { cwd: d.home, env: homeEnv },
