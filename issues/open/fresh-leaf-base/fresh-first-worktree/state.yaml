@@ -1,12 +1,11 @@
 slug: fresh-first-worktree
-phase: plan.synthesis
+phase: check.repair
 created: 2026-11-25
 repo: akrogon
 blocked-by: []
 sources:
   - "Tamdoma/akrogon#156"
-busy_since:
-  A: 2026-11-25T07:12:39.850Z
+busy_since: {}
 busy_notified: {}
 blocked_notified: {}
 attempts:
@@ -16,7 +15,7 @@ lost:
   A: 0
   B: 0
 done: []
-fix_rounds: 0
+fix_rounds: 1
 verdict: {}
 tab: ak238e02c674ee28616e98c55dd942cb
 worktree: /home/ivan/.akrogon/worktrees/akrogon/fresh-first-worktree
@@ -27,9 +26,15 @@ seat:
   A:
     session: infra
     address: t3q8
+  B:
+    session: infra
+    address: t3qf
 prompted:
-  A:
-    turn: 0
-    address: t3q8
+  B:
+    turn: 3
+    address: t3qf
 prompted_at: {}
 delivery_error: {}
+frozen:
+  tests/first-allocation.test.ts: 2c5589f04b37a4ed5dc16b9fe06aefd251be1846
+frozen_cited: []

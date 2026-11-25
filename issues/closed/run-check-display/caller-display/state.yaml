@@ -1,0 +1,48 @@
+slug: caller-display
+phase: merged
+created: 2026-11-25
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#155"
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak3bfa23a241774a447ae674cae37561
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t3q9
+  B:
+    session: infra
+    address: t3qg
+prompted:
+  B:
+    turn: 2
+    address: t3qg
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-25T08:26:14.735Z
+broadcast:
+  kind: issue
+  name: run-check-display
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/run-check-display
+  pushed: 2f4fad18a748d5a7b8c38197925bdd8e0c3e317c
+  sources:
+    - "Tamdoma/akrogon#155"
+frozen:
+  tests/display-env.test.ts: 918aaea03fe79646f997541d748521d4badc8f15
+  tests/isolation.ts: 9643a3d5dd1b579219d08e6783eb1e7231efc187
+frozen_cited: []
