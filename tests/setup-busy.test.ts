@@ -12,7 +12,7 @@ import { hcFixture, shortStartProof, stopCoresAfterFile, type HcFixture, type Te
 import { readState } from '../src/state';
 import { ownLive } from '../src/admission';
 import { readTimings } from '../src/timing';
-import { finishCaptured, spawnFiles, type Result, type SpawnResult } from '../src/shell';
+import { command, finishCaptured, spawnFiles, type Result, type SpawnResult } from '../src/shell';
 import {
   declareEnv,
   next,
@@ -260,10 +260,66 @@ test('criterion 4: a live run-check holds the due setup with capacity full and n
       killTree(held.proc);
       await waitUntil(() => liveRecords(f).length === 0, 'run records never cleared');
     }
-    // With the run gone the next pass runs the due setup even though capacity stays full: the
-    // worktree is already recorded, so the leaf waits on capacity only for a new seat.
+    // With the run gone and the sibling still holding the only slot, the ordinary capacity gate
+    // stands: no setup runs and the leaf records its capacity wait. Setup is owed before an
+    // eligible delivery, not before capacity exists.
+    expect((await next(f, ['build'])).code).toBe(0);
+    expect(setupCallsFor(f, 'build')).toBe(1);
+    expect(
+      readTimings(f.root).filter(
+        (event) => event.kind === 'wait' && event.slug === 'build' && event.reason === 'capacity',
+      ).length,
+    ).toBeGreaterThanOrEqual(1);
+    // Once the sibling's slot frees, the next pass runs the due setup and delivers.
+    const sibling: Terminal = (await f.core.terminals({ 'akrogon.leaf': 'other' }, false))[0];
+    expect((await f.core.hc(['kill', sibling.address])).code).toBe(0);
+    expect((await f.core.hc(['rm', sibling.address])).code).toBe(0);
     expect((await next(f, ['build'])).code).toBe(0);
     expect(setupCallsFor(f, 'build')).toBe(2);
+    const lines: string[] = setupLines(f);
+    expect(lines.lastIndexOf('task-build')).toBeGreaterThan(lines.lastIndexOf(`cwd=${resolve(storeDir(f), 'build')}`));
+  } finally {
+    await f.clean();
+  }
+});
+
+test('criterion 4: a busy unallocated leaf with a dirty leftover reports nothing while its run-check is live', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    declareEnv(f);
+    writeHook(f);
+    writeSetup(f, setupScript(f, 1), { env: ['SETUP_PROBE'], max_active: 1 });
+    const path: string = leaf(f, 'build', 'plan.synthesis');
+    // A manually prepared store leftover with uncommitted changes: the first-allocation validation
+    // would report it, but while the leaf's run-check is live the due-and-busy outcome comes first.
+    const wt: string = resolve(storeDir(f), 'build');
+    const base: string = await command(['git', 'rev-parse', 'refs/remotes/origin/main'], f.root);
+    await command(['git', 'branch', 'build', base], f.root);
+    await command(['git', 'worktree', 'add', wt, 'build'], f.root);
+    writeFileSync(resolve(wt, 'scratch'), 'dirty\n');
+    writeSetup(f, setupScript(f, 2), { env: ['SETUP_PROBE'], max_active: 1 });
+    const held = spawnRunCheck(f, ['run-check', '--leaf', path, '--name', 'held', '--', 'sh', '-c', 'sleep 60']);
+    await waitRunRecord(f, 'live');
+    try {
+      // Quiet busy: exit 0, no setup, no validation error naming the leaf.
+      const pass: Result = await next(f, ['build']);
+      expect(pass.code).toBe(0);
+      expect(pass.stderr).not.toContain('build');
+      expect(setupCallsFor(f, 'build')).toBe(0);
+      expect(
+        readTimings(f.root).filter(
+          (event) => event.kind === 'wait' && event.slug === 'build' && event.reason === 'capacity',
+        ),
+      ).toEqual([]);
+    } finally {
+      killTree(held.proc);
+      await waitUntil(() => liveRecords(f).length === 0, 'run records never cleared');
+    }
+    // With the run gone the ordinary ordering returns: capacity first, and once a slot is free the
+    // validation error surfaces, proving the busy pass suppressed nothing permanently.
+    const denied: Result = await next(f, ['build']);
+    expect(denied.code).not.toBe(0);
+    expect(denied.stderr).toContain('build');
   } finally {
     await f.clean();
   }
