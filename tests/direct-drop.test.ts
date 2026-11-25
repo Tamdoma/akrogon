@@ -1,6 +1,6 @@
 // Criterion 9: akrogon direct-drop <slug> --chart <chart folder> ends an unmerged direct attempt:
 // cancels its live runs, stops the leaf slice and run scopes, removes worktree and branch, moves the
-// owner folder to <chart>/direct/, and refuses the closed shapes without moving or removing anything.
+// owner folder to <chart>/direct/<owner>, and refuses the closed shapes without moving or removing anything.
 import { test, expect } from 'bun:test';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -10,6 +10,7 @@ import { cli, leaf, storeDir, type Fixture } from './helpers';
 import { adopt, hcFixture, stopCoresAfterFile, type HcFixture } from './hc-fixture';
 import { command, type Result } from '../src/shell';
 import { leafSlice } from '../src/scope';
+import { flockHold } from '../src/flock';
 
 stopCoresAfterFile();
 
@@ -236,8 +237,37 @@ test('direct-drop cancels the run, stops slice and scopes, removes worktree and 
     expect(enclosed.code).not.toBe(0);
     expect(enclosed.stderr).toContain(seeded.run);
     await expectUntouched(f, 'fix-alpha', worktree);
+    const drop = (): Promise<Result> => cli(f, ['direct-drop', 'fix-alpha', '--chart', chart.rel], f.root, f.env);
+    const phaseState: Raw = readStateRaw(leafPath);
+    const phaseLock = await flockHold(resolve(f.home, '.lock'), '-x');
+    const raced: Promise<Result> = drop();
+    try {
+      // Simulate the phase writer holding the lock across its eligibility read and state write.
+      expect(await Promise.race([raced.then(() => 'exited'), Bun.sleep(600).then(() => 'waiting')])).toBe('waiting');
+      writeFileSync(resolve(leafPath, 'state.yaml'), Bun.YAML.stringify({ ...phaseState, phase: 'merge' }));
+    } finally {
+      await phaseLock.release();
+      await raced;
+    }
+    expect((await raced).code).not.toBe(0);
+    expect((await raced).stderr).toContain('phase merge');
+    await expectUntouched(f, 'fix-alpha', worktree);
+    writeFileSync(resolve(leafPath, 'state.yaml'), Bun.YAML.stringify(phaseState));
+
     writeFileSync(f.core.shimLog, '');
-    const dropped: Result = await cli(f, ['direct-drop', 'fix-alpha', '--chart', chart.rel], f.root, f.env);
+    const captureLock = await flockHold(resolve(leafPath, '..', '.lock'), '-s');
+    const dropping: Promise<Result> = drop();
+    try {
+      // A capture holding the owner's shared lock can finish publishing before the move.
+      expect(await Promise.race([dropping.then(() => 'exited'), Bun.sleep(600).then(() => 'waiting')])).toBe('waiting');
+      const published: string = 'implementation/published-while-held.log';
+      writeFileSync(resolve(leafPath, published), published);
+      saved.push(published);
+    } finally {
+      await captureLock.release();
+      await dropping;
+    }
+    const dropped: Result = await dropping;
     expect(dropped.code, dropped.stderr).toBe(0);
     // The drop's own hc calls, captured before the status read, which probes sessions of its own.
     const dropCalls: string[] = shimLines(f);

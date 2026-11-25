@@ -517,6 +517,9 @@ test.each(['turn ended', 'reviewer gone'] as const)('a cross-session broadcast h
     expect(sliceStops(f).some((line) => line.includes(sliceOf(f, 'fix-alpha')))).toBe(true);
     expect(readState(closed).phase).toBe('merged');
     expect(existsSync(resolve(f.root, 'issues/closed/chart-x/fix-alpha/state.yaml'))).toBe(true);
+    const settledTable: Result = await cli(f, ['status'], f.root, f.env);
+    expect(settledTable.code, settledTable.stderr).toBe(0);
+    expect(settledTable.stdout).not.toContain('fix-alpha');
     expect((await command(['git', 'branch', '--list', 'fix-alpha'], f.root)).trim()).toBe('');
     // B is a shared terminal: the sweep never ends it.
     if (end === 'turn ended') expect((await reviewer.get(held.address)).state).toBe('live');
