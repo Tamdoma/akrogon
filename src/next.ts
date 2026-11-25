@@ -407,7 +407,7 @@ async function ensureWorktree(repo: Repo, leaf: Leaf, live: boolean): Promise<St
           if (present) {
             const row: { locked: string | false } | undefined = [
               ...(await registeredWorktrees(repo.root)).entries(),
-            ].find(([p]) => realpathSync(p) === realpathSync(path))?.[1];
+            ].find(([p]) => canonicalPath(p) === canonicalPath(path))?.[1];
             const locked: boolean = row !== undefined && row.locked !== false;
             const unlock: string = `git worktree unlock ${quote(path)}`;
             const verdict: { ok: true } | { ok: false; reason: string } = await worktreeRemovable(repo, path);
