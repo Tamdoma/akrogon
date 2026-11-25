@@ -16,14 +16,13 @@ While the watcher is busy, the timer keeps the latest unsent tick. That tick run
 
 ## What each check does
 
-![The watch loop: a 20-minute timer reads status, stops if the repository is paused, then either acts within allowed steps or reports, and notifies you.](../pictures/watch-loop.svg)
+![The watch loop: every 20 minutes the watch runs observe once for pause state and open leaves. It reports a pause or read error without acting. Otherwise it acts within allowed steps or reports, and notifies you.](../pictures/watch-loop.svg)
 
-1. It runs `akrogon status`. If the repository is paused with `akrogon pause`, the check does nothing else.
-2. It reads each open leaf's phase, seats and failure record.
-3. It starts leaves that wait on an idle seat with `akrogon next <slug>`, or `akrogon next --all` when several wait. It leaves a leaf alone while a leaf it is blocked by is not merged.
-4. It retries a failed leaf at the phase where it failed with `akrogon phase <slug> <phase>` and `akrogon next <slug>`. It does this only when the leaf's seats are idle, and it gives up after two retries in a row that fail again.
-5. It reads a busy seat's log and screen. If the seat repeats the same failing step, or works outside its brief, the check stops it once and sends one correcting prompt. A slow command alone is not a reason to step in.
-6. It sends a notice that herdr-app shows as a toast when a leaf needs you, then replies with a few lines on what it saw and did.
+1. It runs `observe.ts` once for the repository's pause state and each open leaf's phase, seats and failure record. It reports and stops if the repository is paused with `akrogon pause` or the read fails.
+2. It starts leaves that wait on an idle seat with `akrogon next <slug>`, or `akrogon next --all` when several wait. It leaves a leaf alone while a leaf it is blocked by is not merged.
+3. It retries a failed leaf at the phase where it failed with `akrogon phase <slug> <phase>` and `akrogon next <slug>`. It does this only when the leaf's seats are idle, and it gives up after two retries in a row that fail again.
+4. It reads a busy seat's log and screen. If the seat repeats the same failing step, or works outside its brief, the check stops it once and sends one correcting prompt. A slow command alone is not a reason to step in.
+5. It sends a notice that herdr-app shows as a toast when a leaf needs you, then replies with a few lines on what it saw and did.
 
 ## What stays yours
 

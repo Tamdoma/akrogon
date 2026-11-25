@@ -22,8 +22,8 @@
   <line class="edge" x1="280" y1="80" x2="280" y2="106" marker-end="url(#arrow)"/>
 
   <rect class="node" x="80" y="110" width="400" height="76" rx="8"/>
-  <text x="280" y="142">read status</text>
-  <text x="280" y="166">(stop if the repo is paused)</text>
+  <text x="280" y="142">run observe for pause and leaves</text>
+  <text x="280" y="166">(act only on an unpaused read)</text>
 
   <line class="edge" x1="200" y1="186" x2="170" y2="226" marker-end="url(#arrow)"/>
   <line class="edge" x1="400" y1="186" x2="430" y2="226" marker-end="url(#arrow)"/>
