@@ -119,7 +119,9 @@ async function directWorktree(f: Fixture, slug: string): Promise<string> {
   const worktree: string = resolve(storeDir(f), slug);
   mkdirSync(storeDir(f), { recursive: true });
   await command(['git', 'worktree', 'add', '-b', slug, worktree, 'origin/main'], f.root);
-  writeFileSync(resolve(worktree, 'direct-file'), 'direct work\n');
+  // Unique per slug: a second leaf branching off the first land's tip (the lifecycle control in
+  // the no-target test) rewrites the same file, and identical bytes leave nothing to commit.
+  writeFileSync(resolve(worktree, 'direct-file'), 'direct work ' + slug + '\n');
   await command(['git', 'add', 'direct-file'], worktree);
   await command(['git', 'commit', '-m', 'direct work'], worktree);
   return worktree;
