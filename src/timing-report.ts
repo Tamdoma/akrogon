@@ -7,7 +7,16 @@ import { readLog, type LogRecord } from './log';
 import { originSource } from './pull';
 import { historicalSlots, type HistoricalPhase, type Slot } from './routing';
 import { retryCommand } from './shell';
-import { repoInventory, sourcePattern, type ForeignLeaf, type Inventory, type Leaf, type LeafFailure } from './state';
+import {
+  repoInventory,
+  sourcePattern,
+  type ForeignLeaf,
+  type Inventory,
+  type Leaf,
+  type LeafFailure,
+  type State,
+} from './state';
+import { leafStart } from './status';
 import { readTimings, waitReasonAt, type TimingEvent, type WaitReason } from './timing';
 
 // Gate bounds fixed by issues/chart/leaf-speed/forks/measure-and-revisit.md (operator 2026-10-12).
@@ -237,18 +246,17 @@ function visitLines(events: TimingEvent[], slug: string, visit: Visit, direct: b
 
 // The direct marker rides on the leaf state, so gap suppression reads the leaf inventory
 // across every area: a merged leaf already rests in closed (plan D12).
-function directSlugs(repo: Repo): Set<string> {
-  return new Set(
-    repoInventory(repo, ['open', 'closed', 'parked'])
-      .leaves.filter((leaf) => leaf.state.direct === true)
-      .map((leaf) => leaf.state.slug),
-  );
+function directStates(repo: Repo): Map<string, State> {
+  const direct = new Map<string, State>();
+  for (const { state } of repoInventory(repo, ['open', 'closed', 'parked']).leaves)
+    if (state.direct === true) direct.set(state.slug, state);
+  return direct;
 }
 
 function slugReport(repo: Repo, slug: string): void {
   const timings: TimingEvent[] = readTimings(repo.root);
   const log: LogRecord[] = readLog(repo.root);
-  const direct: boolean = directSlugs(repo).has(slug);
+  const direct: boolean = directStates(repo).has(slug);
   console.log(
     visitsOf(slug, timings, log)
       .flatMap((visit) => visitLines(timings, slug, visit, direct))
@@ -353,33 +361,38 @@ function verdict(members: Member[], ejections: number): 'pass' | 'fail' | 'insuf
 function cohortReport(repo: Repo, since: string): void {
   const timings: TimingEvent[] = readTimings(repo.root);
   const log: LogRecord[] = readLog(repo.root);
-  const firstPlan = new Map<string, number>();
+  const direct: Map<string, State> = directStates(repo);
+  const cutoff: number = ms(since);
+  const joinedAt = new Map<string, number>();
   for (const event of timings)
     if (
       event.kind === 'prompt' &&
       event.outcome === 'delivered' &&
       event.phase.startsWith('plan.') &&
-      ms(event.ts) > ms(since)
+      !direct.has(event.slug) &&
+      ms(event.ts) > cutoff
     ) {
-      const seen: number | undefined = firstPlan.get(event.slug);
-      if (seen === undefined || ms(event.ts) < seen) firstPlan.set(event.slug, ms(event.ts));
+      const seen: number | undefined = joinedAt.get(event.slug);
+      if (seen === undefined || ms(event.ts) < seen) joinedAt.set(event.slug, ms(event.ts));
     }
-  const joiners: string[] = [...firstPlan.entries()]
+  for (const [slug, state] of direct) {
+    const created: number = leafStart(state, joinedAt)!;
+    if (created > cutoff) joinedAt.set(slug, created);
+  }
+  const joiners: [string, number][] = [...joinedAt]
     .filter(([slug]) => {
       const exit: Move | undefined = movesOf(log, slug).find((record) => record.from === 'implement');
       return exit === undefined || diffLines(exit.diff) <= IMPLEMENT_DIFF_LIMIT;
     })
     .sort((a, b) => a[1] - b[1])
-    .slice(0, COHORT_SIZE)
-    .map(([slug]) => slug);
-  const memberSet: Set<string> = new Set(joiners);
+    .slice(0, COHORT_SIZE);
+  const memberSet: Set<string> = new Set(joiners.map(([slug]) => slug));
   const ejections: number = readAttempts(repo.root)
     .filter((attempt) => attempt.outcome === 'ejected' || attempt.outcome === 'red')
     .filter((attempt) => memberSet.has(attempt.holder)).length;
   const now: number = Date.now();
-  const direct: Set<string> = directSlugs(repo);
-  const members: Member[] = joiners.map((slug) =>
-    memberOf(slug, firstPlan.get(slug)!, timings, log, now, direct.has(slug)),
+  const members: Member[] = joiners.map(([slug, joined]) =>
+    memberOf(slug, joined, timings, log, now, direct.has(slug)),
   );
   console.log(verdict(members, ejections));
   for (const member of members) console.log(memberLine(member));
