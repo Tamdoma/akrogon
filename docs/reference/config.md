@@ -79,7 +79,7 @@ Each registered checkout has `issues/config.yaml`. The [init-akrogon skill](../.
 
 Checks run on every leaf, while merge checks run only when a leaf lands.
 
-Environment variable names in `env` and `pass_env` use capital letters, digits and `_`. A few names akrogon sets itself, such as `TMPDIR`, `AKROGON_BASE` and `AKROGON_EVIDENCE`, are refused. So are `AKROGON_SESSIONS` and `AKROGON_SESSION_MINUTES`, because a paid test's budget is passed in its command, never stored in a repo file.
+Environment variable names in `env` and `pass_env` use capital letters, digits and `_`. A few names akrogon sets itself, such as `TMPDIR`, `AKROGON_BASE` and `AKROGON_EVIDENCE`, are refused. So are `AKROGON_SESSIONS` and `AKROGON_SESSION_MINUTES`, because a paid test's budget is passed in its command, never stored in a repo file. `DISPLAY`, `XAUTHORITY`, `WAYLAND_DISPLAY` and `XDG_RUNTIME_DIR` reach check commands without being listed in `pass_env`, and listing them stays valid.
 
 ```yaml
 remote: origin
