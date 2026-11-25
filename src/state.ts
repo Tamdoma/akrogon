@@ -218,6 +218,60 @@ export function saveState(path: string, state: State): void {
   chmodSync(file, 0o444);
 }
 
+// Schema validation for a caller constructing a state: parsing is state.ts's own job, so modules
+// building a first state.yaml go through this instead of touching the schema.
+export function parseLeafState(data: unknown): State {
+  return stateSchema.parse(data);
+}
+
+// The folders <owner>/<slug> under issues/open and issues/closed, depth two exactly, matched by
+// directory name whether or not they hold a state yet: a direct leaf is always its owner's direct
+// child, and the create verb's scan runs before any state exists.
+export function slugLeafFolders(repo: Pick<Repo, 'root'>, slug: string): string[] {
+  const found: string[] = [];
+  for (const area of ['open', 'closed']) {
+    const root: string = resolve(repo.root, 'issues', area);
+    if (!existsSync(root)) continue;
+    for (const owner of readdirSync(root)) {
+      const candidate: string = resolve(root, owner, slug);
+      if (statSync(candidate, { throwIfNoEntry: false })?.isDirectory() === true) found.push(candidate);
+    }
+  }
+  return found;
+}
+
+// The raw direct marker of an existing state.yaml: the one check the direct verb's rerun scan
+// needs before deciding the rewrite, read here so no other module parses leaf state.
+export function hasDirectMarker(leafPath: string): boolean {
+  const raw: Record<string, unknown> = z
+    .record(z.string(), z.unknown())
+    .parse(Bun.YAML.parse(readFileSync(resolve(leafPath, 'state.yaml'), 'utf8')));
+  return raw.direct === true;
+}
+
+// The direct verb's rerun rewrite: byte-preserving, so it never round-trips through the schema,
+// which would materialize defaults and reorder content. Only the two seat refs change, plus a
+// changed slot's delivery_error key drops.
+export function rewriteSeatRefs(leafPath: string, caller: SeatRef, reviewer: SeatRef): void {
+  const file: string = resolve(leafPath, 'state.yaml');
+  const raw: Record<string, unknown> = z
+    .record(z.string(), z.unknown())
+    .parse(Bun.YAML.parse(readFileSync(file, 'utf8')));
+  const oldRefs = z.object({ A: z.unknown().optional(), B: z.unknown().optional() }).parse(raw.seat);
+  const changed = (slot: 'A' | 'B', next: SeatRef): boolean => {
+    const old = seatRefSchema.safeParse(oldRefs[slot]);
+    return !old.success || old.data.session !== next.session || old.data.address !== next.address;
+  };
+  raw.seat = { A: caller, B: reviewer };
+  if (typeof raw.delivery_error === 'object' && raw.delivery_error !== null) {
+    const errors: Record<string, unknown> = raw.delivery_error as Record<string, unknown>;
+    if (changed('A', caller)) delete errors.A;
+    if (changed('B', reviewer)) delete errors.B;
+  }
+  writeYaml(file, raw);
+  chmodSync(file, 0o444);
+}
+
 export function validateLeafDepth(areaRoot: string, leafPath: string): void {
   const depth: number = relative(areaRoot, leafPath).split(sep).filter(Boolean).length;
   z.number()

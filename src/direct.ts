@@ -2,14 +2,24 @@
 // charting terminal itself (the door) with the reviewer as seat B: no tab, no seats started, no
 // setup run. Every refusal of the create flow runs before any write; a rerun on an existing direct
 // leaf rewrites only the two seat refs.
-import { chmodSync, existsSync, readdirSync, readFileSync, realpathSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, realpathSync, renameSync, statSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
-import { z } from 'zod';
 import { readGlobal, requireRepo, ensureLeafTemp, within, worktreeStore, type Repo } from './config';
 import { HcError, sessions, terminal } from './hc';
 import { checkBase } from './preflight';
-import { command, writeYaml } from './shell';
-import { findLeaf, leafFolders, saveState, seatRefSchema, stateSchema, worktreeLock, withLock, type SeatRef } from './state';
+import { command } from './shell';
+import {
+  findLeaf,
+  hasDirectMarker,
+  leafFolders,
+  parseLeafState,
+  rewriteSeatRefs,
+  saveState,
+  slugLeafFolders,
+  worktreeLock,
+  withLock,
+  type SeatRef,
+} from './state';
 import { createSparseWorktree, writeLeafEnv } from './next';
 import { stopLeafWork } from './stop';
 
@@ -28,46 +38,9 @@ async function probeExactlyOne(address: string, label: string): Promise<SeatRef>
   }
   if (hits.length === 1) return hits[0];
   if (hits.length === 0) throw new Error(`${label}: no live session holds that terminal`);
-  throw new Error(`${label}: the terminal resolves in ${hits.length} live sessions (${hits.map((hit) => hit.session).join(', ')})`);
-}
-
-// The folders <owner>/<slug> under issues/open and issues/closed, depth two exactly: a direct
-// leaf is always its owner's direct child.
-function slugLeafFolders(repo: Repo, slug: string): string[] {
-  const found: string[] = [];
-  for (const area of ['open', 'closed']) {
-    const root: string = resolve(repo.root, 'issues', area);
-    if (!existsSync(root)) continue;
-    for (const owner of readdirSync(root)) {
-      const candidate: string = resolve(root, owner, slug);
-      if (statSync(candidate, { throwIfNoEntry: false })?.isDirectory() === true) found.push(candidate);
-    }
-  }
-  return found;
-}
-
-// Raw state.yaml read for the rerun: the rewrite byte-preserves every key it does not touch, so it
-// never round-trips through the schema, which would materialize defaults and reorder content.
-function readRawState(file: string): Record<string, unknown> {
-  return z.record(z.string(), z.unknown()).parse(Bun.YAML.parse(readFileSync(file, 'utf8')));
-}
-
-function rewriteSeats(leafPath: string, caller: SeatRef, reviewer: SeatRef): void {
-  const file: string = resolve(leafPath, 'state.yaml');
-  const raw: Record<string, unknown> = readRawState(file);
-  const oldRefs = z.object({ A: z.unknown().optional(), B: z.unknown().optional() }).parse(raw.seat);
-  const changed = (slot: 'A' | 'B', next: SeatRef): boolean => {
-    const old = seatRefSchema.safeParse(oldRefs[slot]);
-    return !old.success || old.data.session !== next.session || old.data.address !== next.address;
-  };
-  raw.seat = { A: caller, B: reviewer };
-  if (typeof raw.delivery_error === 'object' && raw.delivery_error !== null) {
-    const errors: Record<string, unknown> = raw.delivery_error as Record<string, unknown>;
-    if (changed('A', caller)) delete errors.A;
-    if (changed('B', reviewer)) delete errors.B;
-  }
-  writeYaml(file, raw);
-  chmodSync(file, 0o444);
+  throw new Error(
+    `${label}: the terminal resolves in ${hits.length} live sessions (${hits.map((hit) => hit.session).join(', ')})`,
+  );
 }
 
 export async function directCommand(
@@ -87,9 +60,9 @@ export async function directCommand(
   const leafPath: string = folders[0];
   const stateFile: string = resolve(leafPath, 'state.yaml');
   if (existsSync(stateFile)) {
-    if (readRawState(stateFile).direct !== true) throw new Error(`${slug} is not a direct leaf`);
+    if (!hasDirectMarker(leafPath)) throw new Error(`${slug} is not a direct leaf`);
     const reviewer: SeatRef = await probeExactlyOne(reviewerAddress, `the reviewer address ${reviewerAddress}`);
-    rewriteSeats(leafPath, caller, reviewer);
+    rewriteSeatRefs(leafPath, caller, reviewer);
     console.log(`leaf: ${realpathSync(leafPath)}`);
     return;
   }
@@ -115,7 +88,7 @@ export async function directCommand(
     ensureLeafTemp(repo, slug);
     saveState(
       leafPath,
-      stateSchema.parse({
+      parseLeafState({
         slug,
         phase: 'implement',
         created: new Date().toISOString(),
