@@ -1,12 +1,11 @@
 slug: shell-sweep
-phase: check.fix
+phase: failed
 created: 2026-11-25
 repo: akrogon
 blocked-by: []
 sources:
   - "Tamdoma/akrogon#157"
-busy_since:
-  A: 2026-11-25T06:43:50.377Z
+busy_since: {}
 busy_notified: {}
 blocked_notified: {}
 attempts:
@@ -18,8 +17,6 @@ lost:
 done: []
 fix_rounds: 5
 verdict: {}
-tab: ak90572cd2732f5ba7ddf991afd767f7
-worktree: /home/ivan/.akrogon/worktrees/akrogon/shell-sweep
 env_names: []
 env_generation: 0
 pane: {}
@@ -30,12 +27,15 @@ seat:
   B:
     session: infra
     address: t3ns
-prompted:
-  A:
-    turn: 7
-    address: t3mw
+prompted: {}
 prompted_at: {}
 delivery_error: {}
+failure:
+  cause: blocked
+  phase: check.fix
+  slot: A
+  reason: "superseded by re-chart seat-shell-kill/tool-cgroup-kill (operator 1a 2a, 2026-11-25); work kept on branch shell-sweep"
+  delivery: shown
 frozen:
   tests/hc-shim.sh: b6fd3d4e46b2c2a47e864013093d30b52aa6835c
   tests/seat-recovery.test.ts: 2aef252d84c5d58927d0ddd46b3ad328f6ea213b

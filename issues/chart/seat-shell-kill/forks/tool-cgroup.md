@@ -46,20 +46,65 @@ Map: slots/map-merged.md. Notes: slots/tool-cgroup-{A,B,C,D}.md, merged slots/to
 - F8 Final-shape checks. An exited, unreaped shell keeps `/proc/<pid>/stat` with its start time in state `Z` (C Probe A). Bun exits 1 on `EPIPE` when stdout's reader is gone (C Probe B). `cgroup.events` `populated` is hierarchical, so a parent reads 1 while only a child holds a process (C Probe C).
 - Convergence after rebuttals: every slot holds Q1 per-shell cgroups (B and D add the deferred caller kill, C keeps pure a and rejects b on F4), Q2 a, Q3 per kind without a `BASH_ENV` base layer (D withdrew it), `Delegate=yes`, uniform width, and enumeration.
 
+## Charting proofs
+
+All on this host 2026-11-25: kernel 7.2.15-5-omarchy, systemd 262, cgroup2fs, GNU bash 5.3.20, hc 0.1.22. Identity: local user ivan, plus the operator's logged-in harness accounts for paid runs. Paid runs went through `akrogon run-check --holder /home/ivan/Work/infra/akrogon/issues/chart/seat-shell-kill/direct` under standing grant 3b. The budget was `timeout 200` per harness inside direct/probe-entry/probe.sh and one short prompt with one shell tool call, because one tool call reaches the property.
+
+- E-free kill and placement (free, own throwaway user scopes, all stopped and verified gone): B P-a to P-d, C Obs 1-6, D E1 to E6, N1 to N5, R1, R2 (slots/map-{B,C,D}.md, slots/tool-cgroup-{B,C,D}.md, slots/tool-cgroup-rebuttal-D.md). They show:
+  - `cgroup.kill` of a child cgroup ends a forking tree and its `setsid` orphans, and leaves siblings alone.
+  - Kill on an empty cgroup succeeds. A killed empty dir rmdirs, a populated one gives EBUSY.
+  - The self-kill and self-freeze hazards.
+  - Child cgroups and moves work with and without `Delegate=yes`, and `set-property` on a live scope leaves a populated child alone.
+  - `systemctl stop` removes hand-made child cgroups.
+  - `BASH_ENV` fires for `bash -c`, `-lc` and `-l -c`, not for `/bin/sh -c`.
+  - A detached helper in a sibling cgroup waits on pid plus start time, then kills.
+  - Limits: no manager reload or reexec.
+- E-free zombie, EPIPE, populated (free): C Probe A (an unreaped child keeps `/proc/<pid>/stat` with its start time in state Z), Probe B (Bun exits 1 on `EPIPE` to a closed stdout reader), Probe C (`populated` is hierarchical) (slots/tool-cgroup-final-check-C.md, -final-check2-C.md). Cleanup: reaped, removed and checked by C. Limits: one kernel, one Bun.
+- E-free entry self-test (free, A):
+  - Command: `systemd-run --user --scope --unit=probeA-entry-<pid>`, then `BASH_ENV=direct/probe-entry/place.sh bash -c` with a nested `bash -c`, `direct/probe-entry/shim/bash -c`, and `/bin/sh -c`.
+  - Result: the `BASH_ENV` shell and the wrapper shell each landed in their own `tools/t-<pid>-<start>`, the nested bash stayed in its parent's `t-`, and `/bin/sh -c` stayed at the root.
+  - Cleanup: kill, rmdir, and the unit was gone (`list-units` 0).
+  - Limits: probe entry script, not the leaf's asset.
+- P-entry-claude (paid): run `check probeA-entry-claude: 0`, log direct/check-probeA-entry-claude-1795595618250-878058.log.
+  - claude 2.1.332, `claude -p --model haiku --effort low --dangerously-skip-permissions`, env `CLAUDE_CODE_SHELL=<probe-entry>/shim/bash CLAUDE_CODE_TOOL_MEMORY_LIMIT=none`, marker set to the run scope root.
+  - Prompt: one command `(sleep 150 >/dev/null 2>&1 &); sleep 3; cat /proc/$$/cgroup`.
+  - Result: the wrapper ran the tool command, its shell was placed in `tools/t-878395-7055064`, and 3 s later the shell still read that `t-` (no late attach with the memory limit off). After claude exited, the `t-` held the orphan `sleep` (populated 1). One `tools/cgroup.kill` left populated 0. The snapshot shells were placed in their own `t-` dirs and had exited.
+  - Cleanup: tools removed, run scope ended by run-check.
+  - Limits: print mode, not an interactive seat; the marker named the run scope root instead of a seat scope root; claude without the memory-limit setting was not compared.
+- P-entry-codex (paid): run `check probeA-entry-codex: 0`, log direct/check-probeA-entry-codex-1795595634720-878605.log.
+  - codex-cli 0.172.0 `exec --skip-git-repo-check -m gpt-6.2-sol -c model_reasoning_effort=low -s danger-full-access` (the seat sandbox), env `BASH_ENV=<probe-entry>/place.sh`.
+  - Result: codex ran `/usr/bin/bash -lc '<command>'`, and the tool command printed its own shell's cgroup as `tools/t-878666-7055686`.
+  - Cleanup: tools removed by the driver, run scope ended.
+  - Limits: exec mode, not an interactive seat. The driver's post-run listing was cut from the captured tail, so the tool command's own output is the observation.
+- P-entry-pi (paid): run `27877497-e515-4da9-907b-324fb3ae676f` (`check probeA-entry-pi: 0`), log direct/check-probeA-entry-pi-1795595656644-879868.log.
+  - pi 1.6.0 `-p --model devin/swe-2-1-max --thinking low`, env `BASH_ENV=<probe-entry>/place.sh`.
+  - Result: the tool shell was placed in `tools/t-881459-7058825` and printed it. After pi exited, that `t-` held the orphan `sleep` (populated 1). The kill left populated 0.
+  - Cleanup: tools removed, run scope ended.
+  - Limits: print mode.
+- P-entry-agy (paid): run `21af38f1-635e-436d-907d-19d9f3d4da24` (`check probeA-entry-agy5: 0`), log direct/check-probeA-entry-agy5-1795595725424-888875.log.
+  - agy 1.5.16 `--model "Gemini 3.8 Flash (Low)" --dangerously-skip-permissions -p`, env `PATH=<probe-entry>/shim:$PATH` plus `DBUS_SESSION_BUS_ADDRESS` and `XDG_RUNTIME_DIR` (run-check strips them, and agy needs them for its login).
+  - Result: agy ran `bash -c '<command>'` through the PATH wrapper, which placed it in `tools/t-889362-7065692`, and the tool command printed that `t-`. After agy exited, the `t-` was empty (agy ended the orphan itself).
+  - Earlier attempts ran no tool, so they give no conclusion: agy, agy2, agy3 and agy4 failed on my flag order and model names (`-p` swallowed `--model`; `neon` and `--effort` are not accepted in print mode). D's P-agy (OAuth without the bus) also gave none.
+  - Cleanup: tools removed, run scope ended.
+  - Limits: print mode with a different model than the seat's `neon`; agy's own cleanup of tool process groups was not studied.
+- Carried (context): issues/chart/seat-turn-idle/forks/shell-sweep.md `## Charting proofs` P1 and P1b (claude flips to `done` when its background shell dies by TERM or SIGKILL), P2 (hc keep recovery shapes), P3 (codex direct helpers).
+
 ## Taken
 
-A's autopilot pick, 2026-11-25. Not operator words. Revised after the final-shape check (slots/tool-cgroup-final-check-{B,C,D}.md); the revision is marked [R] and goes to a second check.
+A's autopilot pick, 2026-11-25. Not operator words. Revised after the final-shape check (slots/tool-cgroup-final-check-{B,C,D}.md), marked [R], and again after the second check (slots/tool-cgroup-final-check2-{B,C,D}.md), marked [R2]. The [R2] lines adopt the checkers' own fixes for placement and cleanup and add no mechanism, so no third check runs.
 
 - Q1 a, with deferred kills for tool shells that have an akrogon call in flight.
   - Each top-level tool shell gets its own `<seat scope>/tools/t-<pid>-<starttime>`.
-  - [R] Every akrogon process relocates (Q2) into `<seat scope>/akrogon/<t-name>/`, named after the `t-` it started in, or after the inherited `t-` env marker when it starts in an `akrogon/` dir (an akrogon started by akrogon).
+  - [R] Every akrogon process except the helper relocates (Q2) into `<seat scope>/akrogon/<t-name>/`, creating it if absent. The name is the `t-` it started in, or the inherited `t-` env marker when it starts in an `akrogon/` dir (an akrogon started by akrogon).
   - [R] commitMove, after the move is saved, enumerates the moved leaf's seat scopes (Q6). For each `t-`:
     - if `akrogon/<t-name>` is unpopulated, it writes `t-/cgroup.kill` now.
-    - if it is populated (an akrogon call from that tool shell is in flight, the caller's or a concurrent sibling seat's), it spawns one detached helper inside `akrogon/<t-name>/helper/`, unless that directory is already populated, that waits, with no timeout, for the tool shell (pid plus start time from the `t-` name) to end, then writes `t-/cgroup.kill` and removes the `t-` best effort.
+    - if it is populated (an akrogon call from that tool shell is in flight, the caller's or a concurrent sibling seat's), it spawns one detached helper, unless [R2] `<seat scope>/helpers/<t-name>/` is already populated, that waits, with no timeout, for the tool shell (pid plus start time from the `t-` name) to end, then writes `t-/cgroup.kill` and removes the `t-` best effort.
+    - [R2] The helper lives in the sibling `helpers/<t-name>/`, never under `akrogon/<t-name>/`, because `populated` counts descendants (F8). commitMove creates that directory and writes the helper's pid into it before it returns, under the home lock, so the next commit's test is exact (C, D second checks).
     - "Ended" means `/proc/<pid>/stat` absent, start time changed, or state `Z` or `X` (C D2: a harness reading stdout to EOF before reaping leaves the shell a zombie).
   - [R] The helper is an akrogon subcommand with stdin, stdout and stderr on `/dev/null`, its own session and no handle held by its parent (C M1: an inherited pipe deadlocks the tool call). It reads `/proc` through the existing proc-root boundary and appends its own timing row (Reporting). At most one helper waits per `t-`.
+  - [R2] The helper is exempt from Q2 relocation and is spawned without the `t-` env marker. It takes the repo, leaf and `t-` path as arguments and skips the state-home migration step (B, C second checks).
   - A move from outside any seat (operator, merge) finds no populated `akrogon/<t-name>` of its own, so it behaves the same way: it kills now or defers per `t-`.
-  - Killed empty `t-` dirs are removed best effort. A kill, rmdir or spawn failure warns with structured fields and never fails the committed move.
+  - Killed empty `t-` dirs are removed best effort. [R2] commitMove also removes, best effort, every unpopulated `akrogon/<t-name>/` and `helpers/<t-name>/` whose `t-` is gone (B, C, D second checks). A kill, rmdir or spawn failure warns with structured fields and never fails the committed move.
   - Reason:
     - The operator sentence is "Leftover seat shells end when the leaf's phase advances" (seed decision). Pure a leaves the caller's same-command child alive, and F3 shows that child stalls delivery exactly like the incident when the same seat owes the next phase.
     - [R] Deciding by `akrogon/<t-name>` population removes the caller-identity question as a class. Concurrent sibling phase calls at check.review (B check), akrogon-from-akrogon chains (D check 4a) and cross-leaf callers (C D1, D check 4b) all fall out. A cross-leaf caller's `t-` is never in the moved leaf's scopes. The read is the kernel's `populated` flag on a directory akrogon minted, not a process census.
@@ -86,7 +131,7 @@ A's autopilot pick, 2026-11-25. Not operator words. Revised after the final-shap
   - Placement acts only when the current cgroup is exactly the seat scope root named by an akrogon env marker set by `startSeat`. It then mints the `t-`, moves in and exports the `t-` path. Anywhere else it does nothing. It discards its own output and never fails the shell.
   - Reason: these are the observed entry channels (F5). `BASH_ENV` on claude would place hooks and MCP children (F5). claude's own tool cgroup must be off or it can pull shells out of `tools/` (F5).
   - Rejected b (`BASH_ENV` only): it does not reach agy's PATH spawn and widens claude's kill set. Rejected c (`CLAUDE_CODE_SHELL_PREFIX`): it wraps stdio MCP launches.
-- [R] Seat bootstrap. `startSeat` creates `<seat scope>/tools/` and `<seat scope>/akrogon/` before the harness can run a tool, and a failure fails the start (C M3a, D check 3). Q6 then sees every seat scope even when entry never fires.
+- [R] Seat bootstrap. `startSeat` creates `<seat scope>/tools/`, `akrogon/` and [R2] `helpers/` once the scope-entry proof sees the harness inside the scope, and a failure fails the start (C M3a, D check 3). Q6 then sees every seat scope even when entry never fires. [R2] The entry also creates `tools/` if absent before minting, so a first tool shell that beats bootstrap is still placed (D second check).
 - Q4 `-p Delegate=yes` on the seat scope.
   - Reason: F6. The only failure it guards against is silent, and the flag costs nothing observed.
   - Rejected none: B's loud-failure premise does not hold under a never-fail entry (B and D rebuttals).
@@ -97,7 +142,7 @@ A's autopilot pick, 2026-11-25. Not operator words. Revised after the final-shap
   - Reason: no state schema change, which keeps rollback safe (F7). No hc call or harness liveness is needed. It cannot race seat creation under the home lock (F7). The `tools/` filter needs no unit-name pattern. Slot attribution for reporting may parse the unit name, never for selection.
   - Rejected: a recorded unit field (F7 rollback hazard), and hc harness-pid resolution (fails when the harness is dead).
 - Reporting [R]:
-  - Every commitMove appends one timing row per enumerated seat scope: leaf, unit, the `t-` dirs that read populated before the write (report only, never acted on), the deferred `t-` dirs and errors. A scope that keeps showing zero `t-` dirs while its seat works is the visible sign that entry stopped firing (C D3, D check 2).
+  - Every commitMove appends one timing row per enumerated seat scope: leaf, unit, [R2] the count of `t-` dirs seen, the `t-` dirs that read populated before the write (report only, never acted on), the deferred `t-` dirs and errors. A scope that keeps showing zero `t-` dirs seen while its seat works is the visible sign that entry stopped firing (C D3, D check 2).
   - Each helper appends one row when it writes or fails.
 - Recovered bare-shell seat (issues/chart/seat-turn-idle/forks/shell-sweep.md Taken Q3 a with its final-shape correction, uncontested by review-B):
   - A seat terminal is lost when it is `live` with `status` null and either shape holds.
@@ -109,4 +154,10 @@ A's autopilot pick, 2026-11-25. Not operator words. Revised after the final-shap
   - Shells the entry misses (`/bin/sh -c`, a non-bash login shell for codex, a harness update that changes its spawn) escape until leaf close. The timing row shows it.
   - Seats started before the leaf lands have no env marker and stay unplaced until replaced (B check).
   - [R] An akrogon process caught by a kill before it relocates (it spawned during another commit's write) dies with its tool shell. It has published nothing, and the harness reports a killed call.
-  - agy entry is unobserved end to end (P-agy blocked on OAuth). The gate fails safe, so an agy miss keeps pre-leaf behaviour. The first real agy seat after landing settles it.
+  - Entry is observed in print mode for all four harnesses (Charting proofs P-entry-*), not in interactive seats. The gate fails safe, so a miss in a live seat keeps pre-leaf behaviour and shows in the timing row.
+
+### Final-shape checks, 2026-11-25
+
+- Check 1 (slots/tool-cgroup-final-check-{B,C,D}.md): all three found defects. Adopted into [R]: concurrent sibling phase calls (B), caller identity across chains and leaves (C D1, D 4), zombie shells (C D2), helper stdio (C M1), run-check publish order and `EPIPE` (C M2), entry forms and atomic refresh (C M3, D 5), bootstrap (C M3a, D 3), reporting (C D3, D 2), the bare-shell `argv` guard (C D4, D 1), and B's reason-line correction.
+- Check 2 (slots/tool-cgroup-final-check2-{B,C,D}.md): helper placement, relocation exemption, directory creators and cleanup, and the seen count. All were adopted as [R2], using the checkers' own fixes. B cleared the population rule against the concurrent-caller case.
+- Leaf review (slots/leaf-review-{B,C,D}.md): B, C and D reviewed the draft as implementers. Every item was adopted into the leaf, tagged, except D7 (the helper moving itself), which would reopen the window closed in check 2. Verified while reviewing (B): `scopeEntry` suffix match, the `observeBusy` clear, the bare-shell turn ordering, and the hc 0.1.22 fields.

@@ -62,3 +62,56 @@ Reviewed base `8d0df9dd2cc0274401346de5fb89ccc48174f570`, prior reviewed head `7
 - Criteria 2 and 3 ran with the planned test filters in `check-check-repair-c2-1795594829095-4025003.log` and `check-check-repair-c3-1795594829655-4026295.log`. Ran the planned criterion 1, 4 and 5 filters on the reviewed head to fill the individual-command evidence gap. `check-first-alloc-c1-1795595224276-824621.log`, `check-first-alloc-c4-1795595224265-824620.log`, and `check-first-alloc-c5-1795595223917-824622.log` passed 4, 2 and 1 cases respectively. Criterion 6 inputs stayed unchanged.
 - `akrogon verify` receipt `e14b40c4-7445-476e-83c8-e6163ea9ab23` is green for the reviewed head. The full test log `check-test-1795595058575-4027741.log` reports 1,453 tests and 1,105 changed-file reruns, all passing. Setup, format and typecheck passed. No paid or covered operations.
 - `src/AREA.md` and its index and worktree config references were checked. The repository-root path listing confirms `src/next.ts`, `src/reconcile.ts`, and the index exist. F1 and F5 qualify the repaired reservation behavior described there.
+
+## check.repair — 2026-11-25 — round 2
+
+Reviewed handoff head `07261665df2ba8c7010c866ff964da389dcda8f7`. The three open fixes each pair a code change with a case missing from the existing acceptance tests. No branch files were edited and no operator action is open.
+
+For the repeated F1 reservation defect, the first repair covered the two rebase state directories. The source search found a single allocation reservation scan and no bisect handling or test. The native Git probe shows why replacing the worktree listing with `%(worktreepath)` or `git branch -vv` would still miss this state. Both lose the holder when bisect detaches HEAD, while `git worktree add --no-checkout` continues to refuse it. `check repair-b-native-reservation: 0 implementation/check-repair-b-native-reservation-1795595349835-855865.log`.
+
+### Handed to A
+
+- **F1** — Criterion 3. Repair the branch reservation check at its source. Add the existing dispatch fixture's active-bisect case with the branch behind tracking, and prove allocation names the holder, preserves the slug ref and leaves the bisect active. The existing rebase case already passes on the defective head. Red CLI evidence is in `check-recheck-b-worktree-reservations-1795595152001-796944.log`.
+- **F5** — Criterion 1. Match the store and Git's registered checkout by filesystem identity for both reservation and lock lookup. Add the default-store case with a symlinked `HOME`, and prove first allocation replaces the only checkout and advances the ref to tracking. The existing clean-leftover case uses a direct path and passes on the defective head. Red and previous-head green evidence are in `check-recheck-b-recovery-and-store-1795595198439-819449.log` and `check-recheck-b-store-baseline-1795595224307-824619.log`.
+- **F6** — Criterion 3. Remove the force-removal alternative from the active rebase refusal and keep the rebase recovery steps. The existing test only checks refusal and rebase presence, so it passes while the destructive command is offered. Add a regression check for the literal removal command on a paused rebase with an uncommitted edit. The disposable checkout and edit were deleted by the emitted command in `check-recheck-b-recovery-and-store-1795595198439-819449.log`.
+
+## check.review — 2026-11-25 — repair round 2
+
+Prior reviewed base `8d0df9dd2cc0274401346de5fb89ccc48174f570`, prior head `07261665df2ba8c7010c866ff964da389dcda8f7`. Reviewed base `2185ddfc1cc63c5ae4af3197b7ccd3619bcc322b`, head `f23eb8a254ae411b298111cde3f2e109637f1943`. Verdict `fix`.
+
+### Prior findings
+
+- **F1** — The active-bisect regression now refuses allocation and preserves the slug ref and store. The paused rebase regression remains green.
+- **F5** — The symlinked-home regression now replaces the only clean checkout and advances both HEAD and the slug ref to tracking. F8 is a separate regression in the new lock lookup.
+- **F6** — A paused rebase with an uncommitted edit now gets rebase recovery commands, with no force-removal command emitted.
+
+### Fixes introduced by the repair
+
+- **F7 — The rebase dropped the required lesson retirement and restored the retired DISPLAY lesson.** A rebased the leaf onto `2185ddfc`, which includes `5530b6c8` retiring `run-check drops DISPLAY`. The replay of `17953b9b` as `92265d1a` keeps `leaf worktree kept at a stale base` active despite its `Applied` history and adds the DISPLAY line back. The exact planned criterion 6 proof exits 1 because the stale-base line is still active. The DISPLAY restoration also undoes the base's retirement. Remove both active lines while preserving their history and the base's other lessons. Evidence is the lesson hunk in `check-recheck-b-round2-range-1795596146530-1831971.log`, the diff from the reviewed base and `check-first-alloc-c6-1795596191051-1852975.log`.
+- **F8 — A deleted, unrelated worktree can block first allocation.** An operator deletes an unrelated linked worktree directory before Git prunes its registration. Git still reports the path as `prunable`. When that row precedes the leaf's existing store checkout, the new lock lookup at `src/next.ts:408–410` calls `realpathSync` on the missing path and aborts with ENOENT. A real `akrogon next` probe with a configured store and this Git listing exited 1, leaving the clean leftover at its stale SHA. The same scenario on the rebased pre-repair commit `832d8afc` exited 0 and advanced to tracking. Criterion 1 requires replacement. Reuse the missing-path-safe identity comparison already used by the reservation scan so the lock lookup tolerates an unrelated stale registration. Both runs are in `check-recheck-b-prunable-worktree-1795596252221-1883385.log`.
+
+### Evidence and scope
+
+- `check recheck-b-round2-range: 0 implementation/check-recheck-b-round2-range-1795596146530-1831971.log` identifies the changed replay `92265d1a` and new commits `ed63ae45` and `f23eb8a2`. Other replayed leaf patches match their prior versions.
+- `check-check-repair2-tests-red2-1795595639585-880181.log` shows the three regression tests red. Their committed test blob is unchanged between `ed63ae45` and the reviewed head. `check-check-repair2-green3-1795595813908-911900.log` shows all 23 cases green post-rebase. Both trailers name `tests/first-allocation.test.ts` and cite the realistic operator actions from F1, F5 and F6. No previous test or assertion was removed.
+- Ran all six planned criterion commands on the reviewed head. Criteria 1–5 passed under the exact filters, with 5, 7, 8, 2 and 1 cases respectively. Kept logs are `check-first-alloc-c1-1795596191629-1852986.log`, `check-first-alloc-c2-1795596191546-1852977.log`, `check-first-alloc-c3-1795596191700-1852987.log`, `check-first-alloc-c4-1795596191611-1852988.log` and `check-first-alloc-c5-1795596191202-1852985.log`. Criterion 6 fails for the leaf-caused F7.
+- `akrogon verify` receipt `d0122021-c863-4ccf-94c3-44098c2dde7b` matches the reviewed head and base. Setup, format, typecheck and test passed. `check-test-1795596102583-916309.log` reports 1,464 passing tests and 1,120 passing changed-file reruns.
+- Checked `src/AREA.md`, its index and the `worktree_root` references. The repository-root listing confirms the changed source pointers exist. F8 qualifies the new filesystem-identity claim. No paid or covered operations.
+
+## check.repair — 2026-11-25 — round 3
+
+- **F7 repaired** in `e1aafe4f0bbd89b82d99a127d837892ed3cb955f`. The rebase replay had left the stale-base lesson active and re-added the DISPLAY lesson retired on main. The repair removes those two active entries and preserves both `Applied` history records. The cumulative lesson list diff against `2185ddfc` now contains only the stale-base removal. Criterion 6 went from `check first-alloc-c6: 1 implementation/check-first-alloc-c6-1795596191051-1852975.log` on `f23eb8a2` to `check first-alloc-c6: 0 implementation/check-first-alloc-c6-1795596353520-1897474.log` on `e1aafe4f`. Criteria 1–5 inputs were unchanged by the lesson fix.
+
+### Handed to A
+
+- **F8** — Criterion 1. Use the same missing-path-safe worktree identity comparison in the lock lookup and reservation scan. Add a dispatch regression where Git lists a deleted unrelated checkout before the existing clean store checkout, and assert allocation succeeds and advances the slug ref and HEAD to tracking. The symlink and clean-leftover acceptance tests pass on the defective head because their Git listings contain no missing row. The comparison probe in `check-recheck-b-prunable-worktree-1795596252221-1883385.log` shows ENOENT on `f23eb8a2` and successful allocation on `832d8afc`. The code change and its missing acceptance case are paired.
+
+## check.review — 2026-11-25 — repair round 3
+
+Reviewed base `2185ddfc1cc63c5ae4af3197b7ccd3619bcc322b`, prior head `f23eb8a254ae411b298111cde3f2e109637f1943`, repaired head `ce0cbbd825cbed80742e58947a4aff39847145a4`. The base is unchanged. Verdict `ready`.
+
+- **F7 closed.** The cumulative lesson list diff removes only the stale-base entry. The DISPLAY entry retired on main stays absent, and both `Applied` history records are intact. `check first-alloc-c6: 0 implementation/check-first-alloc-c6-1795596958201-2861955.log` verifies the planned criterion on the reviewed head.
+- **F8 closed.** The lock lookup uses the same `canonicalPath` comparison as the reservation scan. A missing unrelated checkout no longer causes ENOENT in the lock lookup. The new case creates a prunable row before the clean store checkout and verifies allocation succeeds and both HEAD and the slug ref reach tracking. `check-check-repair3-tests-red2-1795596562679-1915929.log` shows the case fail on the old behavior at the allocation result, and `check-check-repair3-green-1795596586513-1923027.log` shows all 24 cases pass. The test blob is identical at the red-first commit `2c162643` and reviewed head. Both repair trailers cite `tests/first-allocation.test.ts` and F8's deleted-worktree scenario. No existing test was removed or weakened.
+- Criterion 1 passed all six cases in `check-check-repair3-c1-1795596596065-1932225.log`. The planned criterion 2–5 reruns passed 7, 8, 2 and 1 cases in `check-first-alloc-c2-1795596958576-2861954.log`, `check-first-alloc-c3-1795596958822-2861957.log`, `check-first-alloc-c4-1795596958706-2861959.log` and `check-first-alloc-c5-1795596958308-2861961.log`.
+- Verify receipt `47f52dc2-4f63-4ade-86f2-0015ec4a308d` matches the head and base. Setup, format and typecheck passed. The test log `check-test-1795596893333-1933963.log` shows 1,465 tests and 1,125 changed-file reruns, all passing.
+- Reviewed the first-allocation documentation in `src/AREA.md` against the repair. The worktree identity contract still holds. No documented behavior changed. No new findings or operator actions.

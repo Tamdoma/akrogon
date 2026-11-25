@@ -1,5 +1,5 @@
 slug: fresh-first-worktree
-phase: check.repair
+phase: merged
 created: 2026-11-25
 repo: akrogon
 blocked-by: []
@@ -15,10 +15,9 @@ lost:
   A: 0
   B: 0
 done: []
-fix_rounds: 1
+fix_rounds: 3
 verdict: {}
 tab: ak238e02c674ee28616e98c55dd942cb
-worktree: /home/ivan/.akrogon/worktrees/akrogon/fresh-first-worktree
 env_names: []
 env_generation: 0
 pane: {}
@@ -31,10 +30,18 @@ seat:
     address: t3qf
 prompted:
   B:
-    turn: 3
+    turn: 7
     address: t3qf
 prompted_at: {}
 delivery_error: {}
+merge_stamp: 2026-11-25T08:56:24.607Z
+broadcast:
+  kind: issue
+  name: fresh-leaf-base
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/fresh-leaf-base
+  pushed: ce0cbbd825cbed80742e58947a4aff39847145a4
+  sources:
+    - "Tamdoma/akrogon#156"
 frozen:
   tests/first-allocation.test.ts: 2c5589f04b37a4ed5dc16b9fe06aefd251be1846
 frozen_cited: []

@@ -12,7 +12,7 @@ A chart-issues direct-route attempt becomes a real leaf with one new optional st
 6. The merge queue and land run land it. `commandMerged` records a broadcast only when the repo configures at least one target (every leaf), and for a direct leaf the broadcast prompt goes to the recorded B when B reads idle or done.
 7. skills/chart-issues direct-route text describes this flow, and the door's own landing steps and skills/chart-issues/scripts/direct-guards.ts are removed.
 
-Blocked by shell-sweep (issues/open/seat-turn-idle/shell-sweep): this leaf consumes its phase-advance shell sweep and keeps it off a direct leaf's seats.
+Blocked by tool-cgroup-kill (issues/open/seat-shell-kill/tool-cgroup-kill, which replaced seat-turn-idle/shell-sweep on 2026-11-25): this leaf consumes its phase-advance tool-shell kill and keeps it off a direct leaf's seats.
 
 ## Why
 

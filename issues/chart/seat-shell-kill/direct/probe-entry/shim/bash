@@ -1,0 +1,4 @@
+#!/usr/bin/bash
+echo "wrapper $$ $*" >> "${AKROGON_PROBE_LOG:-/dev/null}" 2>/dev/null
+. "$(dirname "$(readlink -f "$0")")/../place.sh"
+exec /usr/bin/bash "$@"

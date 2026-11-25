@@ -77,3 +77,43 @@ Slot B handed four Fixes, all inside `ensureWorktree`'s first-allocation gate; o
 ### Test-Change trailers
 
 `7bc852cd` and `07261665` carry `Test-Change: tests/first-allocation.test.ts slot B review findings F1-F4` — the realistic source is the operator actions B probed (paused interactive rebase, forced second checkout, locked dirty leftover, spaced `worktree_root`).
+
+## check.repair round 2 — 2026-11-25
+
+Slot B re-reviewed `07261665` and handed three more Fixes: the surviving bisect reservation hole (F1), a symlinked-home store misidentifying itself (F5), and the rebase refusal's destructive force-remove advice (F6). One serial unit repaired serial-solo. Main advanced mid-pass; the branch was rebased onto `origin/main` (`2185ddfc`), head now `f23eb8a2` (`ed63ae45` regression tests red-first, then `f23eb8a2` the repair).
+
+### The three Fixes
+
+- **F1 (bisect reservation).** `branchReservation` now probes each worktree's `BISECT_START` through `git rev-parse --git-path` and matches the leaf slug among its refs. Native git refuses `worktree add` of a branch mid-bisect even though HEAD there is detached, so the symbolic and rebase scans alone could never see it. The test seeds real divergence (an own commit on the branch, rewound ref, two revisions between tip and main) so the bisect pauses mid-range exactly as an operator's would.
+- **F5 (symlinked store identity).** The store exclusion in `branchReservation` and the lock lookup now compare `canonicalPath` (exported from `src/config.ts` — realpath of the deepest existing ancestor, so a store that does not exist yet still resolves symlinked ancestors) on both sides. Git registers worktrees by real path; the raw-string comparison let the store pose as another worktree when `$HOME` is a symlink, refusing the only checkout.
+- **F6 (destructive advice).** The rebase refusal now offers only `git rebase --continue` / `git rebase --abort`; the force-remove alternative B proved deletes the uncommitted edit that made the paused rebase worth keeping is gone. The regression test places an uncommitted edit on a paused rebase and asserts the refusal text contains no `git worktree remove`.
+
+`src/AREA.md` updated: reservation detection covers rebase and bisect, compared by filesystem identity.
+
+### Proof log
+
+- Red-first (fix stashed out): `implementation/check-check-repair2-tests-red-1795595551604-870424.log` and the refined `check-check-repair2-tests-red2-1795595639585-880181.log` — exactly the three new tests fail (the bisect red shows the ref moved past `stashed` despite the active bisect; the rebase red shows the force-remove text in the refusal; the symlink red exits 1 instead of replacing), all other tests pass. The first red run predates the bisect-divergence correction in the test setup; the committed test content is what red2 validated.
+- Green: `implementation/check-check-repair2-green2-1795595788303-905329.log` — all 23 tests pass (one intermediate green run had three regressions caused by `realpathSync` throwing on the not-yet-existing store path, repaired by switching to `canonicalPath` before the green2 run).
+- Post-rebase green: `check-repair2-green3-1795595813908-911900.log` — all 23 pass on the rebased head.
+- Full suite: `akrogon verify` GREEN on head `f23eb8a2` (format/typecheck/test exit 0; 1120 changed-file reruns).
+
+### Test-Change trailers
+
+`ed63ae45` and `f23eb8a2` carry `Test-Change` trailers citing slot B's round-2 findings and their realistic operator actions (active bisect, symlinked HOME, paused rebase holding uncommitted work).
+
+## check.repair round 3 — 2026-11-25
+
+Slot B repaired F7 itself in `e1aafe4f` (lesson lines restored after the rebase replay) and handed one Fix to A. Head now `ce0cbbd8` on base `2185ddfc` (`2c162643` regression test red-first, then `ce0cbbd8` the repair).
+
+### F8 (prunable registration blocks replacement)
+
+Root cause: round 2's lock-lookup edit never landed. The replacement string was written against unformatted source, prettier had rewrapped the line, and the sed-style substitution silently matched nothing — `realpathSync` stayed on both sides. Git's `worktree list` is path-sorted, so a deleted unrelated worktree whose path sorts before the store is iterated first by the lookup, and `realpathSync` on the missing path aborted allocation with ENOENT. The repair is the one-liner round 2 intended: `canonicalPath` on both sides, which resolves through the deepest existing ancestor and never throws on a missing row — the same comparison the reservation scan already uses.
+
+Two test-authoring corrections during red validation, both caught by the red run itself: the porcelain list is path-sorted rather than registration-ordered (the first draft registered the stale row first but it still sorted after the store, so `.find` short-circuited on the store row and greened for the wrong reason), and `git branch -D` refuses a branch still registered to the pruned worktree (cleanup removed; the fixture teardown handles the temp repos).
+
+### Proof log
+
+- Red-first: `implementation/check-repair3-tests-red2-1795596562679-1915929.log` — allocation exits 1 instead of replacing with the prunable row sorting first. The earlier `check-repair3-tests-red-…` run is the invalid first draft (allocation greened, only the bogus cleanup failed) kept for the record.
+- Green: `implementation/check-repair3-green-1795596586513-1923027.log` — all 24 tests pass.
+- Criterion 1 rerun: `check-repair3-c1-1795596596065-1932225.log` (exit 0).
+- Full suite: `akrogon verify` GREEN on head `ce0cbbd8` (format/typecheck/test exit 0; 1125 changed-file reruns).

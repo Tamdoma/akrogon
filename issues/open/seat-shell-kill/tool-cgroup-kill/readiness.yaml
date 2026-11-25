@@ -1,0 +1,75 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: claude tool shell through CLAUDE_CODE_SHELL with CLAUDE_CODE_TOOL_MEMORY_LIMIT=none
+    command: akrogon run-check --name probeA-entry-claude --holder /home/ivan/Work/infra/akrogon/issues/chart/seat-shell-kill/direct -- /home/ivan/Work/infra/akrogon/issues/chart/seat-shell-kill/direct/probe-entry/probe.sh claude
+    identity: operator's logged-in claude account (haiku, effort low)
+    target: throwaway akrogon-run scope as the marked scope root
+    version: claude 2.1.332
+    date: '2026-11-25'
+    result: the wrapper ran the tool command and placed its shell in tools/t-878395-7055064, and the shell still read that t- 3 s later; after exit the t- held the orphan sleep and one tools/cgroup.kill emptied it
+    cleanup: tools removed, run scope ended by run-check
+    limits: print mode, not an interactive seat; the marker named a run scope root, not a seat scope root
+    record: issues/chart/seat-shell-kill/forks/tool-cgroup.md
+  - operation: codex tool shell through BASH_ENV
+    command: akrogon run-check --name probeA-entry-codex --holder /home/ivan/Work/infra/akrogon/issues/chart/seat-shell-kill/direct -- /home/ivan/Work/infra/akrogon/issues/chart/seat-shell-kill/direct/probe-entry/probe.sh codex
+    identity: operator's logged-in codex account (gpt-6.2-sol, effort low, sandbox danger-full-access as seats run)
+    target: throwaway akrogon-run scope as the marked scope root
+    version: codex-cli 0.172.0
+    date: '2026-11-25'
+    result: codex ran /usr/bin/bash -lc and the tool command printed its shell's cgroup as tools/t-878666-7055686
+    cleanup: tools removed, run scope ended by run-check
+    limits: exec mode, not an interactive seat
+    record: issues/chart/seat-shell-kill/forks/tool-cgroup.md
+  - operation: pi tool shell through BASH_ENV
+    command: akrogon run-check --name probeA-entry-pi --holder /home/ivan/Work/infra/akrogon/issues/chart/seat-shell-kill/direct -- /home/ivan/Work/infra/akrogon/issues/chart/seat-shell-kill/direct/probe-entry/probe.sh pi
+    identity: operator's logged-in pi account (devin/swe-2-1-max, thinking low)
+    target: throwaway akrogon-run scope as the marked scope root
+    version: pi 1.6.0
+    date: '2026-11-25'
+    result: the tool shell was placed in tools/t-881459-7058825; after exit that t- held the orphan sleep and the kill emptied it
+    cleanup: tools removed, run scope ended by run-check
+    limits: print mode
+    record: issues/chart/seat-shell-kill/forks/tool-cgroup.md
+  - operation: agy tool shell through a PATH bash wrapper
+    command: akrogon run-check --name probeA-entry-agy5 --holder /home/ivan/Work/infra/akrogon/issues/chart/seat-shell-kill/direct -- /home/ivan/Work/infra/akrogon/issues/chart/seat-shell-kill/direct/probe-entry/probe.sh agy
+    identity: operator's logged-in agy account (Gemini 3.8 Flash (Low))
+    target: throwaway akrogon-run scope as the marked scope root
+    version: agy 1.5.16
+    date: '2026-11-25'
+    result: agy ran bash -c through the PATH wrapper, which placed it in tools/t-889362-7065692, and the tool command printed it; agy ended the orphan itself
+    cleanup: tools removed, run scope ended by run-check
+    limits: print mode with a different model than the seat's neon
+    record: issues/chart/seat-shell-kill/forks/tool-cgroup.md
+  - operation: cgroup.kill, child cgroups, Delegate=yes, BASH_ENV coverage, detached helper, zombie stat, populated flag (free kernel and systemd observations)
+    command: throwaway systemd-run --user --scope units per slots/map-{B,C,D}.md, slots/tool-cgroup-{B,C,D}.md, -rebuttal-D.md, -final-check-C.md, -final-check2-C.md, and A's entry self-test
+    identity: local user, no account
+    target: own throwaway user scopes
+    version: kernel 7.2.15-5-omarchy, systemd 262, GNU bash 5.3.20
+    date: '2026-11-25'
+    result: see forks/tool-cgroup.md Charting proofs E-free entries
+    cleanup: every unit stopped and checked gone
+    limits: no systemd reload or reexec observed
+    record: issues/chart/seat-shell-kill/forks/tool-cgroup.md
+  - operation: claude background-shell status in hc, shell ended by SIGKILL (carried)
+    command: akrogon run-check --name mask-probe-kill --holder /home/ivan/Work/infra/akrogon/issues/chart/seat-turn-idle/direct -- timeout 300 /home/ivan/Work/infra/akrogon/issues/chart/seat-turn-idle/direct/mask-probe-kill.sh
+    identity: operator's logged-in claude account (claude-haiku-5-5, effort low, tools Bash(sleep:*) only)
+    target: claude seat terminal in hc session infra
+    version: claude 2.1.331, hc 0.1.22
+    date: '2026-11-25'
+    result: masked working with msg "1 shell still running", one records entry, turn 0; after SIGKILL of the tool shell's process group, status done, turn 1, records null
+    cleanup: terminal t3mg killed and removed; probe folder removed
+    limits: one claude version and model, one background shell; codex and agy not probed
+    record: issues/chart/seat-turn-idle/forks/shell-sweep.md
+  - operation: hc keep recovery of a lost program (carried)
+    command: throwaway hc 0.1.22 core with its own session and runtime dir; hc run --bg --keep, then SIGKILL of the program, then hc server stop
+    identity: local user, no account
+    target: throwaway hc core
+    version: hc 0.1.22
+    date: '2026-11-25'
+    result: after SIGKILL live, status null, reported false, foreground bash, argv rewritten to the shell ; between the death and the shell spawn pid null, foreground null, reason signaled; after core stop live, pid null, foreground null, reason server_stop; a surviving program reattaches with its real pid; hc schema lists reason spawn_pending as an initial spawn still in progress
+    cleanup: terminals killed and removed, core stopped, runtime dir deleted
+    limits: bash programs, not a real harness; a real host reboot not reproduced
+    record: issues/chart/seat-turn-idle/forks/shell-sweep.md
