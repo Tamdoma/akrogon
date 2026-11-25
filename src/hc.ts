@@ -16,7 +16,12 @@ const statusSchema = z.object({
   msg: z.string().nullable().default(null),
 });
 
-const foregroundSchema = z.object({ pid: z.number().int(), cwd: z.string(), argv: z.array(z.string()) });
+const foregroundSchema = z.object({
+  pid: z.number().int(),
+  cwd: z.string(),
+  argv: z.array(z.string()),
+  name: z.string().default(''),
+});
 
 const terminalSchema = z.object({
   address: z.string(),
@@ -31,6 +36,8 @@ const terminalSchema = z.object({
   exit_code: z.number().int().nullable().default(null),
   signal: z.number().int().nullable().default(null),
   foreground: foregroundSchema.nullable().default(null),
+  argv: z.array(z.string()).default([]),
+  reason: z.string().nullable().default(null),
   keep: z.boolean().default(false),
 });
 
@@ -49,7 +56,9 @@ export type Seen = {
   status: { state: string; kind: string | null; msg: string | null } | null;
   exit_code?: number | null;
   signal?: number | null;
-  foreground: { pid: number; cwd: string; argv: string[] } | null;
+  foreground: { pid: number; cwd: string; argv: string[]; name: string } | null;
+  argv: string[];
+  reason: string | null;
   keep?: boolean;
 };
 

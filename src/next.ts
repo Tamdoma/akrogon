@@ -129,6 +129,23 @@ function liveSeat(t: Seen | undefined): t is Seen {
   return t !== undefined && t.state === 'live';
 }
 
+const shellNames: ReadonlySet<string> = new Set(['sh', 'bash', 'dash', 'zsh', 'fish', 'ash', 'ksh', 'nu']);
+
+// A live terminal hc recovered as a bare shell (plan D13): either parked — pid null with a death
+// reason other than the still-starting spawn_pending — or respawned as the machine shell, which a
+// shell foreground with a rewritten non-systemd-run argv shows. A seat's own launch argv starts
+// with systemd-run, so an ordinary seat never matches even while its harness is still coming up.
+export function recoveredShellSeat(t: Seen): boolean {
+  if (t.state !== 'live' || t.status !== null) return false;
+  const parked: boolean = t.pid === null && t.reason !== null && t.reason !== 'spawn_pending';
+  const spawned: boolean =
+    t.foreground !== null &&
+    shellNames.has(t.foreground.name) &&
+    t.argv.length > 0 &&
+    basename(t.argv[0]) !== 'systemd-run';
+  return parked || spawned;
+}
+
 function discover(repo: Repo, invocation: Invocation, areas: readonly string[] = ['open']): Inventory {
   const result: Inventory = repoInventory(repo, areas);
   for (const entry of result.unreadable) report(invocation, repo.name, entry.path, new Error(entry.error));
@@ -770,7 +787,7 @@ async function dispatchSlot(
     }
   };
   const seat: Seen | undefined = known === undefined ? undefined : await lookup(known.address);
-  if (seat === undefined || seat.state === 'finished') {
+  if (seat === undefined || seat.state === 'finished' || recoveredShellSeat(seat)) {
     const recordedPrompt = ref === undefined ? undefined : recorded.prompted[slot];
     const silentEnd: boolean =
       seat !== undefined &&
