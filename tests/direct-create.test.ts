@@ -43,7 +43,10 @@ function doorFiles(f: Fixture, owner: string, slug: string): string {
   const leafPath: string = resolve(ownerPath, slug);
   mkdirSync(leafPath, { recursive: true });
   writeFileSync(resolve(ownerPath, 'ISSUE.md'), '# ' + owner + '\n');
-  writeFileSync(resolve(leafPath, 'readiness.yaml'), '{}\n');
+  writeFileSync(
+    resolve(leafPath, 'readiness.yaml'),
+    Bun.YAML.stringify({ inputs: [], produces: [], grants: [], retained: [], proofs: [] }),
+  );
   writeFileSync(resolve(leafPath, 'brief.md'), '# Brief: ' + slug + '\n');
   writeFileSync(resolve(leafPath, 'design.md'), '# Design: ' + slug + '\n');
   return leafPath;
