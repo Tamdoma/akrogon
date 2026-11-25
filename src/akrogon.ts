@@ -1,12 +1,10 @@
 #!/usr/bin/env bun
 import { randomUUID } from 'node:crypto';
-import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { z } from 'zod';
 import {
   currentRepo,
   effectiveConfig,
-  globalHome,
   readGlobal,
   requireRepo,
   type GlobalConfig,
@@ -162,11 +160,7 @@ switch (verb) {
       if (caller === undefined || caller === '')
         throw new Error('akrogon seat --watch-consultant runs only inside an hc terminal: HC_TERMINAL_ID is not set');
       const global: GlobalConfig = readGlobal();
-      const recipe: SlotConfig | undefined = global.slots.consultant;
-      if (recipe === undefined)
-        throw new Error(
-          `akrogon seat --watch-consultant needs slots.consultant in ${resolve(globalHome(), 'config.yaml')}`,
-        );
+      const recipe: SlotConfig = global.slots.consultant;
       const repo: Repo = await requireRepo(global, process.cwd());
       const space: SpaceResolution = await (await import('./hc')).repoSpace(repo);
       if (!space.ok) throw new Error(space.reason);

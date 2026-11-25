@@ -23,7 +23,7 @@ const indexSchema = z.strictObject({
 export const globalSchema = z
   .strictObject({
     max_active: z.number().int().positive().default(3),
-    slots: z.strictObject({ a: slotConfigSchema, b: slotConfigSchema, consultant: slotConfigSchema.optional() }),
+    slots: z.strictObject({ a: slotConfigSchema, b: slotConfigSchema, consultant: slotConfigSchema }),
     harnesses: z.record(text, text),
     toolkits: z.record(text, text).default({}),
     repos: z.record(text, text).default({}),
@@ -61,13 +61,8 @@ export const globalSchema = z
           message: `run_root must be at most 40 bytes (Chrome's socket path limit under TMPDIR): ${runRoot} is ${bytes} bytes`,
         });
     }
-    const named: Record<string, SlotConfig | undefined> = {
-      a: config.slots.a,
-      b: config.slots.b,
-      consultant: config.slots.consultant,
-    };
-    for (const [key, slot] of Object.entries(named)) {
-      if (slot !== undefined && !Object.hasOwn(config.harnesses, slot.harness))
+    for (const [key, slot] of Object.entries(config.slots)) {
+      if (!Object.hasOwn(config.harnesses, slot.harness))
         ctx.addIssue({
           code: 'custom',
           path: ['slots', key],
@@ -543,7 +538,7 @@ export async function effectiveConfig(cwd: string): Promise<string> {
         resolved === null
           ? global.slots
           : {
-              ...(global.slots.consultant === undefined ? {} : { consultant: global.slots.consultant }),
+              consultant: global.slots.consultant,
               a: resolved.a,
               b: resolved.b,
             },

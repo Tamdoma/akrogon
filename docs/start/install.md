@@ -44,12 +44,13 @@ A minimal file:
 slots:
   a: { harness: claude, model: <model>, effort: <effort> }
   b: { harness: claude, model: <model>, effort: <effort> }
+  consultant: { harness: claude, model: <model>, effort: <effort> }
 harnesses:
   claude: claude --model {model} --effort {effort} <other flags>
 repos: {}
 ```
 
-- `slots` sets seat A and seat B. Each seat names a harness, a model and an effort.
+- `slots` sets seat A, seat B and the watch consultant. Each names a harness, a model and an effort. All three are required: akrogon refuses a file without one. The consultant is the agent a watch starts on its own when a leaf fails and needs help, so pick a model you are willing to let act while you are away.
 - `harnesses` maps a harness name to the command that starts that agent CLI. Akrogon fills `{model}` and `{effort}` from the seat. The command starts with the harness name. Every harness a seat names needs an entry here. Seats run unattended, so add the flags your CLI needs to run without stopping for approval.
 - `repos` lists registered projects. Leave it empty. Setting up a project adds it.
 
