@@ -165,7 +165,14 @@ test.serial('the entry places a bash tool shell exactly once at the scope root a
     expect(read('w.code').trim()).toBe('3');
     expect(read('wref.code').trim()).toBe('3');
     expect(read('w.out'), 'wrapper traced stdout unchanged').toBe(read('wref.out'));
-    expect(read('w.err'), 'wrapper traced stderr byte-identical').toBe(read('wref.err'));
+    // The first traced line is the caller's own trace of its own exec — it names the exec target,
+    // which differs by construction (the wrapper path vs the bare word bash). Everything after it
+    // is the wiring-attributable output and must be byte-identical.
+    const tail = (text: string): string => text.slice(text.indexOf('\n') + 1);
+    expect(read('w.err').split('\n')[0], 'caller exec trace present').toMatch(/^\+ exec /);
+    expect(tail(read('w.err')), 'wrapper traced stderr byte-identical after the exec line').toBe(
+      tail(read('wref.err')),
+    );
 
     // Outside the scope root entirely: the same env is inert in the test process.
     const outsideOut: string = resolve(out, 'outside.cg');
