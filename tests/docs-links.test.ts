@@ -302,3 +302,14 @@ test('chart-issues skill names akrogon pack at every end-marker site', (): void 
   // three end-marker sites. Ordering and phrasing are judgment, not mechanics.
   expect(content.match(/`akrogon pack <chart>`/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
 });
+
+test('files.md documents verify-runs timeouts, durations and attempt', (): void => {
+  const files: string = readFileSync(resolve(import.meta.dir, '../docs/reference/files.md'), 'utf8');
+  const row: string | undefined = files
+    .split('\n')
+    .filter((line: string) => line.startsWith('|'))
+    .find((line: string) => line.startsWith('| `verify-runs.jsonl`'));
+  expect(row, 'files.md holds a verify-runs.jsonl row').not.toBeUndefined();
+  for (const needed of ['`timeouts`', '`durations`', '`attempt`', '20 slowest', 'does not parse under an older akrogon'])
+    expect(row!, `verify-runs.jsonl row names ${needed}`).toContain(needed);
+});

@@ -1,6 +1,7 @@
 import { test, expect } from 'bun:test';
 import {
   chmodSync,
+  copyFileSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -31,7 +32,7 @@ import {
 import { command, finishCaptured, spawnFiles, type Result, type SpawnResult } from '../src/shell';
 import { readRepo, setupCommand, type Repo } from '../src/config';
 import { readState, saveState } from '../src/state';
-import { requireGreenReceipt, verifyCommands, verifyRunSchema, type VerifyRun } from '../src/verify';
+import { requireGreenReceipt, readVerifyRuns, verifyCommands, verifyRunSchema, type VerifyRun } from '../src/verify';
 import { bootId, writePassRecord } from '../src/verify-pass';
 import { readTimings, type TimingEvent } from '../src/timing';
 import { flakyLines } from '../src/flaky';
@@ -2842,4 +2843,316 @@ test('a landed row that saved a unit by rerun does not resolve its main red', as
   } finally {
     f.clean();
   }
+});
+
+// verify-test-facts done-criterion proofs. Every shell script line below copies the Bun output
+// shapes observed in forks/test-facts.md P1/P2 and the 2026-11-25 probe on bun 1.4.5: chained
+// `wrap | sh <script> | ` prefixes, `[<n>ms]` bracket suffixes, unbracketed passes, the caret
+// timeout line `  ^ this test timed out after <n>ms.`, and a thrown error carrying the same words.
+
+async function commitScript(f: Fixture, name: string, body: string): Promise<void> {
+  writeFileSync(resolve(f.root, name), body);
+  await command(['git', 'add', name], f.root);
+  await command(['git', 'commit', '-m', `add ${name}`], f.root);
+  await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+}
+
+test('a merge row records the 20 slowest durations plus every timed failure and keeps them after the log is gone', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const chain: string = 'wrap | sh check-durations.sh | ';
+    const lines: string[] = [chain + '(pass) untimed'];
+    lines.push(chain + '(pass) dupe [1550.00ms]', chain + '(pass) dupe [1450.00ms]');
+    for (let i = 1; i <= 24; i += 1) lines.push(`${chain}(pass) t${String(i).padStart(2, '0')} [${2000 - (i - 1) * 80}.00ms]`);
+    lines.push(
+      chain + '(pass) theta [96.00ms]',
+      chain + '(fail) zeta [5.00ms]',
+      chain + '(fail) zeta [7.00ms]',
+      chain + '(fail) (unnamed) [60.00ms]',
+      '(fail) plain-fail [3.50ms]',
+      'PASS x (pass) [9ms]',
+      chain + '(pass) eta',
+    );
+    await commitScript(f, 'check-durations.sh', lines.map((line) => `echo '${line}'`).join('\n') + '\nexit 7\n');
+    config(f, { checks: { timed: 'sh check-durations.sh', ok: 'echo ok' } });
+    const { worktree } = await callerWorktree(f, 'caller', mergeLeaf('att-durations'));
+    await commitIn(worktree, 'code.ts');
+    expect((await verify(f, ['--attempt', 'att-durations'], worktree)).code).toBe(1);
+    const entry: VerifyRun['commands'][number] = records(f).at(-1)!.commands.find((item) => item.name === 'timed')!;
+    expect(entry.exit).toBe(7);
+    expect(entry.failures).toEqual(['zeta', '(unnamed) sh check-durations.sh', 'plain-fail']);
+    const expected: { name: string; ms: number }[] = [];
+    const table: [string, number][] = [
+      ['t01', 2000], ['t02', 1920], ['t03', 1840], ['t04', 1760], ['t05', 1680], ['t06', 1600],
+      ['dupe', 1550], ['t07', 1520], ['t08', 1440], ['t09', 1360], ['t10', 1280], ['t11', 1200],
+      ['t12', 1120], ['t13', 1040], ['t14', 960], ['t15', 880], ['t16', 800], ['t17', 720],
+      ['t18', 640], ['t19', 560],
+    ];
+    for (const [name, ms] of table) expected.push({ name, ms });
+    expected.push({ name: '(unnamed) sh check-durations.sh', ms: 60 }, { name: 'zeta', ms: 7 }, { name: 'plain-fail', ms: 4 });
+    expect(entry.durations).toEqual(expected);
+    expect(entry.durations!.every((item) => Number.isInteger(item.ms) && item.ms >= 0)).toBe(true);
+    const names: string[] = entry.durations!.map((item) => item.name);
+    expect(new Set(names).size).toBe(names.length);
+    for (const absent of ['t20', 't21', 't22', 't23', 't24', 'theta', 'untimed', 'eta', 'PASS x (pass)'])
+      expect(names).not.toContain(absent);
+    expect(records(f).at(-1)!.commands.find((item) => item.name === 'ok')).not.toHaveProperty('durations');
+    rmSync(entry.log, { force: true });
+    const after: VerifyRun[] = records(f);
+    expect(after.at(-1)!.commands.find((item) => item.name === 'timed')!.durations).toEqual(expected);
+  } finally {
+    f.clean();
+  }
+});
+
+test('a red row records only stream-attached timeouts at leaf and merge scope with failures unchanged', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const b: string = 'wrap | sh other.sh | ';
+    const a: string = 'wrap | sh check-timeouts.sh | ';
+    await commitScript(
+      f,
+      'check-timeouts.sh',
+      [
+        `echo '${a}(fail) alpha-timeout [50.06ms]'`,
+        `echo '${b}(pass) b-ok [3.00ms]'`,
+        `echo '${b}  ^ this test timed out after 100ms.'`,
+        `echo '${b}(fail) beta-assert [0.13ms]'`,
+        `echo '  ^ this test timed out after 50ms.'`,
+        `echo 'error: this test timed out after 50ms.'`,
+        `echo '(fail) gamma-thrower [0.06ms]'`,
+        'exit 7',
+      ].join('\n') + '\n',
+    );
+    await commitScript(f, 'check-plain.sh', 'echo "(fail) delta"\nexit 1\n');
+    config(f, { checks: { timed: 'sh check-timeouts.sh', ok: 'echo ok', plain: 'sh check-plain.sh' } });
+    const { worktree } = await callerWorktree(f);
+    await commitIn(worktree, 'code.ts');
+    expect((await verify(f, [], worktree)).code).toBe(1);
+    const leafRun: VerifyRun = records(f).at(-1)!;
+    const leafTimed: VerifyRun['commands'][number] = leafRun.commands.find((item) => item.name === 'timed')!;
+    expect(leafTimed.failures).toEqual(['alpha-timeout', 'beta-assert', 'gamma-thrower']);
+    expect(leafTimed.timeouts).toEqual(['alpha-timeout']);
+    expect(leafTimed).not.toHaveProperty('durations');
+    expect(leafRun.commands.find((item) => item.name === 'ok')).not.toHaveProperty('timeouts');
+    const leafPlain: VerifyRun['commands'][number] = leafRun.commands.find((item) => item.name === 'plain')!;
+    expect(leafPlain.failures).toEqual(['delta']);
+    expect(leafPlain).not.toHaveProperty('timeouts');
+
+    const { worktree: merging } = await callerWorktree(f, 'merging', mergeLeaf('att-timeouts'));
+    await commitIn(merging, 'mergecode.ts');
+    expect((await verify(f, ['--attempt', 'att-timeouts'], merging)).code).toBe(1);
+    const mergeTimed: VerifyRun['commands'][number] = records(f).at(-1)!.commands.find((item) => item.name === 'timed')!;
+    expect(mergeTimed.failures).toEqual(['alpha-timeout', 'beta-assert', 'gamma-thrower']);
+    expect(mergeTimed.timeouts).toEqual(['alpha-timeout']);
+  } finally {
+    f.clean();
+  }
+});
+
+test('a merge rerun row keeps per-leg durations and timeouts with top-level timeouts a subset of failures', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const a: string = 'wrap | sh first-leg.sh | ';
+    const r: string = 'wrap | sh second-leg.sh | ';
+    await commitScript(
+      f,
+      'first-leg.sh',
+      [
+        `echo '${a}(pass) first-pass [800.00ms]'`,
+        `echo '${a}(fail) alpha [400.00ms]'`,
+        `echo '${a}  ^ this test timed out after 400ms.'`,
+        `echo '${a}(fail) beta [200.00ms]'`,
+        'exit 1',
+      ].join('\n') + '\n',
+    );
+    await commitScript(
+      f,
+      'second-leg.sh',
+      [`echo '${r}(pass) rerun-pass [100.00ms]'`, `echo '${r}(fail) alpha [300.00ms]'`, `echo '${r}  ^ this test timed out after 300ms.'`, 'exit 1'].join('\n') + '\n',
+    );
+    config(f, {
+      checks: { unit: 'sh first-leg.sh', whole: 'echo whole' },
+      full: ['whole'],
+      merge_checks: { member: 'echo member' },
+      rerun: { unit: 'sh second-leg.sh' },
+    });
+    const { worktree } = await callerWorktree(f, 'caller', mergeLeaf('att-leg'));
+    await commitIn(worktree, 'code.ts');
+    expect((await verify(f, ['--attempt', 'att-leg'], worktree)).code).toBe(1);
+    const unit: VerifyRun['commands'][number] = records(f).at(-1)!.commands.find((item) => item.name === 'unit')!;
+    expect(unit.failures).toEqual(['alpha']);
+    expect(unit.rerun).toMatchObject({ exit: 1, failures: ['alpha', 'beta'] });
+    expect(unit.rerun!.timeouts).toEqual(['alpha']);
+    expect(unit.rerun!.durations).toEqual([
+      { name: 'first-pass', ms: 800 },
+      { name: 'alpha', ms: 400 },
+      { name: 'beta', ms: 200 },
+    ]);
+    expect(unit.timeouts).toEqual(['alpha']);
+    expect(unit.durations).toEqual([
+      { name: 'alpha', ms: 300 },
+      { name: 'rerun-pass', ms: 100 },
+    ]);
+    for (const name of unit.timeouts!) expect(unit.failures).toContain(name);
+
+    // A rerun timing out a test the first leg never failed: the subset invariant drops it.
+    writeFileSync(
+      resolve(worktree, 'second-leg.sh'),
+      [`echo '${r}(fail) gamma-new [150.00ms]'`, `echo '${r}  ^ this test timed out after 150ms.'`, 'exit 1'].join('\n') + '\n',
+    );
+    await command(['git', 'add', 'second-leg.sh'], worktree);
+    await command(['git', 'commit', '-m', 'rerun times out a new test'], worktree);
+    await command(['git', 'push', 'origin', 'HEAD:main'], f.root);
+    expect((await verify(f, ['--attempt', 'att-leg'], worktree)).code).toBe(1);
+    const second: VerifyRun['commands'][number] = records(f).at(-1)!.commands.find((item) => item.name === 'unit')!;
+    expect(second.failures).toEqual(['alpha', 'beta']);
+    expect(second).not.toHaveProperty('timeouts');
+    expect(second.durations).toEqual([{ name: 'gamma-new', ms: 150 }]);
+    expect(second.rerun!.timeouts).toEqual(['alpha']);
+  } finally {
+    f.clean();
+  }
+});
+
+test('leaf rows carry no durations, merge and base comparison rows do, blocked rows neither', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const a: string = 'wrap | sh red-timed.sh | ';
+    await commitScript(
+      f,
+      'red-timed.sh',
+      [
+        `echo '${a}(pass) slow-pass [700.00ms]'`,
+        `echo '${a}(fail) alpha [400.00ms]'`,
+        `echo '${a}  ^ this test timed out after 400ms.'`,
+        'exit 7',
+      ].join('\n') + '\n',
+    );
+    config(f, {
+      checks: { red: 'sh red-timed.sh', ok: 'echo ok' },
+      merge_checks: { member: 'echo member' },
+    });
+    const { worktree } = await callerWorktree(f);
+    await commitIn(worktree, 'leafcode.ts');
+    expect((await verify(f, [], worktree)).code).toBe(1);
+    const leafRun: VerifyRun = records(f).at(-1)!;
+    for (const item of leafRun.commands) {
+      expect(item).not.toHaveProperty('durations');
+    }
+    expect(leafRun.commands.find((item) => item.name === 'red')!.timeouts).toEqual(['alpha']);
+
+    const { worktree: merging } = await callerWorktree(f, 'merging', mergeLeaf('att-scope'));
+    await commitIn(merging, 'mergecode.ts');
+    expect((await verify(f, ['--attempt', 'att-scope'], merging)).code).toBe(1);
+    const mergeRun: VerifyRun = records(f).at(-1)!;
+    const mergeRed: VerifyRun['commands'][number] = mergeRun.commands.find((item) => item.name === 'red')!;
+    expect(mergeRed.durations).toEqual([
+      { name: 'slow-pass', ms: 700 },
+      { name: 'alpha', ms: 400 },
+    ]);
+    expect(mergeRed.timeouts).toEqual(['alpha']);
+    const member: VerifyRun['commands'][number] = mergeRun.commands.find((item) => item.name === 'member')!;
+    expect(member.blocked).toBe('red');
+    expect(member.log).toBe(mergeRed.log);
+    expect(member).not.toHaveProperty('durations');
+    expect(member).not.toHaveProperty('timeouts');
+    expect(member).not.toHaveProperty('failures');
+
+    expect((await verify(f, ['--attempt', 'att-scope', '--known-red'], merging)).code).toBe(0);
+    const head: VerifyRun = records(f).findLast((run) => run.compares === undefined)!;
+    const base: VerifyRun = baseRecord(f, head);
+    expect(base.scope).toBe('merge');
+    const baseRed: VerifyRun['commands'][number] = base.commands.find((item) => item.name === 'red')!;
+    expect(baseRed.durations).toEqual([
+      { name: 'slow-pass', ms: 700 },
+      { name: 'alpha', ms: 400 },
+    ]);
+    expect(baseRed.timeouts).toEqual(['alpha']);
+  } finally {
+    f.clean();
+  }
+});
+
+test('verify --attempt stamps the attempt on its run row and a verify without an attempt writes none', async () => {
+  const f: Fixture = await fixture();
+  try {
+    config(f, { checks: { unit: 'echo unit' } });
+    const { worktree } = await callerWorktree(f);
+    await commitIn(worktree, 'code.ts');
+    expect((await verify(f, [], worktree)).code).toBe(0);
+    const { worktree: merging } = await callerWorktree(f, 'merging', mergeLeaf('att-facts'));
+    await commitIn(merging, 'mergecode.ts');
+    expect((await verify(f, ['--attempt', 'att-facts'], merging)).code).toBe(0);
+    const mergeRun: VerifyRun = records(f).at(-1)!;
+    expect(mergeRun.attempt).toBe('att-facts');
+    expect(mergeRun.scope).toBe('merge');
+    const lines: string[] = readFileSync(resolve(f.root, 'issues/verify-runs.jsonl'), 'utf8').trim().split('\n');
+    const leafLine: string = lines.find((line) => JSON.parse(line).scope === 'leaf')!;
+    expect(leafLine).not.toContain('"attempt"');
+    expect(records(f).find((run) => run.scope === 'leaf')).not.toHaveProperty('attempt');
+  } finally {
+    f.clean();
+  }
+});
+
+test('a legacy verify-runs ledger without the new fields parses unchanged', async () => {
+  const f: Fixture = await fixture();
+  try {
+    config(f, { checks: { unit: 'echo unit' } });
+    copyFileSync(
+      resolve(import.meta.dir, 'fixtures/verify-runs-legacy.jsonl'),
+      resolve(f.root, 'issues/verify-runs.jsonl'),
+    );
+    const repo: Repo = readRepo(f.repo, f.root);
+    const rows: VerifyRun[] = readVerifyRuns(repo);
+    const raw: string[] = readFileSync(resolve(f.root, 'issues/verify-runs.jsonl'), 'utf8').trim().split('\n');
+    expect(rows).toHaveLength(raw.length);
+    rows.forEach((row: VerifyRun, index: number) => {
+      expect(row).toEqual(JSON.parse(raw[index]));
+    });
+    expect(rows.some((row) => row.commands.some((item) => item.failures !== undefined))).toBe(true);
+    expect(rows.some((row) => row.commands.some((item) => item.rerun !== undefined))).toBe(true);
+    expect(rows.some((row) => row.compares !== undefined)).toBe(true);
+    expect(rows.some((row) => row.commands.some((item) => item.blocked !== undefined))).toBe(true);
+    for (const row of rows)
+      for (const item of row.commands) {
+        expect(item).not.toHaveProperty('timeouts');
+        expect(item).not.toHaveProperty('durations');
+      }
+  } finally {
+    f.clean();
+  }
+});
+
+test('the receipt schema pins timeouts and durations invariants', () => {
+  const row = (entry: object): object => ({
+    run: 'r1',
+    repo: 'repo',
+    leaf: 'leaf',
+    sha: 's',
+    tree: 't',
+    scope: 'merge',
+    path: '/tmp/x',
+    pid: 1,
+    boot_id: 'b',
+    setup: 0,
+    commands: [{ name: 'test', command: 'bun test', exit: 1, log: '/tmp/x.log', failures: ['alpha'], ...entry }],
+    start: '2026-11-11T00:00:00.000Z',
+    end: '2026-11-11T01:00:00.000Z',
+  });
+  expect(verifyRunSchema.safeParse(row({ timeouts: ['alpha'] })).success).toBe(true);
+  expect(verifyRunSchema.safeParse(row({ timeouts: [] })).success).toBe(false);
+  expect(verifyRunSchema.safeParse(row({ timeouts: ['alpha', 'alpha'] })).success).toBe(false);
+  expect(verifyRunSchema.safeParse(row({ timeouts: ['beta'] })).success).toBe(false);
+  expect(verifyRunSchema.safeParse(row({ durations: [{ name: 'alpha', ms: 4 }] })).success).toBe(true);
+  expect(verifyRunSchema.safeParse(row({ durations: [] })).success).toBe(false);
+  expect(verifyRunSchema.safeParse(row({ durations: [{ name: 'alpha', ms: 1.5 }] })).success).toBe(false);
+  expect(verifyRunSchema.safeParse(row({ durations: [{ name: 'alpha', ms: -1 }] })).success).toBe(false);
+  expect(verifyRunSchema.safeParse(row({ durations: [{ name: 'alpha', ms: 4 }, { name: 'alpha', ms: 7 }] })).success).toBe(false);
+  expect(verifyRunSchema.safeParse(row({ attempt: 'att-1' })).success).toBe(true);
+  const rerunEntry: object = {
+    rerun: { exit: 1, log: '/tmp/first.log', failures: ['alpha'], timeouts: ['alpha'], durations: [{ name: 'alpha', ms: 4 }] },
+  };
+  expect(verifyRunSchema.safeParse(row(rerunEntry)).success).toBe(true);
 });
