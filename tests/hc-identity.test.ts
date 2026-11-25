@@ -10,7 +10,7 @@ import { cli, fixture, leaf, yaml, WAIT_MS, type Fixture } from './helpers';
 import { hcCore, setPrefixes, setSeat, type HcCore, type Terminal, stopCoresAfterFile } from './hc-fixture';
 import { leafSlice } from '../src/scope';
 import { command, spawnCaptured, type SpawnResult } from '../src/shell';
-import { GONE_CODES, HcError, hcReader, sessions, terminal } from '../src/hc';
+import { GONE_CODES, hcReader, probeTerminal, sessions } from '../src/hc';
 import { readState } from '../src/state';
 
 stopCoresAfterFile();
@@ -792,12 +792,11 @@ test('first-switch inventory reads cleanly with no hc call on old ids, and live 
   }
 });
 
-test('terminal() never starts a core for an absent session: it fails fast and leaves no core state', async () => {
-  // Regression: a direct leaf's seat refs name sessions outside the repo's, and observeDirectSeats
-  // probes them. Before the socket probe in terminal(), the probe hit hc unguarded, which starts a
-  // core for any absent session; the orphaned core's lock then wedged every later probe of the
-  // same session name across tests (the 120s direct-phases timeout). The runtime lives under the
-  // real runtime dir, not TMPDIR: hc refuses a socket path past its 107-byte limit.
+test('probeTerminal never starts a core for an absent session: it returns null and leaves no core state', async () => {
+  // Regression companion of the direct-seats integration proof: probeTerminal exists because hc
+  // boots a core for any session it is asked about, so direct seat probes go through it and an
+  // absent socket is null without an hc call. The runtime lives under the real runtime dir, not
+  // TMPDIR: hc refuses a socket path past its 107-byte limit.
   const runtime: string = mkdtempSync('/run/user/1000/akp');
   const stateHome: string = resolve(runtime, 'st');
   mkdirSync(resolve(runtime, 'herdr-core'), { recursive: true });
@@ -807,15 +806,9 @@ test('terminal() never starts a core for an absent session: it fails fast and le
   process.env.XDG_RUNTIME_DIR = runtime;
   process.env.XDG_STATE_HOME = stateHome;
   try {
-    let kind: string | null = null;
     const started: number = Date.now();
-    try {
-      await terminal('akp-absent', 'w1:a-door');
-    } catch (error) {
-      if (!(error instanceof HcError)) throw error;
-      kind = error.kind;
-    }
-    expect(kind).toBe('not_found');
+    const found: unknown = await probeTerminal('akp-absent', 'w1:a-door');
+    expect(found).toBeNull();
     expect(Date.now() - started).toBeLessThan(20_000);
     // The proof that no core started: hc leaves the session's state dir and lock behind when it
     // boots one, and would bind the socket in the runtime dir.

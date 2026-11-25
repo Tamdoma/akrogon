@@ -302,6 +302,30 @@ test('phase moves, stop and passes never touch the direct seats of a cross-sessi
   }
 });
 
+test('a pass over a direct leaf whose seat sessions exist nowhere starts no core and boots nothing', async () => {
+  // Regression: observeDirectSeats probed the recorded refs through terminal(), and hc boots a
+  // core for any session it is asked about. The orphaned core's lock then wedged every later
+  // probe of the same session name across the host — the 120s direct-phases timeout in full runs.
+  // The fixture home is the CLI's HOME, so a booted core would leave its state dir inside it.
+  const f: HcFixture = await hcFixture();
+  try {
+    await directWorktree(f, 'dx-nosession');
+    const seats = {
+      A: { session: 'akp-absent-one', address: 'w1:a-door' },
+      B: { session: 'akp-absent-two', address: 'w1:b-reviewer' },
+    };
+    directLeaf(f, 'dx-nosession', 'implement', seats, {});
+    const result: Result = await cli(f, ['next', 'dx-nosession'], f.root, f.env);
+    expect(result.code, result.stderr).toBe(0);
+    expect(existsSync(resolve(f.home, '.local/state/herdr-core', 'akp-absent-one'))).toBe(false);
+    expect(existsSync(resolve(f.home, '.local/state/herdr-core', 'akp-absent-two'))).toBe(false);
+    // No core means no socket either, anywhere the fixture runtime can see.
+    expect(existsSync(resolve(f.core.runtime, 'herdr-core', 'akp-absent-one.sock'))).toBe(false);
+  } finally {
+    await f.clean();
+  }
+});
+
 test('busy_since records required direct slots across sessions and clears non-required slots', async () => {
   const f: HcFixture = await hcFixture();
   const core2: HcCore = await hcCore(f, { doc: false });
