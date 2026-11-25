@@ -253,7 +253,7 @@ export async function runCheck(
     argv,
     cwd,
   );
-  writeSwallowingEpipe(
+  await writeSwallowingEpipe(
     2,
     `${result.stderr_final_nl ? '' : '\n'}check ${name ?? 'run'}: ${result.code} ${result.log}\n`,
   );
@@ -322,15 +322,9 @@ export async function captureOwner(target: string, repo: Repo): Promise<{ path: 
   return { path: resolve(recorded, ...found.member.split('/').map(() => '..')), kind: 'issue' };
 }
 
-// The echoes write synchronously so an EPIPE surfaces at the write, where it
-// is catchable; Bun's buffered pipe writes raise it only at exit-flush, which
-// would exit 1 over a completed publish. Only EPIPE is swallowed: the publish
-// never depends on the pipe. Bun's child pipes are non-blocking, so an open
-// but undrained reader answers a full pipe with EAGAIN instead of blocking;
-// the echo is the process's final act, so retrying after a short sleep is the
-// blocking write an ordinary pipe would have performed. Any other errno still
-// throws: a writer that cannot report is worse than a dead one.
-export function writeSwallowingEpipe(fd: number, text: string): void {
+// Write directly so EPIPE is caught here instead of surfacing at Bun's exit flush.
+// Yield while a non-blocking pipe has an open reader but no space.
+async function writeSwallowingEpipe(fd: number, text: string): Promise<void> {
   const buffer: Buffer = Buffer.from(text, 'utf8');
   let offset: number = 0;
   while (offset < buffer.length) {
@@ -340,7 +334,7 @@ export function writeSwallowingEpipe(fd: number, text: string): void {
       const code: string | undefined = (error as NodeJS.ErrnoException).code;
       if (code === 'EPIPE') return;
       if (code === 'EAGAIN') {
-        Bun.sleepSync(1);
+        await Bun.sleep(1);
         continue;
       }
       throw error;
@@ -377,6 +371,7 @@ export async function checkedRun(
   const leafTempDir: string = ensureLeafTemp(repo, slug);
   const runRoot: string = mkdtempSync(resolve(leafTempDir, 'run-'));
   let refused: boolean = false;
+  let echo: Result | undefined;
   try {
     const boot: string = existsSync('/proc/sys/kernel/random/boot_id')
       ? readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim()
@@ -497,8 +492,6 @@ export async function checkedRun(
                   })();
             const refusedReason: string | undefined = await ownerRefusal(target, repo, true);
             if (refusedReason !== undefined) {
-              writeSwallowingEpipe(1, result.stdout);
-              writeSwallowingEpipe(2, result.stderr);
               // The holder may have moved mid-run: drop the stale captures under
               // every owner dir their member resolves to, or at the written path.
               for (const captured of [captureOut, captureErr]) {
@@ -507,6 +500,7 @@ export async function checkedRun(
                   hit === null ? [captured] : hit.ownerDirs.map((dir) => resolve(dir, hit.member));
                 for (const path of targets) rmSync(path, { force: true });
               }
+              echo = result;
               refusePublish(refusedReason, result);
             }
             const kept: string = resolve(target, `check-${encodeURIComponent(name)}-${Date.now()}-${process.pid}.log`);
@@ -523,8 +517,7 @@ export async function checkedRun(
             });
             unlinkSync(captureOut);
             unlinkSync(captureErr);
-            writeSwallowingEpipe(1, result.stdout);
-            writeSwallowingEpipe(2, result.stderr);
+            echo = result;
             return {
               code: result.code,
               log: kept,
@@ -542,5 +535,10 @@ export async function checkedRun(
     );
   } finally {
     if (!refused) rmSync(runRoot, { recursive: true, force: true });
+    // Echo only after the owner lock and capture descriptors have been released.
+    if (echo !== undefined) {
+      await writeSwallowingEpipe(1, echo.stdout);
+      await writeSwallowingEpipe(2, echo.stderr);
+    }
   }
 }
