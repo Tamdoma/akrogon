@@ -20,4 +20,4 @@ Report: https://github.com/Tamdoma/akrogon/issues/155
 
 The same headed Playwright proof run through `akrogon run-check` (`env CI=1 npx playwright test e2e/notes-zoom.e2e.ts --headed`) failed all 10 tests at `browserType.launch` with "ui/aura/env.cc:246 The platform failed to initialize. Exiting." A `run-check` printing `env` showed no `DISPLAY`, `WAYLAND_DISPLAY` or `XDG_RUNTIME_DIR` while `/tmp/.X11-unix/X0` was reachable; the same launch from the seat's shell succeeded. Adding `DISPLAY=:0 XDG_RUNTIME_DIR=/run/user/1000` inside the command fixed it. Logs: Himne `issues/open/notes-sheet-layout/notes-reflow-zoom/implementation/check-notes-zoom-e2e-1795538043527-2274478.log`, `check-display-env-1795538102563-2297354.log`.
 
-Applied 2026-11-25 by src/run-check.ts displayEnv/copied: the four display names are copied from the caller into every check command, so a headed browser inherits the caller's session
+Applied 2026-11-25 by src/run-check.ts:63: the four display names are copied from the caller into every check command, so a headed browser inherits the caller's session
