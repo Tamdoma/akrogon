@@ -384,7 +384,7 @@ export async function requireRepo(global: GlobalConfig, cwd: string): Promise<Re
 
 // Realpath of the deepest existing ancestor joined with the remaining suffix,
 // so paths that do not exist yet still resolve symlinked ancestors.
-function canonicalPath(path: string): string {
+export function canonicalPath(path: string): string {
   if (existsSync(path)) return realpathSync(path);
   const parent: string = dirname(path);
   return parent === path ? path : resolve(canonicalPath(parent), basename(path));

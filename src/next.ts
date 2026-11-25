@@ -17,6 +17,7 @@ import {
   repoPrefix,
   type Repo,
   type GlobalConfig,
+  canonicalPath,
 } from './config';
 import {
   readState,
@@ -302,20 +303,27 @@ export async function branchReservation(
   root: string,
   slug: string,
   store: string,
-): Promise<{ path: string; rebase: boolean } | undefined> {
+): Promise<{ path: string; rebase: boolean; bisect: boolean } | undefined> {
+  // Git registers worktrees by their real path, so a store path written through a symlinked home
+  // never string-matches: compare filesystem identity everywhere the store meets the list.
+  const realStore: string = canonicalPath(store);
   const rows: [string, { branch?: string }][] = [...(await registeredWorktrees(root)).entries()].filter(
-    ([p]) => p !== store,
+    ([p]) => canonicalPath(p) !== realStore,
   );
   const holder: [string, { branch?: string }] | undefined = rows.find(([, row]) => row.branch === slug);
-  if (holder !== undefined) return { path: holder[0], rebase: false };
+  if (holder !== undefined) return { path: holder[0], rebase: false, bisect: false };
   for (const [p] of rows) {
     if (!existsSync(resolve(p, '.git'))) continue;
     for (const dir of ['rebase-merge', 'rebase-apply']) {
       const probe: string = await command(['git', 'rev-parse', '--git-path', dir], p);
       const name: string = resolve(p, probe, 'head-name');
       if (existsSync(name) && readFileSync(name, 'utf8').trim() === `refs/heads/${slug}`)
-        return { path: p, rebase: true };
+        return { path: p, rebase: true, bisect: false };
     }
+    const bisectProbe: string = await command(['git', 'rev-parse', '--git-path', 'BISECT_START'], p);
+    const bisectStart: string = resolve(p, bisectProbe);
+    if (existsSync(bisectStart) && readFileSync(bisectStart, 'utf8').trim().split(/\s+/).includes(slug))
+      return { path: p, rebase: false, bisect: true };
   }
   return undefined;
 }
@@ -375,16 +383,21 @@ async function ensureWorktree(repo: Repo, leaf: Leaf, live: boolean): Promise<St
           // Every check runs before the first mutation: a refusal never leaves the store
           // worktree removed or the branch moved.
           const refuseReservation = async (): Promise<void> => {
-            const reserved: { path: string; rebase: boolean } | undefined = await branchReservation(
+            const reserved: { path: string; rebase: boolean; bisect: boolean } | undefined = await branchReservation(
               repo.root,
               slug,
               path,
             );
             if (reserved === undefined) return;
+            if (reserved.bisect)
+              throw new Error(
+                `Refusing first allocation of leaf ${slug}: the commit-free branch ${slug} is reserved by a bisect in progress in ${reserved.path}; ` +
+                  `moving it would corrupt that bisect. Finish or abort the bisect there: git bisect reset`,
+              );
             if (reserved.rebase)
               throw new Error(
                 `Refusing first allocation of leaf ${slug}: the commit-free branch ${slug} is reserved by a rebase in progress in ${reserved.path}; ` +
-                  `moving it would corrupt that rebase. Finish or abort the rebase there (git rebase --continue or git rebase --abort), or remove that worktree: git worktree remove --force ${quote(reserved.path)}`,
+                  `moving it would corrupt that rebase. Finish or abort the rebase there: git rebase --continue or git rebase --abort`,
               );
             throw new Error(
               `Refusing first allocation of leaf ${slug}: the commit-free branch ${slug} is checked out in ${reserved.path}; ` +
@@ -392,7 +405,9 @@ async function ensureWorktree(repo: Repo, leaf: Leaf, live: boolean): Promise<St
             );
           };
           if (present) {
-            const row: { locked: string | false } | undefined = (await registeredWorktrees(repo.root)).get(path);
+            const row: { locked: string | false } | undefined = [
+              ...(await registeredWorktrees(repo.root)).entries(),
+            ].find(([p]) => realpathSync(p) === realpathSync(path))?.[1];
             const locked: boolean = row !== undefined && row.locked !== false;
             const unlock: string = `git worktree unlock ${quote(path)}`;
             const verdict: { ok: true } | { ok: false; reason: string } = await worktreeRemovable(repo, path);
