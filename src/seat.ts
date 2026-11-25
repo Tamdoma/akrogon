@@ -4,13 +4,15 @@
 // live A, so the sidebar indents it, outliving A and typing no notes into it; with no live A it starts
 // parentless too. A consultant starts under its caller.
 import { randomBytes, randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { z } from 'zod';
 import { parse } from 'shell-quote';
 import { base, homePath, leafTemp, repoPrefix, seats, type GlobalConfig, type Repo, type SlotConfig } from './config';
 import { CommandError, quote } from './shell';
 import { readState, saveState, type Leaf, type State } from './state';
-import { leafSlice } from './scope';
+import { leafSlice, procRoot, sliceCgroup } from './scope';
+import { refreshToolEntry } from './tool-cgroup';
 import { type Slot } from './routing';
 import { leafSeats } from './reconcile';
 import {
@@ -183,23 +185,26 @@ async function agyTask(
 
 function cgroupOf(pid: number): string | null {
   try {
-    return readFileSync(`/proc/${pid}/cgroup`, 'utf8').trim();
+    return readFileSync(resolve(procRoot(), String(pid), 'cgroup'), 'utf8').trim();
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
     throw error;
   }
 }
 
+type ScopeEntry = { outcome: 'entered' } | { outcome: 'exited' } | { outcome: 'outside'; cgroup: string };
+
 // systemd-run moves the seat into its leaf scope before it execs the harness, late when the manager is
-// slow, so the start-proof window opens only after scope entry. Returns null once the seat is in its
-// scope or has ended (its /proc entry is gone; firstTask then reports the end), else the cgroup it
-// still sits in when PANE_WAIT_MS passes.
-async function scopeEntry(pid: number, scope: string): Promise<string | null> {
+// slow, so the start-proof window opens only after scope entry. Three outcomes: entered once the
+// seat's cgroup ends with the scope path, exited once its /proc entry is gone (firstTask then reports
+// the end), outside when PANE_WAIT_MS passes with the seat still elsewhere.
+async function scopeEntry(pid: number, scope: string): Promise<ScopeEntry> {
   const deadline: number = Date.now() + PANE_WAIT_MS;
   for (;;) {
     const cgroup: string | null = cgroupOf(pid);
-    if (cgroup === null || cgroup.endsWith(scope)) return null;
-    if (Date.now() >= deadline) return cgroup;
+    if (cgroup === null) return { outcome: 'exited' };
+    if (cgroup.endsWith(scope)) return { outcome: 'entered' };
+    if (Date.now() >= deadline) return { outcome: 'outside', cgroup };
     await Bun.sleep(50);
   }
 }
@@ -302,6 +307,19 @@ export async function startSeat(
   const harness: Harness = harnessArgv(global, seats(global, repo, leaf.path)[seat]);
   const slice: string = leafSlice(repo, state.slug, homePath());
   const unit: string = `${slice.replace(/\.slice$/, '')}-${name}-${randomBytes(4).toString('hex')}.scope`;
+  const scopeCgroup: string = `${sliceCgroup(slice)}/${unit}`;
+  // Both entry files refresh atomically on every start, so a seat never wires a stale script.
+  refreshToolEntry(homePath());
+  const entryDir: string = resolve(homePath(), 'tool-entry');
+  // Every kind carries the seat scope marker; claude gets the wrapper shell, agy the PATH-first
+  // wrapper, every other kind the sourced BASH_ENV. The agy PATH expands akrogon's own PATH at
+  // start time, since env assignments cannot self-reference.
+  const wiring: string[] =
+    harness.kind === 'claude'
+      ? [`CLAUDE_CODE_SHELL=${resolve(entryDir, 'bash')}`, 'CLAUDE_CODE_TOOL_MEMORY_LIMIT=none']
+      : harness.kind === 'agy'
+        ? [`PATH=${entryDir}:${process.env.PATH ?? ''}`]
+        : [`BASH_ENV=${resolve(entryDir, 'bash-env')}`];
   const a: Seen | undefined = slot === 'B' ? (await leafSeats(space.session, repo, readState(leaf.path))).A : undefined;
   // The seat's own labels: hc sets them at creation and herdr-app never changes them.
   const own: Record<string, string> = { 'akrogon.repo': repo.name, 'akrogon.leaf': state.slug, 'akrogon.seat': seat };
@@ -331,6 +349,9 @@ export async function startSeat(
         'CollectMode=inactive-or-failed',
         '-p',
         'SendSIGHUP=yes',
+        // Delegate the scope so its tools/, akrogon/ and helpers/ sub-cgroups can exist.
+        '-p',
+        'Delegate=yes',
         '--',
         'env',
         ...UNSET,
@@ -338,6 +359,8 @@ export async function startSeat(
         'GIT_EDITOR=true',
         `TMPDIR=${leafTemp(repo, state.slug)}`,
         'NODE_DISABLE_COMPILE_CACHE=1',
+        `AKROGON_SEAT_CGROUP=${scopeCgroup}`,
+        ...wiring,
         ...harness.argv,
         ...(harness.kind === 'agy' ? [] : [task]),
       ],
@@ -348,12 +371,35 @@ export async function startSeat(
       prompted: { ...s.prompted, [slot]: undefined },
       delivery_error: { ...s.delivery_error, [slot]: undefined },
     }));
-    const cgroup: string | null = await scopeEntry(z.number().parse(launched.pid), `/${slice}/${unit}`);
-    if (cgroup !== null) {
+    const entry: ScopeEntry = await scopeEntry(z.number().parse(launched.pid), `/${slice}/${unit}`);
+    if (entry.outcome === 'outside') {
       await end(space.session, launched.address);
       throw new Error(
-        JSON.stringify({ seat: launched.address, error: 'seat outside its leaf scope', expected: unit, cgroup }),
+        JSON.stringify({
+          seat: launched.address,
+          error: 'seat outside its leaf scope',
+          expected: unit,
+          cgroup: entry.cgroup,
+        }),
       );
+    }
+    // The scope's three sub-cgroups: tools/ minted by the entry, akrogon/ the relocation target,
+    // helpers/ the deferred-kill waiters. A creation failure refuses the start like the outside
+    // refusal; an exited seat never bootstraps — firstTask reports its end.
+    if (entry.outcome === 'entered') {
+      try {
+        for (const dir of ['tools', 'akrogon', 'helpers']) mkdirSync(resolve(scopeCgroup, dir), { recursive: true });
+      } catch (error) {
+        await end(space.session, launched.address);
+        throw new Error(
+          JSON.stringify({
+            seat: launched.address,
+            error: 'seat scope bootstrap failed',
+            expected: unit,
+            cause: error instanceof Error ? error.message : String(error),
+          }),
+        );
+      }
     }
     const started: Started = await firstTask(stream, launched, harness.kind, task);
     announce(started);
