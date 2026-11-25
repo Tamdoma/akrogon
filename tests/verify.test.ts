@@ -3212,3 +3212,96 @@ test('the receipt schema pins timeouts and durations invariants', () => {
   };
   expect(verifyRunSchema.safeParse(row(rerunEntry)).success).toBe(true);
 });
+
+// check.fix reproduction tests for review-B F1-F4, each proven on real Bun 1.4.5 output in
+// implementation/check-review-b-bun-streams-1795578777102-2337248.log and
+// implementation/check-review-b-timeout-adjacency-1795578823379-2362062.log.
+
+test('repro F1: legacy failure names survive a U+2028 title and CRLF-wrapped output', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const u2028: string = String.fromCharCode(0x2028);
+    await commitScript(
+      f,
+      'check-cr.sh',
+      "printf '%s\\r\\n' '(fail) assertion [0.04ms]' '  ^ this test timed out after 50ms.'\nexit 7\n",
+    );
+    await commitScript(f, 'check-u2028.sh', `echo '(fail) first${u2028}second [0.01ms]'\nexit 7\n`);
+    config(f, { checks: { crlf: 'sh check-cr.sh', wide: 'sh check-u2028.sh' } });
+    const { worktree } = await callerWorktree(f);
+    await commitIn(worktree, 'code.ts');
+    expect((await verify(f, [], worktree)).code).toBe(1);
+    const run: VerifyRun = records(f).at(-1)!;
+    const crlf: VerifyRun['commands'][number] = run.commands.find((item) => item.name === 'crlf')!;
+    expect(crlf.failures).toEqual(['assertion']);
+    expect(crlf.timeouts).toEqual(['assertion']);
+    const wide: VerifyRun['commands'][number] = run.commands.find((item) => item.name === 'wide')!;
+    expect(wide.failures).toEqual(['first']);
+  } finally {
+    f.clean();
+  }
+});
+
+test('repro F2: a caret separated from its failure by other lines of its stream attaches nowhere', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await commitScript(
+      f,
+      'check-adjacency.sh',
+      [
+        `echo '(fail) ordinary assertion failure [0.04ms]'`,
+        `echo '(pass) intervening pass'`,
+        `echo 'example timeout diagnostic:'`,
+        `echo '  ^ this test timed out after 50ms.'`,
+        `echo '(pass) prints an example diagnostic [0.01ms]'`,
+        `echo '(fail) direct-timeout [50.06ms]'`,
+        `echo '  ^ this test timed out after 50ms.'`,
+        'exit 7',
+      ].join('\n') + '\n',
+    );
+    config(f, { checks: { adjacency: 'sh check-adjacency.sh' } });
+    const { worktree } = await callerWorktree(f);
+    await commitIn(worktree, 'code.ts');
+    expect((await verify(f, [], worktree)).code).toBe(1);
+    const entry: VerifyRun['commands'][number] = records(f).at(-1)!.commands[0];
+    expect(entry.failures).toEqual(['ordinary assertion failure', 'direct-timeout']);
+    expect(entry.timeouts).toEqual(['direct-timeout']);
+  } finally {
+    f.clean();
+  }
+});
+
+test('repro F3: an untimed bracketed pass title stores no duration and the ledger keeps parsing', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await commitScript(
+      f,
+      'check-untimed-bracket.sh',
+      `echo '(pass) understands the output form [...ms]'\necho '(pass) real [10.50ms]'\nexit 0\n`,
+    );
+    config(f, { checks: { untimed: 'sh check-untimed-bracket.sh' } });
+    const { worktree } = await callerWorktree(f, 'caller', mergeLeaf('att-untimed'));
+    await commitIn(worktree, 'code.ts');
+    expect((await verify(f, ['--attempt', 'att-untimed'], worktree)).code).toBe(0);
+    const entry: VerifyRun['commands'][number] = records(f).at(-1)!.commands[0];
+    expect(entry.durations).toEqual([{ name: 'real', ms: 11 }]);
+    expect(entry.durations!.every((item) => Number.isInteger(item.ms))).toBe(true);
+  } finally {
+    f.clean();
+  }
+});
+
+test('repro F4: a pass title containing failure-like text keeps its full timed title', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await commitScript(f, 'check-piped-title.sh', `echo '(pass) keeps text | (fail) in a title [10.09ms]'\nexit 0\n`);
+    config(f, { checks: { piped: 'sh check-piped-title.sh' } });
+    const { worktree } = await callerWorktree(f, 'caller', mergeLeaf('att-piped'));
+    await commitIn(worktree, 'code.ts');
+    expect((await verify(f, ['--attempt', 'att-piped'], worktree)).code).toBe(0);
+    const entry: VerifyRun['commands'][number] = records(f).at(-1)!.commands[0];
+    expect(entry.durations).toEqual([{ name: 'keeps text | (fail) in a title', ms: 10 }]);
+  } finally {
+    f.clean();
+  }
+});
