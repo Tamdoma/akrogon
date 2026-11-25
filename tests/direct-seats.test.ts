@@ -204,13 +204,11 @@ test('phase moves, stop and passes never touch the direct seats of a cross-sessi
     const path: string = directLeaf(f, 'fix-alpha', 'implement', seats, { worktree });
     // The lifecycle control: real labeled seats of the same repo, dispatched normally.
     leaf(f, 'lc', 'plan.synthesis');
+    // Adoption runs for the whole test: the endgame passes re-dispatch lc's seat after stop --all
+    // ended it, and a seat restarts only when herdr-app adopts it into the tab.
     const stopAdopt: () => void = adopt(f.core);
-    try {
-      expect((await cli(f, ['next', 'lc'], f.root, f.env)).code).toBe(0);
-      expect(await f.core.terminals({ 'akrogon.leaf': 'lc' }, false)).not.toEqual([]);
-    } finally {
-      stopAdopt();
-    }
+    expect((await cli(f, ['next', 'lc'], f.root, f.env)).code).toBe(0);
+    expect(await f.core.terminals({ 'akrogon.leaf': 'lc' }, false)).not.toEqual([]);
     const pids: { door: number | null; reviewer: number | null } = {
       door: (await f.core.get(door)).pid,
       reviewer: (await core2.get(reviewer)).pid,
@@ -274,10 +272,23 @@ test('phase moves, stop and passes never touch the direct seats of a cross-sessi
     expect(stoppedKeys(f)).not.toContain(f.repo + '/fix-alpha');
 
     // stop --all sweeps the lifecycle control and passes over the direct leaf without harm.
+    // D18 selects the direct leaf again: the earlier stop consumed its slice in the fake db, and
+    // real systemd exits 0 stopping an already-stopped unit, so the slice is re-seeded into the
+    // state a real host is in.
+    const db1 = z.object({ units: z.array(z.unknown()) }).parse(JSON.parse(readFileSync(f.systemctl.db, 'utf8')));
+    db1.units.push({ unit: leafSlice({ name: f.repo }, 'fix-alpha', f.home), sub: 'active' });
+    writeFileSync(f.systemctl.db, JSON.stringify(db1));
     const stopAll: Result = await cli(f, ['stop', '--all'], f.root, f.env);
     expect(stopAll.code, stopAll.stderr).toBe(0);
     expect(stoppedKeys(f)).toContain(f.repo + '/lc');
     await seatsUntouched();
+
+    // Operator unstop of both leaves: leaf-stop pins a non-zero bare next while any leaf is
+    // stopped, so the passes below run with both records deleted.
+    const parsed2 = z.record(z.string(), z.unknown()).parse(Bun.YAML.parse(readFileSync(file, 'utf8')));
+    delete parsed2[f.repo + '/fix-alpha'];
+    delete parsed2[f.repo + '/lc'];
+    yaml(file, parsed2);
 
     // A plain pass and a reconcile pass both complete without touching the direct seats.
     const nextResult: Result = await cli(f, ['next'], f.root, f.env);
@@ -287,6 +298,7 @@ test('phase moves, stop and passes never touch the direct seats of a cross-sessi
     expect(resume.code, resume.stderr).toBe(0);
     await seatsUntouched();
     expect(existsSync(worktree)).toBe(true);
+    stopAdopt();
   } finally {
     await core2.stop();
     await f.clean();
