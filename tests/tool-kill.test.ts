@@ -410,6 +410,71 @@ test.serial(
   },
 );
 
+test.serial('the tool sweep follows the state save and reports only eligible scopes and populated tools', async () => {
+  const f: Fixture = await fixture();
+  const slug: string = 'tk-save';
+  const slice: string = testSlice(f, slug);
+  const sliceDir: string = sliceCgroup(slice);
+  const activeUnit: string = 'tk-active.scope';
+  const bareUnit: string = 'tk-bare.scope';
+  const active: string = resolve(sliceDir, activeUnit);
+  const tools: string = resolve(active, 'tools');
+  try {
+    yaml(resolve(f.root, 'issues/config.yaml'), { checks: {}, grounding: 'none' });
+    const leafPath: string = leaf(f, slug, 'plan.synthesis');
+    const loopPath: string = resolve(f.home, 'loop.sh');
+    const barePath: string = resolve(f.home, 'bare.sh');
+    writeFileSync(loopPath, loopScript(active));
+    writeFileSync(barePath, 'exec sleep 600\n');
+    const env: NodeJS.ProcessEnv = scopeEnv(f);
+    await spawnScope(slice, activeUnit, loopPath, env, f.root);
+    await spawnScope(slice, bareUnit, barePath, env, f.root);
+    const toolNames = (): string[] => readdirSync(tools).filter((name) => name.startsWith('t-'));
+    await waitFor(() => existsSync(tools) && toolNames().length === 1, 'tool cgroup created');
+    const [liveTool]: string[] = toolNames();
+    const events: string = resolve(tools, liveTool, 'cgroup.events');
+    await waitFor(() => readFileSync(events, 'utf8').includes('populated 1'), 'tool cgroup populated');
+    mkdirSync(resolve(tools, 't-1-0'));
+    expect(existsSync(resolve(sliceDir, bareUnit, 'tools'))).toBe(false);
+
+    const phase: string[] = ['phase', slug, 'implement', '--slot', 'A'];
+    // exec keeps the shell's PID, so the directory blocks this invocation's state temp file.
+    const refused: Cap = cap(
+      [
+        'bash',
+        '-c',
+        'mkdir "$1/state.yaml.$$.tmp" || exit; shift; exec "$@"',
+        'phase',
+        leafPath,
+        process.execPath,
+        entry,
+        ...phase,
+      ],
+      { cwd: f.root, env },
+    );
+    expect(await refused.exited).not.toBe(0);
+    expect(await refused.stderr).toContain('EISDIR');
+    expect(readState(leafPath).phase).toBe('plan.synthesis');
+    expect(rows(f, 'tool_kill')).toEqual([]);
+    expect(readFileSync(events, 'utf8')).toContain('populated 1');
+
+    const moved = await cli(f, phase);
+    expect(moved.code).toBe(0);
+    expect(readState(leafPath).phase).toBe('implement');
+    expect(warnings(moved.stderr).some((warning) => warning.unit === bareUnit)).toBe(false);
+    const kills = rows(f, 'tool_kill');
+    expect(kills).toHaveLength(1);
+    expect(kills[0]).toMatchObject({ slug, unit: activeUnit, seen: 2, populated: [liveTool] });
+  } finally {
+    try {
+      await stopSliceNow(slice);
+      expect(await waitGone(sliceDir)).toBe(true);
+    } finally {
+      f.clean();
+    }
+  }
+});
+
 async function waitForFile(path: string, ms: number = WAIT_MS): Promise<string> {
   await waitFor(() => existsSync(path), path, ms);
   const begun: number = Date.now();
