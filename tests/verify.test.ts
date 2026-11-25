@@ -2918,7 +2918,7 @@ test('a red row records only stream-attached timeouts at leaf and merge scope wi
         `echo '${b}(pass) b-ok [3.00ms]'`,
         `echo '${b}  ^ this test timed out after 100ms.'`,
         `echo '${b}(fail) beta-assert [0.13ms]'`,
-        `echo '  ^ this test timed out after 50ms.'`,
+        `echo '${a}  ^ this test timed out after 50ms.'`,
         `echo 'error: this test timed out after 50ms.'`,
         `echo '(fail) gamma-thrower [0.06ms]'`,
         'exit 7',
