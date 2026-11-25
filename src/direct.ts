@@ -11,8 +11,8 @@ import { enclosingCapture } from './pack';
 import { checkBase } from './preflight';
 import { command } from './shell';
 import {
+  directMarker,
   findLeaf,
-  hasDirectMarker,
   hasLeafFolder,
   leafFolders,
   parseLeafState,
@@ -68,8 +68,9 @@ export async function directCommand(
     throw new Error('akrogon direct runs inside an hc terminal: HC_TERMINAL_ID is not set');
   const caller: SeatRef = await probeExactlyOne(callerAddress, `HC_TERMINAL_ID ${callerAddress}`);
   const leafPath: string = directLeafPath(repo, slug);
-  if (existsSync(resolve(leafPath, 'state.yaml'))) {
-    if (!hasDirectMarker(leafPath)) throw new Error(`${slug} is not a direct leaf`);
+  const marker: boolean | undefined = directMarker(leafPath);
+  if (marker === false) throw new Error(`${slug} is not a direct leaf`);
+  if (marker === true) {
     const reviewer: SeatRef = await probeExactlyOne(reviewerAddress, `the reviewer address ${reviewerAddress}`);
     const currentPath: string = await withLock(resolve(globalHome(), '.lock'), async () => {
       const path: string = directLeafPath(repo, slug);

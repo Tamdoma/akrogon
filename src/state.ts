@@ -246,8 +246,9 @@ function readRawLeafState(file: string): Record<string, unknown> {
   return z.record(z.string(), z.unknown()).parse(Bun.YAML.parse(readFileSync(file, 'utf8')));
 }
 
-export function hasDirectMarker(leafPath: string): boolean {
-  return readRawLeafState(resolve(leafPath, 'state.yaml')).direct === true;
+export function directMarker(leafPath: string): boolean | undefined {
+  const file: string = resolve(leafPath, 'state.yaml');
+  return existsSync(file) ? readRawLeafState(file).direct === true : undefined;
 }
 
 // Called under the global state lock. Read the current state without materializing schema defaults.
