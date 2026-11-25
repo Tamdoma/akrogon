@@ -29,7 +29,9 @@ afterAll(async () => {
   }
 });
 
-const CMD: string = 'cat /proc/$$/cgroup > "$OUT/$N.cg"; echo "out-$N"; echo "err-$N" >&2; exit 3';
+// The command every wiring shape runs: records its own cgroup, prints one stdout and one stderr
+// line, exits 3. Written to cmd.sh by the test so no invocation nests quoting.
+const CMD_SH: string = 'cat /proc/$$/cgroup > "$OUT/$N.cg"\necho "out-$N"\necho "err-$N" >&2\nexit 3\n';
 
 // Case bodies run inside one real delegated scope: the script writes the scope root, then runs
 // each wiring shape with the command above and records where the command's shell sat.
@@ -42,20 +44,20 @@ function scopeScript(): string {
     // The command still runs, unplaced, with its output and exit code unchanged.
     'mkdir "$root/tools" 2>/dev/null',
     'echo 1 > "$root/cgroup.max.depth" 2>/dev/null',
-    'BASH_ENV="$ENTRY/bash-env" OUT="$OUT" N=f bash -c \'eval "$CMD"\' > "$OUT/f.out" 2> "$OUT/f.err"; echo $? > "$OUT/f.code"',
+    'BASH_ENV="$ENTRY/bash-env" OUT="$OUT" N=f bash "$OUT/cmd.sh" > "$OUT/f.out" 2> "$OUT/f.err"; echo $? > "$OUT/f.code"',
     'echo 32 > "$root/cgroup.max.depth" 2>/dev/null',
     // a: the pi/codex wiring shape.
-    'BASH_ENV="$ENTRY/bash-env" OUT="$OUT" N=a bash -c \'eval "$CMD"\' > "$OUT/a.out" 2> "$OUT/a.err"; echo $? > "$OUT/a.code"',
+    'BASH_ENV="$ENTRY/bash-env" OUT="$OUT" N=a bash "$OUT/cmd.sh" > "$OUT/a.out" 2> "$OUT/a.err"; echo $? > "$OUT/a.code"',
     // b: the claude wiring shape — the wrapper is the shell.
-    'OUT="$OUT" N=b "$ENTRY/bash" -c \'eval "$CMD"\' > "$OUT/b.out" 2> "$OUT/b.err"; echo $? > "$OUT/b.code"',
+    'OUT="$OUT" N=b "$ENTRY/bash" "$OUT/cmd.sh" > "$OUT/b.out" 2> "$OUT/b.err"; echo $? > "$OUT/b.code"',
     // c: the agy wiring shape — the wrapper is first on PATH.
-    'PATH="$ENTRY:$PATH" OUT="$OUT" N=c bash -c \'eval "$CMD"\' > "$OUT/c.out" 2> "$OUT/c.err"; echo $? > "$OUT/c.code"',
+    'PATH="$ENTRY:$PATH" OUT="$OUT" N=c bash "$OUT/cmd.sh" > "$OUT/c.out" 2> "$OUT/c.err"; echo $? > "$OUT/c.code"',
     // r: the reference run with no wiring at all.
-    'OUT="$OUT" N=r bash -c \'eval "$CMD"\' > "$OUT/r.out" 2> "$OUT/r.err"; echo $? > "$OUT/r.code"',
+    'OUT="$OUT" N=r bash "$OUT/cmd.sh" > "$OUT/r.out" 2> "$OUT/r.err"; echo $? > "$OUT/r.code"',
     // d: a nested shell inside a placed shell keeps the outer placement.
-    'BASH_ENV="$ENTRY/bash-env" OUT="$OUT" bash -c \'cat /proc/$$/cgroup > "$OUT/d-outer.cg"; N=d bash -c "eval \\"$CMD\\"" > "$OUT/d.out" 2> "$OUT/d.err"; echo $? > "$OUT/d.code"\'',
+    'BASH_ENV="$ENTRY/bash-env" OUT="$OUT" bash -c \'cat /proc/$$/cgroup > "$OUT/d-outer.cg"; N=d bash "$OUT/cmd.sh" > "$OUT/d.out" 2> "$OUT/d.err"; echo $? > "$OUT/d.code"\'',
     // g: /bin/sh never sources BASH_ENV — unplaced, output unchanged.
-    'BASH_ENV="$ENTRY/bash-env" OUT="$OUT" N=g sh -c \'eval "$CMD"\' > "$OUT/g.out" 2> "$OUT/g.err"; echo $? > "$OUT/g.code"',
+    'BASH_ENV="$ENTRY/bash-env" OUT="$OUT" N=g sh "$OUT/cmd.sh" > "$OUT/g.out" 2> "$OUT/g.err"; echo $? > "$OUT/g.code"',
     'echo done > "$OUT/done"',
     'exit 0',
   ].join('\n');
@@ -74,6 +76,7 @@ test.serial('the entry places a bash tool shell exactly once at the scope root a
 
     const out: string = resolve(f.home, 'entry-out');
     mkdirSync(out, { recursive: true });
+    writeFileSync(resolve(out, 'cmd.sh'), CMD_SH);
     const script: string = resolve(f.home, 'entry-scope.sh');
     writeFileSync(script, scopeScript());
     const slice: string = `akrogon-tentry-p${process.pid}.slice`;
