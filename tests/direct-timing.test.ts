@@ -211,6 +211,10 @@ test('a direct leaf shows no prompt or seat_done gaps, its run pair counts, and 
     expect(direct.stdout).not.toContain('incomplete prompt');
     expect(direct.stdout).not.toContain('incomplete seat_done');
     expect(direct.stdout).not.toMatch(/incomplete prompt:[AB]/);
+    const cohort: Result = await cli(f, ['timing', '--cohort', '--since', '2026-10-10T00:00:00Z']);
+    expect(cohort.code, cohort.stderr).toBe(0);
+    const member: string | undefined = cohort.stdout.split('\n').find((line) => line.startsWith('dt '));
+    expect(member).toBe('dt F 30m');
     // The lifecycle control with the identical shape produces both gap kinds.
     const control: Result = await cli(f, ['timing', 'ctl']);
     expect(control.code).toBe(0);
