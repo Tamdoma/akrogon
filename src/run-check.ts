@@ -325,7 +325,11 @@ export async function captureOwner(target: string, repo: Repo): Promise<{ path: 
 // The echoes write synchronously so an EPIPE surfaces at the write, where it
 // is catchable; Bun's buffered pipe writes raise it only at exit-flush, which
 // would exit 1 over a completed publish. Only EPIPE is swallowed: the publish
-// never depends on the pipe.
+// never depends on the pipe. Bun's child pipes are non-blocking, so an open
+// but undrained reader answers a full pipe with EAGAIN instead of blocking;
+// the echo is the process's final act, so retrying after a short sleep is the
+// blocking write an ordinary pipe would have performed. Any other errno still
+// throws: a writer that cannot report is worse than a dead one.
 export function writeSwallowingEpipe(fd: number, text: string): void {
   const buffer: Buffer = Buffer.from(text, 'utf8');
   let offset: number = 0;
@@ -333,7 +337,12 @@ export function writeSwallowingEpipe(fd: number, text: string): void {
     try {
       offset += writeSync(fd, buffer, offset, buffer.length - offset);
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'EPIPE') return;
+      const code: string | undefined = (error as NodeJS.ErrnoException).code;
+      if (code === 'EPIPE') return;
+      if (code === 'EAGAIN') {
+        Bun.sleepSync(1);
+        continue;
+      }
       throw error;
     }
   }
