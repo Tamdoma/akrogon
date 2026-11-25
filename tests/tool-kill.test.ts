@@ -384,7 +384,7 @@ test.serial(
         // A committed move on a leaf whose slice directory never existed: no warning, no rows.
         const none = await cli(f, ['phase', 'tk-none', 'implement', '--slot', 'A'], f.root);
         expect(none.code, `stdout: ${none.stdout} stderr: ${none.stderr}`).toBe(0);
-        expect(none.stderr).not.toContain('tk-none');
+        expect(none.stderr).not.toContain('"tool_kill"');
         expect(rows(f, 'tool_kill').some((row) => row.slug === 'tk-none')).toBe(false);
 
         // Scope s4 carried an empty tools/: a row with seen 0 and no warning.
