@@ -76,8 +76,8 @@ export function orderHook(f: HcFixture): void {
 }
 
 export function setupMarkerPath(wt: string): string {
-  const probe: string = Bun.spawnSync(['git', 'rev-parse', '--git-path', 'akrogon-setup'], { cwd: wt }).stdout
-    .toString()
+  const probe: string = Bun.spawnSync(['git', 'rev-parse', '--git-path', 'akrogon-setup'], { cwd: wt })
+    .stdout.toString()
     .trim();
   return resolve(wt, probe);
 }

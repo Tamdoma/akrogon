@@ -332,7 +332,12 @@ export async function branchReservation(
   return undefined;
 }
 
-async function ensureWorktree(repo: Repo, leaf: Leaf, live: boolean, busy: string | null): Promise<State | { busy: string }> {
+async function ensureWorktree(
+  repo: Repo,
+  leaf: Leaf,
+  live: boolean,
+  busy: string | null,
+): Promise<State | { busy: string }> {
   const path: string = resolve(worktreeStore(repo), leaf.state.slug);
   const slug: string = leaf.state.slug;
   if (leaf.state.worktree !== undefined && leaf.state.worktree !== path)
@@ -464,9 +469,7 @@ async function ensureWorktree(repo: Repo, leaf: Leaf, live: boolean, busy: strin
   // by the marker at the worktree's git path. Due and busy returns here, before writeLeafEnv, so
   // .env and env_names/env_generation stay in step.
   const pending: { setup: string; marker: string } | undefined =
-    repo.config.setup === undefined
-      ? undefined
-      : { setup: repo.config.setup, marker: await setupMarkerPath(path) };
+    repo.config.setup === undefined ? undefined : { setup: repo.config.setup, marker: await setupMarkerPath(path) };
   const due: boolean =
     pending !== undefined && (!existsSync(pending.marker) || readFileSync(pending.marker, 'utf8') !== pending.setup);
   if (due && busy !== null) return { busy };
@@ -1030,7 +1033,12 @@ async function dispatchLeaf(
     const mustCreate: boolean = !existsSync(resolve(worktreeStore(repo), slug));
     await checkBase(repo, mustCreate);
     if ((await ownPlace()) === null) return 'skipped';
-    const allocated: Allocation | null | { busy: string } = await allocate(global, repo, { path: leaf.path, state }, invocation);
+    const allocated: Allocation | null | { busy: string } = await allocate(
+      global,
+      repo,
+      { path: leaf.path, state },
+      invocation,
+    );
     if (allocated === null) return end('capacity');
     // Setup is due and a busy seat or live run-check holds the leaf: the leaf simply waits for the
     // next pass — no capacity row, no error, no skipped record.
@@ -1518,7 +1526,9 @@ export async function seatCommand(slug: string, slot: Slot, task: string | undef
         `No free seat capacity: ${await capRefusal(global, repo, invocation, leaf.state.worktree === undefined)}`,
       );
     if ('busy' in allocated)
-      throw new Error(`Refusing akrogon seat ${slug} ${slot}: setup is due in the worktree and ${allocated.busy} holds the leaf`);
+      throw new Error(
+        `Refusing akrogon seat ${slug} ${slot}: setup is due in the worktree and ${allocated.busy} holds the leaf`,
+      );
     const started: Started = await startSeat(
       global,
       repo,

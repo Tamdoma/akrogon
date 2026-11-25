@@ -40,14 +40,7 @@ test('criterion 1: a fresh leaf runs setup once per checkout state before the fi
     const wt: string = resolve(storeDir(f), 'build');
     const lines: string[] = setupLines(f);
     expect(setupCalls(f)).toBe(1);
-    expect(lines.slice(0, 6)).toEqual([
-      `cwd=${wt}`,
-      'ver=v1',
-      'run=unset',
-      'cc=unset',
-      'lock=held',
-      'dotenv=yes',
-    ]);
+    expect(lines.slice(0, 6)).toEqual([`cwd=${wt}`, 'ver=v1', 'run=unset', 'cc=unset', 'lock=held', 'dotenv=yes']);
     expect(lines[6]).toBe('task-build');
     expect(readFileSync(setupMarkerPath(wt), 'utf8')).toBe(setupScript(f, 1));
     const seat = await waitIdle(f, 'build', 'a');
@@ -132,7 +125,9 @@ test('criterion 3: move deletes the marker and the next re-prompt runs setup bef
     expect(secondTask).toBeGreaterThan(secondSetup);
     expect(lines[secondSetup + 1]).toBe('ver=v1');
     expect(existsSync(resolve(wt, 'top-file'))).toBe(true);
-    expect(f.core.tasks(seat.address).filter((text: string) => text.startsWith('check-issue build slot=B'))).toHaveLength(2);
+    expect(
+      f.core.tasks(seat.address).filter((text: string) => text.startsWith('check-issue build slot=B')),
+    ).toHaveLength(2);
     expect(readState(path).worktree).toBe(wt);
   } finally {
     await f.clean();
