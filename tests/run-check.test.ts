@@ -1,5 +1,6 @@
 import { test, expect } from 'bun:test';
 import { z } from 'zod';
+import { createHash } from 'node:crypto';
 import { basename, dirname, resolve } from 'node:path';
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import {
@@ -694,6 +695,49 @@ test('a nested run-check inherits neither AKROGON_SESSIONS nor AKROGON_SESSION_M
     );
     expect(result.code, result.stderr).toBe(0);
     expect(readFileSync(inner, 'utf8')).toBe('unset:unset');
+  } finally {
+    f.clean();
+  }
+});
+
+// The fixture config declares neither temp-root name, so the nested run-check gets the caller's
+// values only when constructedEnv copies them. The default-root path is computed for the fixture's
+// own repo root and slug, never scanned in the shared /var/tmp root.
+test('a nested run-check inherits the caller temp roots', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { worktree } = await leafWorktree(f, 'nested-roots');
+    const shim = fakeAkrogon(f);
+    const received: string = resolve(f.home, 'nested-roots-env');
+    const result: Result = await cli(
+      f,
+      [
+        'run-check',
+        '--name',
+        'outer',
+        '--',
+        'akrogon',
+        'run-check',
+        '--name',
+        'inner',
+        '--',
+        'sh',
+        '-c',
+        `printf %s:%s "\${AKROGON_LEAF_TEMP_ROOT:-unset}" "\${AKROGON_RETIRED_TEMP_ROOT:-unset}" > ${received}`,
+      ],
+      worktree,
+      { ...shim.env, HOME: f.home },
+    );
+    expect(result.code, result.stderr).toBe(0);
+    expect(readFileSync(received, 'utf8')).toBe(`${leafTempRoot(f)}:${resolve(f.home, 'retired-temp')}`);
+    const hex = (text: string): string => createHash('sha256').update(text).digest('hex');
+    const root: string = readRepo(f.repo, f.root).root;
+    const defaultLeaf: string = resolve(
+      `/var/tmp/akr-${process.getuid!()}`,
+      hex(root).slice(0, 4),
+      hex(`${root}\nnested-roots`).slice(0, 8),
+    );
+    expect(existsSync(defaultLeaf), `default-root leaf dir created: ${defaultLeaf}`).toBe(false);
   } finally {
     f.clean();
   }
