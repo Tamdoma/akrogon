@@ -21,31 +21,42 @@ import { appendTiming } from './timing';
 // the relocation every akrogon process runs out of a t-, the commitMove kill
 // sweep and the detached helper that ends a deferred t- once its shell exits.
 
+// The shared inner body of both entry forms, indented for one group level.
+function placementBody(root: string): string[] {
+  return [
+    '  __akrogon_tool_entry() {',
+    '    [ -n "${AKROGON_SEAT_CGROUP:-}" ] || return 0',
+    '    local cur',
+    "    cur=$(sed -n 's/^0:://p' /proc/self/cgroup 2>/dev/null) || return 0",
+    `    [ "${root}$cur" = "$AKROGON_SEAT_CGROUP" ] || return 0`,
+    '    mkdir -p "$AKROGON_SEAT_CGROUP/tools" 2>/dev/null',
+    '    local st',
+    '    st=$(cat /proc/$$/stat 2>/dev/null) || return 0',
+    '    st=${st##*) }',
+    '    set -- $st',
+    '    local d="$AKROGON_SEAT_CGROUP/tools/t-$$-${20}"',
+    '    mkdir -p "$d" 2>/dev/null && echo $$ > "$d/cgroup.procs" 2>/dev/null && export AKROGON_TOOL_CGROUP="$d"',
+    '    return 0',
+    '  }',
+    '  __akrogon_tool_entry',
+    '  unset -f __akrogon_tool_entry',
+    '  true',
+  ];
+}
+
 // The placement shell text both entry forms share, probe-proven in
 // issues/chart/seat-shell-kill/direct/probe-entry/place.sh: act only when the
 // process sits exactly at the seat scope root, then mint tools/t-<pid>-<starttime>,
 // move in and export the marker. Every step discards output and failure.
+//
+// The whole body runs inside one brace group whose streams both go to
+// /dev/null: bash xtrace prints a simple command's trace before applying its
+// redirections, so `f 2>/dev/null` would leak `+ f` onto a traced user's
+// stderr — but commands inside a redirected group trace only after the
+// group's own redirection applies. Nothing the entry does ever reaches the
+// traced stderr, and the shell's xtrace state passes through untouched.
 function placementShell(root: string): string {
-  return [
-    '__akrogon_tool_entry() {',
-    '  [ -n "${AKROGON_SEAT_CGROUP:-}" ] || return 0',
-    '  local cur',
-    "  cur=$(sed -n 's/^0:://p' /proc/self/cgroup 2>/dev/null) || return 0",
-    `  [ "${root}$cur" = "$AKROGON_SEAT_CGROUP" ] || return 0`,
-    '  mkdir -p "$AKROGON_SEAT_CGROUP/tools" 2>/dev/null',
-    '  local st',
-    '  st=$(cat /proc/$$/stat 2>/dev/null) || return 0',
-    '  st=${st##*) }',
-    '  set -- $st',
-    '  local d="$AKROGON_SEAT_CGROUP/tools/t-$$-${20}"',
-    '  mkdir -p "$d" 2>/dev/null && echo $$ > "$d/cgroup.procs" 2>/dev/null && export AKROGON_TOOL_CGROUP="$d"',
-    '  return 0',
-    '}',
-    '__akrogon_tool_entry >/dev/null 2>&1',
-    'unset -f __akrogon_tool_entry',
-    'true',
-    '',
-  ].join('\n');
+  return ['{', ...placementBody(root), '} >/dev/null 2>&1', ''].join('\n');
 }
 
 function entryTemplate(root: string, bash: string): { env: string; wrapper: string } {
@@ -54,9 +65,31 @@ function entryTemplate(root: string, bash: string): { env: string; wrapper: stri
   // clobbers the outer positional parameters, so the exec still carries the
   // caller's argv. The shebang is the resolved real bash: a PATH lookup here
   // would recurse into the wrapper itself on the agy wiring.
+  //
+  // When xtrace reaches the wrapper through an exported SHELLOPTS, the
+  // caller's trace state must survive into the final shell, yet the wrapper's
+  // own exec line must never join the trace: xtrace is remembered, then
+  // disabled inside the silenced group (the group's redirection hides the
+  // disable itself), and restored by prepending -x to the exec's argv — the
+  // same end state an inherited xtrace would have produced in the exec'ed
+  // bash. Xtrace is never re-enabled in the wrapper shell itself, so the exec
+  // command line never traces.
+  const wrapperBody: string = [
+    '{',
+    '  __akrogon_tool_x=0',
+    '  case $- in',
+    '    *x*) __akrogon_tool_x=1; set +x ;;',
+    '  esac',
+    ...placementBody(root),
+    '} >/dev/null 2>&1',
+    'case $__akrogon_tool_x in',
+    '  1) set -- -x "$@" ;;',
+    'esac',
+    '',
+  ].join('\n');
   return {
     env: placement,
-    wrapper: `#!${bash}\n${placement}exec ${bash} "$@"\n`,
+    wrapper: `#!${bash}\n${wrapperBody}exec ${bash} "$@"\n`,
   };
 }
 
@@ -168,12 +201,19 @@ function warn(slug: string, unit: string, t: string, error: unknown): void {
   );
 }
 
-function rmdirBestEffort(path: string): void {
+// cgroup.kill reaps asynchronously, so a rmdir that fails while the cgroup
+// still reads populated 1 is the routine reaping race: silent, removal
+// converges over later commits. A failure while the cgroup reads populated 0
+// (or its events are unreadable) has nothing left to reap, so the failure is
+// real and reports through the caller. ENOENT is a concurrent pass having
+// already removed the directory — success in effect, never a warning.
+function rmdirOrReport(path: string, report: (error: unknown) => void): void {
   try {
     rmdirSync(path);
-  } catch {
-    // cgroup.kill reaps asynchronously and the t- may be repopulated or already
-    // gone; removal converges over later commits, so a rmdir never warns.
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+    if (populated(path)) return;
+    report(error);
   }
 }
 
@@ -246,9 +286,10 @@ function isDirectory(path: string): boolean {
 
 // One scope's sweep: every t- whose akrogon/ child is unpopulated is killed
 // now, every populated one defers to a single helper. Killed-empty t- dirs and
-// the akrogon/ and helpers/ dirs of gone t-s are removed best effort. Kill
-// write, spawn and pid-write failures count into the row's errors and warn;
-// rmdir failures never do, since zombie reaping pins the dir asynchronously.
+// the akrogon/ and helpers/ dirs of gone t-s are removed after; removal
+// failures warn only when they cannot be the kernel's reaping race. Kill
+// write, spawn, pid-write and real removal failures count into the row's
+// errors and warn.
 function sweepScope(repo: Repo, slug: string, scopeDir: string, unit: string): void {
   const toolsDir: string = resolve(scopeDir, 'tools');
   let seen: number = 0;
@@ -272,7 +313,7 @@ function sweepScope(repo: Repo, slug: string, scopeDir: string, unit: string): v
         } catch (error) {
           fail(t, error);
         }
-        rmdirBestEffort(resolve(toolsDir, t));
+        rmdirOrReport(resolve(toolsDir, t), (error) => fail(t, error));
         continue;
       }
       deferred.push(t);
@@ -289,7 +330,7 @@ function sweepScope(repo: Repo, slug: string, scopeDir: string, unit: string): v
       for (const name of readdirSync(dir)) {
         if (!name.startsWith('t-')) continue;
         if (names.includes(name) || populated(resolve(dir, name))) continue;
-        rmdirBestEffort(resolve(dir, name));
+        rmdirOrReport(resolve(dir, name), (error) => fail(name, error));
       }
     }
   } catch (error) {
@@ -360,13 +401,22 @@ export async function toolKillHelper(
       errorText = error instanceof Error ? error.message : String(error);
     }
   }
+  // The rmdir retries briefly since the kernel reaps asynchronously. A failure
+  // left when the deadline passes is real only when nothing is reaping: the
+  // row then carries it in its error field while the outcome keeps recording
+  // the kill write itself.
   const deadline: number = Date.now() + 2000;
   for (;;) {
     try {
       rmdirSync(toolPath);
       break;
-    } catch {
-      if (Date.now() > deadline) break;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') break;
+      if (Date.now() > deadline) {
+        if (outcome === 'written' && !populated(toolPath))
+          errorText = error instanceof Error ? error.message : String(error);
+        break;
+      }
       await Bun.sleep(100);
     }
   }
