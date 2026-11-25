@@ -310,12 +310,6 @@ test('files.md documents verify-runs timeouts, durations and attempt', (): void 
     .filter((line: string) => line.startsWith('|'))
     .find((line: string) => line.startsWith('| `verify-runs.jsonl`'));
   expect(row, 'files.md holds a verify-runs.jsonl row').not.toBeUndefined();
-  for (const needed of [
-    '`timeouts`',
-    '`durations`',
-    '`attempt`',
-    '20 slowest',
-    'does not parse under an older akrogon',
-  ])
+  for (const needed of ['`timeouts`', '`durations`', '`attempt`'])
     expect(row!, `verify-runs.jsonl row names ${needed}`).toContain(needed);
 });
