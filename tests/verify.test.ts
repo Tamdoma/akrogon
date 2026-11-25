@@ -3305,3 +3305,53 @@ test('repro F4: a pass title containing failure-like text keeps its full timed t
     f.clean();
   }
 });
+
+// check.fix round 2 reproductions for review-B F2/F4, proven on real Bun 1.4.5 output in
+// implementation/check-recheck-b-bun-streams-1795581072649-3786828.log.
+
+test('repro F2 round 2: a real blank line expires the timeout candidate', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await commitScript(
+      f,
+      'check-blank-adjacency.sh',
+      [
+        `echo '(fail) assertion failure [0.04ms]'`,
+        `echo ''`,
+        `echo '  ^ this test timed out after 50ms.'`,
+        `echo '(pass) prints an example diagnostic after a blank line [0.01ms]'`,
+        `echo '(fail) direct-timeout [50.06ms]'`,
+        `echo '  ^ this test timed out after 50ms.'`,
+        'exit 7',
+      ].join('\n') + '\n',
+    );
+    config(f, { checks: { blank: 'sh check-blank-adjacency.sh' } });
+    const { worktree } = await callerWorktree(f);
+    await commitIn(worktree, 'code.ts');
+    expect((await verify(f, [], worktree)).code).toBe(1);
+    const entry: VerifyRun['commands'][number] = records(f).at(-1)!.commands[0];
+    expect(entry.failures).toEqual(['assertion failure', 'direct-timeout']);
+    expect(entry.timeouts).toEqual(['direct-timeout']);
+  } finally {
+    f.clean();
+  }
+});
+
+test('repro F4 round 2: a wrapped pass title holding failure-like text keeps its full timed title', async () => {
+  const f: Fixture = await fixture();
+  try {
+    await commitScript(
+      f,
+      'check-wrapped-piped.sh',
+      `echo 'wrap | sh run-tests.sh | (pass) keeps text | (fail) in a title [10.12ms]'\nexit 0\n`,
+    );
+    config(f, { checks: { wrapped: 'sh check-wrapped-piped.sh' } });
+    const { worktree } = await callerWorktree(f, 'caller', mergeLeaf('att-wrapped'));
+    await commitIn(worktree, 'code.ts');
+    expect((await verify(f, ['--attempt', 'att-wrapped'], worktree)).code).toBe(0);
+    const entry: VerifyRun['commands'][number] = records(f).at(-1)!.commands[0];
+    expect(entry.durations).toEqual([{ name: 'keeps text | (fail) in a title', ms: 10 }]);
+  } finally {
+    f.clean();
+  }
+});
