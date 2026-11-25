@@ -63,7 +63,7 @@ Each registered checkout has `issues/config.yaml`. The [init-akrogon skill](../.
 | `fix_rounds` | How many repair rounds the chart door's direct route may use. Default 3. |
 | `max_active` | How many of this repo's leaves may run at once, under the machine `max_active`, which still limits the total. Counted like the machine limit, except that before a leaf that never started gets a seat, the repo's leaves waiting in merge, minus the one landing, count too. Optional, a positive whole number; absent means only the machine limit applies. `akrogon config` shows it as `repo_max_active`. Install a build that knows the key before adding it: an older build rejects the file. |
 | `implement` | `subagents` lets seat A hand units to worker agents. `inline` makes seat A do all the work itself. Default `subagents`. |
-| `setup` | A command that installs dependencies in each fresh checkout, such as `bun install --frozen-lockfile --backend=copyfile`. Akrogon runs it before check commands. Optional. |
+| `setup` | A command that installs dependencies in each fresh checkout, such as `bun install --frozen-lockfile --backend=copyfile`. Akrogon runs it before check commands, and in a leaf worktree before a seat works there, once per checkout state. Optional. |
 | `checks` | Named commands every leaf must pass. A red check blocks. Default empty. |
 | `merge_checks` | Named commands that run only at merge, all at once once the `checks` stage is green. `akrogon config` prints `akrogon verify --attempt <id>` for each entry — the merge turn's runner — and `akrogon run-check` refuses the command itself. Default empty. |
 | `merge_covers` | Names from `checks` that a merge check already covers, so merge skips them. Needs a non-empty `merge_checks`. Default empty. |
