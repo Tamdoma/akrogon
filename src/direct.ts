@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, realpathSync, renameSync, statSync } from 'node:
 import { basename, dirname, resolve } from 'node:path';
 import { globalHome, readGlobal, requireRepo, ensureLeafTemp, within, worktreeStore, type Repo } from './config';
 import { flockHold } from './flock';
-import { HcError, sessions, terminal } from './hc';
+import { terminalIfPresent, type Seen } from './hc';
 import { enclosingCapture } from './pack';
 import { checkBase } from './preflight';
 import { command } from './shell';
@@ -27,24 +27,10 @@ import {
 import { createSparseWorktree, writeLeafEnv } from './next';
 import { stopLeafWork } from './stop';
 
-// One address probed across every live session: exactly one live session must hold it as a live
-// terminal. Zero hits is absence, more than one is ambiguity, and both refuse with the
-// caller-supplied label; a probe error other than not-found refuses with the original error.
-async function probeExactlyOne(address: string, label: string): Promise<SeatRef> {
-  const hits: SeatRef[] = [];
-  for (const session of (await sessions()).live) {
-    try {
-      const found = await terminal(session, address);
-      if (found.state === 'live') hits.push({ session, address });
-    } catch (error) {
-      if (!(error instanceof HcError) || error.kind !== 'not_found') throw error;
-    }
-  }
-  if (hits.length === 1) return hits[0];
-  if (hits.length === 0) throw new Error(`${label}: no live session holds that terminal`);
-  throw new Error(
-    `${label}: the terminal resolves in ${hits.length} live sessions (${hits.map((hit) => hit.session).join(', ')})`,
-  );
+async function liveSeat(session: string, address: string, label: string): Promise<SeatRef> {
+  const found: Seen | null = await terminalIfPresent(session, address);
+  if (found?.state !== 'live') throw new Error(`${label}: not a live terminal in HC_SESSION ${session}`);
+  return { session, address };
 }
 
 function directLeafPath(repo: Repo, slug: string): string {
@@ -66,12 +52,15 @@ export async function directCommand(
   const callerAddress: string | undefined = process.env.HC_TERMINAL_ID;
   if (callerAddress === undefined || callerAddress.trim() === '')
     throw new Error('akrogon direct runs inside an hc terminal: HC_TERMINAL_ID is not set');
-  const caller: SeatRef = await probeExactlyOne(callerAddress, `HC_TERMINAL_ID ${callerAddress}`);
+  const session: string | undefined = process.env.HC_SESSION;
+  if (session === undefined || session.trim() === '')
+    throw new Error('akrogon direct runs inside an hc terminal: HC_SESSION is not set');
+  const caller: SeatRef = await liveSeat(session, callerAddress, `HC_TERMINAL_ID ${callerAddress}`);
+  const reviewer: SeatRef = await liveSeat(session, reviewerAddress, `the reviewer address ${reviewerAddress}`);
   const leafPath: string = directLeafPath(repo, slug);
   const marker: boolean | undefined = directMarker(leafPath);
   if (marker === false) throw new Error(`${slug} is not a direct leaf`);
   if (marker === true) {
-    const reviewer: SeatRef = await probeExactlyOne(reviewerAddress, `the reviewer address ${reviewerAddress}`);
     const currentPath: string = await withLock(resolve(globalHome(), '.lock'), async () => {
       const path: string = directLeafPath(repo, slug);
       rewriteSeatRefs(path, caller, reviewer);
@@ -96,7 +85,6 @@ export async function directCommand(
     throw new Error(
       `${ownerPath} already holds the leaf ${siblings.map((path) => basename(path)).join(', ')}: a direct leaf is its owner's only leaf`,
     );
-  const reviewer: SeatRef = await probeExactlyOne(reviewerAddress, `the reviewer address ${reviewerAddress}`);
   const base: string = await checkBase(repo, true);
   const worktree: string = resolve(worktreeStore(repo), slug);
   // Everything after the worktree's creation rolls back when it fails: worktree, branch and state

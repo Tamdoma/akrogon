@@ -229,8 +229,7 @@ export function slugLeafFolders(repo: Pick<Repo, 'root'>, slug: string): string[
   const found: string[] = [];
   for (const area of ['open', 'closed']) {
     const root: string = resolve(repo.root, 'issues', area);
-    if (!existsSync(root)) continue;
-    for (const owner of readdirSync(root)) {
+    for (const owner of issueFolders(repo.root, `issues/${area}`)) {
       const candidate: string = resolve(root, owner, slug);
       if (
         statSync(candidate, { throwIfNoEntry: false })?.isDirectory() === true &&
