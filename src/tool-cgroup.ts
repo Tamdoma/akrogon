@@ -30,7 +30,7 @@ function placementShell(root: string): string {
     '__akrogon_tool_entry() {',
     '  [ -n "${AKROGON_SEAT_CGROUP:-}" ] || return 0',
     '  local cur',
-    '  cur=$(sed -n \'s/^0:://p\' /proc/self/cgroup 2>/dev/null) || return 0',
+    "  cur=$(sed -n 's/^0:://p' /proc/self/cgroup 2>/dev/null) || return 0",
     `  [ "${root}$cur" = "$AKROGON_SEAT_CGROUP" ] || return 0`,
     '  mkdir -p "$AKROGON_SEAT_CGROUP/tools" 2>/dev/null',
     '  local st',
@@ -212,7 +212,17 @@ function spawnHelper(
     env[key] = value;
   }
   const child: Bun.Subprocess = Bun.spawn(
-    [setsid, process.execPath, resolve(toolRoot, 'src/akrogon.ts'), 'tool-kill-helper', repoName, repoRoot, slug, unit, resolve(scopeDir, 'tools', t)],
+    [
+      setsid,
+      process.execPath,
+      resolve(toolRoot, 'src/akrogon.ts'),
+      'tool-kill-helper',
+      repoName,
+      repoRoot,
+      slug,
+      unit,
+      resolve(scopeDir, 'tools', t),
+    ],
     { stdin: 'ignore', stdout: 'ignore', stderr: 'ignore', env },
   );
   child.unref();
@@ -360,8 +370,12 @@ export async function toolKillHelper(
       await Bun.sleep(100);
     }
   }
-  appendTiming(
-    { name: repoName, root: repoRoot } as Repo,
-    { kind: 'tool_kill_deferred', slug, unit, t, outcome, ...(errorText === undefined ? {} : { error: errorText }) },
-  );
+  appendTiming({ name: repoName, root: repoRoot } as Repo, {
+    kind: 'tool_kill_deferred',
+    slug,
+    unit,
+    t,
+    outcome,
+    ...(errorText === undefined ? {} : { error: errorText }),
+  });
 }

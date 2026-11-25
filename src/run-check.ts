@@ -253,7 +253,10 @@ export async function runCheck(
     argv,
     cwd,
   );
-  writeSwallowingEpipe(2, `${result.stderr_final_nl ? '' : '\n'}check ${name ?? 'run'}: ${result.code} ${result.log}\n`);
+  writeSwallowingEpipe(
+    2,
+    `${result.stderr_final_nl ? '' : '\n'}check ${name ?? 'run'}: ${result.code} ${result.log}\n`,
+  );
   return result.code;
 }
 
