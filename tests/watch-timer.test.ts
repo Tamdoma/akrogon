@@ -4,7 +4,7 @@
 // delivered line. `akrogon` on the watcher's PATH is a recording wrapper written by the test.
 // Run: akrogon run-check --name watch-timer -- bun test --timeout=30000 tests/watch-timer.test.ts
 import { expect, test } from 'bun:test';
-import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { command, spawnCaptured, type Result, type SpawnResult } from '../src/shell';
@@ -94,7 +94,7 @@ async function waitFinished(core: HcCore, address: string, ms: number = WAIT_MS)
   }
   throw new Error(`terminal ${address} still live`);
 }
-const statusCalls = (rig: Rig): number => calls(rig).filter((l) => l.startsWith('call status')).length;
+const observeCalls = (rig: Rig): number => calls(rig).filter((l) => l.startsWith('call observe')).length;
 const nextCalls = (rig: Rig): number => calls(rig).filter((l) => l.startsWith('call next')).length;
 const tasks = (rig: Rig): string[] => rig.f.core.tasks(rig.watcher);
 const hooks = (rig: Rig): string[] => {
@@ -107,8 +107,8 @@ const tickLines = (rig: Rig, due: number | null = null): string[] =>
       l.startsWith('watch-issues tick ') && (due === null || l.includes(`due=${due} `) || l.endsWith(`due=${due}`)),
   );
 
-// A wrapper `akrogon` ahead of the real one: logs each call (argv, hc turn), holds a `status` call
-// while <flags>/hold-status exists (logging `held status n=<status calls before it>`), then
+// The observe-specific copy of the akrogon wrapper records and holds only the observe read,
+// while <flags>/hold-observe exists (logging `held observe n=<observe calls before it>`), then
 // forwards to the checkout's akrogon with fixture env. The file holds seconds to sleep, or
 // `release`: hold until the test removes the file.
 function logbin(f: HcFixture, flags: string): { bin: string; calls: string } {
@@ -130,22 +130,26 @@ function logbin(f: HcFixture, flags: string): { bin: string; calls: string } {
   writeFileSync(
     resolve(bin, 'akrogon'),
     `#!/bin/sh
-if [ "$1" = "status" ] && [ -f '${flags}/hold-status' ]; then
-  echo "held status n=$(grep -c '^call status' '${calls}')" >> '${calls}'
-  held=$(cat '${flags}/hold-status')
+call="$*"
+[ "\${0##*/}" != observe ] || call=observe
+if [ "$call" = observe ] && [ -f '${flags}/hold-observe' ]; then
+  echo "held observe n=$(grep -c '^call observe' '${calls}')" >> '${calls}'
+  held=$(cat '${flags}/hold-observe')
   if [ "$held" = release ]; then
-    while [ -f '${flags}/hold-status' ]; do sleep 0.05; done
+    while [ -f '${flags}/hold-observe' ]; do sleep 0.05; done
   else
     sleep "$held"
-    rm -f '${flags}/hold-status'
+    rm -f '${flags}/hold-observe'
   fi
 fi
 turn=$(HC_SESSION='${f.core.session}' hc get --json "$HC_TERMINAL_ID" 2>/dev/null | grep -o '"turn":[0-9]*' | head -1 | cut -d: -f2)
-echo "call $* t=\${turn:-?}" >> '${calls}'
+if [ "$call" = observe ] && [ "\${WATCH_IMMEDIATE_CHECK:-}" = 1 ]; then call="observe start"; fi
+echo "call $call t=\${turn:-?}" >> '${calls}'
 exec env -u HC_SESSION -u HC_TERMINAL_ID -u HC_TERMINAL_SOCKET -u HC_SCOPE ${env} PATH='${forward}' '${bun}' '${entry}' "$@"
 `,
   );
   Bun.spawnSync(['chmod', '+x', resolve(bin, 'akrogon')]);
+  copyFileSync(resolve(bin, 'akrogon'), resolve(bin, 'observe'));
   return { bin, calls };
 }
 
@@ -165,6 +169,8 @@ async function watchUp(
   const envs: string[] = [
     `XDG_RUNTIME_DIR=${f.env.XDG_RUNTIME_DIR}`,
     `HOME=${f.home}`,
+    `AKROGON_HOME=${f.home}`,
+    `OBSERVE_AKROGON=${resolve(bin, 'observe')}`,
     `PATH=${watcherPath}`,
     `STANDIN_DIR=${standin}`,
     `WATCH_SKILLDIR=${skilldir}`,
@@ -233,18 +239,18 @@ async function waitLabel(rig: Rig, due: number, ms: number = WAIT_MS): Promise<v
   throw new Error(`receipt due=${due} missing: ${JSON.stringify(await get(rig.core, rig.timer))}`);
 }
 
-// At least n checks have called status (the start check's is the first). Dues keep running,
+// At least n checks have called observe (the start check's is the first). Dues keep running,
 // so later tick checks may already have run too.
 async function waitChecks(rig: Rig, n: number, ms: number = WAIT_MS): Promise<void> {
   const deadline: number = Date.now() + ms;
-  while (Date.now() < deadline && statusCalls(rig) < n) await Bun.sleep(200);
-  expect(statusCalls(rig)).toBeGreaterThanOrEqual(n);
+  while (Date.now() < deadline && observeCalls(rig) < n) await Bun.sleep(200);
+  expect(observeCalls(rig)).toBeGreaterThanOrEqual(n);
 }
 
-// Each tick check's status call follows its hook's accept line, so even while later dues run,
-// status calls never outnumber accepted ticks plus the start check. Count calls first.
+// Each tick check's observe call follows its hook's accept line, so even while later dues run,
+// observe calls never outnumber accepted ticks plus the start check. Count calls first.
 const checksPerDue = (rig: Rig): void => {
-  const checks: number = statusCalls(rig);
+  const checks: number = observeCalls(rig);
   expect(checks).toBeLessThanOrEqual(hooks(rig).filter((l) => l.startsWith('tick exit=0 accept')).length + 1);
 };
 
@@ -265,13 +271,13 @@ async function waitDues(rig: Rig, count: number, ms: number = WAIT_MS): Promise<
 }
 
 // One task's own hook block: its first line at or after `from` matching `match`, up to the next
-// task's first line. A check would write a `status` line inside it.
+// task's first line. A check would write a `observe` line inside it.
 function ownBlock(rig: Rig, from: number, match: RegExp): string[] {
   const lines: string[] = hooks(rig);
   const at: number = lines.findIndex((l, i) => i >= from && match.test(l));
   expect(at).toBeGreaterThanOrEqual(0);
   const tail: string[] = lines.slice(at);
-  const next: number = tail.slice(1).findIndex((l) => /exit=|ignored |skipped /.test(l));
+  const next: number = tail.slice(1).findIndex((l) => /^(tick |start |stop |ignored )/.test(l));
   return next < 0 ? tail : tail.slice(0, next + 1);
 }
 
@@ -288,9 +294,9 @@ async function firstDueAt(rig: Rig, ms: number = WAIT_MS): Promise<number> {
 async function heldPair(rig: Rig, ms: number = WAIT_MS): Promise<[number, number]> {
   const deadline: number = Date.now() + ms;
   while (Date.now() < deadline) {
-    const held: string | undefined = calls(rig).find((l) => l.startsWith('held status n='));
+    const held: string | undefined = calls(rig).find((l) => l.startsWith('held observe n='));
     const delivered: number[] = dues(rig);
-    const k: number = Number(held?.slice('held status n='.length));
+    const k: number = Number(held?.slice('held observe n='.length));
     if (held !== undefined && delivered.length > k) return [delivered[k - 1], delivered[k]];
     await Bun.sleep(200);
   }
@@ -353,18 +359,18 @@ test('start runs the check and claims the labelled timer; refusals and conflicts
     expect(argv).toContain('skills/watch-issues/scripts/timer.ts');
     const w: Term = await get(f.core, rig.watcher);
     expect(argv).toContain(`--pin-pid ${z.number().parse(w.foreground?.pid)}`);
-    // The agent logs its start line before the immediate check and its `status` line after it.
+    // The agent logs its start line before the immediate check and its `observe` line after it.
     const deadline: number = Date.now() + WAIT_MS;
-    while (Date.now() < deadline && !tasks(rig).some((l) => l.startsWith('status '))) await Bun.sleep(200);
-    expect(statusCalls(rig)).toBe(1); // the immediate check on started
+    while (Date.now() < deadline && !tasks(rig).some((l) => l.startsWith('observe '))) await Bun.sleep(200);
+    expect(calls(rig).filter((l) => l.startsWith('call observe start '))).toHaveLength(1);
 
     // Second start: one more check, still one timer (criterion 2). The hook writes its start
-    // line before the check runs and its `status` line after it.
+    // line before the check runs and its `observe` line after it.
     const secondAt: number = hooks(rig).length;
     await send(rig, `watch-issues ${f.root}`);
     await waitHooks(rig, 'start exit=0 running', secondAt);
-    await waitHooks(rig, /^status /, secondAt);
-    expect(statusCalls(rig)).toBe(2);
+    await waitHooks(rig, /^observe /, secondAt);
+    expect(observeCalls(rig)).toBe(2);
     expect(await labelled(f.core, f.repo)).toHaveLength(1);
 
     // A second labelled terminal → conflict, no check, nothing touched.
@@ -384,7 +390,7 @@ test('start runs the check and claims the labelled timer; refusals and conflicts
     const otherAddr: string = z.object({ address: z.string() }).parse(JSON.parse(other.stdout)).address;
     await send(rig, `watch-issues ${f.root}`);
     await waitHooks(rig, /start exit=\d+ conflict/);
-    expect(statusCalls(rig)).toBe(2);
+    expect(observeCalls(rig)).toBe(2);
     expect((await get(f.core, rig.timer)).state).toBe('live');
     await f.core.hc(['kill', otherAddr]);
     await f.core.hc(['rm', otherAddr]);
@@ -407,7 +413,8 @@ test('start runs the check and claims the labelled timer; refusals and conflicts
     const squatAt: number = hooks(rig).length;
     await send(rig, `watch-issues ${f.root}`);
     await waitHooks(rig, /start exit=\d+ conflict/, squatAt);
-    expect(statusCalls(rig)).toBe(2);
+    expect(observeCalls(rig)).toBe(2);
+    expect(calls(rig).filter((l) => l.startsWith('call status '))).toEqual([]);
     expect(await labelled(f.core, f.repo)).toHaveLength(0);
     await f.core.hc(['kill', squatter]);
     await f.core.hc(['rm', squatter]);
@@ -486,7 +493,7 @@ fi
   }
 });
 
-// Criteria 3, 4, 8: per-due delivery with receipt before the check, busy dues, paused repo.
+// Per-due delivery with receipt before the check, including busy coalescing.
 test('each due runs one check with its receipt first; busy dues coalesce to the latest', async () => {
   const f: HcFixture = await hcFixture();
   try {
@@ -496,68 +503,92 @@ test('each due runs one check with its receipt first; busy dues coalesce to the 
     for (let n: number = 0; n < 50 && nextCalls(rig) < 1; n += 1) await Bun.sleep(200);
     expect(nextCalls(rig)).toBeGreaterThanOrEqual(1); // start's check runs next on the waiting leaf
     const [first]: number[] = await waitDues(rig, 1);
-    // Receipt precedes the check: the hook records the timer's label, then calls status.
+    // Receipt precedes the check: the hook records the timer's label, then calls observe.
     await waitHooks(rig, new RegExp(`^receipt=${first}$`));
     await waitChecks(rig, 2);
     checksPerDue(rig);
 
-    // Busy: hold the next status call ~2.5 intervals. Brief C4: the dues that accrue while the
+    // Busy: hold the next observe call ~2.5 intervals. Brief C4: the dues that accrue while the
     // watcher works collapse into one unsent due at the latest boundary; it is sent once the
     // watcher is idle, tick.ts accepts it and its check runs. Armed after the first due's check
-    // called status, the hold grabs whichever later tick's check runs next.
-    writeFileSync(resolve(rig.flags, 'hold-status'), '5');
+    // called observe, the hold grabs whichever later tick's check runs next.
+    writeFileSync(resolve(rig.flags, 'hold-observe'), '5');
     const [head, coalesced]: [number, number] = await heldPair(rig);
     expect(coalesced).toBeGreaterThanOrEqual(head + 2);
     await waitLabel(rig, coalesced);
     const sent: number[] = await sentDues(rig);
     expect(sent.slice(sent.indexOf(head), sent.indexOf(head) + 2)).toEqual([head, coalesced]);
     // The hook writes the accept line, then the receipt it read: the coalesced due's accept
-    // carries its turn, and that turn's `call status` is the check it ran.
+    // carries its turn, and that turn's `call observe` is the check it ran.
     await waitHooks(rig, new RegExp(`^receipt=${coalesced}$`));
     const receiptAt = (): number => hooks(rig).findIndex((l) => l === `receipt=${coalesced}`);
     const accepted: string = hooks(rig)[receiptAt() - 1] ?? '';
     expect(accepted).toMatch(/^tick exit=0 accept t=\d+$/);
     const heldTurn: string = z.string().parse(/ t=(\d+)$/.exec(accepted)?.[1]);
     const turnChecked = (): boolean =>
-      calls(rig).some((l) => l.startsWith('call status') && l.endsWith(`t=${heldTurn}`));
+      calls(rig).some((l) => l.startsWith('call observe') && l.endsWith(`t=${heldTurn}`));
     const checkedBy: number = Date.now() + WAIT_MS;
     while (Date.now() < checkedBy && !turnChecked()) await Bun.sleep(200);
     expect(
-      calls(rig).some((l) => l.startsWith('call status') && l.endsWith(`t=${heldTurn}`)),
-      `status call at the coalesced due's turn ${heldTurn}`,
+      calls(rig).some((l) => l.startsWith('call observe') && l.endsWith(`t=${heldTurn}`)),
+      `observe call at the coalesced due's turn ${heldTurn}`,
     ).toBe(true);
-    // one status call per delivered due: start + the first due + the held due + the coalesced due
-    expect(statusCalls(rig)).toBeGreaterThanOrEqual(4);
+    // one observe call per delivered due: start + the first due + the held due + the coalesced due
+    expect(observeCalls(rig)).toBeGreaterThanOrEqual(4);
 
-    // Paused: a due still counts delivered (receipt set) but acts on nothing. The no-next proof
-    // is turn-attributed: an earlier check's `next` may still be landing when pause takes effect,
-    // so a bare count flakes. The paused check's own task turn carries `t=<turn>` on both the
-    // hook's tick line and the wrapper's call lines; its `next` would share that turn.
+    // Check completed turns, not just a total sampled while another due can run.
+    await waitHooks(rig, new RegExp(`^check .* t=${heldTurn}$`));
+    for (const line of hooks(rig).filter((l) => l.startsWith('check '))) {
+      const turn: string = z.string().parse(/ t=(\d+)$/.exec(line)?.[1]);
+      expect(calls(rig).filter((l) => l === `call observe t=${turn}`)).toHaveLength(1);
+    }
+    expect(calls(rig).filter((l) => l.startsWith('call status '))).toEqual([]);
+  } finally {
+    await f.clean();
+  }
+});
+
+test('the next due sees a staged leaf but paused and failed observes never dispatch', async () => {
+  const f: HcFixture = await hcFixture();
+  try {
+    const rig: Rig = await watchUp(f, { interval: '3' });
+    await started(rig);
+    const check = async (due: number, verdict: string, observation: RegExp): Promise<string> => {
+      await waitHooks(rig, new RegExp(`^receipt=${due}$`));
+      const lines: string[] = hooks(rig);
+      const receiptAt: number = lines.indexOf(`receipt=${due}`);
+      const turn: string = z.string().parse(/^tick exit=0 accept t=(\d+)$/.exec(lines[receiptAt - 1])?.[1]);
+      await waitHooks(rig, new RegExp(`^check .* t=${turn}$`), receiptAt + 1);
+      expect(hooks(rig).slice(receiptAt + 1)).toContain(`check ${verdict} t=${turn}`);
+      expect(hooks(rig)[receiptAt + 1]).toMatch(observation);
+      expect(calls(rig).filter((l) => l === `call observe t=${turn}`)).toHaveLength(1);
+      return turn;
+    };
+    const nextAt = (turn: string): string[] =>
+      calls(rig).filter((l) => l.startsWith('call next ') && l.endsWith(`t=${turn}`));
+
+    const [emptyDue] = await waitDues(rig, 1);
+    const emptyTurn: string = await check(emptyDue, 'empty', /^observe exit=0 line2=paused=false /);
+    expect(nextAt(emptyTurn)).toEqual([]);
+    leaf(f, 'watch-staged-leaf', 'plan.synthesis');
+    const [, stagedDue] = await waitDues(rig, 2);
+    const stagedTurn: string = await check(stagedDue, 'acting', /^observe exit=0 line2=paused=false /);
+    expect(nextAt(stagedTurn)).toHaveLength(1);
+
     const paused: Result = await cli(f, ['pause']);
-    expect(paused.code).toBe(0);
-    // The first tick accepted after the pause writes its accept line, then calls status: that
-    // check runs paused whichever due it carries.
-    const pausedAt: number = hooks(rig).length;
-    await waitHooks(rig, /^tick exit=0 accept/, pausedAt);
-    const pTickIdx: number = hooks(rig).findIndex((l, i) => i >= pausedAt && /^tick exit=0 accept/.test(l));
-    const pTurn: string | null = / t=(\d+)/.exec(hooks(rig)[pTickIdx] ?? '')?.[1] ?? null;
-    expect(pTurn).not.toBeNull();
-    // The wrapper logs `call status` when the call starts; the hook's `status <out>` line lands
-    // only when it finishes, so the check provably ran while paused (the hook logs only the first
-    // output line, so paused may not be in it; the no-next proof below is the criterion). A
-    // would-be `next` runs before the hook exits, so the next task's first line (dues keep
-    // arriving while paused) closes this task: no `call next` at its turn can come after it.
-    await waitHooks(rig, /^status /, pTickIdx);
-    await waitHooks(rig, /exit=|ignored |skipped /, pTickIdx + 1);
-    const pStatusIdx: number = calls(rig).findLastIndex((l) => l.startsWith('call status') && l.endsWith(`t=${pTurn}`));
-    expect(pStatusIdx).toBeGreaterThanOrEqual(0);
-    expect(
-      calls(rig)
-        .slice(pStatusIdx)
-        .some((l) => l.startsWith('call next') && l.endsWith(`t=${pTurn}`)),
-    ).toBe(false);
-    const unpaused: Result = await cli(f, ['unpause']);
-    expect(unpaused.code).toBe(0);
+    expect(paused.code, paused.stderr).toBe(0);
+    const pausedState: string = resolve(leaf(f, 'watch-paused-leaf', 'plan.synthesis'), 'state.yaml');
+    const beforePauseCheck: string = readFileSync(pausedState, 'utf8');
+    const [, , pausedDue] = await waitDues(rig, 3);
+    const pausedTurn: string = await check(pausedDue, 'paused', /^observe exit=0 line2=paused=true /);
+    expect(nextAt(pausedTurn)).toEqual([]);
+    expect(readFileSync(pausedState, 'utf8')).toBe(beforePauseCheck);
+
+    writeFileSync(resolve(f.home, 'paused.yaml'), `${f.repo}: false\n`);
+    const [, , , failedDue] = await waitDues(rig, 4);
+    const failedTurn: string = await check(failedDue, 'failed', /^observe exit=[1-9]\d* line2= /);
+    expect(nextAt(failedTurn)).toEqual([]);
+    expect(calls(rig).filter((l) => l.startsWith('call status '))).toEqual([]);
   } finally {
     await f.clean();
   }
@@ -569,7 +600,7 @@ test('an unreceipted due is resent once then dropped while later dues continue',
     const rig: Rig = await watchUp(f, { mode: 'idle' }); // hook never runs: no receipt, no check
     rig.timer = await started(rig);
     await waitChecks(rig, 1);
-    expect(statusCalls(rig)).toBe(1); // start's own check only
+    expect(observeCalls(rig)).toBe(1); // start's own check only
     // The first due is whatever boundary the timer saw first; the idle watcher queues every
     // later boundary, so the dues after it go out in order.
     const [first]: number[] = await waitDues(rig, 1);
@@ -580,7 +611,7 @@ test('an unreceipted due is resent once then dropped while later dues continue',
     while (Date.now() < deadline && tickLines(rig, first + 1).length < 2) await Bun.sleep(200);
     expect(tickLines(rig, first + 1)).toHaveLength(2); // the first never sends a third time; the rule repeats
     await waitTick(rig, first + 2);
-    expect(statusCalls(rig)).toBe(1); // no check ran for any due
+    expect(observeCalls(rig)).toBe(1); // no check ran for any due
     // Criterion 14: the timer prints each skipped send and each drop to its own screen.
     // The run-created timer carries --rm, so it is removed only when it exits; it lives here.
     const screen: string = await screenOf(f.core, rig.timer);
@@ -630,7 +661,7 @@ test('stop kills the verified timer; stale and forged ticks run nothing', async 
     // The reason must sit between `no-watch` and the hook's ` t=` suffix — `no-watch t=0` alone
     // is the bare line this criterion forbids (14).
     expect(own.some((l) => /tick exit=[^0]+ no-watch (?!t=)\S/.test(l))).toBe(true);
-    expect(own.some((l) => l.startsWith('status '))).toBe(false);
+    expect(own.some((l) => l.startsWith('observe '))).toBe(false);
 
     // Stale due (≤ receipt) is refused without a check. Seed the receipt with the first due.
     const [seeded]: number[] = await waitDues(rig, 1);
@@ -638,7 +669,7 @@ test('stop kills the verified timer; stale and forged ticks run nothing', async 
     const staleAt: number = hooks(rig).length;
     await send(rig, `watch-issues tick timer=${rig.timer} pid=${pinPid} due=${seeded} ${f.root}`);
     await waitHooks(rig, /tick exit=\d+ no-watch stale/, staleAt);
-    expect(ownBlock(rig, staleAt, /tick exit=\d+ no-watch stale/).some((l) => l.startsWith('status '))).toBe(false);
+    expect(ownBlock(rig, staleAt, /tick exit=\d+ no-watch stale/).some((l) => l.startsWith('observe '))).toBe(false);
 
     // Stop from a non-watcher terminal (the test process stands in for it).
     const env: NodeJS.ProcessEnv = directEnv(f, rig.bin);
@@ -672,7 +703,7 @@ test('stop kills the verified timer; stale and forged ticks run nothing', async 
     await waitHooks(rig, /stop exit=0/);
     await waitGone(f.core, restarted);
     // Legit dues may land around it; the old-address tick's own block holds no check.
-    expect(ownBlock(rig, oldAt, /tick exit=\d+ no-watch/).some((l) => l.startsWith('status '))).toBe(false);
+    expect(ownBlock(rig, oldAt, /tick exit=\d+ no-watch/).some((l) => l.startsWith('observe '))).toBe(false);
 
     // A tick on a root the session does not hold is refused with its reason (14).
     const rootAt: number = hooks(rig).length;
@@ -698,7 +729,7 @@ test('stop kills the verified timer; stale and forged ticks run nothing', async 
     await send(rig, `watch-issues tick timer=${third} pid=${pinPid + 40000} due=1 ${f.root}`);
     await waitHooks(rig, /tick exit=\d+ stopped/, forgedAt);
     await waitGone(f.core, third);
-    expect(ownBlock(rig, forgedAt, /tick exit=\d+ stopped/).some((l) => l.startsWith('status '))).toBe(false);
+    expect(ownBlock(rig, forgedAt, /tick exit=\d+ stopped/).some((l) => l.startsWith('observe '))).toBe(false);
   } finally {
     await f.clean();
   }
@@ -1079,10 +1110,10 @@ test('dues queued behind a busy watcher coalesce to the latest boundary', async 
   try {
     const rig: Rig = await watchUp(f);
     rig.timer = await started(rig);
-    // Armed after the start check's status call, the hold grabs whichever tick's check runs
+    // Armed after the start check's observe call, the hold grabs whichever tick's check runs
     // next; due numbers depend on host speed, so the test reads which tick that was.
     await waitChecks(rig, 1);
-    writeFileSync(resolve(rig.flags, 'hold-status'), '6');
+    writeFileSync(resolve(rig.flags, 'hold-observe'), '6');
     // The held check keeps the watcher busy at least 6 s past its due's boundary, three more
     // boundaries; they collapse into one send carrying the newest due number.
     const [head, coalesced]: [number, number] = await heldPair(rig);
@@ -1116,7 +1147,7 @@ test('dues queued during an idle timer gap coalesce when the watcher works', asy
     const backlog: number = await (async (): Promise<number> => {
       try {
         await Bun.sleep(6500);
-        writeFileSync(resolve(rig.flags, 'hold-status'), '8');
+        writeFileSync(resolve(rig.flags, 'hold-observe'), '8');
         return Math.floor((Date.now() - firstDue) / 2000) + 1;
       } finally {
         process.kill(pid, 'SIGCONT');
@@ -1149,11 +1180,11 @@ test('boundaries missed while the head due finishes coalesce to the latest', asy
     // the stop sees the turn done and the new boundaries together. The backlog is counted on the
     // timer's clock while it is still stopped; the next send must reach it.
     await waitChecks(rig, 1);
-    const hold: string = resolve(rig.flags, 'hold-status');
+    const hold: string = resolve(rig.flags, 'hold-observe');
     writeFileSync(hold, 'release');
     const deadline: number = Date.now() + WAIT_MS;
-    while (Date.now() < deadline && !calls(rig).some((l) => l.startsWith('held status'))) await Bun.sleep(100);
-    expect(calls(rig).some((l) => l.startsWith('held status'))).toBe(true);
+    while (Date.now() < deadline && !calls(rig).some((l) => l.startsWith('held observe'))) await Bun.sleep(100);
+    expect(calls(rig).some((l) => l.startsWith('held observe'))).toBe(true);
     process.kill(pid, 'SIGSTOP');
     const clock = (): number => Math.floor((Date.now() - firstDue) / 2000) + 1;
     const backlog: number = await (async (): Promise<number> => {
@@ -1162,9 +1193,9 @@ test('boundaries missed while the head due finishes coalesce to the latest', asy
         rmSync(hold);
         // Released (the held call returned) and the watcher idle: the head due's turn is done.
         const turnDone = async (): Promise<boolean> => {
-          const after: string[] = calls(rig).slice(calls(rig).findIndex((l) => l.startsWith('held status')));
+          const after: string[] = calls(rig).slice(calls(rig).findIndex((l) => l.startsWith('held observe')));
           const state: string | undefined = (await get(f.core, rig.watcher)).status?.state;
-          return after.some((l) => l.startsWith('call status')) && (state === 'idle' || state === 'done');
+          return after.some((l) => l.startsWith('call observe')) && (state === 'idle' || state === 'done');
         };
         const until: number = Date.now() + WAIT_MS;
         while (Date.now() < until && !(await turnDone())) await Bun.sleep(100);
@@ -1353,10 +1384,26 @@ test('docs describe the timer watch for all harnesses with no cron wording', () 
   expect(skill).toContain('/new'); // the codex/pi reset limit
   expect(skill).toMatch(/compaction/i);
   expect(skill).toMatch(/draft/i); // the held-draft limit
-  // Criterion 15: the check runs `akrogon status` at <root>; `akrogon status <root>` errors
-  // "Missing leaf" and must not appear in the skill text.
-  expect(skill).toContain('akrogon status');
-  expect(skill).not.toContain('akrogon status <root>');
   const guide: string = readFileSync(files[1], 'utf8');
   for (const harness of ['claude', 'codex', 'pi', 'agy']) expect(guide).toContain(harness);
 });
+
+for (const path of [
+  'skills/watch-issues/SKILL.md',
+  'docs/use/watch-while-away.md',
+  'docs/pictures/watch-loop.svg',
+  'skills/AREA.md',
+]) {
+  test(`the watch check uses observe alone in ${path}`, () => {
+    const text: string = readFileSync(resolve(import.meta.dir, '..', path), 'utf8');
+    const check: string =
+      path === 'skills/AREA.md'
+        ? z.string().parse(text.split('\n').find((line) => line.includes('scripts/observe.ts')))
+        : path === 'docs/use/watch-while-away.md'
+          ? text.split('## What each check does')[1].split('\n## ')[0]
+          : text;
+    expect(check).not.toMatch(/akrogon status|read(?:s)? status/i);
+    expect(check).toMatch(/\bobserve(?:\.ts)?\b/);
+    expect(check).toMatch(/\bpaus(?:e|ed)\b/i);
+  });
+}

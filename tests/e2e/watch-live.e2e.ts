@@ -24,6 +24,7 @@
 // A cell runs exactly its own test: preflight cells use the first, stand-in the second, paid
 // the third (patterns 'preflight', 'standin', 'real harness').
 import { test, expect } from 'bun:test';
+import { randomUUID } from 'node:crypto';
 import {
   cpSync,
   existsSync,
@@ -38,6 +39,8 @@ import { join, resolve } from 'node:path';
 import { z } from 'zod';
 import { waitForTerminal, type Seen } from '../../src/hc';
 import { spawnCaptured, type SpawnResult } from '../../src/shell';
+import { readState, type State } from '../../src/state';
+import { transcriptFor } from '../../src/transcript';
 import { answerTrust, realHome, required, reservedSessions } from './tier';
 import { holdSession, observeReady, session, startWatchTier, stopWatchTier, type WatchTier } from './watch-tier';
 
@@ -197,11 +200,11 @@ async function settleIdle(tier: WatchTier, address: string, ms: number): Promise
   throw new Error(`${address} never stayed idle`);
 }
 
-// The wrapper logs `call <argv> t=<watcher turn>` per akrogon invocation, holds one `status`
-// call while <flags>/hold-status exists, then forwards to the tier shim. The call line is
+// The wrapper logs `call <argv> t=<watcher turn>` per akrogon invocation, holds one observe
+// call while <flags>/hold-observe exists, then forwards to the tier shim. The call line is
 // written first and the flag removed before the sleep: a model that wraps the check in
-// `timeout` (codex does: `timeout 30s akrogon status`) would otherwise kill the sleep and keep
-// every later status call unlogged under a leftover flag. When the hold ends (or that timeout
+// `timeout` (codex does: `timeout 30s bun observe.ts …`) would otherwise kill the sleep and keep
+// every later observe call unlogged under a leftover flag. When the hold ends (or that timeout
 // kills it) the wrapper logs `hold start=<ms> end=<ms> t=<turn>`, the span a busy check covered.
 function logbin(tier: WatchTier, name: string, flags: string): { bin: string; calls: string } {
   const bin: string = resolve(leafTemp, `${name}-logbin`);
@@ -213,10 +216,12 @@ function logbin(tier: WatchTier, name: string, flags: string): { bin: string; ca
     resolve(bin, 'akrogon'),
     `#!/bin/sh
 turn=$(hc get --json "$HC_TERMINAL_ID" 2>/dev/null | grep -o '"turn":[0-9]*' | head -1 | cut -d: -f2)
-echo "call $* t=\${turn:-?}" >> '${calls}'
-if [ "$1" = "status" ] && [ -f '${flags}/hold-status' ]; then
-  held=$(cat '${flags}/hold-status')
-  rm -f '${flags}/hold-status'
+call="$*"
+[ "\${0##*/}" != observe ] || call=observe
+echo "call $call t=\${turn:-?}" >> '${calls}'
+if [ "$call" = observe ] && [ -f '${flags}/hold-observe' ]; then
+  held=$(cat '${flags}/hold-observe')
+  rm -f '${flags}/hold-observe'
   start=$(date +%s%3N)
   span() { echo "hold start=$start end=$(date +%s%3N) t=\${turn:-?}" >> '${calls}'; }
   trap 'span; exit 143' TERM
@@ -228,12 +233,13 @@ exec '${tier.shimBin}/akrogon' "$@"
 `,
   );
   Bun.spawnSync(['chmod', '+x', resolve(bin, 'akrogon')]);
+  symlinkSync('akrogon', resolve(bin, 'observe'));
   return { bin, calls };
 }
 
 const calls = (file: string): string[] =>
   existsSync(file) ? readFileSync(file, 'utf8').split('\n').filter(Boolean) : [];
-const statusCalls = (file: string): number => calls(file).filter((l) => l.startsWith('call status')).length;
+const observeCalls = (file: string): number => calls(file).filter((l) => l.startsWith('call observe')).length;
 const nextCalls = (file: string): number => calls(file).filter((l) => l.startsWith('call next')).length;
 const hookLines = (tier: WatchTier, watcher: string): string[] => {
   const file: string = resolve(tier.standin, `${watcher}.hooks`);
@@ -300,7 +306,7 @@ function sentBetween(scr: string, low: number, high: number): number[] {
     .filter((n: number) => n > low && n < high);
 }
 
-// Due 2's check stayed busy across a due boundary: its status call took the hold in its own turn,
+// Due 2's check stayed busy across a due boundary: its observe call took the hold in its own turn,
 // and a boundary (the timer's up time plus whole intervals) fell inside the hold's span.
 async function expectHeldAcrossBoundary(tier: WatchTier, timer: string, callLog: string, busy: number): Promise<void> {
   const [start, end, turn] = z
@@ -527,6 +533,8 @@ function launchEnvFor(cell: Cell): string[] {
   const envs: string[] = [
     `XDG_RUNTIME_DIR=${cell.tier.runtime}`,
     `HOME=${realHome}`,
+    `AKROGON_HOME=${cell.tier.akrogonEnv.AKROGON_HOME}`,
+    `OBSERVE_AKROGON=${resolve(cell.bin, 'observe')}`,
     `PATH=${cell.bin}:${cell.tier.shimBin}:${cell.tier.corePath}`,
     `WATCH_TICK_SECONDS=${intervalSec}`,
     `WATCH_SKILLDIR=${skill}`,
@@ -565,8 +573,9 @@ async function startCell(cell: Cell): Promise<Term> {
     await Bun.sleep(1000);
     const ready: Promise<Seen | null> = waitForTerminal(session, watcher, idle, readyTimeout);
     const launchSh: string = resolve(leafTemp, `launch-${cell.kind}-${cell.shape}.sh`);
+    const argv: string[] = [...spec.argv(model), ...(cell.kind === 'pi' ? ['--session-id', randomUUID()] : [])];
     const q = (s: string): string => `'${s.replaceAll(`'`, `'\\''`)}'`;
-    writeFileSync(launchSh, `#!/bin/sh\nexec env ${launchEnv.map(q).join(' ')} ${spec.argv(model).map(q).join(' ')}\n`);
+    writeFileSync(launchSh, `#!/bin/sh\nexec env ${launchEnv.map(q).join(' ')} ${argv.map(q).join(' ')}\n`);
     Bun.spawnSync(['chmod', '+x', launchSh]);
     await launchFromShell(cell.tier, watcher, `sh ${q(launchSh)}`, spec.trust);
     if (spec.trust !== null) await answerTrust(cell.tier, 'watcher', async () => watcher, spec.trust, ready);
@@ -594,7 +603,7 @@ async function startCell(cell: Cell): Promise<Term> {
   }
   const startTurn: number = await send(cell.tier, watcher, `watch-issues ${cell.tier.root}`);
   if (cell.kind === 'standin') {
-    // The hook logs the script outcome per task; wait for its start line, then its status call.
+    // The hook logs the script outcome per task; wait for its start line, then its observe call.
     await waitHook(cell.tier, watcher, /start exit=0 (started|running)/, 60_000);
   } else {
     await turnDone(cell.tier, watcher, startTurn, 300_000);
@@ -604,6 +613,7 @@ async function startCell(cell: Cell): Promise<Term> {
   const timer: Term = await verifiedTimer(cell);
   // Every cell keeps its timer's screen (grant bound), not only at the held-due check.
   cell.tier.record('timer-screen.txt', await screen(cell.tier, timer.address));
+  expect(calls(cell.callLog).filter((l) => l.startsWith('call status '))).toEqual([]);
   return timer;
 }
 
@@ -659,7 +669,7 @@ async function noDeliveredTick(cell: Cell, ms: number): Promise<void> {
 }
 
 // A probe tick that must run no check: wait for the hook's `tick exit=` boundary, then read the
-// task's own hook block (up to the next boundary) — a check would have written `status` inside.
+// task's own hook block (up to the next boundary) — a check would have written `observe` inside.
 async function tickRunsNoCheck(cell: Cell, text: string, boundary: RegExp): Promise<string[]> {
   const watcher: string = cell.watcher;
   const base: number = hookLines(cell.tier, watcher).length;
@@ -675,9 +685,9 @@ async function tickRunsNoCheck(cell: Cell, text: string, boundary: RegExp): Prom
   }
   if (idx === -1) throw new Error(`no ${boundary} in ${JSON.stringify(hookLines(cell.tier, watcher))}`);
   const tail: string[] = hookLines(cell.tier, watcher).slice(idx);
-  const end: number = tail.slice(1).findIndex((l) => /exit=|ignored |skipped /.test(l));
+  const end: number = tail.slice(1).findIndex((l) => /^(tick |start |stop |ignored )/.test(l));
   const own: string[] = end === -1 ? tail : tail.slice(0, end + 1);
-  expect(own.some((l) => l.startsWith('status '))).toBe(false);
+  expect(own.some((l) => l.startsWith('observe '))).toBe(false);
   return own;
 }
 
@@ -686,6 +696,75 @@ async function teardownCell(cell: Cell): Promise<void> {
   const left: string[] = await stopWatchTier(cell.tier, [leafTemp]);
   cell.tier.record('absence.json', { left });
   expect(left).toEqual([]);
+  expect(calls(cell.callLog).filter((l) => l.startsWith('call status '))).toEqual([]);
+}
+
+async function stageLeaf(tier: WatchTier, slug: string): Promise<string> {
+  const path: string = resolve(tier.root, 'issues/open/e2e', slug);
+  mkdirSync(path, { recursive: true });
+  await Bun.write(
+    resolve(path, 'state.yaml'),
+    Bun.YAML.stringify({ slug, phase: 'plan.synthesis', created: '2026-11-20', repo: 'akre2e', 'blocked-by': [] }),
+  );
+  return path;
+}
+
+async function provePauseAndFreshRead(cell: Cell, timer: string, empty: { due: number; turn: number }): Promise<void> {
+  const { tier, watcher, callLog } = cell;
+  const nextAt = (turn: number): string[] =>
+    calls(callLog).filter((l) => l.startsWith('call next ') && l.endsWith(`t=${turn}`));
+  await turnDone(tier, watcher, empty.turn, 120_000);
+  expect(nextAt(empty.turn)).toEqual([]);
+  const inventory: SpawnResult = await tier.observe();
+  expect(inventory.code, inventory.stderr).toBe(0);
+  expect(inventory.stdout).toBe(`session=${session}\npaused=false\n`);
+
+  const stagedPath: string = await stageLeaf(tier, 'watch-staged-leaf');
+  const staged: { due: number; turn: number } = await nextSent(tier, timer, empty.due, 120_000);
+  await waitDue(tier, timer, staged.due, 120_000);
+  await turnDone(tier, watcher, staged.turn, 120_000);
+  const stagedNext: string[] = nextAt(staged.turn);
+  expect(
+    stagedNext.some((call) => /^call next (watch-staged-leaf|--all) /.test(call)),
+    stagedNext.join('\n'),
+  ).toBe(true);
+  expect(readState(stagedPath).seat.A).toBeDefined();
+
+  const pause: SpawnResult = await tier.akrogon(['pause']);
+  expect(pause.code, pause.stderr).toBe(0);
+  const pausedPath: string = await stageLeaf(tier, 'watch-paused-leaf');
+  const before: State = readState(pausedPath);
+  expect(before.phase).toBe('plan.synthesis');
+  expect(before['blocked-by']).toEqual([]);
+  expect(before.seat).toEqual({});
+  const paused: { due: number; turn: number } = await nextSent(tier, timer, staged.due, 120_000);
+  await waitDue(tier, timer, paused.due, 120_000);
+  await turnDone(tier, watcher, paused.turn, 120_000);
+  expect(nextAt(paused.turn)).toEqual([]);
+  expect(readState(pausedPath)).toEqual(before);
+
+  const timerScreen: string = await screen(tier, timer, 400);
+  tier.record('paused-timer-screen.txt', timerScreen);
+  expect(timerScreen).not.toMatch(/due=\d+ dropped/);
+  const acceptedTurns: Map<number, number> = new Map(
+    [...timerScreen.matchAll(/due=(\d+) sent \(attempt \d+, turn=(\d+)\)/g)]
+      .map((match): [number, number] => [Number(match[1]), Number(match[2])])
+      .filter(([due]) => due <= paused.due),
+  );
+  expect(acceptedTurns.get(paused.due)).toBe(paused.turn);
+  for (const turn of acceptedTurns.values())
+    expect(calls(callLog).filter((l) => l === `call observe t=${turn}`)).toHaveLength(1);
+
+  if (cell.kind === 'standin') {
+    expect(hookLines(tier, watcher)).toContain(`observe exit=0 line2=paused=true t=${paused.turn}`);
+    return;
+  }
+
+  const transcript: string = z.string().parse(await transcriptFor({ session, address: watcher }));
+  tier.record('pi-paused-turn.json', { watcher, empty, staged, paused, transcript });
+  const recorded: string = readFileSync(transcript, 'utf8');
+  expect(recorded.trim().length).toBeGreaterThan(0);
+  tier.record('pi-watch-transcript.jsonl', recorded);
 }
 
 // Writes stay under the run's AKROGON_E2E_ROOT and AKROGON_E2E_OUT: an operator-supplied root
@@ -800,25 +879,13 @@ test.serial(
       expect(tier.standin).not.toBe(configured.worktree_root);
       await observeReady(tier);
       await wireSkill(cell);
-      const leafPath: string = resolve(tier.root, 'issues/open/e2e', 'watch-live-leaf');
-      mkdirSync(leafPath, { recursive: true });
-      await Bun.write(
-        resolve(leafPath, 'state.yaml'),
-        Bun.YAML.stringify({
-          slug: 'watch-live-leaf',
-          phase: 'plan.synthesis',
-          created: '2026-11-20',
-          repo: 'akre2e',
-          'blocked-by': [],
-        }),
-      );
 
       if (shape === 'shell') {
         // Paused start: the timer still starts (criterion 8: starting is not an act on a leaf).
         const paused0: SpawnResult = await tier.akrogon(['pause']);
         expect(paused0.code).toBe(0);
         const timer: Term = await startCell(cell);
-        await waitCalls(callLog, (l) => l.startsWith('call status'), 1, 30_000);
+        await waitCalls(callLog, (l) => l.startsWith('call observe'), 1, 30_000);
         expect(nextCalls(callLog)).toBe(0); // the paused check acts on nothing
 
         // Criterion 12: the tier socket keeps answering after a real akrogon unpause.
@@ -828,19 +895,19 @@ test.serial(
         expect(listed.code).toBe(0);
         tier.record('after-unpause.txt', listed.stdout);
 
-        // One tick with its receipt and the acting check (3). Due 1's calls are attributed
+        // One tick with its receipt and an empty check (3). Due 1's calls are attributed
         // by a newer turn: the receipt lands before the check call.
         await waitDue(tier, timer.address, 1, 90_000);
-        await waitDueCall(tier, timer.address, callLog, 1, 'next', 90_000);
+        await waitDueCall(tier, timer.address, callLog, 1, 'observe', 90_000);
 
         // A due that falls due while the previous check runs is held, then runs once (4):
-        // hold due 2's status call across interval boundaries; the newest due is sent once.
-        writeFileSync(resolve(cell.flags, 'hold-status'), String(intervalSec * 2 + 5));
+        // hold due 2's observe call across interval boundaries; the newest due is sent once.
+        writeFileSync(resolve(cell.flags, 'hold-observe'), String(intervalSec * 2 + 5));
         const busy2: number = await sentTurn(tier, timer.address, 2, 90_000);
         await waitDue(tier, timer.address, 2, 90_000);
         const held: { due: number; turn: number } = await nextSent(tier, timer.address, 2, 90_000 + intervalSec * 2000);
         await waitDue(tier, timer.address, held.due, 90_000);
-        await waitCallAtTurn(callLog, 'status', held.turn, 90_000);
+        await waitCallAtTurn(callLog, 'observe', held.turn, 90_000);
         expect(held.turn).toBeGreaterThan(busy2);
         await expectHeldAcrossBoundary(tier, timer.address, callLog, busy2);
         const timerScreen: string = await screen(tier, timer.address);
@@ -849,20 +916,7 @@ test.serial(
         expect(timerScreen).not.toContain(`due=${held.due} dropped`);
         expect(sentBetween(timerScreen, 2, held.due)).toEqual([]);
 
-        // Pause again: the next due receipts and checks but acts on nothing (8).
-        const paused1: SpawnResult = await tier.akrogon(['pause']);
-        expect(paused1.code).toBe(0);
-        const pausedTurn: number = await checkTurn(
-          tier,
-          cell.watcher,
-          'paused',
-          hookLines(tier, cell.watcher).length,
-          90_000,
-        );
-        const pausedNext: string[] = calls(callLog).filter(
-          (l: string) => l.startsWith('call next') && (l.endsWith(`t=${pausedTurn}`) || l.endsWith('t=?')),
-        );
-        expect(pausedNext).toEqual([]);
+        await provePauseAndFreshRead(cell, timer.address, held);
 
         // Agent exit leaves no new tick text in the shell (7).
         await exitAgent(cell);
@@ -875,7 +929,7 @@ test.serial(
 
       // shape=root: start with its check and verified timer (1).
       const timer: Term = await startCell(cell);
-      await waitCalls(callLog, (l) => l.startsWith('call status'), 1, 30_000);
+      await waitCalls(callLog, (l) => l.startsWith('call observe'), 1, 30_000);
       const wTerm: Term = await get(tier, cell.watcher);
       const pinPid: number = z.number().parse(wTerm.foreground?.pid);
       expect(z.string().parse(timer.argv?.join(' '))).toContain(`--pin-pid ${pinPid}`);
@@ -883,24 +937,26 @@ test.serial(
       // Second start: one more check, still one timer (2).
       await send(tier, cell.watcher, `watch-issues ${tier.root}`);
       await waitHook(tier, cell.watcher, /start exit=0 running/, 60_000);
-      await waitCalls(callLog, (l) => l.startsWith('call status'), 2, 30_000);
+      await waitCalls(callLog, (l) => l.startsWith('call observe'), 2, 30_000);
       expect(await labelled(tier)).toHaveLength(1);
+
+      await stageLeaf(tier, 'watch-root-due');
 
       // One tick per due with its receipt and the Judge's next on the waiting leaf (3, 11).
       // Due 1's calls are attributed by a newer turn: the receipt lands before the check call.
       const t1: number = await sentTurn(tier, timer.address, 1, 90_000);
       await waitDue(tier, timer.address, 1, 90_000);
-      await waitCallAtTurn(callLog, 'status', t1, 90_000);
+      await waitCallAtTurn(callLog, 'observe', t1, 90_000);
       await waitCallAtTurn(callLog, 'next', t1, 90_000);
       expect(hookLines(tier, cell.watcher).some((l) => l === 'receipt=1')).toBe(true);
 
-      // One tick held behind a busy check (4): due 2's status call is held while newer dues accrue.
-      writeFileSync(resolve(cell.flags, 'hold-status'), String(intervalSec * 2 + 5));
+      // One tick held behind a busy check (4): due 2's observe call is held while newer dues accrue.
+      writeFileSync(resolve(cell.flags, 'hold-observe'), String(intervalSec * 2 + 5));
       const busy2r: number = await sentTurn(tier, timer.address, 2, 90_000);
       await waitDue(tier, timer.address, 2, 90_000);
       const held: { due: number; turn: number } = await nextSent(tier, timer.address, 2, 90_000 + intervalSec * 2000);
       await waitDue(tier, timer.address, held.due, 90_000);
-      await waitCallAtTurn(callLog, 'status', held.turn, 90_000);
+      await waitCallAtTurn(callLog, 'observe', held.turn, 90_000);
       expect(held.turn).toBeGreaterThan(busy2r);
       await expectHeldAcrossBoundary(tier, timer.address, callLog, busy2r);
       const heldScreen: string = await screen(tier, timer.address);
@@ -923,13 +979,14 @@ test.serial(
         (l: string) => l.startsWith('call next') && (l.endsWith(`t=${pausedTurn}`) || l.endsWith('t=?')),
       );
       expect(pausedNext).toEqual([]);
-      const resumeFrom: number = hookLines(tier, cell.watcher).length;
       const unpaused: SpawnResult = await tier.akrogon(['unpause']);
       expect(unpaused.code).toBe(0);
       const listed: SpawnResult = await tier.hc(['ls', '--json']);
       expect(listed.code).toBe(0); // criterion 12: the socket still answers
+      const resumeFrom: number = hookLines(tier, cell.watcher).length;
+      await stageLeaf(tier, 'watch-root-resumed');
       // The first due after unpause can legitimately run while still paused (its task was
-      // already in flight), so the proof is the first check after unpause whose status saw it
+      // already in flight), so the proof is the first check after unpause whose observe saw it
       // unpaused, with its own next call.
       await waitCallAtTurn(callLog, 'next', await checkTurn(tier, cell.watcher, 'acting', resumeFrom, 90_000), 90_000);
 
@@ -1012,29 +1069,17 @@ test.serial(
     try {
       await observeReady(tier);
       await wireSkill(cell);
-      const leafPath: string = resolve(tier.root, 'issues/open/e2e', 'watch-live-leaf');
-      mkdirSync(leafPath, { recursive: true });
-      await Bun.write(
-        resolve(leafPath, 'state.yaml'),
-        Bun.YAML.stringify({
-          slug: 'watch-live-leaf',
-          phase: 'plan.synthesis',
-          created: '2026-11-20',
-          repo: 'akre2e',
-          'blocked-by': [],
-        }),
-      );
       const timer: Term = await startCell(cell);
 
       if (shape === 'shell') {
-        // start (1), one tick with its receipt (3). Due 1's status call is attributed by a
+        // start (1), one tick with its receipt (3). Due 1's observe call is attributed by a
         // newer turn: the receipt lands before the check call.
-        expect(statusCalls(callLog)).toBeGreaterThanOrEqual(1);
+        expect(observeCalls(callLog)).toBeGreaterThanOrEqual(1);
         await waitDue(tier, timer.address, 1, 120_000);
-        await waitDueCall(tier, timer.address, callLog, 1, 'status', 120_000);
+        await waitDueCall(tier, timer.address, callLog, 1, 'observe', 120_000);
         // One tick held behind a busy check, running once after it (4): due 2's check is held
         // while newer dues accrue; the newest is sent once after the check and runs its own check.
-        writeFileSync(resolve(cell.flags, 'hold-status'), String(intervalSec * 2 + 15));
+        writeFileSync(resolve(cell.flags, 'hold-observe'), String(intervalSec * 2 + 15));
         const busy2p: number = await sentTurn(tier, timer.address, 2, 120_000);
         await waitDue(tier, timer.address, 2, 120_000);
         const held: { due: number; turn: number } = await nextSent(
@@ -1044,7 +1089,7 @@ test.serial(
           120_000 + intervalSec * 2000,
         );
         await waitDue(tier, timer.address, held.due, 120_000);
-        await waitCallAtTurn(callLog, 'status', held.turn, 120_000);
+        await waitCallAtTurn(callLog, 'observe', held.turn, 120_000);
         expect(held.turn).toBeGreaterThan(busy2p);
         await expectHeldAcrossBoundary(tier, timer.address, callLog, busy2p);
         const timerScreen: string = await screen(tier, timer.address);
@@ -1052,6 +1097,7 @@ test.serial(
         expect(timerScreen.match(new RegExp(`due=${held.due} sent`, 'g')) ?? []).toHaveLength(1);
         expect(timerScreen).not.toContain(`due=${held.due} dropped`);
         expect(sentBetween(timerScreen, 2, held.due)).toEqual([]);
+        if (kind === 'pi') await provePauseAndFreshRead(cell, timer.address, held);
         // Agent exit leaves no tick text in the shell (7).
         await exitAgent(cell);
         await waitGone(tier, timer.address, 90_000);
@@ -1062,20 +1108,21 @@ test.serial(
       }
 
       // shape=root: start with its check and timer (1).
-      expect(statusCalls(callLog)).toBeGreaterThanOrEqual(1);
+      expect(observeCalls(callLog)).toBeGreaterThanOrEqual(1);
       // One tick running one check with its receipt and the Judge's next (3, 11). Due 1's
       // calls are attributed by a newer turn: the receipt lands before the check call.
+      await stageLeaf(tier, 'watch-paid-root-due');
       const t1p: number = await sentTurn(tier, timer.address, 1, 120_000);
       await waitDue(tier, timer.address, 1, 120_000);
-      await waitCallAtTurn(callLog, 'status', t1p, 120_000);
+      await waitCallAtTurn(callLog, 'observe', t1p, 120_000);
       await waitCallAtTurn(callLog, 'next', t1p, 120_000);
       // One tick held behind a busy check, running once after it (4).
-      writeFileSync(resolve(cell.flags, 'hold-status'), String(intervalSec * 2 + 15));
+      writeFileSync(resolve(cell.flags, 'hold-observe'), String(intervalSec * 2 + 15));
       const busy2pr: number = await sentTurn(tier, timer.address, 2, 120_000);
       await waitDue(tier, timer.address, 2, 120_000);
       const held: { due: number; turn: number } = await nextSent(tier, timer.address, 2, 120_000 + intervalSec * 2000);
       await waitDue(tier, timer.address, held.due, 120_000);
-      await waitCallAtTurn(callLog, 'status', held.turn, 120_000);
+      await waitCallAtTurn(callLog, 'observe', held.turn, 120_000);
       expect(held.turn).toBeGreaterThan(busy2pr);
       await expectHeldAcrossBoundary(tier, timer.address, callLog, busy2pr);
       const timerScreen: string = await screen(tier, timer.address);

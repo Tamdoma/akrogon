@@ -5,12 +5,12 @@
 // skills/watch-issues/scripts/observe.test.ts and observe-log-tail.test.ts.
 import { test, expect } from 'bun:test';
 import { createHash } from 'node:crypto';
-import { chmodSync, copyFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
-import { entry, fixture, leaf, WAIT_MS, type Fixture } from './helpers';
+import { cli, entry, fixture, leaf, WAIT_MS, type Fixture } from './helpers';
 import { hcCore, recordedDoc, type HcCore, type Terminal, stopCoresAfterFile } from './hc-fixture';
-import { spawnCaptured, type SpawnResult } from '../src/shell';
+import { spawnCaptured, type Result, type SpawnResult } from '../src/shell';
 import { hcReader } from '../src/hc';
 
 stopCoresAfterFile();
@@ -214,8 +214,9 @@ test('observe prints each recorded leaf from its hc seats in the repo session', 
     expect(seen.code, seen.stderr).toBe(0);
     const out: string[] = lines(seen.stdout);
     const rest: string = 'attempts=A0,B0 blocked=';
-    expect(out.slice(0, 17)).toEqual([
+    expect(out.slice(0, 18)).toEqual([
       `session=${s}`,
+      'paused=false',
       `slug=ob-absent phase=implement ${rest} A=t999/- B=-/- notified=`,
       `slug=ob-blocked phase=implement ${rest}a,b A=-/- B=-/- notified=A,B`,
       `slug=ob-elsewhere phase=implement ${rest} A=${otherA}/- B=-/- notified=`,
@@ -234,7 +235,7 @@ test('observe prints each recorded leaf from its hc seats in the repo session', 
       `slug=ob-work phase=check.review attempts=A1,B2 blocked= A=${workA}/working busy=0h00m logA=${log} B=${workB}/working logB=- notified=A`,
     ]);
     // Unreadable, foreign, too-shallow and duplicate-slug leaves print no leaf line, only reports after the leaves.
-    const reports: string[] = out.slice(17);
+    const reports: string[] = out.slice(18);
     expect(reports).toHaveLength(5);
     expect(reports.every((line: string) => line.startsWith('unreadable='))).toBe(true);
     expect(reports.join('\n')).toContain(resolve(badDir, 'state.yaml'));
@@ -263,18 +264,18 @@ test('observe prints each recorded leaf from its hc seats in the repo session', 
   }
 });
 
-test('observe prints only the session line for an empty inventory and refuses without the repo space', async () => {
+test('observe prints only the headers for an empty inventory and refuses without the repo space', async () => {
   const f: Fixture = await fixture();
   const core: HcCore = await hcCore(f);
   try {
     const empty: SpawnResult = await observe(f, core);
     expect(empty.code, empty.stderr).toBe(0);
-    expect(empty.stdout).toBe(`session=${core.session}\n`);
+    expect(empty.stdout).toBe(`session=${core.session}\npaused=false\n`);
 
     rmSync(resolve(f.root, 'issues/open'), { recursive: true, force: true });
     const missing: SpawnResult = await observe(f, core);
     expect(missing.code, missing.stderr).toBe(0);
-    expect(missing.stdout).toBe(`session=${core.session}\n`);
+    expect(missing.stdout).toBe(`session=${core.session}\npaused=false\n`);
 
     leaf(f, 'ob-wait', 'implement');
     const failing: string = akrogonShim(f, 'akrogon-fail', '#!/bin/sh\necho "akrogon boom" >&2\nexit 2\n');
@@ -304,3 +305,67 @@ test('observe prints only the session line for an empty inventory and refuses wi
     f.clean();
   }
 });
+
+test('observe skips inventory and seat reads while paused, then restores the rows after unpause', async () => {
+  const f: Fixture = await fixture();
+  const core: HcCore = await hcCore(f);
+  const shimLog = (): string[] => readFileSync(core.shimLog, 'utf8').split('\n').filter(Boolean);
+  try {
+    const baseline: SpawnResult = await observe(f, core);
+    expect(baseline.code, baseline.stderr).toBe(0);
+    const discovery: string[] = shimLog();
+    expect(discovery.length).toBeGreaterThan(0);
+
+    const workA: string = await seat(core, seatLabels(f, 'ob-pause', 'a'), working);
+    leaf(f, 'ob-pause', 'implement', { seat: { A: { session: core.session, address: workA } } });
+    leaf(f, 'ob-waiting', 'plan.synthesis');
+    const badState: string = resolve(f.root, 'issues/open/issue/bad-leaf/state.yaml');
+    mkdirSync(badState, { recursive: true });
+    await core.waitFor(workA, (t: Terminal) => t.status?.state === 'working');
+
+    const pause: Result = await cli(f, ['pause']);
+    expect(pause.code, pause.stderr).toBe(0);
+    const start: number = shimLog().length;
+    const paused: SpawnResult = await observe(f, core);
+    expect(paused.code, paused.stderr).toBe(0);
+    expect(shimLog().slice(start)).toEqual(discovery);
+    expect(paused.stdout).toBe(`session=${core.session}\npaused=true\n`);
+
+    // The CLI's unpause dispatch sweep refuses unreadable entries even after it cleared the pause.
+    // Move only the unreadable fixture out of inventory while running the command.
+    const parked: string = resolve(f.home, 'bad-state');
+    renameSync(badState, parked);
+    const unpause: Result = await cli(f, ['unpause'], f.root, core.env);
+    expect(unpause.code, unpause.stderr).toBe(0);
+    renameSync(parked, badState);
+    const restored: SpawnResult = await observe(f, core);
+    expect(restored.code, restored.stderr).toBe(0);
+    const out: string[] = lines(restored.stdout);
+    expect(out.slice(0, 2)).toEqual([`session=${core.session}`, 'paused=false']);
+    expect(out[2]).toMatch(new RegExp(`^slug=ob-pause phase=implement .+ A=${workA}/working `));
+    expect(out[3]).toMatch(/^slug=ob-waiting phase=plan\.synthesis /);
+    expect(out.slice(4)).toHaveLength(1);
+    expect(out[4]).toContain(`unreadable=${badState}`);
+  } finally {
+    await core.stop();
+    f.clean();
+  }
+});
+
+for (const invalid of ['{not yaml', 'non-true value']) {
+  test(`observe refuses malformed pause state: ${invalid}`, async () => {
+    const f: Fixture = await fixture();
+    const core: HcCore = await hcCore(f);
+    try {
+      const path: string = resolve(f.home, 'paused.yaml');
+      writeFileSync(path, invalid === 'non-true value' ? `${f.repo}: false\n` : invalid);
+      const seen: SpawnResult = await observe(f, core);
+      expect(seen.code).not.toBe(0);
+      expect(seen.stdout).toBe('');
+      expect(seen.stderr).toContain(path);
+    } finally {
+      await core.stop();
+      f.clean();
+    }
+  });
+}

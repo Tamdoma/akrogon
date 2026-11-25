@@ -324,6 +324,7 @@ export function lines(stdout: string): string[] {
 export async function observeReady(tier: WatchTier): Promise<void> {
   const seen: SpawnResult = await tier.observe();
   tier.record('observe-before-launch.txt', `${seen.code}\n${seen.stdout}\n${seen.stderr}`);
-  if (seen.code !== 0 || lines(seen.stdout)[0] !== `session=${session}`)
-    throw new Error(`observe does not read ${session}: ${JSON.stringify(seen)}`);
+  const [header, paused]: string[] = lines(seen.stdout);
+  if (seen.code !== 0 || header !== `session=${session}` || paused !== 'paused=false')
+    throw new Error(`observe did not read ${session} as unpaused: ${JSON.stringify(seen)}`);
 }
