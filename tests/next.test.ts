@@ -3405,7 +3405,14 @@ for (const kind of ['tracked file', 'unignored'] as const) {
         await command(['git', 'add', '-f', '.env'], worktree);
         await command(['git', 'commit', '-m', 'track env'], worktree);
       }
-      if (kind === 'unignored') writeFileSync(resolve(worktree, '.gitignore'), 'node_modules\n');
+      if (kind === 'unignored') {
+        writeFileSync(resolve(worktree, '.gitignore'), 'node_modules\n');
+        // Committed, so the branch holds a commit of its own and allocation adopts it: an
+        // unignored .env hazard only survives into allocation on the adopt arm, since a
+        // commit-free leftover with uncommitted changes is refused before any .env logic.
+        await command(['git', 'add', '.gitignore'], worktree);
+        await command(['git', 'commit', '-m', 'drop env ignore'], worktree);
+      }
       leaf(f, 'build', 'plan.synthesis');
       const result: Result = await next(f, ['build']);
       expect(result.code).not.toBe(0);
