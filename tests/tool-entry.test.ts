@@ -123,7 +123,7 @@ test.serial('the entry places a bash tool shell exactly once at the scope root a
       expect(read(`${n}.err`), `${n} stderr`).toBe('err-' + n + '\n');
       expect(read(`${n}.code`).trim(), `${n} exit code`).toBe('3');
       expect(cgOf(n), `${n} placed in tools/t-`).toMatch(
-        new RegExp(`^0::${escapeRe(root)}/tools/t-\\d+-\\d+$`.replace(/^0::/, '0::')),
+        new RegExp(`^0::${escapeRe(root.replace('/sys/fs/cgroup', ''))}/tools/t-\\d+-\\d+$`),
       );
     }
 
