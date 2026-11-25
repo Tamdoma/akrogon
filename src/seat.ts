@@ -312,14 +312,19 @@ export async function startSeat(
   refreshToolEntry(homePath());
   const entryDir: string = resolve(homePath(), 'tool-entry');
   // Every kind carries the seat scope marker; claude gets the wrapper shell, agy the PATH-first
-  // wrapper, every other kind the sourced BASH_ENV. The agy PATH expands akrogon's own PATH at
-  // start time, since env assignments cannot self-reference.
+  // wrapper, every other kind the sourced BASH_ENV. Env assignments cannot self-reference, so the
+  // agy wrapper prepends the entry dir inside a shell that execs the harness, keeping the terminal's
+  // inherited PATH whole.
   const wiring: string[] =
     harness.kind === 'claude'
       ? [`CLAUDE_CODE_SHELL=${resolve(entryDir, 'bash')}`, 'CLAUDE_CODE_TOOL_MEMORY_LIMIT=none']
       : harness.kind === 'agy'
-        ? [`PATH=${entryDir}:${process.env.PATH ?? ''}`]
+        ? []
         : [`BASH_ENV=${resolve(entryDir, 'bash-env')}`];
+  // The agy harness runs through a shell that prepends the entry dir to its inherited PATH and
+  // execs the harness tokens unchanged, so the wrapper script shadows bash for agy's shell children.
+  const agyWrap: string[] =
+    harness.kind === 'agy' ? ['sh', '-c', `export PATH=${quote(entryDir)}:$PATH; exec "$0" "$@"`] : [];
   const a: Seen | undefined = slot === 'B' ? (await leafSeats(space.session, repo, readState(leaf.path))).A : undefined;
   // The seat's own labels: hc sets them at creation and herdr-app never changes them.
   const own: Record<string, string> = { 'akrogon.repo': repo.name, 'akrogon.leaf': state.slug, 'akrogon.seat': seat };
@@ -361,6 +366,7 @@ export async function startSeat(
         'NODE_DISABLE_COMPILE_CACHE=1',
         `AKROGON_SEAT_CGROUP=${scopeCgroup}`,
         ...wiring,
+        ...agyWrap,
         ...harness.argv,
         ...(harness.kind === 'agy' ? [] : [task]),
       ],
