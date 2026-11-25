@@ -31,50 +31,34 @@ function streamKey(tokens: string[]): string {
   return tokens.join('\0');
 }
 
-// One ordered scan of captured Bun output. `names` is byte-identical to the historical
-// failureNames output: `(fail)` titles, `(unnamed)` qualified by its stream's innermost token,
-// and `(script) <script>` for a failed script whose own stream printed no `(fail)` line — the
-// stream's wrappers dropped first, `Signaled:` and free text never naming. `timeouts` holds the
-// names whose own chain prints `  ^ this test timed out after <n>ms.` as the next line of that
-// same chain after its `(fail)` line; lines of other chains in between do not break attachment.
-// `durations` holds every `(pass)` or `(fail)` line with a `[<n>ms]` bracket as one deduped entry
-// per name keeping its largest rounded ms; unbracketed lines store nothing.
+// One scan of captured Bun output. `names` is byte-identical to the historical failureNames
+// output: the multiline regexes run over the whole text exactly as before, so every JavaScript
+// line terminator (CR, CRLF, U+2028, U+2029) reads the same — `(fail)` titles, `(unnamed)`
+// qualified by its stream's innermost token, and `(script) <script>` for a failed script whose
+// own stream printed no `(fail)` line. `timeouts` and `durations` come from a per-line pass
+// over the same terminator set (CRLF pairing reads as one empty segment, which neither attaches
+// nor expires). `timeouts` holds the names whose own chain prints `  ^ this test timed out
+// after <n>ms.` as the immediately preceding line of that same chain after its `(fail)` line:
+// any other line of the chain expires the candidate, a caret is consumed, and lines of other
+// chains or other streams do not break attachment. `durations` holds every `(pass)` or `(fail)`
+// line with a strict `[<n>ms]` bracket (digits with at most one dot after a leading digit, so
+// `[...ms]` never parses as NaN) as one deduped entry per name keeping its largest rounded ms.
+// An anchored line's duration title is its whole remainder even when it holds `| (fail) `;
+// chained lines keep the legacy chain extraction with `(unnamed)` normalization.
 export function scanBunOutput(text: string): BunScan {
+  // Names: the legacy extraction verbatim. The multiline anchors already treat \r, U+2028 and
+  // U+2029 as line boundaries, so no segmenter can diverge from them.
   const titles: string[] = [];
   const failedStreams: string[][] = [];
-  const exited: string[][] = [];
-  const lastFail: Map<string, string> = new Map();
-  const timeouts: string[] = [];
-  const ms: Map<string, number> = new Map();
-  for (const line of text.split('\n')) {
-    const fail: RegExpExecArray | null = /^(?:\(fail\) |(.+?)\| \(fail\) )(.+?)(?: \[([\d.]+m?s)\])?$/.exec(line);
-    const pass: RegExpExecArray | null =
-      fail === null ? /^(?:\(pass\) |(.+?)\| \(pass\) )(.+?)(?: \[([\d.]+m?s)\])?$/.exec(line) : null;
-    const result: RegExpExecArray | null = fail ?? pass;
-    if (result !== null) {
-      const stream: string[] = result[1] === undefined ? [] : chain(result[1]);
-      const title: string =
-        result[2] === '(unnamed)' && stream.length > 0 ? `(unnamed) ${stream[stream.length - 1]}` : result[2];
-      if (fail !== null) {
-        failedStreams.push(stream);
-        titles.push(title);
-        lastFail.set(streamKey(stream), title);
-      }
-      if (result[3] !== undefined && result[3].endsWith('ms')) {
-        const value: number = Math.round(Number.parseFloat(result[3]));
-        if (!ms.has(title) || ms.get(title)! < value) ms.set(title, value);
-      }
-      continue;
-    }
-    const timeout: RegExpExecArray | null = /^(?:(.+?)\| )?  \^ this test timed out after [\d.]+ms\.$/.exec(line);
-    if (timeout !== null) {
-      const tokens: string[] = timeout[1] === undefined ? [] : chain(timeout[1]);
-      const attached: string | undefined = lastFail.get(streamKey(tokens));
-      if (attached !== undefined && !timeouts.includes(attached)) timeouts.push(attached);
-      continue;
-    }
-    if (/^.+\| Exited with code (?!0\b)\d+\s*$/.test(line)) exited.push(chain(line.slice(0, line.lastIndexOf('|'))));
+  for (const match of text.matchAll(/^(?:\(fail\) |(.+?)\| \(fail\) )(.+?)(?: \[[\d.]+m?s\])?$/gm)) {
+    const title: string = match[2];
+    const stream: string[] = match[1] === undefined ? [] : chain(match[1]);
+    failedStreams.push(stream);
+    titles.push(title === '(unnamed)' && stream.length > 0 ? `(unnamed) ${stream[stream.length - 1]}` : title);
   }
+  const exited: string[][] = [...text.matchAll(/^.+\| Exited with code (?!0\b)\d+\s*$/gm)].map(
+    (match: RegExpMatchArray) => chain(match[0].slice(0, match[0].lastIndexOf('|'))),
+  );
   const leaf: string[][] = exited.filter(
     (candidate: string[]) => !exited.some((other: string[]) => prefixOf(candidate, other)),
   );
@@ -84,6 +68,71 @@ export function scanBunOutput(text: string): BunScan {
     .filter((tokens: string[]) => !failedStreams.some((stream: string[]) => sameStream(stream, tokens)))
     .map((tokens: string[]) => `(script) ${tokens[tokens.length - 1]}`);
   const all: string[] = [...new Set([...titles, ...scripts])];
+
+  // Timeouts and durations: one ordered pass. `candidate` is each chain's open timeout window:
+  // set by its `(fail)` line, expired by anything else of the same chain, consumed by its caret.
+  const candidate: Map<string, string> = new Map();
+  const known: string[][] = [];
+  const timeouts: string[] = [];
+  const ms: Map<string, number> = new Map();
+  const remember = (tokens: string[]): void => {
+    if (tokens.length > 0 && !known.some((entry) => sameStream(entry, tokens))) known.push(tokens);
+  };
+  const timed = (line: string): { chain: string[]; title: string; bracket: string | undefined } | null => {
+    const anchored: RegExpExecArray | null = /^(?:\(pass\) |\(fail\) )(.+?)(?: \[(\d+(?:\.\d+)?)ms\])?$/.exec(line);
+    if (anchored !== null) return { chain: [], title: anchored[1], bracket: anchored[2] };
+    const chained: RegExpExecArray | null =
+      /^(.+?)\| \(fail\) (.+?)(?: \[(\d+(?:\.\d+)?)ms\])?$/.exec(line) ??
+      /^(.+?)\| \(pass\) (.+?)(?: \[(\d+(?:\.\d+)?)ms\])?$/.exec(line);
+    if (chained === null) return null;
+    const tokens: string[] = chain(chained[1]);
+    const title: string =
+      chained[2] === '(unnamed)' && tokens.length > 0 ? `(unnamed) ${tokens[tokens.length - 1]}` : chained[2];
+    return { chain: tokens, title, bracket: chained[3] };
+  };
+  for (const line of text.split(/[\n\r\u2028\u2029]/)) {
+    if (line.length === 0) continue;
+    const fail: RegExpExecArray | null = /^(?:\(fail\) |(.+?)\| \(fail\) )(.+?)(?: \[([\d.]+m?s)\])?$/.exec(line);
+    const pass: RegExpExecArray | null =
+      fail === null ? /^(?:\(pass\) |(.+?)\| \(pass\) )(.+?)(?: \[([\d.]+m?s)\])?$/.exec(line) : null;
+    const result: RegExpExecArray | null = fail ?? pass;
+    if (result !== null) {
+      const stream: string[] = result[1] === undefined ? [] : chain(result[1]);
+      const title: string =
+        result[2] === '(unnamed)' && stream.length > 0 ? `(unnamed) ${stream[stream.length - 1]}` : result[2];
+      remember(stream);
+      const key: string = streamKey(stream);
+      if (fail !== null) candidate.set(key, title);
+      else candidate.delete(key);
+    } else {
+      const timeout: RegExpExecArray | null = /^(?:(.+?)\| )?  \^ this test timed out after [\d.]+ms\.$/.exec(line);
+      if (timeout !== null) {
+        const tokens: string[] = timeout[1] === undefined ? [] : chain(timeout[1]);
+        remember(tokens);
+        const key: string = streamKey(tokens);
+        const attached: string | undefined = candidate.get(key);
+        if (attached !== undefined && !timeouts.includes(attached)) timeouts.push(attached);
+        candidate.delete(key);
+      } else if (/^.+\| Exited with code \d+\s*$/.test(line)) {
+        const tokens: string[] = chain(line.slice(0, line.lastIndexOf('|')));
+        remember(tokens);
+        candidate.delete(streamKey(tokens));
+      } else {
+        // Ordinary output expires its own chain. Its prefix carries no terminator, so the owning
+        // chain is the longest chain already seen whose tokens strictly open the line's tokens;
+        // anything else is bare output of the empty chain.
+        const tokens: string[] = chain(line);
+        let owner: string[] = [];
+        for (const entry of known) if (prefixOf(entry, tokens) && entry.length > owner.length) owner = entry;
+        candidate.delete(streamKey(owner));
+      }
+    }
+    const timing: { chain: string[]; title: string; bracket: string | undefined } | null = timed(line);
+    if (timing !== null && timing.bracket !== undefined) {
+      const value: number = Math.round(Number.parseFloat(timing.bracket));
+      if (!ms.has(timing.title) || ms.get(timing.title)! < value) ms.set(timing.title, value);
+    }
+  }
   return {
     names: all.length === 0 ? ['(no test name)'] : all,
     timeouts,
