@@ -46,7 +46,17 @@ import {
 import { cgroupRoot, leafSlice, ownSlices, procRoot, sessionBusEnv } from './scope';
 import { liveRuns, liveStartTime } from './admission';
 import { CommandError, command, run, spawnCaptured, type Result } from './shell';
-import { closeTab, end, HcError, repoSpace, terminal, terminals, windowOpen, type Seen, type SpaceResolution } from './hc';
+import {
+  closeTab,
+  end,
+  HcError,
+  repoSpace,
+  terminal,
+  terminals,
+  windowOpen,
+  type Seen,
+  type SpaceResolution,
+} from './hc';
 
 export type Reconciled = { removed: string[]; kept: { path: string; reason: string; clears?: string }[] };
 

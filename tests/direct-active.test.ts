@@ -62,8 +62,12 @@ function capacityWaits(f: Fixture, slug: string): unknown[] {
   const file: string = resolve(f.root, 'issues/timings.jsonl');
   const rows: unknown[] = [];
   try {
-    for (const line of readFileSync(file, 'utf8').split('\n').filter((line: string) => line !== '')) {
-      const row = z.object({ kind: z.string(), slug: z.string().optional(), reason: z.string().optional() }).parse(JSON.parse(line));
+    for (const line of readFileSync(file, 'utf8')
+      .split('\n')
+      .filter((line: string) => line !== '')) {
+      const row = z
+        .object({ kind: z.string(), slug: z.string().optional(), reason: z.string().optional() })
+        .parse(JSON.parse(line));
       if (row.kind === 'wait' && row.slug === slug && row.reason === 'capacity') rows.push(row);
     }
   } catch (error) {
@@ -93,10 +97,15 @@ test('an unfinished direct leaf in the same live repo never counts toward max_ac
     const worktree: string = await directWorktree(f, 'fix-alpha');
     const door: string = await catTerminal(f, worktree);
     const reviewer: string = await catTerminal(f, f.home);
-    directLeaf(f, 'fix-alpha', {
-      A: { session: f.core.session, address: door },
-      B: { session: f.core.session, address: reviewer },
-    }, { worktree });
+    directLeaf(
+      f,
+      'fix-alpha',
+      {
+        A: { session: f.core.session, address: door },
+        B: { session: f.core.session, address: reviewer },
+      },
+      { worktree },
+    );
     leaf(f, 'lc', 'implement');
     const result: Result = await cli(f, ['next', 'lc'], f.root, f.env);
     await seatsLifecycle(f, result);
@@ -122,10 +131,15 @@ test('an unfinished direct leaf in a repo whose session is unreadable never coun
     const worktree: string = await directWorktree(f, 'fix-alpha');
     const door: string = await catTerminal(f, worktree);
     const reviewer: string = await catTerminal(f, f.home);
-    directLeaf(f, 'fix-alpha', {
-      A: { session: f.core.session, address: door },
-      B: { session: f.core.session, address: reviewer },
-    }, { worktree });
+    directLeaf(
+      f,
+      'fix-alpha',
+      {
+        A: { session: f.core.session, address: door },
+        B: { session: f.core.session, address: reviewer },
+      },
+      { worktree },
+    );
     leaf(f, 'lc', 'implement');
     const result: Result = await cli(f, ['next', 'lc'], f.root, f.env);
     await seatsLifecycle(f, result);

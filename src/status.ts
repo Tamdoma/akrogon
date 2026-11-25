@@ -92,18 +92,16 @@ function scanRepo(name: string, registeredPath: string, global: GlobalConfig): S
     // array must carry (uniform across leaf kinds). Text tables filter back to the open area.
     const scanned = (leaf: Leaf): boolean => leaf.path.startsWith(open + sep) || broadcastPending(leaf.state);
     const closed: Leaf[] = inventory.leaves.filter((leaf) => !scanned(leaf));
-    const leaves: ScannedLeaf[] = inventory.leaves
-      .filter(scanned)
-      .map((leaf) => {
-        path = resolve(leaf.path, 'readiness.yaml');
-        const seat = seats(global, repo, leaf.path);
-        return {
-          ...leaf,
-          missing: leafGaps(global, leaf),
-          seatSources: seat.source,
-          resolved: { a: seat.a, b: seat.b },
-        };
-      });
+    const leaves: ScannedLeaf[] = inventory.leaves.filter(scanned).map((leaf) => {
+      path = resolve(leaf.path, 'readiness.yaml');
+      const seat = seats(global, repo, leaf.path);
+      return {
+        ...leaf,
+        missing: leafGaps(global, leaf),
+        seatSources: seat.source,
+        resolved: { a: seat.a, b: seat.b },
+      };
+    });
     const failures: LeafFailure[] = [
       ...inventory.unreadable.map((failure) => ({
         path: resolve(failure.path, 'state.yaml'),

@@ -1125,7 +1125,11 @@ async function dispatchLeaf(
     // Setup is due and a busy seat or live run-check holds the leaf: the leaf simply waits for the
     // next pass — no capacity row, no error, no skipped record.
     if ('busy' in allocated) return end('none');
-    for (const slot of requiredSlots(allocated.state.phase, allocated.state.fix_rounds, allocated.state.direct === true)) {
+    for (const slot of requiredSlots(
+      allocated.state.phase,
+      allocated.state.fix_rounds,
+      allocated.state.direct === true,
+    )) {
       const delivery: string = `${repo.name}/${slug}/${allocated.state.phase}/${slot}`;
       if (invocation.dispatched.has(delivery)) continue;
       invocation.dispatched.add(delivery);
@@ -1581,14 +1585,7 @@ async function broadcastPass(global: GlobalConfig, repo: Repo, invocation: Invoc
         }
         const allocated: Allocation | null | { busy: string } = await allocate(global, repo, fresh, invocation);
         if (allocated === null || 'busy' in allocated) return;
-        await dispatchSlot(
-          global,
-          repo,
-          { path: fresh.path, state: allocated.state },
-          'B',
-          prompt,
-          allocated,
-        );
+        await dispatchSlot(global, repo, { path: fresh.path, state: allocated.state }, 'B', prompt, allocated);
       });
     } catch (error) {
       if (!(error instanceof Error)) throw error;

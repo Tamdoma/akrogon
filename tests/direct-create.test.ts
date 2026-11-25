@@ -65,12 +65,7 @@ async function standin(f: HcFixture, name: string): Promise<string> {
   return z.object({ address: z.string() }).parse(JSON.parse(started.stdout)).address;
 }
 
-async function direct(
-  f: HcFixture,
-  slug: string,
-  flags: string[],
-  env: NodeJS.ProcessEnv = {},
-): Promise<Result> {
+async function direct(f: HcFixture, slug: string, flags: string[], env: NodeJS.ProcessEnv = {}): Promise<Result> {
   return cli(f, ['direct', slug, ...flags], f.root, { ...f.env, ...env });
 }
 
@@ -107,9 +102,7 @@ async function worktreeStanza(f: Fixture, worktree: string): Promise<string> {
   const stanza: string | undefined = output
     .split('\n\n')
     .find(
-      (block) =>
-        block.startsWith('worktree ') &&
-        realpathSync(block.split('\n')[0].slice('worktree '.length)) === real,
+      (block) => block.startsWith('worktree ') && realpathSync(block.split('\n')[0].slice('worktree '.length)) === real,
     );
   expect(stanza, 'no worktree stanza for ' + worktree + ' in: ' + output).toBeDefined();
   return z.string().parse(stanza);

@@ -30,7 +30,11 @@ function directLeaf(f: Fixture, slug: string, phase: string, created: string, ex
 }
 
 // The direct leaf's real sparse worktree on its own branch, built with the product helper.
-async function directWorktree(f: Fixture, slug: string, extra: object = {}): Promise<{ leafPath: string; worktree: string }> {
+async function directWorktree(
+  f: Fixture,
+  slug: string,
+  extra: object = {},
+): Promise<{ leafPath: string; worktree: string }> {
   const at: string = resolve(storeDir(f), slug);
   await createSparseWorktree(readRepo(f.repo, f.root), at, 'origin/main', { branch: slug });
   const worktree: string = realpathSync(at);

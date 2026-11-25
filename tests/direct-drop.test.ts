@@ -70,7 +70,12 @@ function chartFolder(f: Fixture, slug: string): { rel: string; abs: string } {
 
 // A direct leaf in the open area: owner folder chart-x with its ISSUE.md, leaf state seeded raw
 // (the schema has no direct field yet, so leaf() writes it as plain yaml) plus the seat refs.
-function seedDirectLeaf(f: HcFixture, slug: string, seats: { door: string; reviewer: string }, extra: Raw = {}): string {
+function seedDirectLeaf(
+  f: HcFixture,
+  slug: string,
+  seats: { door: string; reviewer: string },
+  extra: Raw = {},
+): string {
   const path: string = leaf(
     f,
     slug,
@@ -99,7 +104,9 @@ function readStateRaw(path: string): Raw {
 // The hc calls akrogon made, one argv per line, from the fixture's recording shim.
 function shimLines(f: HcFixture): string[] {
   return existsSync(f.core.shimLog)
-    ? readFileSync(f.core.shimLog, 'utf8').split('\n').filter((line: string) => line !== '')
+    ? readFileSync(f.core.shimLog, 'utf8')
+        .split('\n')
+        .filter((line: string) => line !== '')
     : [];
 }
 
@@ -141,7 +148,10 @@ function bootId(): string {
 // A live run record of the leaf, backed by a real sleeper pid: research-tests 6i's fake-units
 // construction. The fake systemctl db gains the leaf slice, the run scope and its guard so the
 // drop's stops succeed and land in the log. Returns the record identity for assertions.
-function seedLiveRun(f: HcFixture, slug: string): { run: string; unit: string; guard: string; slice: string; sleeper: Bun.Subprocess } {
+function seedLiveRun(
+  f: HcFixture,
+  slug: string,
+): { run: string; unit: string; guard: string; slice: string; sleeper: Bun.Subprocess } {
   const run: string = randomUUID();
   const token: string = randomUUID();
   const hash: string = createHash('sha256').update(token).digest('hex');
@@ -187,7 +197,9 @@ function runRecords(f: HcFixture): Raw[] {
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
     .filter((name: string) => name.endsWith('.yaml'))
-    .map((name: string) => z.record(z.string(), z.unknown()).parse(Bun.YAML.parse(readFileSync(resolve(dir, name), 'utf8'))));
+    .map((name: string) =>
+      z.record(z.string(), z.unknown()).parse(Bun.YAML.parse(readFileSync(resolve(dir, name), 'utf8'))),
+    );
 }
 
 // The state a refusal must leave: the owner folder unmoved, the worktree and the branch in place.

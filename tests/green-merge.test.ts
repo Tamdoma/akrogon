@@ -37,7 +37,11 @@ import { bootId, writePassRecord } from '../src/verify-pass';
 stopCoresAfterFile();
 type GreenFixture = HcFixture & { launches: string; systemctl: SystemctlFixture };
 
-async function greenFrom(f: HcFixture, checks: Record<string, string>, broadcast: boolean = false): Promise<GreenFixture> {
+async function greenFrom(
+  f: HcFixture,
+  checks: Record<string, string>,
+  broadcast: boolean = false,
+): Promise<GreenFixture> {
   const config: Record<string, unknown> = { checks, grounding: 'none' };
   if (broadcast) config.broadcast = { discord: { webhook_env: ['AKROGON_TEST_WEBHOOK'] } };
   yaml(resolve(f.root, 'issues/config.yaml'), config);

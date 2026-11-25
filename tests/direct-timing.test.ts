@@ -159,9 +159,7 @@ test('a merged direct leaf totals its merge time from creation, not null', async
     const created: string = new Date(now - 50 * 60000).toISOString();
     const close: string = new Date(now - 8 * 60000).toISOString();
     directLeaf(f, 'dt-merged', 'merged', created);
-    records(f, 'log', [
-      move(f, { slug: 'dt-merged', from: 'merge', to: 'merged', ts: close, slot: null }),
-    ]);
+    records(f, 'log', [move(f, { slug: 'dt-merged', from: 'merge', to: 'merged', ts: close, slot: null })]);
     const env: z.infer<typeof envelopeSchema> = await statusJson(f);
     const row = env.merges.find((item) => item.repo === f.repo && item.slug === 'dt-merged');
     expect(row).toBeDefined();
@@ -179,7 +177,15 @@ test('a direct leaf shows no prompt or seat_done gaps, its run pair counts, and 
     const ctl: { log: Row[]; timings: Row[] } = journey(f, 'ctl');
     // One complete run pair inside the direct leaf's implement visit.
     dt.timings.push(
-      event(f, { slug: 'dt', kind: 'check_start', run: 'r1', name: 'unit', scope: 'leaf', phase: 'implement', ts: at(2) }),
+      event(f, {
+        slug: 'dt',
+        kind: 'check_start',
+        run: 'r1',
+        name: 'unit',
+        scope: 'leaf',
+        phase: 'implement',
+        ts: at(2),
+      }),
       event(f, {
         slug: 'dt',
         kind: 'check_end',
@@ -215,7 +221,15 @@ test('a direct leaf shows no prompt or seat_done gaps, its run pair counts, and 
       resolve(f.root, 'issues/timings.jsonl'),
       readFileSync(resolve(f.root, 'issues/timings.jsonl'), 'utf8') +
         JSON.stringify(
-          event(f, { slug: 'dt', kind: 'check_start', run: 'r2', name: 'lint', scope: 'leaf', phase: 'implement', ts: at(4) }),
+          event(f, {
+            slug: 'dt',
+            kind: 'check_start',
+            run: 'r2',
+            name: 'lint',
+            scope: 'leaf',
+            phase: 'implement',
+            ts: at(4),
+          }),
         ) +
         '\n',
     );

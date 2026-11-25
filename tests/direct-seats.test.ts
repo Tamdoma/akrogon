@@ -119,10 +119,7 @@ function holdHook(core: HcCore): void {
 }
 
 // A stand-in terminal (fake harness, work mode) started with the task HOLD: working until released.
-async function heldTerminal(
-  core: HcCore,
-  cwd: string,
-): Promise<{ address: string; release: () => void }> {
+async function heldTerminal(core: HcCore, cwd: string): Promise<{ address: string; release: () => void }> {
   holdHook(core);
   const started: SpawnResult = await core.hc([
     'run',

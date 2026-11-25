@@ -95,9 +95,7 @@ test('run-check from the direct leaf worktree attributes the run, the timings ro
     expect(result.stderr).toContain('check dcrun: 0');
     const rows: TimingEvent[] = checkRows(f, 'dc-run');
     expect(rows.some((event) => event.kind === 'check_start' && event.name === 'dcrun')).toBe(true);
-    expect(
-      rows.some((event) => event.kind === 'check_end' && event.name === 'dcrun' && event.exit === 0),
-    ).toBe(true);
+    expect(rows.some((event) => event.kind === 'check_end' && event.name === 'dcrun' && event.exit === 0)).toBe(true);
     const logs: string[] = readdirSync(resolve(leafPath, 'implementation')).filter((name) =>
       /^check-dcrun-.+\.log$/.test(name),
     );
@@ -141,7 +139,8 @@ test('run-check from the direct leaf worktree attributes the run, the timings ro
     expect(blocked.code).toBe(0);
     expect(
       readTimings(f.root).some(
-        (event) => event.kind === 'check_end' && event.slug === 'dc-run' && event.name === 'dcblock' && event.exit === 0,
+        (event) =>
+          event.kind === 'check_end' && event.slug === 'dc-run' && event.name === 'dcblock' && event.exit === 0,
       ),
     ).toBe(true);
   } finally {

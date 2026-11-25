@@ -239,8 +239,8 @@ function visitLines(events: TimingEvent[], slug: string, visit: Visit, direct: b
 // across every area: a merged leaf already rests in closed (plan D12).
 function directSlugs(repo: Repo): Set<string> {
   return new Set(
-    repoInventory(repo, ['open', 'closed', 'parked']).leaves
-      .filter((leaf) => leaf.state.direct === true)
+    repoInventory(repo, ['open', 'closed', 'parked'])
+      .leaves.filter((leaf) => leaf.state.direct === true)
       .map((leaf) => leaf.state.slug),
   );
 }
