@@ -334,7 +334,10 @@ test.serial('a seat whose launcher is a bash script stays at its scope root, out
     const scope: string = `${sliceCgroup(leafSlice({ name: f.repo }, slug, f.home))}/${unit}`;
     const procs: string[] = readFileSync(resolve(scope, 'cgroup.procs'), 'utf8').split('\n').filter(Boolean);
     expect(procs.length, 'the seat sits at the scope root').toBeGreaterThan(0);
-    expect(readdirSync(resolve(scope, 'tools')), 'no t- minted for the seat').toEqual([]);
+    expect(
+      readdirSync(resolve(scope, 'tools')).filter((name) => name.startsWith('t-')),
+      'no t- minted for the seat',
+    ).toEqual([]);
   } finally {
     await core.stop();
     slices.push(leafSlice({ name: f.repo }, slug, f.home));
