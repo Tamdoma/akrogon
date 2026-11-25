@@ -10,6 +10,7 @@ import {
   rmSync,
   unlinkSync,
   writeFileSync,
+  writeSync,
 } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
@@ -34,6 +35,7 @@ import { locate, type LogTarget } from './evidence';
 import { FlockError, flockHold } from './flock';
 import { captureAncestry } from './pack';
 import { leafSlice, runSlice, runUnitArgv, runUnitBase, runtimeDir, sessionBusAddress, startRunGuard } from './scope';
+import { relocateFromToolCgroup } from './tool-cgroup';
 import { type Phase } from './routing';
 
 const forbidden: readonly string[] = [
@@ -251,7 +253,7 @@ export async function runCheck(
     argv,
     cwd,
   );
-  process.stderr.write(`${result.stderr_final_nl ? '' : '\n'}check ${name ?? 'run'}: ${result.code} ${result.log}\n`);
+  writeSwallowingEpipe(2, `${result.stderr_final_nl ? '' : '\n'}check ${name ?? 'run'}: ${result.code} ${result.log}\n`);
   return result.code;
 }
 
@@ -317,6 +319,23 @@ export async function captureOwner(target: string, repo: Repo): Promise<{ path: 
   return { path: resolve(recorded, ...found.member.split('/').map(() => '..')), kind: 'issue' };
 }
 
+// The echoes write synchronously so an EPIPE surfaces at the write, where it
+// is catchable; Bun's buffered pipe writes raise it only at exit-flush, which
+// would exit 1 over a completed publish. Only EPIPE is swallowed: the publish
+// never depends on the pipe.
+export function writeSwallowingEpipe(fd: number, text: string): void {
+  const buffer: Buffer = Buffer.from(text, 'utf8');
+  let offset: number = 0;
+  while (offset < buffer.length) {
+    try {
+      offset += writeSync(fd, buffer, offset, buffer.length - offset);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EPIPE') return;
+      throw error;
+    }
+  }
+}
+
 export async function checkedRun(
   repo: Repo,
   { slug, target, scope, unit, phase, attempt }: LeafTarget,
@@ -326,6 +345,9 @@ export async function checkedRun(
   cwd: string,
   rerunNames?: string,
 ): Promise<{ code: number; log: string; output: string; stderr_final_nl: boolean }> {
+  // A direct library call gets the same relocation the CLI entry runs: the
+  // writer leaves its t- before any record or capture.
+  relocateFromToolCgroup();
   const early: string | undefined = await ownerRefusal(target, repo, false);
   if (early !== undefined) throw new PublishRefusedError(early);
   const run: string = randomUUID();
@@ -461,10 +483,10 @@ export async function checkedRun(
                       await admission.end();
                     }
                   })();
-            process.stdout.write(result.stdout);
-            process.stderr.write(result.stderr);
             const refusedReason: string | undefined = await ownerRefusal(target, repo, true);
             if (refusedReason !== undefined) {
+              writeSwallowingEpipe(1, result.stdout);
+              writeSwallowingEpipe(2, result.stderr);
               // The holder may have moved mid-run: drop the stale captures under
               // every owner dir their member resolves to, or at the written path.
               for (const captured of [captureOut, captureErr]) {
@@ -476,6 +498,9 @@ export async function checkedRun(
               refusePublish(refusedReason, result);
             }
             const kept: string = resolve(target, `check-${encodeURIComponent(name)}-${Date.now()}-${process.pid}.log`);
+            // The publish precedes the echoes: kept file, check_end row and
+            // capture unlinks all stand even when the echo pipe's reader is
+            // gone (the seat's t- kill closes it mid-run).
             writeFileSync(kept, result.stdout + result.stderr);
             appendTiming(repo, {
               kind: 'check_end',
@@ -486,6 +511,8 @@ export async function checkedRun(
             });
             unlinkSync(captureOut);
             unlinkSync(captureErr);
+            writeSwallowingEpipe(1, result.stdout);
+            writeSwallowingEpipe(2, result.stderr);
             return {
               code: result.code,
               log: kept,

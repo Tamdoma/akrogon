@@ -63,6 +63,22 @@ if (verb !== undefined && values.help === true && Object.hasOwn(VERB_OPTIONS, ve
   process.exit(0);
 }
 
+// The deferred-kill helper: no usage entry, no relocation (it is spawned
+// outside any t- without the marker, and belt-and-suspenders exempt), no
+// state-home migration. It waits out its tool shell, kills the t- and exits 0.
+if (verb === 'tool-kill-helper') {
+  const [repoName, repoRoot, slug, unit, toolPath]: [string, string, string, string, string] = z
+    .tuple([z.string(), z.string(), z.string(), z.string(), z.string()])
+    .parse(positionals);
+  await (await import('./tool-cgroup')).toolKillHelper(repoName, repoRoot, slug, unit, toolPath);
+  process.exit(0);
+}
+
+// Every akrogon process starting inside a tool cgroup leaves it before any
+// lock, migration, record or capture: a kill that lands after this move never
+// ends the process inside the killable t-. A failed move throws loudly here.
+(await import('./tool-cgroup')).relocateFromToolCgroup();
+
 if (verb !== 'timing') await migrateStateHome();
 
 switch (verb) {

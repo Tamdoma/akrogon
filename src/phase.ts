@@ -55,6 +55,7 @@ import { requireGreenReceipt } from './verify';
 import { enclosingCapture, logFiles } from './pack';
 import { flockHold } from './flock';
 import { abandonedCaptures } from './run-check';
+import { sweepToolCgroups } from './tool-cgroup';
 
 export async function repoNotices(repo: Repo): Promise<string> {
   const space: SpaceResolution = await repoSpace(repo);
@@ -283,18 +284,24 @@ export async function commitMove(
     );
   } finally {
     try {
-      await logMove(repo, recorded, to === 'failed' ? readState(leaf.path) : announced, slot);
-      appendTiming(repo, {
-        kind: 'visit_start',
-        slug: recorded.slug,
-        phase: to,
-        visit: currentVisit(readLog(repo.root), recorded.slug, to),
-      });
-    } catch (error) {
-      const cause: Error = error instanceof Error ? error : new Error(String(error), { cause: error });
-      throw new MoveCommittedError(repo, to, `Move to ${to} is committed, but log append failed: ${cause.message}`, {
-        cause,
-      });
+      try {
+        await logMove(repo, recorded, to === 'failed' ? readState(leaf.path) : announced, slot);
+        appendTiming(repo, {
+          kind: 'visit_start',
+          slug: recorded.slug,
+          phase: to,
+          visit: currentVisit(readLog(repo.root), recorded.slug, to),
+        });
+      } catch (error) {
+        const cause: Error = error instanceof Error ? error : new Error(String(error), { cause: error });
+        throw new MoveCommittedError(repo, to, `Move to ${to} is committed, but log append failed: ${cause.message}`, {
+          cause,
+        });
+      }
+    } finally {
+      // Independently guarded: a log-append failure and the sweep never suppress
+      // each other, and the sweep itself never throws out of here.
+      sweepToolCgroups(repo, recorded.slug);
     }
   }
   return announced;

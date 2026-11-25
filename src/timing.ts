@@ -86,6 +86,23 @@ export const timingEventSchema = z.discriminatedUnion('kind', [
   z.strictObject({ ...slugged, kind: z.literal('check_refused'), ...checkCore }),
   z.strictObject({
     ...slugged,
+    kind: z.literal('tool_kill'),
+    unit: z.string(),
+    seen: z.number().int().nonnegative(),
+    populated: z.array(z.string()),
+    deferred: z.array(z.string()),
+    errors: z.number().int().nonnegative(),
+  }),
+  z.strictObject({
+    ...slugged,
+    kind: z.literal('tool_kill_deferred'),
+    unit: z.string(),
+    t: z.string(),
+    outcome: z.enum(['written', 'killed-already', 'error']),
+    error: z.string().optional(),
+  }),
+  z.strictObject({
+    ...slugged,
     kind: z.literal('batch'),
     attempt,
     holder: z.string(),
