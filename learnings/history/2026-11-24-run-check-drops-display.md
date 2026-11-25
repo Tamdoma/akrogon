@@ -15,3 +15,7 @@ Himne leaf notes-stanza-layout, plan.synthesis pass, 2026-11-24. The operator lo
 A headed browser run under run-check starts with no display unless the display variables reach it. Either the repo lists `DISPLAY` (and `XDG_RUNTIME_DIR` where needed) in `pass_env`, or the proof command sets them inside the run-check command. A plan that names a `--headed` proof under run-check without one of these fails before it tests anything.
 
 Report: https://github.com/Tamdoma/akrogon/issues/155
+
+## Case 2026-11-24, Himne notes-reflow-zoom plan.synthesis
+
+The same headed Playwright proof run through `akrogon run-check` (`env CI=1 npx playwright test e2e/notes-zoom.e2e.ts --headed`) failed all 10 tests at `browserType.launch` with "ui/aura/env.cc:246 The platform failed to initialize. Exiting." A `run-check` printing `env` showed no `DISPLAY`, `WAYLAND_DISPLAY` or `XDG_RUNTIME_DIR` while `/tmp/.X11-unix/X0` was reachable; the same launch from the seat's shell succeeded. Adding `DISPLAY=:0 XDG_RUNTIME_DIR=/run/user/1000` inside the command fixed it. Logs: Himne `issues/open/notes-sheet-layout/notes-reflow-zoom/implementation/check-notes-zoom-e2e-1795538043527-2274478.log`, `check-display-env-1795538102563-2297354.log`.

@@ -1,0 +1,35 @@
+opened: '2026-11-25T03:04:41Z'
+seats:
+  - seat: A
+    address: t126
+    name: null
+    recipe:
+      harness: claude
+    session: /home/ivan/.claude/projects/-home-ivan-Work-infra-akrogon/4a6532cd-ddc9-4f18-b569-bcdf8a96ef81.jsonl
+  - seat: B
+    address: t3p0
+    name: ak-slot-b
+    recipe:
+      harness: pi
+      model: devin/swe-2-1-max
+      effort: high
+    session: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon--/2026-11-25T03-07-21-534Z_898fedfa-ee6b-4160-a3d7-bcf9fc783204.jsonl
+  - seat: C
+    address: t3p1
+    name: ak-slot-c
+    recipe:
+      harness: agy
+      model: neon
+      effort: high
+    session: /home/ivan/.gemini/antigravity-cli/conversations/c942e8b8-a151-4f39-b6b7-6116ff4f9541.db
+  - seat: D
+    address: t3p2
+    name: ak-slot-d
+    recipe:
+      harness: pi
+      model: meta/muse-wonder-full-1.0
+      effort: high
+    session: /home/ivan/.pi/agent/sessions/--home-ivan-Work-infra-akrogon--/2026-11-25T03-07-26-466Z_0db65c1a-bf66-4415-b82e-03a2bfa31bd4.jsonl
+spans:
+  - from: '2026-11-25T03:04:41Z'
+    to: '2026-11-25T04:01:41Z'

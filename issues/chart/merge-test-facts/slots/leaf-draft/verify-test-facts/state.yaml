@@ -1,0 +1,7 @@
+slug: verify-test-facts
+phase: plan.synthesis
+created: '2026-11-25'
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#154"

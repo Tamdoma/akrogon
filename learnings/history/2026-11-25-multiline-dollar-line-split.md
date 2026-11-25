@@ -1,0 +1,7 @@
+# Case: replicating a multiline regex scan line-by-line drops failures on \r and U+2028 inputs
+
+verify-test-facts review-A F1, 2026-11-25. `failureNames` was rewritten as an ordered per-line scan iterating `text.split('\n')`. The original scan applied one regex with the multiline flag over the whole text, where `^`/`$` are line-boundary anchors for every JavaScript line terminator — `\n`, `\r`, U+2028 and U+2029 — while `.` excludes all four. A per-`\n` split keeps `\r` inside the line, where `.` cannot match it, so a `(fail)` line ending in `\r\n` or holding a mid-line `\r` matched the old scan and fails the new one.
+
+Evidence: probe on the reviewed head comparing the verbatim pre-change implementation with the new scan: `(fail) x\r\n(fail) y\n` old `["x","y"]` new `["y"]`; `(fail) a\rb\n` old `["a"]` new `[]`; `(fail) z\r` old `["z"]` new `[]`; `(fail) q\u2028\n` old `["q"]` new `[]`; 2424/3000 fuzz inputs diverging, versus 2000/2000 identical for `\n`-only inputs. Recorded in `issues/open/merge-test-facts/verify-test-facts/review-A.md` F1.
+
+Learning: when a multiline regex over a whole text is re-implemented as a line-by-line scan, replicate the line boundaries of the regex engine, not `\n` alone: split on `[\n\r\u2028\u2029]` or the rewrite silently narrows what matches. Verify byte-identity claims with fuzz input containing `\r` and U+2028, since every natural test fixture uses `\n` only.

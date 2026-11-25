@@ -1,0 +1,43 @@
+slug: shell-sweep
+phase: check.fix
+created: 2026-11-25
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#157"
+busy_since:
+  A: 2026-11-25T06:43:50.377Z
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 5
+verdict: {}
+tab: ak90572cd2732f5ba7ddf991afd767f7
+worktree: /home/ivan/.akrogon/worktrees/akrogon/shell-sweep
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t3mw
+  B:
+    session: infra
+    address: t3ns
+prompted:
+  A:
+    turn: 7
+    address: t3mw
+prompted_at: {}
+delivery_error: {}
+frozen:
+  tests/hc-shim.sh: b6fd3d4e46b2c2a47e864013093d30b52aa6835c
+  tests/seat-recovery.test.ts: 2aef252d84c5d58927d0ddd46b3ad328f6ea213b
+  tests/shell-sweep.test.ts: b54d29bda2d3dbd778cac644df5cca78e578e2a8
+frozen_cited: []

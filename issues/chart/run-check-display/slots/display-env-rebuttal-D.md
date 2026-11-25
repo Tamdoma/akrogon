@@ -1,0 +1,21 @@
+# Rebuttal: display-env, slot D
+
+Disagreements only. Tiers: T1 = observed on this host 2026-11-25. T2 = akrogon source at main `085f2f88` or my own blind notes, 2026-11-25.
+
+## R1. Wrong attribution: the user-manager env mechanism in the Q2 a-refutation is C's, not D's, and it corrects my stated mechanism
+
+- Fact: the merged Q2 bullet ends "So a leaves verify host-dependent, not display-less (C,D)". My blind notes said the opposite mechanism: that a verify pass would see no display names because the service receives only `passForwarded` plus repo `env`/`pass_env` (my E12, and my rejected-a text: the pass "sees empty process.env for display names").
+- Evidence: T2, `display-env-D.md` Q2 parts 2 and 3, written 2026-11-25. T1, my probe just now, 2026-11-25: `systemctl --user show-environment` lists `DISPLAY=:0`, `WAYLAND_DISPLAY=wayland-1`, `XDG_RUNTIME_DIR=/run/user/1000`, `XDG_SESSION_TYPE=wayland`, and no `XAUTHORITY`, which matches the merged file's report of C's service probe and A's re-read (2026-11-25).
+- Consequence: credit for the refutation mechanism belongs to C (and A's re-read), not D. My recorded consequence of Q2a, "verify runs display-less", is wrong on this host; the correct consequence is C's: verify picks up the user manager's values, which need not equal the caller's. My Q2 pick was reached with a wrong mechanism for this point.
+
+## R2. Disagreement: keeping no `--unsetenv` leaves a door divergence in the caller-lacks-a-name case, and the "never `--unsetenv`" phrase is wrongly attributed to D
+
+- Fact: the merged Q2 pitfall says display names must use the only-if-set pattern, "never `--setenv=DISPLAY=` and never `--unsetenv` (B,C,D)", the Q2 open question carries "Keep only-if-set with no `--unsetenv` (C recommends)", and done-criterion 4 asserts only that the pass and land unit argv carry no `--setenv` when the caller lacks the names. My notes said only-if-set and never synthesize (my P7, C4, C8). They never prohibited `--unsetenv` and never considered manager-env inheritance.
+- Evidence: T1, `systemctl --user show-environment`, 2026-11-25, above: the manager holds the display names. T1, my probe `d-env-baseline`, 2026-11-25: a run-check payload printed none of them on this same host. T2, `src/verify.ts` `runOnce` to `checkedRun` to `constructedEnv` (`src/run-check.ts`): a verify payload's env is built from the pass service's own `process.env`, so a display name the caller lacked but the service inherited from the manager is copied into the payload once `copied` holds it. T2, `display-env-D.md` Q2 parts 4 and 5, 2026-11-25: no `--unsetenv` position exists in my notes.
+- Consequence: under the merged recommendation, a caller without `DISPLAY` (for example an SSH shell on this desktop host) gets no `DISPLAY` under run-check and the manager's `DISPLAY=:0` under verify and land. That is the same command seeing a different display at each door, which is what Q2b's stated reason claims to remove, and done-criterion 4 as written can pass on argv while the payload sees the manager's value. The leaf must either add `--unsetenv` for display names the caller lacks in `launchPass` and `launchLand`, or the done-criteria and docs must state this caller-lacks divergence as accepted. The merged file records neither open choice nor the divergence.
+
+## R3. Minor attribution corrections (no effect on picks)
+
+- Fact: three items credited partly to D were not in my notes in that form. (1) "wl_display_connect opens `$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY` (B,C,D)": my support for the same fact was the observed socket path and a failing probe, plus the XDG spec; I did not cite libwayland. (2) "A tool that sniffs `DISPLAY` ... the cheap suite stays green (A,D)": I proposed the cheap suite staying green as a leaf proof (my C3); I did not run it. (3) Done-criterion 4's "`launchLand` carries one `XDG_RUNTIME_DIR` (B,C,D)": my C7 asserted the fake-systemd log shows the names reaching both units; the single-`XDG_RUNTIME_DIR` condition was not mine.
+- Evidence: T2, `display-env-D.md`, 2026-11-25: E4 and E7 for item 1; P2 and C3 for item 2; C7 for item 3.
+- Consequence: credit and proof status only. Item 2 matters to reading the merged file: cheap-suite-green is a proof the leaf still owes, not charting evidence already in hand from D.

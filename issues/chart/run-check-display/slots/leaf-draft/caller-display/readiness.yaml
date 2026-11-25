@@ -1,0 +1,25 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: headed Chromium launch inside akrogon run-check with and without display variables
+    command: akrogon run-check --holder <chart>/direct -- sh -c 'cd /home/ivan/Work/personal/Himne && [DISPLAY=:0 | WAYLAND_DISPLAY=wayland-1 XDG_RUNTIME_DIR=/run/user/1000] node -e <chromium.launch headless:false, open data page, close>' (probes P0 to P3)
+    identity: local user, no account
+    target: this host's Hyprland session with Xwayland at :0
+    version: akrogon release 085f2f88, Playwright 1.63.0 Chromium, node v26.13.1
+    date: '2026-11-25'
+    result: no display variable reaches the command today; with none Chromium exits "Missing X server or $DISPLAY"; DISPLAY alone opens a window; the Wayland pair alone fails by default (X11 ozone backend) and passes with --ozone-platform=wayland (peer probes)
+    cleanup: browser closed by the script; logs only under the chart's direct/
+    limits: one host, Xwayland with no auth cookie so XAUTHORITY not exercised; Firefox and WebKit not tried; the fixed CLI not run
+    record: issues/chart/run-check-display/forks/display-env.md
+  - operation: systemd-run --user transient service environment with --setenv and -p UnsetEnvironment=
+    command: systemd-run --user --quiet --pipe --collect [--setenv=NAME=VALUE] [-p 'UnsetEnvironment=NAME ...'] env (probes A-S1 to A-S4), and env -i ... systemd-run --user --scope env
+    identity: local user, no account
+    target: this host's systemd user manager
+    version: systemd 262 (262.2-1-arch)
+    date: '2026-11-25'
+    result: a transient service inherits the manager's DISPLAY, WAYLAND_DISPLAY, XDG_SESSION_TYPE; --setenv overrides an inherited value; UnsetEnvironment= removes inherited names, space-separated or as repeated -p flags; a --scope runs with only the env it is handed
+    cleanup: --collect, no unit left
+    limits: --pipe services, not the launchPass or launchLand argv itself; a listener started before the desktop display was read from unit timestamps, not observed launching a land
+    record: issues/chart/run-check-display/forks/display-env.md

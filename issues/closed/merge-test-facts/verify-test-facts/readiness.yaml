@@ -1,0 +1,35 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+- operation: Bun test output lines for pass, fail and timeout (pre-existing format the parser reads)
+  command: bun test ./p.test.ts > out.log 2>&1 on a scratch file (0 ms pass, 1200 ms pass, assertion failure, 50 ms-limit test sleeping 500 ms, thrown error reading "this test timed out after 50ms."), once with CLAUDECODE=1 and once with env -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT
+  identity: local user, no credential
+  target: this host's bun
+  version: bun 1.4.5
+  date: '2026-11-25'
+  result: 'without CLAUDECODE, "(pass) <title> [<n>ms]" for passes (a 0.01 ms pass printed [0.01ms]; C''s probe the same day saw passes under about 0.005 ms print with no bracket), "(fail) <title> [<n>ms]", and "  ^ this test timed out after <n>ms." as the next line after a timed-out test''s (fail) line; the thrown error prints "error: this test timed out after 50ms." before its (fail) line; with CLAUDECODE=1 no (pass) line prints'
+  cleanup: scratch folder removed and verified absent
+  limits: one unwrapped file; wrapper chains and interleaving covered only by the framework log read (forks/test-facts.md P2); a later bun may change the format
+  record: issues/chart/merge-test-facts/forks/test-facts.md
+- operation: framework merge verify output under wrapper chains (pre-existing logs, read only)
+  command: read check-verify-1795568767546-3477817.log, check-verify-1795549654908-735600.log and check-verify-1795566622096-2368929.log under /home/ivan/Work/infra/tamdoma/framework/issues/open/
+  identity: local user, no credential
+  target: framework repo files
+  version: bun 1.4.5 (a7733435c) as printed in the logs
+  date: '2026-11-25'
+  result: 12,077 chain-prefixed "(pass) <title> [<n>ms]" lines in one log; "<chain> |   ^ this test timed out after <n>ms." follows the same chain's (fail) line and repeats in the end summary; 123 and 130 (pass) lines with no [<n>ms] suffix in check-verify-1795487484756-1065562.log and check-verify-1795553672666-2146688.log (C)
+  cleanup: none, read only
+  limits: framework's wrapper format only
+  record: issues/chart/merge-test-facts/forks/test-facts.md
+- operation: verify command environment does not carry CLAUDECODE (pass lines print on the merge path)
+  command: read akrogon src/run-check.ts constructedEnv
+  identity: none
+  target: akrogon main 085f2f88
+  version: 085f2f88
+  date: '2026-11-25'
+  result: constructedEnv copies an allow-list plus repo env/pass_env only; the framework merge log above holds pass lines
+  cleanup: none
+  limits: a repo listing CLAUDECODE in pass_env loses its pass lines and so its green durations
+  record: issues/chart/merge-test-facts/forks/test-facts.md

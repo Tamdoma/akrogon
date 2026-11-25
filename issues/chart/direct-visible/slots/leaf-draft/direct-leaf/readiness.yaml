@@ -1,0 +1,25 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+- operation: find a terminal by hc address across live sessions (pre-existing hc helpers the create verb uses)
+  command: bun -e calling src/hc.ts sessions() then terminal(session, address) for t126 and t3p0 in every live session
+  identity: local user, no credential
+  target: this host's hc sessions
+  version: hc 0.1.22, akrogon main 085f2f88
+  date: '2026-11-25'
+  result: sessions() listed five live sessions; each address resolved in exactly one session (infra) with state live and a status word (working for the door, done for the idle consultant) and a turn number; every other session answered not_found with exit code 3
+  cleanup: none, read only
+  limits: addresses were unique across sessions on this host; a duplicate address across sessions was not observed, so the verb's refusal on two matches is untested here
+  record: issues/chart/direct-visible/forks/direct-leaf.md
+- operation: real throwaway hc core for tests (pre-existing test machinery the proofs use)
+  command: read akrogon tests/hc-fixture.ts and count its users
+  identity: none
+  target: akrogon main 085f2f88
+  version: 085f2f88
+  date: '2026-11-25'
+  result: tests/hc-fixture.ts starts a real hc core per test file with a scratch XDG_RUNTIME_DIR, a stand-in agent and a recording hc shim; 40 test files use it
+  cleanup: none
+  limits: the stand-in agent is not a real harness
+  record: issues/chart/direct-visible/forks/direct-leaf.md

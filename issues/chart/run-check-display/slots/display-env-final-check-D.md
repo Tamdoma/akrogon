@@ -1,0 +1,15 @@
+# Final-shape check: display-env, slot D
+
+Problems only. Tiers: T1 = observed on this host 2026-11-25. T2 = akrogon source at main `085f2f88`, read 2026-11-25.
+
+## F1. [C2] and [C4] contradict each other for a set-but-empty display value
+
+- Fact: [C2] says the services "carry the caller's display values exactly" with `--setenv=NAME=<value>` when the caller has a name, and "Never `--setenv=NAME=` with an empty value". [C4] says a caller holding the three names gets `--setenv` for each "with the caller's value". For a caller holding `DISPLAY=` (set, empty), exact carry and [C4] require `--setenv=DISPLAY=`, which [C2] forbids, and the `UnsetEnvironment` branch is worded for a caller that "does not" have the name. The same shape preserves a blank value as a real state at the run-check door ("blank stays blank", done-criterion 1), so treating blank as absent in the services would also be a door divergence the text never states.
+- Evidence: T1, final-shape text [C2], [C4], Q1 paragraph and done-criterion 1, 2026-11-25. T2, `src/run-check.ts` `constructedEnv`: a name is copied when `process.env[key] !== undefined`, so an empty string is copied into the run-check payload as a present blank. T2, `src/scope.ts` `runtimeDir()`: the service-side code already treats blank as missing for `XDG_RUNTIME_DIR` (`trim() !== ''`), so the codebase holds both blank rules today and the shape does not say which one the three display names follow in `launchPass`/`launchLand`.
+- Consequence: an implementer must silently pick one of three different behaviors (forbidden empty `--setenv`, `UnsetEnvironment`, or blank forwarded by another route) for `DISPLAY=`/`WAYLAND_DISPLAY=`/`XAUTHORITY=` callers, and [C4]'s test cannot be written for that case from the shape as written. The shape needs one sentence fixing the blank rule for the services, and whether it matches the run-check door.
+
+## F2. [C1]'s reason overstates what excluding `XDG_SESSION_TYPE` does
+
+- Fact: [C1] says excluding `XDG_SESSION_TYPE` and `WAYLAND_SOCKET` "keeps every headed proof on the probed X11 path". Excluding `XDG_SESSION_TYPE` only keeps Chromium's default platform selection on X11. A headed proof whose command selects Wayland itself still runs on the Wayland path under Q1b, because `WAYLAND_DISPLAY` and `XDG_RUNTIME_DIR` are forwarded.
+- Evidence: T1, my probe `d-headed-wayland-ozone`, 2026-11-25: headed Chromium with `--ozone-platform=wayland`, the Wayland pair and no `XDG_SESSION_TYPE` opened the page and exited 0 (log under `issues/chart/run-check-display/direct/`). T1, probe `d-headed-wayland-sessiontype`, 2026-11-25: adding `XDG_SESSION_TYPE=wayland` changed the *default* launch's platform choice, which is the only behavior [C1] actually pins down.
+- Consequence: as written, [C1]'s reason contradicts the purpose of forwarding the Wayland pair in Q1b and can be copied into the leaf's docs as a false guarantee. The sentence holds only when scoped to default Chromium platform selection; it does not hold for every headed proof.

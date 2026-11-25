@@ -1,0 +1,35 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: claude background-shell status in hc
+    command: akrogon run-check --name mask-probe --holder /home/ivan/Work/infra/akrogon/issues/chart/seat-turn-idle/direct -- timeout 300 /home/ivan/Work/infra/akrogon/issues/chart/seat-turn-idle/direct/mask-probe.sh
+    identity: operator's logged-in claude account (claude-haiku-5-5, effort low, tools Bash(sleep:*) only)
+    target: claude seat terminal in hc session infra
+    version: claude 2.1.331, hc 0.1.22
+    date: '2026-11-25'
+    result: after the turn ended with a background sleep, status was working with msg "1 shell still running" and one records entry, turn 0; after TERM of the tool shell's process group, status done, turn 1, records null within 8 s
+    cleanup: terminal t3m2 killed and removed; probe folder removed
+    limits: one claude version and model, one background shell; codex and agy not probed
+    record: issues/chart/seat-turn-idle/forks/shell-sweep.md
+  - operation: claude background-shell status in hc, shell ended by SIGKILL
+    command: akrogon run-check --name mask-probe-kill --holder /home/ivan/Work/infra/akrogon/issues/chart/seat-turn-idle/direct -- timeout 300 /home/ivan/Work/infra/akrogon/issues/chart/seat-turn-idle/direct/mask-probe-kill.sh
+    identity: operator's logged-in claude account (claude-haiku-5-5, effort low, tools Bash(sleep:*) only)
+    target: claude seat terminal in hc session infra
+    version: claude 2.1.331, hc 0.1.22
+    date: '2026-11-25'
+    result: masked working with msg "1 shell still running", one records entry, turn 0; after SIGKILL of the tool shell's process group, status done, turn 1, records null
+    cleanup: terminal t3mg killed and removed; probe folder removed
+    limits: one claude version and model, one background shell; codex and agy not probed
+    record: issues/chart/seat-turn-idle/forks/shell-sweep.md
+  - operation: hc keep recovery of a lost program
+    command: throwaway hc 0.1.22 core with its own session and runtime dir; hc run --bg --keep, then SIGKILL of the program, then hc server stop
+    identity: local user, no account
+    target: throwaway hc core
+    version: hc 0.1.22
+    date: '2026-11-25'
+    result: after SIGKILL live, status null, reported false, foreground bash, argv rewritten to the shell ; between the death and the shell spawn pid null, foreground null, reason signaled; after core stop live, pid null, foreground null, reason server_stop; a surviving program reattaches with its real pid; hc schema lists reason spawn_pending as an initial spawn still in progress
+    cleanup: terminals killed and removed, core stopped, runtime dir deleted
+    limits: bash programs, not a real harness; a real host reboot not reproduced
+    record: issues/chart/seat-turn-idle/forks/shell-sweep.md
