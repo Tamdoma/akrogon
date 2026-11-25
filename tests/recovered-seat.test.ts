@@ -88,7 +88,7 @@ test.serial('a seat recovered as a bare shell is charged lost, ended and replace
   setSeat(f, 'a', 'fake', 'work');
   setSeat(f, 'b', 'fake', 'work');
   const core: HcCore = await hcCore(f);
-  const path: string = leaf(f, 'rs-leaf', 'check.review');
+  const path: string = leaf(f, 'rs-leaf', 'implement');
   try {
     // The crafted terminal stands in for a seat: the leaf's own labels, a plain kept bash.
     const started = await core.hc([
