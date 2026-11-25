@@ -21,75 +21,59 @@ import { appendTiming } from './timing';
 // the relocation every akrogon process runs out of a t-, the commitMove kill
 // sweep and the detached helper that ends a deferred t- once its shell exits.
 
-// The shared inner body of both entry forms, indented for one group level.
-function placementBody(root: string): string[] {
-  return [
-    '  __akrogon_tool_entry() {',
-    '    [ -n "${AKROGON_SEAT_CGROUP:-}" ] || return 0',
-    '    local cur',
-    "    cur=$(sed -n 's/^0:://p' /proc/self/cgroup 2>/dev/null) || return 0",
-    `    [ "${root}$cur" = "$AKROGON_SEAT_CGROUP" ] || return 0`,
-    '    mkdir -p "$AKROGON_SEAT_CGROUP/tools" 2>/dev/null',
-    '    local st',
-    '    st=$(cat /proc/$$/stat 2>/dev/null) || return 0',
-    '    st=${st##*) }',
-    '    set -- $st',
-    '    local d="$AKROGON_SEAT_CGROUP/tools/t-$$-${20}"',
-    '    mkdir -p "$d" 2>/dev/null && echo $$ > "$d/cgroup.procs" 2>/dev/null && export AKROGON_TOOL_CGROUP="$d"',
-    '    return 0',
-    '  }',
-    '  __akrogon_tool_entry',
-    '  unset -f __akrogon_tool_entry',
-    '  true',
-  ];
-}
-
-// The placement shell text both entry forms share, probe-proven in
-// issues/chart/seat-shell-kill/direct/probe-entry/place.sh: act only when the
-// process sits exactly at the seat scope root, then mint tools/t-<pid>-<starttime>,
-// move in and export the marker. Every step discards output and failure.
-//
-// The whole body runs inside one brace group whose streams both go to
-// /dev/null: bash xtrace prints a simple command's trace before applying its
-// redirections, so `f 2>/dev/null` would leak `+ f` onto a traced user's
-// stderr — but commands inside a redirected group trace only after the
-// group's own redirection applies. Nothing the entry does ever reaches the
-// traced stderr, and the shell's xtrace state passes through untouched.
+// The group redirects before tracing its first command. Temporarily close a
+// custom trace descriptor too, then disable xtrace before the group restores
+// the descriptors. If BASH_XTRACEFD is unset, use the ordinary stderr group.
 function placementShell(root: string): string {
-  return ['{', ...placementBody(root), '} >/dev/null 2>&1', ''].join('\n');
+  return [
+    '__akrogon_tool_entry() {',
+    '  __akrogon_tool_options=$SHELLOPTS',
+    '  set +x',
+    '  [ -n "${AKROGON_SEAT_CGROUP:-}" ] || return 0',
+    '  local cur',
+    "  cur=$(sed -n 's/^0:://p' /proc/self/cgroup 2>/dev/null) || return 0",
+    `  [ "${root}$cur" = "$AKROGON_SEAT_CGROUP" ] || return 0`,
+    '  mkdir -p "$AKROGON_SEAT_CGROUP/tools" || return 0',
+    '  local st',
+    '  st=$(cat /proc/$$/stat 2>/dev/null) || return 0',
+    '  st=${st##*) }',
+    '  set -- $st',
+    '  local d="$AKROGON_SEAT_CGROUP/tools/t-$$-${20}"',
+    '  mkdir -p "$d" && echo $$ > "$d/cgroup.procs" && export AKROGON_TOOL_CGROUP="$d"',
+    '  return 0',
+    '}',
+    '{ __akrogon_tool_entry; } >/dev/null 2>&1 {BASH_XTRACEFD}>&- ||',
+    '  { __akrogon_tool_entry; } >/dev/null 2>&1',
+    'unset -f __akrogon_tool_entry',
+    '',
+  ].join('\n');
 }
 
 function entryTemplate(root: string, bash: string): { env: string; wrapper: string } {
   const placement: string = placementShell(root);
-  // The wrapper's placement runs inside the function, whose `set --` never
-  // clobbers the outer positional parameters, so the exec still carries the
-  // caller's argv. The shebang is the resolved real bash: a PATH lookup here
-  // would recurse into the wrapper itself on the agy wiring.
-  //
-  // When xtrace reaches the wrapper through an exported SHELLOPTS, the
-  // caller's trace state must survive into the final shell, yet the wrapper's
-  // own exec line must never join the trace: xtrace is remembered, then
-  // disabled inside the silenced group (the group's redirection hides the
-  // disable itself), and restored by prepending -x to the exec's argv — the
-  // same end state an inherited xtrace would have produced in the exec'ed
-  // bash. Xtrace is never re-enabled in the wrapper shell itself, so the exec
-  // command line never traces.
-  const wrapperBody: string = [
-    '{',
-    '  __akrogon_tool_x=0',
-    '  case $- in',
-    '    *x*) __akrogon_tool_x=1; set +x ;;',
-    '  esac',
-    ...placementBody(root),
-    '} >/dev/null 2>&1',
-    'case $__akrogon_tool_x in',
-    '  1) set -- -x "$@" ;;',
-    'esac',
-    '',
-  ].join('\n');
   return {
-    env: placement,
-    wrapper: `#!${bash}\n${wrapperBody}exec ${bash} "$@"\n`,
+    // Rebind Bash's trace stream after the descriptor was closed and restored.
+    env: [
+      placement,
+      'case :$__akrogon_tool_options: in',
+      '  *:xtrace:*)',
+      '    if [[ -n ${BASH_XTRACEFD:-} ]]; then BASH_XTRACEFD=$BASH_XTRACEFD; fi',
+      '    unset __akrogon_tool_options',
+      '    set -x ;;',
+      '  *) unset __akrogon_tool_options ;;',
+      'esac',
+      '',
+    ].join('\n'),
+    // Restore inherited xtrace via the environment so long options keep their order.
+    wrapper: [
+      `#!${bash}`,
+      placement,
+      'case :$__akrogon_tool_options: in',
+      `  *:xtrace:*) exec /usr/bin/env "SHELLOPTS=$__akrogon_tool_options" "${bash}" "$@" ;;`,
+      'esac',
+      `exec "${bash}" "$@"`,
+      '',
+    ].join('\n'),
   };
 }
 
