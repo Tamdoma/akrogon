@@ -137,10 +137,12 @@ const shellNames: ReadonlySet<string> = new Set(['sh', 'bash', 'dash', 'zsh', 'f
 // with systemd-run, so an ordinary seat never matches even while its harness is still coming up.
 export function recoveredShellSeat(t: Seen): boolean {
   if (t.state !== 'live' || t.status !== null) return false;
-  const parked: boolean = t.pid === null && t.reason !== null && t.reason !== 'spawn_pending';
+  const parked: boolean = t.pid === null && t.reason != null && t.reason !== 'spawn_pending';
   const spawned: boolean =
     t.foreground !== null &&
+    t.foreground.name !== undefined &&
     shellNames.has(t.foreground.name) &&
+    t.argv !== undefined &&
     t.argv.length > 0 &&
     basename(t.argv[0]) !== 'systemd-run';
   return parked || spawned;

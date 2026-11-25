@@ -56,9 +56,9 @@ export type Seen = {
   status: { state: string; kind: string | null; msg: string | null } | null;
   exit_code?: number | null;
   signal?: number | null;
-  foreground: { pid: number; cwd: string; argv: string[]; name: string } | null;
-  argv: string[];
-  reason: string | null;
+  foreground: { pid: number; cwd: string; argv: string[]; name?: string } | null;
+  argv?: string[];
+  reason?: string | null;
   keep?: boolean;
 };
 
