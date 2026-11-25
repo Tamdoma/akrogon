@@ -200,6 +200,7 @@ async function sliceHasProcess(slice: string): Promise<boolean> {
 
 async function broadcastInProgress(state: State, live: Seen[] | null): Promise<boolean> {
   if (state.phase !== 'merged' || state.broadcast === undefined) return false;
+  if (broadcastPending(state)) return true;
   // The repo's session list cannot identify a direct reviewer. Probe the recorded session,
   // keeping cleanup on hold for an unreadable reviewer but not one that has gone away.
   if (state.direct === true) {
@@ -217,7 +218,6 @@ async function broadcastInProgress(state: State, live: Seen[] | null): Promise<b
     return typeof prompted !== 'object' || seat.turn <= prompted.turn;
   }
   return (
-    broadcastPending(state) ||
     live === null ||
     live.some(
       (t: Seen) => t.address === state.seat.B?.address && t.status?.state !== 'idle' && t.status?.state !== 'done',
