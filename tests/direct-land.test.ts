@@ -529,6 +529,60 @@ test.each(['turn ended', 'reviewer gone'] as const)('a cross-session broadcast h
   }
 });
 
+test('a pending broadcast keeps cleanup held for a replacement reviewer', async () => {
+  const f: LandFixture = await landFixture(true);
+  const original: HcCore = await hcCore(f, { doc: false });
+  f.core.link(original);
+  try {
+    const { address } = await heldTerminal(original, f.home);
+    const seats = await seatRefs(f, address);
+    const { path, worktree, attempt } = await mergeable(f, 'fix-alpha', address, {
+      seat: { A: seats.A, B: { session: original.session, address } },
+    });
+    const temp: string = leafTempDir(f, 'fix-alpha');
+    mkdirSync(temp, { recursive: true });
+    sliceSeeded(f, 'fix-alpha');
+    expect((await next(f, webhookEnv)).code).toBe(0);
+    expect((await land(f, 'fix-alpha', attempt, webhookEnv)).code).toBe(0);
+    const closed: string = moved(path);
+    expect(readState(closed)).toMatchObject({ phase: 'merged', broadcast: expect.any(Object) });
+    expect(readState(closed).prompted.B).toBeUndefined();
+
+    await original.stop();
+    expect((await next(f, webhookEnv)).code).toBe(0);
+    expect(readState(closed).prompted.B).toBeUndefined();
+    expect(existsSync(worktree)).toBe(true);
+    expect(existsSync(temp)).toBe(true);
+    expect(sliceLoaded(f, 'fix-alpha')).toBe(true);
+
+    const replacement: string = await idleTerminal(f);
+    holdHook(f.core, true);
+    const repointed: Result = await cli(f, ['direct', 'fix-alpha', '--reviewer', replacement], f.root, {
+      ...f.env,
+      HC_TERMINAL_ID: seats.A.address,
+    });
+    expect(repointed.code, repointed.stderr).toBe(0);
+    expect((await next(f, webhookEnv)).code).toBe(0);
+    const prompted = z.object({ address: z.string(), turn: z.number() }).parse(readState(closed).prompted.B);
+    expect(prompted.address).toBe(replacement);
+    await f.core.waitFor(replacement, (t: Terminal) => t.turn === prompted.turn && t.status?.state === 'working');
+    expect(f.core.tasks(replacement).filter((text) => text.startsWith('broadcast-issue'))).toHaveLength(1);
+    expect(existsSync(worktree)).toBe(true);
+    expect(existsSync(temp)).toBe(true);
+    expect(sliceLoaded(f, 'fix-alpha')).toBe(true);
+
+    writeFileSync(resolve(f.core.standin, 'free-' + replacement), '');
+    await f.core.waitFor(replacement, (t: Terminal) => t.turn > prompted.turn);
+    expect((await next(f, webhookEnv)).code).toBe(0);
+    expect(existsSync(worktree)).toBe(false);
+    expect(existsSync(temp)).toBe(false);
+    expect(sliceLoaded(f, 'fix-alpha')).toBe(false);
+  } finally {
+    await original.stop();
+    await f.clean();
+  }
+});
+
 test('a late broadcast delivery settles at the original turn without sending again', async () => {
   const f: LandFixture = await landFixture(true);
   try {
