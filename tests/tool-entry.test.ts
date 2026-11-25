@@ -236,7 +236,9 @@ test.serial('the seat launch argv carries Delegate=yes, the scope env marker and
       } else if (kind === 'agy') {
         const pathEntry: string | undefined = argv.match(/(?:^|\s)PATH=(\S+)/)?.[1];
         expect(pathEntry, 'agy PATH wiring').toBeDefined();
-        expect((pathEntry as string).split(':')[0]).toBe(entryDir);
+        // The wrapper script shell-quotes the dir it prepends; strip the quotes the shell reads away.
+        const first: string = (pathEntry as string).split(':')[0].replace(/^'(.*)'$/, '$1');
+        expect(first).toBe(entryDir);
       } else {
         expect(argv, `${kind} BASH_ENV`).toContain(`BASH_ENV=${resolve(entryDir, 'bash-env')}`);
       }
