@@ -312,19 +312,20 @@ export async function startSeat(
   refreshToolEntry(homePath());
   const entryDir: string = resolve(homePath(), 'tool-entry');
   // Every kind carries the seat scope marker; claude gets the wrapper shell, agy the PATH-first
-  // wrapper, every other kind the sourced BASH_ENV. Env assignments cannot self-reference, so the
-  // agy wrapper prepends the entry dir inside a shell that execs the harness, keeping the terminal's
-  // inherited PATH whole.
+  // wrapper, every other kind the sourced BASH_ENV.
   const wiring: string[] =
     harness.kind === 'claude'
       ? [`CLAUDE_CODE_SHELL=${resolve(entryDir, 'bash')}`, 'CLAUDE_CODE_TOOL_MEMORY_LIMIT=none']
       : harness.kind === 'agy'
         ? []
         : [`BASH_ENV=${resolve(entryDir, 'bash-env')}`];
-  // The agy harness runs through a shell that prepends the entry dir to its inherited PATH and
-  // execs the harness tokens unchanged, so the wrapper script shadows bash for agy's shell children.
-  const agyWrap: string[] =
-    harness.kind === 'agy' ? ['sh', '-c', `export PATH=${quote(entryDir)}:$PATH; exec "$0" "$@"`] : [];
+  // Every harness runs through a sh hop (sh never sources BASH_ENV) that exports its own pid as
+  // AKROGON_SEAT_PID and execs the harness tokens unchanged in that pid, so a bash-script launcher
+  // (codex through mise) is the seat itself and the entry leaves it at the scope root. For agy the
+  // hop also prepends the entry dir to the inherited PATH, since env assignments cannot
+  // self-reference, so the wrapper script shadows bash for agy's shell children.
+  const agyPath: string = harness.kind === 'agy' ? ` PATH=${quote(entryDir)}:$PATH` : '';
+  const seatWrap: string[] = ['sh', '-c', `export AKROGON_SEAT_PID=$$${agyPath}; exec "$0" "$@"`];
   const a: Seen | undefined = slot === 'B' ? (await leafSeats(space.session, repo, readState(leaf.path))).A : undefined;
   // The seat's own labels: hc sets them at creation and herdr-app never changes them.
   const own: Record<string, string> = { 'akrogon.repo': repo.name, 'akrogon.leaf': state.slug, 'akrogon.seat': seat };
@@ -366,7 +367,7 @@ export async function startSeat(
         'NODE_DISABLE_COMPILE_CACHE=1',
         `AKROGON_SEAT_CGROUP=${scopeCgroup}`,
         ...wiring,
-        ...agyWrap,
+        ...seatWrap,
         ...harness.argv,
         ...(harness.kind === 'agy' ? [] : [task]),
       ],

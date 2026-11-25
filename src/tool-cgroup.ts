@@ -30,6 +30,8 @@ function placementShell(root: string): string {
     '  __akrogon_tool_options=$SHELLOPTS',
     '  set +x',
     '  [ -n "${AKROGON_SEAT_CGROUP:-}" ] || return 0',
+    // The seat's own process (a bash-script launcher execed by the launch hop) is never a tool shell.
+    '  [ "$$" != "${AKROGON_SEAT_PID:-}" ] || return 0',
     '  local cur',
     "  cur=$(sed -n 's/^0:://p' /proc/self/cgroup 2>/dev/null) || return 0",
     `  [ "${root}$cur" = "$AKROGON_SEAT_CGROUP" ] || return 0`,
@@ -232,7 +234,13 @@ function spawnHelper(
   const setsid: string = resolveExecutable('setsid');
   const env: Record<string, string> = {};
   for (const [key, value] of Object.entries(process.env)) {
-    if (key === 'AKROGON_TOOL_CGROUP' || key === 'AKROGON_SEAT_CGROUP' || value === undefined) continue;
+    if (
+      key === 'AKROGON_TOOL_CGROUP' ||
+      key === 'AKROGON_SEAT_CGROUP' ||
+      key === 'AKROGON_SEAT_PID' ||
+      value === undefined
+    )
+      continue;
     env[key] = value;
   }
   const child: Bun.Subprocess = Bun.spawn(
