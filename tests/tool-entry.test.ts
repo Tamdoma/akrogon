@@ -48,6 +48,12 @@ function scopeScript(): string {
     'echo 32 > "$root/cgroup.max.depth" 2>/dev/null',
     // a: the pi/codex wiring shape.
     'BASH_ENV="$ENTRY/bash-env" OUT="$OUT" N=a bash "$OUT/cmd.sh" > "$OUT/a.out" 2> "$OUT/a.err"; echo $? > "$OUT/a.code"',
+    // s: a bash-script launcher through the seat launch hop — the hop exports its own pid and execs
+    // the launcher in that pid, which sources BASH_ENV as the seat itself and must stay at the root;
+    // the bash it forks (not its last command, so a real fork) is a tool shell and is placed.
+    'BASH_ENV="$ENTRY/bash-env" OUT="$OUT" sh -c \'export AKROGON_SEAT_PID=$$; exec "$0" "$@"\' bash "$OUT/seat.sh"; echo $? > "$OUT/s.code"',
+    // u: a marker naming another pid places the shell as usual.
+    'BASH_ENV="$ENTRY/bash-env" AKROGON_SEAT_PID=1 OUT="$OUT" N=u bash "$OUT/cmd.sh" > "$OUT/u.out" 2> "$OUT/u.err"; echo $? > "$OUT/u.code"',
     // b: the claude wiring shape — the wrapper is the shell.
     'OUT="$OUT" N=b "$ENTRY/bash" "$OUT/cmd.sh" > "$OUT/b.out" 2> "$OUT/b.err"; echo $? > "$OUT/b.code"',
     // c: the agy wiring shape — the wrapper is first on PATH.
@@ -85,6 +91,10 @@ test.serial('the entry places a bash tool shell exactly once at the scope root a
     const out: string = resolve(f.home, 'entry-out');
     mkdirSync(out, { recursive: true });
     writeFileSync(resolve(out, 'cmd.sh'), CMD_SH);
+    writeFileSync(
+      resolve(out, 'seat.sh'),
+      'cat /proc/$$/cgroup > "$OUT/s-seat.cg"\nN=s bash "$OUT/cmd.sh" > "$OUT/s.out" 2> "$OUT/s.err"\necho $? > "$OUT/s-child.code"\n',
+    );
     writeFileSync(resolve(out, 'trace.sh'), 'echo "trace-out"\necho "trace-err" >&2\nexit 3\n');
     const script: string = resolve(f.home, 'entry-scope.sh');
     writeFileSync(script, scopeScript());
@@ -130,7 +140,7 @@ test.serial('the entry places a bash tool shell exactly once at the scope root a
     expect(read('r.code').trim()).toBe('3');
     expect(cgOf('r')).toBe(`0::${root.replace('/sys/fs/cgroup', '')}\n`.trim());
 
-    for (const n of ['a', 'b', 'c']) {
+    for (const n of ['a', 'b', 'c', 'u']) {
       expect(read(`${n}.out`), `${n} stdout`).toBe('out-' + n + '\n');
       expect(read(`${n}.err`), `${n} stderr`).toBe('err-' + n + '\n');
       expect(read(`${n}.code`).trim(), `${n} exit code`).toBe('3');
@@ -138,6 +148,18 @@ test.serial('the entry places a bash tool shell exactly once at the scope root a
         new RegExp(`^0::${escapeRe(root.replace('/sys/fs/cgroup', ''))}/tools/t-\\d+-\\d+$`),
       );
     }
+
+    // The seat itself (the launcher bash in the hop's pid) stays at the scope root; its forked bash
+    // child is placed in its own t-.
+    expect(read('s.code').trim()).toBe('0');
+    expect(read('s-seat.cg').trim(), 'seat launcher stays at the scope root').toBe(
+      `0::${root.replace('/sys/fs/cgroup', '')}`,
+    );
+    expect(read('s.out')).toBe('out-s\n');
+    expect(read('s-child.code').trim()).toBe('3');
+    expect(cgOf('s'), 'the seat-forked bash placed in tools/t-').toMatch(
+      new RegExp(`^0::${escapeRe(root.replace('/sys/fs/cgroup', ''))}/tools/t-\\d+-\\d+$`),
+    );
 
     // Nested: the inner shell keeps the outer shell's t-, no second placement.
     expect(read('d.out')).toBe('out-d\n');
@@ -269,6 +291,12 @@ test.serial('the seat launch argv carries Delegate=yes, the scope env marker and
       } else {
         expect(argv, `${kind} BASH_ENV`).toContain(`BASH_ENV=${resolve(entryDir, 'bash-env')}`);
       }
+      // Every kind runs through the hop that exports the seat's own pid and execs the harness in it.
+      const tokens: string[] = argv.split('\t');
+      const hop: number = tokens.findIndex((t, i) => t === 'sh' && tokens[i + 1] === '-c');
+      expect(hop, `${kind} launch hop`).toBeGreaterThan(-1);
+      expect(tokens[hop + 2], `${kind} seat pid marker`).toContain('export AKROGON_SEAT_PID=$$');
+      expect(tokens[hop + 2], `${kind} hop execs the harness`).toContain('exec "$0" "$@"');
       // The bootstrap created the scope's three directories.
       expect(existsSync(resolve(expectedCgroup, 'tools')), `${kind} tools/`).toBe(true);
       expect(existsSync(resolve(expectedCgroup, 'akrogon')), `${kind} akrogon/`).toBe(true);
@@ -283,6 +311,33 @@ test.serial('the seat launch argv carries Delegate=yes, the scope env marker and
       const slice: string = leafSlice({ name: f.repo }, slug, f.home);
       slices.push(slice);
     }
+    f.clean();
+  }
+});
+
+test.serial('a seat whose launcher is a bash script stays at its scope root, out of tools/', async () => {
+  const f: Fixture = await fixture();
+  const core: HcCore = await hcCore(f);
+  const slug: string = 'te-bashlaunch';
+  try {
+    // The launcher shape of codex through mise: a bash script that execs the agent in its own pid.
+    const standinBin: string = readdirSync(f.home)
+      .filter((name) => name.startsWith('standin-bin-'))
+      .map((name) => resolve(f.home, name))[0];
+    const launcher: string = resolve(standinBin, 'codex');
+    writeFileSync(launcher, `#!/bin/bash\nexec "${resolve(standinBin, 'fake')}" "$@"\n`);
+    chmodSync(launcher, 0o755);
+    setSeat(f, 'a', 'codex', 'work');
+    leaf(f, slug, 'plan.synthesis');
+    const { unit } = await startAndReadArgv(f, core, 'codex', slug);
+    // State, not start success: a start can win the race against the launcher's own placement.
+    const scope: string = `${sliceCgroup(leafSlice({ name: f.repo }, slug, f.home))}/${unit}`;
+    const procs: string[] = readFileSync(resolve(scope, 'cgroup.procs'), 'utf8').split('\n').filter(Boolean);
+    expect(procs.length, 'the seat sits at the scope root').toBeGreaterThan(0);
+    expect(readdirSync(resolve(scope, 'tools')), 'no t- minted for the seat').toEqual([]);
+  } finally {
+    await core.stop();
+    slices.push(leafSlice({ name: f.repo }, slug, f.home));
     f.clean();
   }
 });
