@@ -43,11 +43,11 @@ test('the recovered-shell predicate matches bare-shell recoveries only', () => {
   });
   // Positives: parked shapes (the machine-shell replacement still starting or the core down).
   for (const reason of ['signaled', 'server_stop', 'stopped_by_restart']) {
-    expect(recoveredShellSeat(seenRow({ pid: null, reason }), `parked ${reason}`)).toBe(true);
+    expect(recoveredShellSeat(seenRow({ pid: null, reason })), `parked ${reason}`).toBe(true);
   }
   // Positives: spawned shapes — live, status null, foreground a shell, argv rewritten to a shell line.
   for (const name of ['bash', 'sh']) {
-    expect(recoveredShellSeat(seenRow({ foreground: shellFg(name), argv: [name] }), `spawned ${name}`)).toBe(true);
+    expect(recoveredShellSeat(seenRow({ foreground: shellFg(name), argv: [name] })), `spawned ${name}`).toBe(true);
   }
   // Negatives.
   expect(recoveredShellSeat(seenRow({ pid: null, reason: 'spawn_pending' })), 'spawn_pending').toBe(false);
