@@ -51,7 +51,7 @@ import {
   end,
   HcError,
   repoSpace,
-  terminal,
+  probeTerminal,
   terminals,
   windowOpen,
   type Seen,
@@ -206,12 +206,9 @@ async function broadcastInProgress(state: State, live: Seen[] | null): Promise<b
   if (state.direct === true) {
     const ref = state.seat.B;
     if (ref === undefined) return true;
-    try {
-      const t: Seen = await terminal(ref.session, ref.address);
-      return t.status?.state !== 'idle' && t.status?.state !== 'done';
-    } catch {
-      return true;
-    }
+    const probed: Seen | null = await probeTerminal(ref.session, ref.address);
+    if (probed === null) return true;
+    return probed.status?.state !== 'idle' && probed.status?.state !== 'done';
   }
   return (
     live === null ||

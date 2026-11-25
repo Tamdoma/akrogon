@@ -293,21 +293,30 @@ export async function terminals(
 
 // `signal` stops the lookup: its aborted call fails like a killed one. The kill is SIGKILL, since a
 // suspended lookup holds SIGTERM until it is continued and would keep this process alive.
-// A probe of a session whose socket is absent or dead must never reach hc: hc boots a core for any
-// session it is asked about, and an orphaned core's lock wedges every later probe of the same name
-// across the host. Absent is not_found, the same kind the core itself returns for a missing address.
 export async function terminal(session: string, address: string, signal?: AbortSignal): Promise<Seen> {
-  const runtime: string | undefined = process.env.XDG_RUNTIME_DIR;
-  const argv: string[] = ['hc', 'get', '--json', address];
-  if (runtime !== undefined && runtime.trim() !== '') {
-    const socket: string = resolve(runtime, 'herdr-core', `${session}.sock`);
-    if (!existsSync(socket) || !(await listening(socket)))
-      throw new HcError('not_found', argv, { code: 3, stdout: '', stderr: '' });
-  }
   return seen(
     session,
     terminalSchema.parse(JSON.parse(await hc(session, ['get', '--json', address], { signal, killSignal: 'SIGKILL' }))),
   );
+}
+
+// A probe that tolerates absence: the seat refs a direct leaf records name sessions outside the
+// repo's, and any of them may be stopped or never have existed. hc boots a core for any session it
+// is asked about, so the socket is probed first and an absent or dead one is null without an hc
+// call — an orphaned core's lock otherwise wedges every later probe of the same name across the
+// host. HcError from the probe itself is null the same way, matching the unobservable reading.
+export async function probeTerminal(session: string, address: string): Promise<Seen | null> {
+  const runtime: string | undefined = process.env.XDG_RUNTIME_DIR;
+  if (runtime !== undefined && runtime.trim() !== '') {
+    const socket: string = resolve(runtime, 'herdr-core', `${session}.sock`);
+    if (!existsSync(socket) || !(await listening(socket))) return null;
+  }
+  try {
+    return await terminal(session, address);
+  } catch (error) {
+    if (error instanceof HcError) return null;
+    throw error;
+  }
 }
 
 export function screen(session: string, address: string): Promise<string> {

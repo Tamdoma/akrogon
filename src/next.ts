@@ -59,6 +59,7 @@ import {
   screen,
   send,
   sessions,
+  probeTerminal,
   terminal,
   terminals,
   windowOpen,
@@ -270,12 +271,8 @@ async function observeDirectSeats(path: string, state: State): Promise<State> {
     const ref: SeatRef | undefined = state.seat[seat];
     let busy: boolean | null = null;
     if (ref !== undefined) {
-      try {
-        const t: Seen = await terminal(ref.session, ref.address);
-        busy = t.status?.state === 'working' || t.status?.state === 'blocked';
-      } catch (error) {
-        if (!(error instanceof HcError)) throw error;
-      }
+      const t: Seen | null = await probeTerminal(ref.session, ref.address);
+      if (t !== null) busy = t.status?.state === 'working' || t.status?.state === 'blocked';
     }
     if (!required.includes(seat) || busy === false) writes[seat] = undefined;
     else if (busy === true) writes[seat] = state.busy_since[seat] ?? new Date().toISOString();
@@ -1516,13 +1513,9 @@ async function mergeTurnExit(
 async function broadcastDirect(path: string, state: State, prompt: string): Promise<void> {
   const ref: SeatRef | undefined = state.seat.B;
   if (ref === undefined) return;
-  let seat: Seen;
-  try {
-    seat = await terminal(ref.session, ref.address);
-  } catch (error) {
-    if (error instanceof HcError) return;
-    throw error;
-  }
+  const probed: Seen | null = await probeTerminal(ref.session, ref.address);
+  if (probed === null) return;
+  const seat: Seen = probed;
   const status: string | null = seat.status?.state ?? null;
   if (status !== 'idle' && status !== 'done') return;
   const recorded: DeliveryError | undefined = state.delivery_error.B;
