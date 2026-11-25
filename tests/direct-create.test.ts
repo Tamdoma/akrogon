@@ -2,20 +2,11 @@
 // creates a direct leaf (state.yaml with direct: true, seat refs, worktree, .env, no tab),
 // refuses the bad shapes writing nothing, and a rerun rewrites only seats.
 import { test, expect } from 'bun:test';
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  realpathSync,
-  unlinkSync,
-  renameSync,
-  symlinkSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, unlinkSync, renameSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { cli, storeDir, type Fixture } from './helpers';
-import { adopt, hcFixture, stopCoresAfterFile, type HcFixture } from './hc-fixture';
+import { adopt, hcCore, hcFixture, stopCoresAfterFile, type HcCore, type HcFixture } from './hc-fixture';
 import { command, type Result } from '../src/shell';
 import { flockHold } from '../src/flock';
 
@@ -77,8 +68,31 @@ async function standin(f: HcFixture, name: string): Promise<string> {
   return z.object({ address: z.string() }).parse(JSON.parse(started.stdout)).address;
 }
 
+// The door runs in the fixture core's session unless a case names another HC_SESSION or unsets it.
 async function direct(f: HcFixture, slug: string, flags: string[], env: NodeJS.ProcessEnv = {}): Promise<Result> {
-  return cli(f, ['direct', slug, ...flags], f.root, { ...f.env, ...env });
+  return cli(f, ['direct', slug, ...flags], f.root, { ...f.env, HC_SESSION: f.core.session, ...env });
+}
+
+// A second live session in the same runtime dir, whose terminals take the same t1, t2... addresses.
+async function secondSession(f: HcFixture): Promise<HcCore> {
+  const other: HcCore = await hcCore(f, { doc: false });
+  f.core.link(other);
+  return other;
+}
+
+async function catIn(core: HcCore, f: HcFixture, name: string): Promise<string> {
+  const started = await core.hc(['run', '--bg', '--json', '--no-parent', '--name', name, '--cwd', f.root, '--', 'cat']);
+  expect(started.code, started.stderr).toBe(0);
+  return z.object({ address: z.string() }).parse(JSON.parse(started.stdout)).address;
+}
+
+function seatRefs(state: Raw): { A: { session: string; address: string }; B: { session: string; address: string } } {
+  return z
+    .object({
+      A: z.object({ session: z.string(), address: z.string() }),
+      B: z.object({ session: z.string(), address: z.string() }),
+    })
+    .parse(state.seat);
 }
 
 // One env var in the fixture repo config, so env_names and the worktree .env have observable content.
@@ -356,22 +370,127 @@ test('direct refuses a reviewer address dead in every live session, nothing writ
   }
 });
 
-test('direct refuses a reviewer two live sessions resolve, nothing written', async () => {
+test('direct resolves both seats in the caller HC_SESSION when another live session holds the same addresses', async () => {
+  const f: HcFixture = await hcFixture();
+  const stopAdopt: () => void = adopt(f.core);
+  try {
+    const other: HcCore = await secondSession(f);
+    const leafPath: string = doorFiles(f, 'chart-x', 'fix-alpha');
+    const door: string = await standin(f, 'door');
+    const reviewer: string = await standin(f, 'reviewer');
+    expect(await catIn(other, f, 'door')).toBe(door);
+    expect(await catIn(other, f, 'reviewer')).toBe(reviewer);
+    const created: Result = await direct(f, 'fix-alpha', ['--reviewer', reviewer], { HC_TERMINAL_ID: door });
+    expect(created.code, created.stderr).toBe(0);
+    expect(seatRefs(readRaw(leafPath))).toEqual({
+      A: { session: f.core.session, address: door },
+      B: { session: f.core.session, address: reviewer },
+    });
+    // The rerun comes from the other session, which is not the repo's: both seats follow the caller's HC_SESSION.
+    const rerun: Result = await direct(f, 'fix-alpha', ['--reviewer', reviewer], {
+      HC_TERMINAL_ID: door,
+      HC_SESSION: other.session,
+    });
+    expect(rerun.code, rerun.stderr).toBe(0);
+    expect(seatRefs(readRaw(leafPath))).toEqual({
+      A: { session: other.session, address: door },
+      B: { session: other.session, address: reviewer },
+    });
+  } finally {
+    stopAdopt();
+    await f.clean();
+  }
+});
+
+test.each([
+  ['blank', ''],
+  ['unset', undefined],
+] as const)('direct refuses an HC_SESSION that is %s, nothing written', async (_label, value) => {
   const f: HcFixture = await hcFixture();
   const stopAdopt: () => void = adopt(f.core);
   try {
     const leafPath: string = doorFiles(f, 'chart-x', 'fix-alpha');
     const door: string = await standin(f, 'door');
     const reviewer: string = await standin(f, 'reviewer');
-    // A second socket name for the same core: sessions() lists both names as live and the reviewer
-    // address resolves under each of them.
-    symlinkSync(f.core.socket, resolve(f.core.runtime, 'herdr-core', 'aktduplicate.sock'));
-    const refused: Result = await direct(f, 'fix-alpha', ['--reviewer', reviewer], { HC_TERMINAL_ID: door });
+    const refused: Result = await direct(f, 'fix-alpha', ['--reviewer', reviewer], {
+      HC_TERMINAL_ID: door,
+      HC_SESSION: value,
+    });
     expect(refused.code).not.toBe(0);
-    expect(refused.stderr).not.toBe('');
-    expect(refused.stderr).not.toMatch(/Usage|unknown flag/);
+    expect(refused.stderr).toContain('HC_SESSION');
     expect(existsSync(resolve(leafPath, 'state.yaml'))).toBe(false);
     await expectNothingCreated(f, 'fix-alpha');
+  } finally {
+    stopAdopt();
+    await f.clean();
+  }
+});
+
+test.each(['caller', 'reviewer'] as const)(
+  'direct refuses a %s address live only in another session, nothing written',
+  async (missing) => {
+    const f: HcFixture = await hcFixture();
+    const stopAdopt: () => void = adopt(f.core);
+    try {
+      const other: HcCore = await secondSession(f);
+      const leafPath: string = doorFiles(f, 'chart-x', 'fix-alpha');
+      const door: string = await standin(f, 'door');
+      const reviewer: string = await standin(f, 'reviewer');
+      const one: string = await catIn(other, f, 'one');
+      const two: string = await catIn(other, f, 'two');
+      // t3 is live only in the other session; its t1 and t2 end, so only the caller's session holds those live.
+      const elsewhere: string = await catIn(other, f, 'elsewhere');
+      for (const address of [one, two]) {
+        expect((await other.hc(['kill', address])).code).toBe(0);
+        await other.waitFor(address, (t) => t.state !== 'live');
+      }
+      expect([door, reviewer]).not.toContain(elsewhere);
+      const refused: Result = await direct(
+        f,
+        'fix-alpha',
+        ['--reviewer', missing === 'reviewer' ? elsewhere : reviewer],
+        {
+          HC_TERMINAL_ID: missing === 'caller' ? elsewhere : door,
+        },
+      );
+      expect(refused.code).not.toBe(0);
+      expect(refused.stderr).toContain(elsewhere);
+      expect(refused.stderr).toContain(f.core.session);
+      if (missing === 'caller') expect(refused.stderr).toContain('HC_TERMINAL_ID');
+      else expect(refused.stderr).toContain('reviewer');
+      expect(existsSync(resolve(leafPath, 'state.yaml'))).toBe(false);
+      await expectNothingCreated(f, 'fix-alpha');
+    } finally {
+      stopAdopt();
+      await f.clean();
+    }
+  },
+);
+
+test('plain files beside owner folders: direct creates an open leaf and reruns a closed one', async () => {
+  const f: HcFixture = await hcFixture();
+  const stopAdopt: () => void = adopt(f.core);
+  try {
+    mkdirSync(resolve(f.root, 'issues/closed'), { recursive: true });
+    writeFileSync(resolve(f.root, 'issues/closed/legacy-note.md'), '# legacy\n');
+    const leafPath: string = doorFiles(f, 'chart-x', 'fix-alpha');
+    writeFileSync(resolve(f.root, 'issues/open/README.md'), '# open\n');
+    const door: string = await standin(f, 'door');
+    const firstReviewer: string = await standin(f, 'reviewer-one');
+    const secondReviewer: string = await standin(f, 'reviewer-two');
+    const created: Result = await direct(f, 'fix-alpha', ['--reviewer', firstReviewer], { HC_TERMINAL_ID: door });
+    expect(created.code, created.stderr).toBe(0);
+    expect(readRaw(leafPath)).toMatchObject({ direct: true, phase: 'implement' });
+    const worktree: string = z.string().parse(readRaw(leafPath).worktree);
+    await command(['git', 'worktree', 'remove', '--force', worktree], f.root);
+    await command(['git', 'update-ref', '-d', 'refs/heads/fix-alpha'], f.root);
+    writeRaw(leafPath, { ...readRaw(leafPath), phase: 'merged' });
+    renameSync(resolve(f.root, 'issues/open/chart-x'), resolve(f.root, 'issues/closed/chart-x'));
+    const closedLeaf: string = resolve(f.root, 'issues/closed/chart-x/fix-alpha');
+    const rerun: Result = await direct(f, 'fix-alpha', ['--reviewer', secondReviewer], { HC_TERMINAL_ID: door });
+    expect(rerun.code, rerun.stderr).toBe(0);
+    expect(readRaw(closedLeaf).phase).toBe('merged');
+    expect(seatRefs(readRaw(closedLeaf)).B).toEqual({ session: f.core.session, address: secondReviewer });
   } finally {
     stopAdopt();
     await f.clean();

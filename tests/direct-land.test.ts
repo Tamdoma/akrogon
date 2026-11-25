@@ -559,6 +559,7 @@ test('a pending broadcast keeps cleanup held for a replacement reviewer', async 
     holdHook(f.core, true);
     const repointed: Result = await cli(f, ['direct', 'fix-alpha', '--reviewer', replacement], f.root, {
       ...f.env,
+      HC_SESSION: seats.A.session,
       HC_TERMINAL_ID: seats.A.address,
     });
     expect(repointed.code, repointed.stderr).toBe(0);
