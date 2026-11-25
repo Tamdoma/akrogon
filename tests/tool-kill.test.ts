@@ -312,7 +312,7 @@ test.serial(
         expect(
           rows(f, 'tool_kill').filter((row) => row.slug === 'tk').length,
           'tool_kill rows exist for the committed move',
-        ).toBe(3);
+        ).toBe(4);
 
         // Sweep kills: t-loop and t-orphan contents die — the loop's latest child and the
         // disowned orphan — while neither shell was in flight.
