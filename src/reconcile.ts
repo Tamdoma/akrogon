@@ -46,7 +46,7 @@ import {
 import { cgroupRoot, leafSlice, ownSlices, procRoot, sessionBusEnv } from './scope';
 import { liveRuns, liveStartTime } from './admission';
 import { CommandError, command, run, spawnCaptured, type Result } from './shell';
-import { closeTab, end, HcError, repoSpace, terminals, windowOpen, type Seen, type SpaceResolution } from './hc';
+import { closeTab, end, HcError, repoSpace, terminal, terminals, windowOpen, type Seen, type SpaceResolution } from './hc';
 
 export type Reconciled = { removed: string[]; kept: { path: string; reason: string; clears?: string }[] };
 
@@ -187,29 +187,41 @@ async function sliceHasProcess(slice: string): Promise<boolean> {
   return subtreeHasProcess(join(cgroupRoot(), group));
 }
 
-function broadcastInProgress(state: State, live: Seen[] | null): boolean {
+async function broadcastInProgress(state: State, live: Seen[] | null): Promise<boolean> {
+  if (broadcastPending(state)) return true;
+  if (state.phase !== 'merged' || state.broadcast === undefined) return false;
+  // A direct leaf's broadcast seat is probed by its recorded ref, in the ref's own session:
+  // addresses collide across sessions and the live list scans the repo session only. A probe
+  // failure or a missing terminal is in-progress, matching the live === null keep.
+  if (state.direct === true) {
+    const ref = state.seat.B;
+    if (ref === undefined) return true;
+    try {
+      const t: Seen = await terminal(ref.session, ref.address);
+      return t.status?.state !== 'idle' && t.status?.state !== 'done';
+    } catch {
+      return true;
+    }
+  }
   return (
-    broadcastPending(state) ||
-    (state.phase === 'merged' &&
-      state.broadcast !== undefined &&
-      (live === null ||
-        live.some(
-          (t: Seen) => t.address === state.seat.B?.address && t.status?.state !== 'idle' && t.status?.state !== 'done',
-        )))
+    live === null ||
+    live.some(
+      (t: Seen) => t.address === state.seat.B?.address && t.status?.state !== 'idle' && t.status?.state !== 'done',
+    )
   );
 }
 
 // Why a leaf-matched slice survives this pass, or null when it may stop.
-function sliceKeepReason(
+async function sliceKeepReason(
   slice: string,
   leaf: Leaf,
   live: Seen[] | null,
   own: Set<string>,
   runs: Set<string>,
-): string | null {
+): Promise<string | null> {
   if (own.has(slice)) return 'own slice';
   if (runs.has(slice)) return 'live run record';
-  if (broadcastInProgress(leaf.state, live)) return 'broadcast in progress';
+  if (await broadcastInProgress(leaf.state, live)) return 'broadcast in progress';
   // A merge batch can hold a running land unit inside the slice even with every seat gone.
   if (leaf.state.phase === 'merge' && leaf.state.batch !== undefined) return 'merge batch';
   if (leaf.state.tab === undefined && !finished(leaf)) return 'unfinished leaf';
@@ -434,7 +446,7 @@ async function closeLeaf(session: string, repo: Repo, state: State, tab: string)
 // finished, is killed and removed, then a tab a live terminal still held closes when a window shows it.
 export async function closeMergedTab(repo: Repo, leaf: Leaf, live: Seen[] | null): Promise<boolean> {
   const tab: string | undefined = leaf.state.tab;
-  if (tab === undefined || live === null || broadcastInProgress(leaf.state, live)) return false;
+  if (tab === undefined || live === null || (await broadcastInProgress(leaf.state, live))) return false;
   const resolved: SpaceResolution = await repoSpace(repo);
   if (!resolved.ok) return false;
   const seats: Seats = await leafSeats(resolved.session, repo, leaf.state);
@@ -579,7 +591,7 @@ export async function reconcile(
     for (const leaf of leaves) {
       const slice: string = leafSlice(repo, leaf.state.slug, homePath());
       if (loadedSlices === null || !loadedSlices.has(slice)) continue;
-      const reason: string | null = sliceKeepReason(slice, leaf, live, own, runs);
+      const reason: string | null = await sliceKeepReason(slice, leaf, live, own, runs);
       if (reason !== null) {
         keep(slice, reason, 'removed once the pass, recorded run or live tab ends and pane inventory is available');
         continue;
@@ -815,7 +827,7 @@ export async function reconcile(
       if (
         state.phase === 'merged' &&
         state.batch === undefined &&
-        !broadcastInProgress(state, live) &&
+        !(await broadcastInProgress(state, live)) &&
         live !== null &&
         tabLive(panes, state.tab) &&
         !(within(leaf.path, openRoot) && ownerCompletes(repo, leaf))
@@ -851,7 +863,7 @@ export async function reconcile(
       keep(worktree, 'state.batch', 'removed once the leaf releases its merge batch');
       continue;
     }
-    if (broadcastInProgress(state, live)) {
+    if (await broadcastInProgress(state, live)) {
       keep(worktree, 'broadcast in progress', 'removed once the broadcast seat finishes');
       continue;
     }
@@ -1196,8 +1208,13 @@ export async function reconcile(
           // finished leaves report what stays; a finished leaf's temp also
           // stays while its slice still holds a running unit (D2).
           const done: boolean = finished(leaf);
-          if (broadcastInProgress(leaf.state, live))
+          if (await broadcastInProgress(leaf.state, live))
             keep(dir, 'broadcast in progress', 'removed once the broadcast seat finishes');
+          // An unfinished direct leaf keeps its temp: no seat pane ever has it as cwd, so
+          // livePaneInside can never protect it. Failed direct leaves lose their temps exactly
+          // as failed lifecycle leaves do.
+          else if (leaf.state.direct === true && !done)
+            keep(dir, 'active leaf', 'removed once the owning leaf finishes');
           else if (live === null) {
             if (done) keep(dir, 'pane list unavailable', 'restore hc terminal reads and retry cleanup');
           } else if (union === null) {
@@ -1315,7 +1332,7 @@ export async function reconcileHost(
       const match: { repo: Repo; leaf: Leaf } | undefined = leafOf.get(slice);
       if (match !== undefined) {
         const view: Seen[] | null = match.leaf.state.tab === undefined ? panes : await repoView(match.repo);
-        const reason: string | null = sliceKeepReason(slice, match.leaf, view, own, runs);
+        const reason: string | null = await sliceKeepReason(slice, match.leaf, view, own, runs);
         if (reason !== null) {
           keep(slice, reason, 'removed once the pass, recorded run or live tab ends and pane inventory is available');
           continue;

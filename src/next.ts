@@ -43,6 +43,7 @@ import {
   type Tool,
   type Leaf,
   type State,
+  type SeatRef,
   type Inventory,
   worktreeLock,
 } from './state';
@@ -254,6 +255,38 @@ async function observeBusy(
   const recorded: State = { ...observed, busy_notified: { ...observed.busy_notified, [seat]: 'pending' } };
   saveState(path, recorded);
   return { state: recorded, notified: true };
+}
+
+// Busy observation of a direct leaf's recorded seats (plan D10): each probe runs in the ref's own
+// session — addresses collide across sessions, so the repo session can never stand in. A probe
+// error or a missing terminal is unobservable for that seat: no busy write and no throw, since a
+// dead door terminal must not wedge the engine. Only the phase's required slots record busy_since;
+// a non-required slot's busy_since is cleared even while its terminal works, and clearing needs no
+// observation. Blocked and stall notices are never written: direct seats are shared terminals.
+async function observeDirectSeats(path: string, state: State): Promise<State> {
+  const required: readonly Slot[] = requiredSlots(state.phase, state.fix_rounds, true);
+  const writes: Partial<Record<Slot, string | undefined>> = {};
+  for (const seat of ['A', 'B'] as const) {
+    const ref: SeatRef | undefined = state.seat[seat];
+    let busy: boolean | null = null;
+    if (ref !== undefined) {
+      try {
+        const t: Seen = await terminal(ref.session, ref.address);
+        busy = t.status?.state === 'working' || t.status?.state === 'blocked';
+      } catch (error) {
+        if (!(error instanceof HcError)) throw error;
+      }
+    }
+    if (!required.includes(seat) || busy === false) writes[seat] = undefined;
+    else if (busy === true) writes[seat] = state.busy_since[seat] ?? new Date().toISOString();
+  }
+  const changed: boolean = (['A', 'B'] as const).some(
+    (seat) => seat in writes && writes[seat] !== state.busy_since[seat],
+  );
+  if (!changed) return state;
+  const next: State = { ...state, busy_since: { ...state.busy_since, ...writes } };
+  saveState(path, next);
+  return next;
 }
 
 // Reconcile's view of the repo's session: every live terminal in it, labelled or not (plan D20). A
@@ -637,9 +670,11 @@ async function activeCount(global: GlobalConfig, repoName: string, invocation: I
           : inventory.leaves.filter((leaf) => unfinished(leaf) && live.has(leaf.state.slug)).length) +
         inventory.unreadable.length;
     } else {
-      // A refused or unreadable session counts unreadable plus unfinished, never max_active.
-      total +=
-        inventory.unreadable.length + (inventory.leaves.some(seated) ? inventory.leaves.filter(unfinished).length : 0);
+      // A refused or unreadable session counts unreadable plus unfinished, never max_active. A
+      // direct leaf is never seated: its shared terminals are no work of akrogon's, so it joins
+      // neither the seated trigger nor the unfinished count.
+      const counted: Leaf[] = inventory.leaves.filter((leaf) => leaf.state.direct !== true);
+      total += inventory.unreadable.length + (counted.some(seated) ? counted.filter(unfinished).length : 0);
     }
     if (repo.name === repoName) {
       own = total - before;
@@ -1003,12 +1038,15 @@ async function dispatchLeaf(
       state.phase !== 'failed' &&
       (state.seat.A !== undefined || state.seat.B !== undefined)
     ) {
-      const place: Place | null = await ownPlace();
-      if (place === null) return 'skipped';
-      const found: Seats = await leafSeats(place.session, repo, state);
-      for (const seat of ['A', 'B'] as const) {
-        const t: Seen | undefined = found[seat];
-        if (liveSeat(t)) state = (await observeBusy(repo, leaf.path, state, seat, t, Date.now())).state;
+      if (state.direct === true) state = await observeDirectSeats(leaf.path, state);
+      else {
+        const place: Place | null = await ownPlace();
+        if (place === null) return 'skipped';
+        const found: Seats = await leafSeats(place.session, repo, state);
+        for (const seat of ['A', 'B'] as const) {
+          const t: Seen | undefined = found[seat];
+          if (liveSeat(t)) state = (await observeBusy(repo, leaf.path, state, seat, t, Date.now())).state;
+        }
       }
     }
     if (state.phase === 'merged') {
@@ -1068,6 +1106,9 @@ async function dispatchLeaf(
       state.phase === 'merge' ? mergeQueue(global, repo, inventory.leaves, () => readLog(repo.root))[0] : undefined;
     if (state.phase === 'merge')
       return end('merge_turn', turn === undefined || turn.leaf.state.slug === slug ? undefined : turn.leaf.state.slug);
+    // A direct leaf owns its seats: the pass never places, allocates, prompts or ends anything
+    // for it — dispatch reduces to the busy observation above (plan D10).
+    if (state.direct === true) return end('none');
     seats(global, repo, leaf.path);
     // Mirrors ensureWorktree's path: a missing worktree needs remote proof, an existing one only local.
     // A replaced leftover passes the same local proof: the base the replace resets to is localBase itself.
