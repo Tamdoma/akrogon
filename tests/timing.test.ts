@@ -293,10 +293,11 @@ test('unwritable timings: prompts, checks and moves complete with one warning pe
     const moved: Result = await phase(f, ['unw', 'implement', '--slot', 'A']);
     expect(moved.code).toBe(0);
     expect(moved.stdout).toContain('moved implement');
-    // The move runs its own-leaf pass (plan D14), which prompts the idle seat, and its sweep writes one
-    // row for the enumerated seat scope: one warning each for the move's visit_start, the sweep's
-    // tool_kill row, the pass's visit_start (the unreadable file reads as empty) and the prompt.
-    expect(warnings(moved)).toHaveLength(4);
+    // The move runs its own-leaf pass (plan D14), which prompts the idle seat: one warning each for
+    // the move's visit_start, the pass's visit_start (the unreadable file reads as empty) and the prompt.
+    // The sweep's tool_kill row no longer fails here: kill rows append to their own sibling ledger,
+    // which the blocking directory does not shadow.
+    expect(warnings(moved)).toHaveLength(3);
     expect((await delivered(f, 'unw')).some((p) => p.text.startsWith('implement-issue unw '))).toBe(true);
     expect(readState(path).phase).toBe('implement');
 

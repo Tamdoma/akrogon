@@ -59,12 +59,13 @@ function scopeScript(): string {
     // g: /bin/sh never sources BASH_ENV — unplaced, output unchanged.
     'BASH_ENV="$ENTRY/bash-env" OUT="$OUT" N=g sh "$OUT/cmd.sh" > "$OUT/g.out" 2> "$OUT/g.err"; echo $? > "$OUT/g.code"',
     // x: a traced shell — the user's own trace lines stay byte-identical with and without the
-    // wiring; the entry's internals must never join stderr.
-    'BASH_ENV="$ENTRY/bash-env" OUT="$OUT" N=x bash -ex "$OUT/cmd.sh" > "$OUT/x.out" 2> "$OUT/x.err"; echo $? > "$OUT/x.code"',
-    'OUT="$OUT" N=x bash -ex "$OUT/cmd.sh" > "$OUT/xref.out" 2> "$OUT/xref.err"; echo $? > "$OUT/xref.code"',
+    // wiring; the entry's internals must never join stderr. trace.sh, not cmd.sh: a trace line
+    // embedding $$ would differ between any two invocations.
+    'BASH_ENV="$ENTRY/bash-env" OUT="$OUT" N=x bash -ex "$OUT/trace.sh" > "$OUT/x.out" 2> "$OUT/x.err"; echo $? > "$OUT/x.code"',
+    'OUT="$OUT" N=x bash -ex "$OUT/trace.sh" > "$OUT/xref.out" 2> "$OUT/xref.err"; echo $? > "$OUT/xref.code"',
     // w: the executed wrapper under a traced caller keeps the same stderr shape.
-    'OUT="$OUT" N=w bash -c \'set -x; exec "$ENTRY/bash" "$OUT/cmd.sh"\' > "$OUT/w.out" 2> "$OUT/w.err"; echo $? > "$OUT/w.code"',
-    'OUT="$OUT" N=w bash -c \'set -x; exec bash "$OUT/cmd.sh"\' > "$OUT/wref.out" 2> "$OUT/wref.err"; echo $? > "$OUT/wref.code"',
+    'OUT="$OUT" N=w bash -c \'set -x; exec "$ENTRY/bash" "$OUT/trace.sh"\' > "$OUT/w.out" 2> "$OUT/w.err"; echo $? > "$OUT/w.code"',
+    'OUT="$OUT" N=w bash -c \'set -x; exec bash "$OUT/trace.sh"\' > "$OUT/wref.out" 2> "$OUT/wref.err"; echo $? > "$OUT/wref.code"',
     'echo done > "$OUT/done"',
     'exit 0',
   ].join('\n');
@@ -84,6 +85,7 @@ test.serial('the entry places a bash tool shell exactly once at the scope root a
     const out: string = resolve(f.home, 'entry-out');
     mkdirSync(out, { recursive: true });
     writeFileSync(resolve(out, 'cmd.sh'), CMD_SH);
+    writeFileSync(resolve(out, 'trace.sh'), 'echo "trace-out"\necho "trace-err" >&2\nexit 3\n');
     const script: string = resolve(f.home, 'entry-scope.sh');
     writeFileSync(script, scopeScript());
     const slice: string = `akrogon-tentry-p${process.pid}.slice`;

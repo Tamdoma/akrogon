@@ -22,8 +22,14 @@ test('tool kill rows land in their own ledger, leaving timings.jsonl parseable b
     mkdirSync(resolve(root, 'issues'), { recursive: true });
     writeFileSync(
       resolve(root, 'issues/timings.jsonl'),
-      JSON.stringify({ kind: 'visit_start', slug: 'x', phase: 'implement', visit: 1, ts: '2026-01-01', repo: 'r' }) +
-        '\n',
+      JSON.stringify({
+        kind: 'visit_start',
+        slug: 'x',
+        phase: 'implement',
+        visit: 1,
+        ts: '2026-01-01T00:00:00.000Z',
+        repo: 'r',
+      }) + '\n',
     );
     const repo: Repo = { name: 'r', root } as Repo;
     appendTiming(repo, {
