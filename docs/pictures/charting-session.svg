@@ -10,7 +10,7 @@
     .key { fill: #e7ede2; stroke: #5e7355; stroke-width: 1.5; stroke-linejoin: round; }
     .link { fill: none; stroke: #90a985; stroke-width: 1.5; stroke-linecap: round; stroke-dasharray: 4 6; }
     .line { fill: none; stroke: #0f0f0f; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
-    .frame { fill: #f8f6ee; }
+    .frame { fill: #f4f1e6; }
     .arrow { marker-end: url(#arrow); }
   </style>
   <defs>
