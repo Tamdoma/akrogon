@@ -31,7 +31,7 @@ Every SVG in `docs/pictures/` follows these rules.
 - Palette: ink `#0f0f0f`, ink-soft `#6e6a5c`, beige `#f0ede0` and `#e0dccf`, and the sage scale `#e7ede2`, `#b7c8ae`, `#90a985`, `#7a9b76`, `#5e7355`.
 - Strokes: 1.5 px with round caps and joins, flat fills, and dashed sage connectors.
 - Fonts: the system sans stack (`ui-sans-serif, system-ui, ...`) and the `ui-monospace` stack. Labels stay as text so a rename search finds them.
-- Mark: "created by" and the Tamdoma logotype as inline paths, in a group titled `<title>Tamdoma</title>`, at the bottom right. Copy the group from `docs/pictures/mode-and-route.svg`.
+- Mark: one group, titled `<title>Tamdoma</title>`, holding the "created by" text and the Tamdoma logotype as inline paths, placed at the bottom right by its one translate. Every picture copies the group whole from `docs/pictures/mode-and-route.svg` and changes only that translate.
 - Still: no animation, no script, no `href`, no web font and no `@import`.
 - Layout: about 960 px wide, read left to right, with short labels in the guide's words. No screenshots of command output.
 
