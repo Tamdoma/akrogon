@@ -1,0 +1,55 @@
+slug: direct-leaf
+phase: merged
+created: 2026-11-25
+repo: akrogon
+blocked-by:
+  - tool-cgroup-kill
+sources:
+  - "Tamdoma/akrogon#153"
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 2
+verdict: {}
+tab: ak5003bb9d4ff7de61be576df7ea2fc9
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t3sr
+  B:
+    session: infra
+    address: t3wg
+prompted:
+  B:
+    turn: 5
+    address: t3wg
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-25T21:57:42.977Z
+broadcast:
+  kind: issue
+  name: direct-visible
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/direct-visible
+  pushed: 8ea0ff7320227e1e45785410787481e71989851e
+  sources:
+    - "Tamdoma/akrogon#153"
+frozen:
+  tests/direct-active.test.ts: a49ef8dc71fcec79f3037473bdde80b2e88182a4
+  tests/direct-create.test.ts: 0dc7fc757032cf545bf449dbb6e20323e5ebeb29
+  tests/direct-drop.test.ts: 17998cc37a5dba116e3a7052873b24fcc2a74c15
+  tests/direct-land.test.ts: e03d8be6b287428f45d475f3e518024831c6768b
+  tests/direct-phases.test.ts: 37567616465c0b1584f06461236131cada865bbf
+  tests/direct-runs.test.ts: fa0a1540eee4322ef5167351cc7bbe9896a3480a
+  tests/direct-seats.test.ts: 1971810cfda8f4b00d67dfb152f58793392a5350
+  tests/direct-timing.test.ts: e7a883c78afa2612ab422469abb880336cd793b9
+frozen_cited: []

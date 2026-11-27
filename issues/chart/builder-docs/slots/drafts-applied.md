@@ -1,0 +1,5 @@
+# Drafts review applied (A, 2026-11-27)
+
+Applied from drafts-review-b.md: F1 (logotype.svg paths, never public/logos), F2 ("created by" + logotype with <title>Tamdoma</title>), F3 (two-epic correction in all designs), F4 (run-permit forbids), F5 (guide-chapters owns 04/08 prev/next), F6 (keep picture-style lines), F7 (taxonomy-rename edits mode words in four docs pages), F8 (`Old record words:` line, tracked .md scan, no "as a mode name"), F9 (test consumers), F10 (watch and shelf pins), F11 (slots b: claude/claude-opus-5-5/high on the four docs issues, A's pick: Claude Code has subagents and reads PNG screenshots; the writer for text leaves is agy so the reader model differs), F12, F13, F14.
+Applied from drafts-review-c.md: 1, 2, 4, 5, 6 (node_modules skip), 7 (rollback move named), 8.
+Declined: C3 adding charting-pictures to guide-chapters blocked-by. Reason: guide-chapters consumes no output of charting-pictures, ordering by file overlap is not a dependency; the keep rule for the picture-style lines covers the overlap, and builder-docs-rest stays parked until the operator has read the charting chapter with its pictures.

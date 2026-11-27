@@ -1,0 +1,40 @@
+inputs: []
+produces: []
+grants:
+  - approved:
+      by: standing
+      date: '2026-11-23'
+      answer: '3b: every money or usage limit (paid runs, paid launches, nested runs), no operator approval'
+    principal: the leaf's implementing and reviewing seats
+    account: the logged-in pi harness account in ~/.akrogon/config.yaml harnesses
+    credential:
+      name: pi harness login
+      holder: operator machine
+    targets: [pi watcher session in the throwaway hc session akr-e2e-watch]
+    fixtures: []
+    operations: [akrogon run-check --name watch-live-pi-shell of tests/e2e/watch-live.e2e.ts paid cell with AKROGON_SESSIONS budget, including the tier's start and stopWatchTier cleanup]
+    effects: paid pi model sessions on the logged-in account; local writes under AKROGON_E2E_ROOT and AKROGON_E2E_OUT; the throwaway hc core's runtime and state for session akr-e2e-watch (XDG_RUNTIME_DIR/akr-e2e-watch*, ~/.local/state/herdr-core/akr-e2e-watch), removed and absence-checked by stopWatchTier; pi's own session transcript under ~/.pi/agent/sessions, as every paid pi cell writes
+    bounds: none
+    stop_line: no other harness account, provider or outside write; no write outside the paths named in effects
+retained: []
+proofs:
+  - operation: watch-live e2e pi cell launch (existing machinery the live criterion uses)
+    command: akrogon run-check --holder <chart>/direct --name pi-preflight -- env AKROGON_E2E=watch-preflight AKROGON_E2E_KIND=pi AKROGON_E2E_ROOT=<tmp> AKROGON_E2E_OUT=<chart>/direct/e2e-pi-preflight bun test --timeout=30000 ./tests/e2e/watch-live.e2e.ts --test-name-pattern preflight
+    identity: operator's local account, pi harness login
+    target: throwaway hc session akr-e2e-watch
+    version: akrogon main 4325f9ce
+    date: '2026-11-25'
+    result: 1 pass, pi launched with real flags and listed the skill, no prompt sent
+    cleanup: temp root removed
+    limits: no prompt sent and no tool subprocess run; does not prove OBSERVE_AKROGON reaches pi's tool subprocesses
+    record: issues/chart/watch-one-read/forks/observe-paused.md
+  - operation: observe output on a real hc core, akrogon pause semantics and manual next ignoring pause (pre-existing contracts)
+    command: akrogon run-check --holder <chart>/direct --name hc-observe -- bun test --timeout=30000 tests/hc-observe.test.ts tests/pause-next.test.ts
+    identity: operator's local account
+    target: throwaway hc core and fixture repos
+    version: akrogon main 4325f9ce
+    date: '2026-11-25'
+    result: 30 pass
+    cleanup: fixtures removed by the tests
+    limits: proves today's output, not the new paused line
+    record: issues/chart/watch-one-read/forks/observe-paused.md

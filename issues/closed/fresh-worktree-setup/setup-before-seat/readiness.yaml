@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: per-worktree git path, marker lifetime, install idempotence, stale node_modules after reset --keep, worktree removal with ignored files (free git and bun observations)
+    command: throwaway git repos and linked worktrees under mktemp per slots/map-B.md O-A to O-F, slots/map-C.md Observations 1 and 2, slots/map-D.md OBS1 and OBS2, slots/rebuttal-B.md RB1
+    identity: local user, no account
+    target: own throwaway repos and worktrees
+    version: git 2.56.1, bun 1.4.5, npm 11.20.0
+    date: '2026-11-25'
+    result: git rev-parse --git-path resolves inside .git/worktrees/<name>/; a git-dir marker survives checkout, stays out of git status and goes with git worktree remove; a frozen bun install reruns as a no-op; after git reset --keep onto a commit adding a dependency, node_modules exists without it until setup reruns; git worktree remove accepts ignored node_modules
+    cleanup: every temp dir removed and checked absent
+    limits: small local fixtures; network and cold-cache installs not measured beyond B O-B
+    record: issues/chart/fresh-worktree-setup/forks/setup-before-seat.md

@@ -1,0 +1,51 @@
+slug: direct-lookup
+phase: merged
+created: 2026-11-25
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#162"
+  - "Tamdoma/akrogon#163"
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak2d3db8a04efa4410911c5ec33dc963
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t3yk
+  B:
+    session: infra
+    address: t3yv
+prompted:
+  B:
+    turn: 2
+    address: t3yv
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-25T23:22:48.688Z
+broadcast:
+  kind: epic
+  name: unblocked-runs
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/unblocked-runs
+  pushed: 562611bd309252ddcbe7a18a04a88629d0e82c0e
+  sources:
+    - "Tamdoma/akrogon#162"
+    - "Tamdoma/akrogon#163"
+    - "Tamdoma/akrogon#161"
+frozen:
+  tests/direct-create.test.ts: e092380c7dd896101bf186316ec67e204a70d92f
+  tests/direct-land.test.ts: 62678b6b5e688f3c1e92cb7cf7ff36c7b6dff076
+frozen_cited: []

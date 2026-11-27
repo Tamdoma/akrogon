@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: 'P1 failure reproduced by PATH prefix'
+    command: 'PATH="$HOME/.akrogon/tool-entry:$PATH" bun test tests/tool-entry.test.ts -t "exactly once"; then without the prefix'
+    identity: 'operator user ivan, local CLI, no credentials'
+    target: 'akrogon repo at 562611bd'
+    version: 'bun 1.4.5'
+    date: '2026-11-27'
+    result: 'with prefix red at r (placed in tools/t-); without prefix green'
+    cleanup: 'none needed'
+    limits: 'does not exercise run-check or verify'
+    record: issues/chart/agy-tool-entry/slots/map-b.md

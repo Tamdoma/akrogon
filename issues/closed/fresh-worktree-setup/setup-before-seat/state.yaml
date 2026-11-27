@@ -1,0 +1,50 @@
+slug: setup-before-seat
+phase: merged
+created: 2026-11-25
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#158"
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 2
+verdict: {}
+tab: ak220719c22a9b8f44d13e164193c2d1
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t3s3
+  B:
+    session: infra
+    address: t3s6
+prompted:
+  B:
+    turn: 5
+    address: t3s6
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-25T15:00:51.307Z
+broadcast:
+  kind: issue
+  name: fresh-worktree-setup
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/fresh-worktree-setup
+  pushed: 4a1f34078029c43be2309fcb96e570202366ea02
+  sources:
+    - "Tamdoma/akrogon#158"
+frozen:
+  tests/AREA.md: 1c0165e55eaef6ed71369429ffe91fdbf27739c8
+  tests/setup-busy.test.ts: 7b7ac41a72f2f6905cf7cf17b72d67c7aedf03ca
+  tests/setup-dispatch.test.ts: 78c7d7ef566d5bcc76ceba04d706deb9d36b01d1
+  tests/setup-fixture.ts: ef5bc7cbe485daafd918e3a82851d74ae7308c26
+frozen_cited: []

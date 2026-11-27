@@ -1,0 +1,12 @@
+
+akr-e2e-watch-standin-shell sp main ? ❯ sh '/var/tmp/wo.IwrLjj/launch-standin-shell.sh'
+
+watch-issues /var/tmp/wo.IwrLjj/akr-e2e-watch-standin-shell sp
+watch-issues tick timer=t2 pid=1743749 due=1 /var/tmp/wo.IwrLjj/akr-e2e-watch-standin-shell sp
+watch-issues tick timer=t2 pid=1743749 due=2 /var/tmp/wo.IwrLjj/akr-e2e-watch-standin-shell sp
+watch-issues tick timer=t2 pid=1743749 due=4 /var/tmp/wo.IwrLjj/akr-e2e-watch-standin-shell sp
+watch-issues tick timer=t2 pid=1743749 due=5 /var/tmp/wo.IwrLjj/akr-e2e-watch-standin-shell sp
+watch-issues tick timer=t2 pid=1743749 due=6 /var/tmp/wo.IwrLjj/akr-e2e-watch-standin-shell sp
+Terminated                 sh '/var/tmp/wo.IwrLjj/launch-standin-shell.sh'
+
+akr-e2e-watch-standin-shell sp main ? ✗

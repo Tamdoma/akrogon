@@ -1,0 +1,120 @@
+Tamdoma Pi (swe-2-max)
+
+ Warning: Model "swe-2-max" not found for provider "devin". Using custom model id.
+
+
+ watch-issues /var/tmp/wo.97FUFo/akr-e2e-watch-pi-shell sp
+
+
+ Thinking...
+
+
+ [skill] watch-issues (ctrl+o to expand)
+
+
+ Thinking...
+
+
+ $ bun /home/ivan/.akrogon/worktrees/akrogon/observe-paused/skills/watch-issues/scripts/start.ts "/var/tmp/wo.97FUFo/akr-e2e-watch-pi-shell sp"
+
+ started t2
+
+ Done · 2 lines · 0.1s
+
+
+ Thinking...
+
+
+ $ cd "/var/tmp/wo.97FUFo/akr-e2e-watch-pi-shell sp" && timeout 60 bun /home/ivan/.akrogon/worktrees/akrogon/observe-paused/skills/watch-issues/scripts/observe.ts "/var/tmp/wo.97FUFo/akr-e2e-watch-p…
+
+ session=akr-e2e-watch
+ paused=false
+
+ Done · 3 lines · 0.1s
+
+
+ Thinking...
+
+ started t2. Check ran: unpaused, session akr-e2e-watch, no open leaves. Watching until watch-issues stop.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ Parent — Idle · task: watch-issues /var/tmp/wo.97FUFo/akr-e2e-watch-pi-shell sp · action: idle · elapsed: 9s · idle: 0s
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ PI │ 4% │ $0.00 │ swe-2-max │ akr-e2e-watch-pi-shell sp │ main

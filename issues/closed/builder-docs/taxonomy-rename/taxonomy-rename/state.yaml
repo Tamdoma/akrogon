@@ -1,0 +1,44 @@
+slug: taxonomy-rename
+phase: merged
+created: 2026-11-27
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 2
+verdict: {}
+tab: ak522ab4e3faa47b2a9ad930f9e13b5e
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t42j
+  B:
+    session: infra
+    address: t42v
+prompted:
+  B:
+    turn: 6
+    address: t42v
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-27T11:15:30.847Z
+broadcast:
+  kind: epic
+  name: builder-docs
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/builder-docs
+  pushed: 79dcbd9e5da96e24ff78c34aef40263358515238
+  sources: []
+frozen: {}
+frozen_cited: []

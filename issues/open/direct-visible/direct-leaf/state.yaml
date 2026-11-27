@@ -1,7 +1,0 @@
-slug: direct-leaf
-phase: plan.synthesis
-created: '2026-11-25'
-repo: akrogon
-blocked-by: [tool-cgroup-kill]
-sources:
-  - "Tamdoma/akrogon#153"

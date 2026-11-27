@@ -1,0 +1,25 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: agy interactive seat at an approval boundary (host toolPermission always-proceed, --mode auto)
+    command: akrogon run-check --name agy-boundary-auto --holder issues/chart/unblocked-runs/direct -- env HC_SESSION=infra XDG_RUNTIME_DIR=/run/user/1000 AKROGON_SESSIONS=1 AKROGON_SESSION_MINUTES=6 timeout 360 sh issues/chart/unblocked-runs/direct/agy-boundary.sh unix:path=/run/user/1000/bus auto
+    identity: this host's logged-in agy account (no secret value)
+    target: agy 1.5.17 terminal in hc session infra, cwd /home/ivan/Work/infra/akrogon
+    version: agy 1.5.17
+    date: '2026-11-25'
+    result: rm -rf of a directory outside the workspace plus curl ran with no pause although it matches the host's agy ask rule; turn ended done; directory deleted
+    cleanup: terminal killed and removed (absent), directory absent
+    limits: this host's agy settings only; artifactReviewPolicy and agy deny-rule matches not exercised; proves the existing behaviour this leaf relies on, not any new launch
+    record: issues/chart/unblocked-runs/forks/seat-unattended.md
+  - operation: claude seat launch merges permissions.denyInsteadOfPrompting
+    command: inspected src/seat.ts harnessArgv; Himne seat transcripts' returned denials
+    identity: n/a (code and transcripts)
+    target: akrogon release 15582bcd; claude 2.1.332 transcripts of 2026-11-25
+    version: commit 32bdee31
+    date: '2026-11-25'
+    result: every claude launch carries denyInsteadOfPrompting true; both Himne denials returned to the model ("Permission to use Bash with command ... has been denied.") under bypassPermissions
+    cleanup: none (read only)
+    limits: does not explain the chord-tap-editor dialog claim, which no transcript shows
+    record: issues/chart/unblocked-runs/forks/seat-unattended.md

@@ -1,0 +1,36 @@
+slug: seats-never-wait
+phase: merged
+created: 2026-11-25
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#161"
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak8d47fa36df4b2113aca00e6e3a5081
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t3ym
+  B:
+    session: infra
+    address: t3yr
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-25T23:20:19.291Z
+frozen: {}
+frozen_cited: []

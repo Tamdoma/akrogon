@@ -1,0 +1,30 @@
+Shared SVG frame (D4). H is the picture height, about 400 to 500. Token values may not change; classes may be added.
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 H" width="960" height="H" role="img" aria-labelledby="t d">
+  <title id="t">...</title>
+  <desc id="d">...</desc>
+  <style>
+    text { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 15px; fill: #0f0f0f; }
+    .h { font-size: 20px; font-weight: 600; }
+    .soft { font-size: 13px; fill: #6e6a5c; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; letter-spacing: .04em; fill: #5e7355; }
+    .box { fill: #f0ede0; stroke: #0f0f0f; stroke-width: 1.5; stroke-linejoin: round; }
+    .key { fill: #e7ede2; stroke: #5e7355; stroke-width: 1.5; stroke-linejoin: round; }
+    .link { fill: none; stroke: #90a985; stroke-width: 1.5; stroke-linecap: round; stroke-dasharray: 4 6; }
+    .line { fill: none; stroke: #0f0f0f; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  </style>
+  <rect x="0.75" y="0.75" width="958.5" height="H-1.5" rx="14" fill="#f4f1e6" stroke="#c4c0b3" stroke-width="1.5"/>
+  <!-- content -->
+  <text class="mono" x="838" y="H-18" text-anchor="end">created by</text>
+  <g transform="translate(846 H-36) scale(0.05)" fill="#0f0f0f"><title>Tamdoma</title>
+    <!-- the 8 path lines from: awk '/<path/' /home/ivan/Work/infra/tamdoma/website/website/src/components/logotype.svg | sed 's/ fill="#90A985"//' -->
+  </g>
+</svg>
+
+Rules for the frame:
+- Write H as a number everywhere (for example 460, so the card height is 458.5 and the attribution y values are 442 and 424).
+- Flat fills only: no gradients, filters, shadows. Boxes use rx 8 to 10.
+- Labels are <text>, never outlined paths. Keep labels short with about 20 percent width slack, because the reader's system font varies.
+- No href attribute at all, internal or outside. No <use>, <image>, <a>, <script>, <foreignObject>, @import, @font-face, animation, <animate>, prefers-color-scheme. Arrowheads are drawn paths, or a <marker> referenced by url(#id).
+- Attribution sits bottom-right: x and y may shift a few px so "created by" lines up with the logotype's middle (the logotype is 1114x390 units, so about 56x20 px at scale 0.05). The group, its title, its color and the corner stay.
+- Words: only Charting mode, Build route, No autopilot, Semi-autopilot, Full autopilot, Direct, Lifecycle, slot A (the builder), slot B (the reviewer), charting agent, consultant, signposts, needs sheet, territory map, fork, decisions, hand-off review, c- tab, and plain connecting words. Never "manual", "quick fix", "attended" or "autopilot signposts".

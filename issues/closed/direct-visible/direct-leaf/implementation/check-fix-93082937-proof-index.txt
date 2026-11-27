@@ -1,0 +1,71 @@
+Proof head: 93082937cca22052d4377dace947dce6b4738343
+bun install v1.4.5 (a7733435c)
+
+Checked 9 installs across 10 packages (no changes) [0.00ms]
+
+ 11 pass
+ 0 fail
+ 88 expect() calls
+Ran 11 tests across 1 file. [1179.00ms]
+check repair-state-inventory: 0 /home/ivan/Work/infra/akrogon/issues/open/direct-visible/direct-leaf/implementation/check-repair-state-inventory-1795642617633-2928962.log
+wall repair-state-inventory: 1s
+ 14 pass
+ 0 fail
+ 146 expect() calls
+Ran 14 tests across 1 file. [800.00ms]
+check direct-create: 0 /home/ivan/Work/infra/akrogon/issues/open/direct-visible/direct-leaf/implementation/check-direct-create-1795642618547-2933131.log
+wall direct-create: 1s
+ 6 pass
+ 0 fail
+ 89 expect() calls
+Ran 6 tests across 1 file. [1.51s]
+check direct-drop: 0 /home/ivan/Work/infra/akrogon/issues/open/direct-visible/direct-leaf/implementation/check-direct-drop-1795642620169-2935909.log
+wall direct-drop: 2s
+ 4 pass
+ 0 fail
+ 132 expect() calls
+Ran 4 tests across 1 file. [2.51s]
+check direct-seats: 0 /home/ivan/Work/infra/akrogon/issues/open/direct-visible/direct-leaf/implementation/check-direct-seats-1795642622792-2939678.log
+wall direct-seats: 2s
+ 2 pass
+ 0 fail
+ 18 expect() calls
+Ran 2 tests across 1 file. [423.00ms]
+check direct-active: 0 /home/ivan/Work/infra/akrogon/issues/open/direct-visible/direct-leaf/implementation/check-direct-active-1795642623339-2945450.log
+wall direct-active: 1s
+ 3 pass
+ 0 fail
+ 25 expect() calls
+Ran 3 tests across 1 file. [272.00ms]
+check direct-timing: 0 /home/ivan/Work/infra/akrogon/issues/open/direct-visible/direct-leaf/implementation/check-direct-timing-1795642623732-2946792.log
+wall direct-timing: 0s
+ 3 pass
+ 0 fail
+ 28 expect() calls
+Ran 3 tests across 1 file. [282.00ms]
+check direct-runs: 0 /home/ivan/Work/infra/akrogon/issues/open/direct-visible/direct-leaf/implementation/check-direct-runs-1795642624128-2947456.log
+wall direct-runs: 1s
+ 6 pass
+ 0 fail
+ 90 expect() calls
+Ran 6 tests across 1 file. [1083.00ms]
+check direct-phases: 0 /home/ivan/Work/infra/akrogon/issues/open/direct-visible/direct-leaf/implementation/check-direct-phases-1795642625342-2948467.log
+wall direct-phases: 1s
+ 7 pass
+ 0 fail
+ 151 expect() calls
+Ran 7 tests across 1 file. [2.71s]
+check direct-land: 0 /home/ivan/Work/infra/akrogon/issues/open/direct-visible/direct-leaf/implementation/check-direct-land-1795642628165-2950745.log
+wall direct-land: 3s
+ 11 pass
+ 0 fail
+ 1970 expect() calls
+Ran 11 tests across 2 files. [879.00ms]
+check direct-cmdref: 0 /home/ivan/Work/infra/akrogon/issues/open/direct-visible/direct-leaf/implementation/check-direct-cmdref-1795642629157-2958756.log
+wall direct-cmdref: 1s
+ 13 pass
+ 0 fail
+ 42 expect() calls
+Ran 13 tests across 1 file. [23.00ms]
+check direct-docs-links: 0 /home/ivan/Work/infra/akrogon/issues/open/direct-visible/direct-leaf/implementation/check-direct-docs-links-1795642629294-2960742.log
+check direct-retired-guard: 0 /home/ivan/Work/infra/akrogon/issues/open/direct-visible/direct-leaf/implementation/check-direct-retired-guard-1795642629396-2960981.log

@@ -1,0 +1,35 @@
+slug: charting-guide
+phase: merged
+created: 2026-11-27
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak43580d262273d608f1b2dd5386f0ab
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t42h
+  B:
+    session: infra
+    address: t430
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-27T10:57:18.197Z
+frozen: {}
+frozen_cited: []

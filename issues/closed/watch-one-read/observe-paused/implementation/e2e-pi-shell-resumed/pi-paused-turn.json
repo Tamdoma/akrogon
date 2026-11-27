@@ -1,0 +1,16 @@
+{
+  "watcher": "t1",
+  "empty": {
+    "due": 4,
+    "turn": 3
+  },
+  "staged": {
+    "due": 5,
+    "turn": 4
+  },
+  "paused": {
+    "due": 6,
+    "turn": 5
+  },
+  "transcript": "/home/ivan/.pi/agent/sessions/--var-tmp-wo.97FUFo-akr-e2e-watch-pi-shell sp--/2026-11-25T22-14-20-202Z_654e89a0-fbd0-41d5-a20f-1cd3f4823481.jsonl"
+}

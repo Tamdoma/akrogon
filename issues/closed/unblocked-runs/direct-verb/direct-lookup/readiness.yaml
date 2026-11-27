@@ -1,0 +1,15 @@
+inputs: []
+produces: []
+grants: []
+retained: []
+proofs:
+  - operation: hc terminal environment names the caller's session (HC_SESSION)
+    command: env | grep ^HC_   (in the chart door terminal t126)
+    identity: operator's local hc session infra
+    target: herdr-core session infra
+    version: akrogon release 15582bcd, herdr-core as installed 2026-11-25
+    date: '2026-11-25'
+    result: 'HC_SESSION=infra, HC_TERMINAL_SOCKET=/run/user/1000/herdr-core/infra.sock, HC_TERMINAL_ID=t126; the #162 report shows the same three variables in the pi-extensions door' # (A,B)
+    cleanup: none (read only)
+    limits: does not prove every hc launch path sets HC_SESSION; a blank value is refused loudly by done-criterion 2
+    record: issues/chart/unblocked-runs/forks/direct-session.md

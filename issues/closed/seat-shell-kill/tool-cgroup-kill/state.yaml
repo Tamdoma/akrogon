@@ -1,0 +1,49 @@
+slug: tool-cgroup-kill
+phase: merged
+created: 2026-11-25
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#157"
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+tab: ak47d792f7fd1ac22d0e4b1e5da9bfa8
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t3qv
+  B:
+    session: infra
+    address: t3rt
+prompted:
+  B:
+    turn: 4
+    address: t3rt
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-25T15:03:51.191Z
+broadcast:
+  kind: issue
+  name: seat-shell-kill
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/seat-shell-kill
+  pushed: e3ec4b02d76a2273f35ea2f636f81fe30b1d8b54
+  sources:
+    - "Tamdoma/akrogon#157"
+frozen:
+  tests/recovered-seat.test.ts: 7b08126911505120f0ee554fbb6d6919c6379bbe
+  tests/tool-entry.test.ts: 54b816aa6673634948a86cf0074bfba080ddce6b
+  tests/tool-kill.test.ts: 921a9415ccc419e6d8358971bdb2451a7c6584ec
+frozen_cited: []

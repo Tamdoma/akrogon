@@ -1,0 +1,45 @@
+slug: nested-temp-root
+phase: merged
+created: 2026-11-25
+repo: akrogon
+blocked-by: []
+sources: []
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak158979333cd9657b554d2d1749adb8
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t3s4
+  B:
+    session: infra
+    address: t3s5
+prompted:
+  B:
+    turn: 1
+    address: t3s5
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-25T13:26:24.720Z
+broadcast:
+  kind: issue
+  name: test-temp-leftovers
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/test-temp-leftovers
+  pushed: 011d47575accb875bdf898f5b52f67d016a1120f
+  sources: []
+frozen:
+  tests/run-check.test.ts: 1e2fd9172f6f8ed781b9a008d924cce4279355d9
+frozen_cited: []

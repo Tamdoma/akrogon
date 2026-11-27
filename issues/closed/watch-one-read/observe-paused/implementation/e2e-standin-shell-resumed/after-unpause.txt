@@ -1,0 +1,1 @@
+{"hidden_finished":0,"terminals":[{"address":"t1","agent":"env","cwd":"/var/tmp/wo.IwrLjj/akr-e2e-watch-standin-shell sp","name":"akr-e2e-watcher","state":"live","status":"idle","turn":2},{"address":"t2","agent":"env","cwd":"/var/tmp/wo.IwrLjj/akr-e2e-watch-standin-shell sp","name":"aw-watch","parent":"t1","state":"live","turn":0}]}

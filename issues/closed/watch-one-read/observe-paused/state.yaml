@@ -1,0 +1,52 @@
+slug: observe-paused
+phase: merged
+created: 2026-11-25
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#160"
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: akd4e053d38dd6813e7ba31a6786100b
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t3wf
+  B:
+    session: infra
+    address: t3xp
+prompted:
+  B:
+    turn: 2
+    address: t3xp
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-25T22:33:07.167Z
+broadcast:
+  kind: issue
+  name: watch-one-read
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/watch-one-read
+  pushed: 15582bcdcfd1f14ab30f11fee4333a7da6a4871d
+  sources:
+    - "Tamdoma/akrogon#160"
+frozen:
+  tests/e2e/watch-live.e2e.ts: f96b6f3b443907465eaf6b0bcb4a88f33f6a76f9
+  tests/e2e/watch-tier.ts: 39321a5281b320db926e06a30bdf23e00dc9ef6c
+  tests/fixtures/watch-agent.sh: f52b620bdaac3d0c9a77e3e67acd4e493e116b98
+  tests/fixtures/watch-hook.sh: cc790275a2b2ac603c2726e408693efe0ecb8643
+  tests/hc-observe.test.ts: 17520cace2fc5939186dffb34dca7f1cf18699ba
+  tests/watch-timer.test.ts: b3e2ce43b66d178a4ae90efd942fcd28e358f8f6
+frozen_cited: []

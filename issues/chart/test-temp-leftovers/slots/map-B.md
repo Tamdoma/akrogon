@@ -1,0 +1,106 @@
+# Map B: test-temp-leftovers
+
+Blind consultant map, slot B, written 2026-11-25. The preload isolation already exists (`tests/isolation.ts` via `bunfig.toml` `[test] preload`); the leftovers exist because the isolation never crosses the product's own environment-filtering boundaries, and because the product's worktree store anchors to `os.homedir()` instead of the akrogon state home. Both are mechanism failures in the product, not missing test hygiene.
+
+## 1. Sources, by file and function
+
+### S1. `/var/tmp/akr-1000/<hash4>/<hash8>` — nested akrogon commands lose `AKROGON_LEAF_TEMP_ROOT` at the run-check boundary
+
+Chain, all file-pinned:
+
+1. `tests/isolation.ts:54-75` (preload) sets `AKROGON_LEAF_TEMP_ROOT` and `HOME` per worker. `tests/helpers.ts:cli()` passes both to every CLI subprocess. So far, isolated.
+2. `src/run-check.ts:340` `checkedRun` creates the run root under `ensureLeafTemp(repo, slug)` — correctly inside the override root.
+3. `src/run-check.ts:47-65` `copied` whitelists exactly `HOME, PATH, XDG_CACHE_HOME, FAKE_SYSTEMD_RUN_LOG, AKROGON_HOME` and the display names. **`AKROGON_LEAF_TEMP_ROOT` and `AKROGON_RETIRED_TEMP_ROOT` are not in it.** Every command run inside a run-check scope or a verify pass therefore drops both overrides.
+4. Any nested `akrogon` invocation inside such a command (`akrogon run-check` for nested scopes, `akrogon verify` for nested verification, or any user check command that calls akrogon) re-enters `ensureLeafTemp` (`src/config.ts:429`) which resolves `leafTempRoot()` to the real `/var/tmp/akr-<uid>` (`src/config.ts:407-416`) and creates `<hash4>/<hash8>` there.
+5. `checkedRun`'s finally (`src/run-check.ts:~470`) removes only the `run-*` dir. The `hash4/hash8` leaf dirs stay — empty. Production cleanup (`closeMergedTab` / reconcile scratch pass) removes leaf temps of *registered* repos; fixture repos are not registered in the operator's `~/.akrogon/config.yaml`, so nothing ever removes them.
+6. `src/reconcile.ts:1396-1410` `reconcileHost` explicitly *keeps* every `<hash4>` dir that is not a registered repo's hash ("not a registered repo of this home … remove this path by hand"). The product's own sweep cannot clean this class by design.
+
+Reproduced, free, controlled: `run-check` outer → nested `run-check` inner with a fixture override, the inner created `/var/tmp/akr-1000/3b03/ca55000c` (real root) while the outer used the fixture root. Same h8 in both because hash inputs match (`<fixture-root>` = real repo root path string is the same; only the *root prefix* differs). Deleted the dir after proof. Observation log in section 5.
+
+Telltale test debt proving the mechanism is already known but handled per-test: `tests/run-permit.test.ts:250` declares `env: ['AKROGON_HOME', 'AKROGON_LEAF_TEMP_ROOT']` in the fixture repo config plus a matching `.env` file *only so the nested inner scope keeps its isolation*. `repoSchema` allows these two names in `env`/`pass_env` (only `TMPDIR` and friends are reserved, `src/config.ts` constructed-env list). Every fixture that does not redeclare them leaks. The sibling boundary `akrogon verify` already forwards both names into its service (`src/verify.ts` `passForwarded`: `AKROGON_LEAF_TEMP_ROOT`, `AKROGON_RETIRED_TEMP_ROOT` present) — but the copy is pointless today because the command env the names must survive is `constructedEnv`'s.
+
+Evidence of scale on the live host: at 2026-11-25T12:20Z, 69 of 72 `<hash4>` dirs under `/var/tmp/akr-1000` are *not* any registered repo's hash (12 registered hashes computed), each holding exactly one empty h8. A full suite run (91 files, all pass) added 8 new unregistered pairs in 90 s.
+
+### S2. `~/.akrogon/worktrees/akrogon-XXXXXX` — the worktree store anchors to `os.homedir()`, not the state home, and is exposed wherever HOME propagation fails
+
+Chain:
+
+1. `src/config.ts:394` `worktreeStore` resolves `resolve(homedir(), '.akrogon/worktrees', repo.name)` when no `worktree_root` is configured. Fixture repos are created with no `worktree_root` unless the test sets one (most do not; `tests/batch.test.ts:116` setting one explicitly is the exception).
+2. The empty `akrogon-XXXXXX` names are fixture-home basenames: `tests/helpers.ts:79` `fixture()` does `mkdtempSync(resolve(tmpdir(), 'akrogon-'))` and the repo name is that basename (`fixtureRepo`: `repo: basename(home)`). So each leftover is a fixture repo's whole store directory — meaning `git worktree add` ran with the store under the *real* home.
+3. Proven: `git worktree add` creates missing parent dirs and `git worktree remove` leaves the empty parent behind (observation O6). That is exactly the observed shape: *empty* `<repo>` dirs.
+4. `os.homedir()` in Bun 1.4.5 is frozen at first call per process and never follows `process.env` writes or even libc `setenv` after that first call (observation O1). The preload's libc `setenv(HOME)` works only because it runs before any `homedir()` call in the worker. Any process launched without `HOME` or with empty `HOME` falls back to `/home/ivan` (O1, O2).
+5. The propagation gap with the cleanest proof: `systemd-run --user` *service* units do not inherit the caller's environment at all — the user manager substitutes its own `HOME=/home/ivan` (O3). Scopes do inherit (O3). akrogon starts services for `verify` passes and `land` — both *do* forward `HOME` today (`src/verify.ts` `passForwarded` includes `HOME`; `src/land.ts` sets `--setenv=HOME=${process.env.HOME}`) — but `run-check` guards (`src/scope.ts` `startRunGuard`, no env needed) and any future or missed service path get the real `HOME` silently. Note the land edge: `--setenv=HOME=${process.env.HOME ?? ''}` writes an *empty* HOME when unset, and empty-HOME `homedir()` resolves to `/home/ivan` (O2).
+6. I could not reproduce the store leak in probes (full suite plus 12 single-file runs, zero recurrences; git-shim trap on `next/first-allocation/reconcile/batch-merge/flaky-merge/merge-attempts/green-merge/hc-identity/hc-fixture-slices/leaf-slices` never fired). The store leak is rarer than S1 — plausibly one or few spawn sites, possibly already partially fixed since the intake count. But the mechanism is live and needs no new spawn-site reasoning to fix: see F2 in section 2. The per-test `process.env.HOME` mutations (`tests/batch.test.ts`, `tests/batch-merge.test.ts`) run under `concurrentTestGlob = "**/*.test.ts"` (`bunfig.toml`), so *all* tests in a file execute concurrently; mutations restore only in `afterEach` of serial sections and race other tests' spawns. This makes any HOME-dependent behavior in subprocesses stochastic — consistent with a rare, hard-to-attribute leak, and a reason not to rely on per-test env control at all.
+
+### S3. Why the existing fixture isolation does not catch them
+
+`tests/AREA.md:12` claims the preload means "the suite never reaches real HOME or `/var/tmp/akr-<uid>`". That is only true for the worker process itself and direct children inheriting its env. It is false across the three boundaries the product itself inserts: `constructedEnv` filtering (S1), service-unit env substitution (S2.5), and `os.homedir()` launch-caching plus process-global env mutation races (S2.4/6). Nothing in the suite asserts the claim, so it regressed silently — exactly the class a guard would catch.
+
+## 2. Material forks
+
+### F1. Where leaf-temp isolation belongs
+
+- O1a (recommended): fix the mechanism — add `AKROGON_LEAF_TEMP_ROOT` and `AKROGON_RETIRED_TEMP_ROOT` to `copied` in `src/run-check.ts`. Production behavior unchanged (both unset in production → no diff); test fixtures keep isolation across arbitrary nesting depth, services included. One-line class removal; matches signpost 1a and the existing precedent (`AKROGON_HOME`'s copy comment exists for exactly this reason). Cost: minutes plus boundary tests.
+  - Could break/invite later: a seat or run that deliberately wanted the *real* root for a nested call loses that option; no such use exists in the codebase today, and the override names are test seams by design. Future env-filter additions (`AKROGON_PROC_ROOT`, `AKROGON_CGROUP_ROOT`, `AKROGON_RUN_SLICE` — all fixture seams, all already in verify's `passForwarded` but absent from `copied`) hit the same bug the day a test needs them across nesting. Consider copying the same full seam set in both places so the two whitelists cannot drift apart again; that is the actual invariant verify's `passForwarded` already encodes.
+- O1b: declare the names per fixture repo config (`env:` entries + `.env` files), as `run-permit.test.ts:250` does. Per-test fixes; the next 30 fixtures forget it again. Violates 1a. Rejected.
+- O1c: the product refuses an unset `AKROGON_LEAF_TEMP_ROOT` under test (e.g., refuse when `HOME` differs from the state home parent). Adds a mode and a new failure surface for the operator's own manual runs in the main checkout; the override mechanism works fine once forwarded. Rejected — guards a symptom instead of removing the drop.
+
+### F2. Where the worktree store belongs
+
+- O2a (recommended): `worktreeStore` resolves under `homePath()` (the `AKROGON_HOME`-aware state home) instead of `homedir()`: `<homePath>/worktrees/<repo>`. Default deployments are byte-identical (`AKROGON_HOME` unset ⇒ `homedir()/.akrogon` either way). This removes the `HOME`-propagation dependency entirely: any process that knows the state home finds the right store, which is already the rule for slices (`leafSlice` keys on `homePath()`, `src/scope.ts:8`), locks and records. `reconcile.ts:1384` and `1445` use `homedir()` for the *retired* surfaces; those stay as they are (retired paths are history, not state). Old records keep parsing (6a): they carry absolute paths, no migration. Invite-later analysis: an operator who runs with `AKROGON_HOME` set to a scratch dir today gets worktrees in the real home — surprising; after the change they get them in the scratch home — correct. The only real cost is behavior change for anyone relying on the split, which no current surface expresses.
+  - Residual risk: does not fix the leak by itself for processes that carry *neither* variable right — but combined with O1a the whole env chain is closed, and no remaining resolution path depends on `HOME` reaching a service or nested scope.
+- O2b: fix HOME propagation per spawn site (forward `HOME` everywhere, never produce empty HOME). Whack-a-mole across systemd-run, hc, env-filter layers; any future service reintroduces it. Rejected per 1a, though the empty-string HOME in `src/land.ts` is worth correcting either way (write the flag only when set, or write `--setenv=HOME` value from `homedir()`).
+- O2c: configure `worktree_root` in every fixture (`batch.test` already does). Same per-test patch class as O1b. Rejected.
+
+### F3. Detecting leftovers so the class cannot return
+
+- O3a (recommended): behavior-assertion boundary tests, not host scans. Concretely: a nested run-check/verify test asserting the inner run's leaf-temp landed under the fixture root and *nothing* appeared at the real root path computed in-test (`/var/tmp/akr-<uid>/<hash4-of-fixture-root>` is computable in-process — the fixture root hash is known, so the assertion is exact, not a global scan); and a worktree test asserting the store resolves under the fixture state home with no `HOME` propagation. These are deterministic and free.
+- O3b: a serial host-scan guard comparing `/var/tmp/akr-<uid>` and `~/.akrogon/worktrees` before/after. Flaky on a shared host — production seats legitimately create entries in the real root during any suite run on this machine (observed live during probes: the operator's running leaves write under `5d20`/`b419`/`e527`). A scan can only assert on unregistered-hash dirs, and even those can belong to other checkouts' tests. Cost: permanent flake surface for small signal once O3a exists. Rejected as primary; acceptable as a manual operator sweep command, not a gate.
+- O3c: nothing. Rejected — the AREA.md claim already proves the class regresses silently.
+
+### F4. Should the product's host sweep clean the leaked entries?
+
+- O4a (recommended): no. `reconcileHost`'s keep-for-unregistered rule is correct: the root is shared across homes and deleting another home's temp by hash collision is worse than the leak. The leak is a creation bug; the outcome is "a test run leaves nothing behind", which prevention satisfies. Invite-later check: if leaks keep accumulating after the fix, the answer is a failing guard, not a bolder sweep.
+- O4b: extend the sweep to drop empty, old, unregistered hash dirs. Small, bounded, but it teaches the system to tolerate the class (signpost 1a cuts against it) and still cannot distinguish another home's idle repo. Rejected.
+
+### F5. The concurrent-env-mutation hazard
+
+`concurrentTestGlob` makes every test concurrent; `process.env` is process-wide. `tests/batch.test.ts` and `batch-merge.test.ts` mutate `HOME`/`AKROGON_LEAF_TEMP_ROOT` for in-process product calls. Even with O1a/O2a landed, in-process mutations keep racing concurrent spawns in the same worker (a subprocess can inherit a *dying sibling fixture's* home — wrong but isolated, so harmless for leftovers, yet a flake source). Not required for this leaf's outcome, but the cheapest hardening is passing the env explicitly to the in-process entry points that need it (several already take `home` parameters, e.g. `selfUpdate(repo, home)`) and deleting the mutations. Flag as optional scope — ask the door; do not fold in silently.
+
+## 3. Practitioner questions and pitfalls (all verified live, bun 1.4.5 / systemd on this host, 2026-11-25)
+
+- P1. Bun's `os.homedir()` is frozen at first call in the process: later `process.env` writes do nothing, and even libc `setenv` after the first call does nothing. `os.tmpdir()` is frozen at *launch* env (libc `setenv` even before first use has no effect). Consequently the isolation preload must and does use FFI `setenv` before any `homedir()` call, and test-spawned children must get `HOME` through their spawn env, never through in-process mutation. (Model knowledge cross-check: this matches libuv's caching behavior in Node; verified here for Bun 1.4.5 by direct probes O1/O2 — no docs page states it for Bun; bun docs only say homedir "returns the home directory".)
+- P2. `systemd-run --user` **service** units inherit nothing from the caller — not even `HOME`; the manager supplies its own (`HOME=/home/ivan` observed). `systemd-run --user --scope` inherits everything (runs in place). Any future service launch site must forward the seam names explicitly; `UnsetEnvironment` is needed for names that must stay absent (verify already does this for display names).
+- P3. `git worktree add` creates missing parent directories; `git worktree remove` leaves them empty. Every store path resolution bug therefore leaves a permanent empty `<repo>` dir even when the worktree itself is properly removed — which is why the leak is invisible to `git worktree list` and to reconcile's registered-worktree logic.
+- P4. `checkedRun` removes only `run-*`; empty `<h4>/<h8>` shells are by-design production state, so the leak shape is indistinguishable from legitimate production dirs except by hash membership — do not write cleanup logic keyed on "empty".
+- P5. `bun test` never runs `exit` handlers in workers (preload comment); the suite relies on cross-worker reaping of `akrogon-suite-<pid>-` roots. Any new per-run guard must live inside test assertions (O3a), not exit handlers.
+- P6. `tests/config.test.ts:1136` uses `mkdtempSync('/tmp/akt-')` and `hc-fixture-retry.test.ts` uses `/run/user/<uid>` scratch — outside TMPDIR and suiteRoot; under `run-check` (verify) these are the *only* suite scratch that escapes the run root, a separate pre-existing exemption to keep in mind if a host-scan guard is ever attempted.
+- P7. The fake systemd-run (`tests/fake-systemd-run.sh`) execs scope payloads in place with full env inheritance — matching real scope semantics. Real-unit coverage exists (`tests/run-units.test.ts`); a boundary test for O1a can use the fake seam and still prove the env chain, since the drop happens entirely inside `constructedEnv`.
+
+## 4. Recommendation, cost, proof, open questions
+
+Direction: one leaf (4a) doing O1a + O2a + O3a, optionally the `land.ts` empty-HOME correction (one line, same mechanism). Explicitly not O4b and not per-test patches. Cost: small — two one-line mechanism changes plus tests; the boundary tests dominate. Risk window: `worktreeStore`'s move under `AKROGON_HOME` is the only user-visible behavior change; confirm no production workflow sets `AKROGON_HOME` while expecting worktrees in the real home (the operator dev runs are the only known AKROGON_HOME users; intake does not settle this — ask the operator or accept since the new behavior is the coherent one).
+
+Proof per signpost 2a, free tests at the real boundary:
+1. Extend/duplicate the `run-permit.test.ts:243` nested test: drop its per-repo `env` declaration and `.env` crutch, then assert the inner run's capture and leaf-temp live under the fixture root and that `/var/tmp/akr-<uid>/<sha256(fixture root)[0:4]>` does not exist after the test. Before the fix this test fails exactly as the leak does; after it, it passes deterministically.
+2. A test driving `akrogon verify` through merge_checks (`akrogon verify --attempt` inside the scope) asserting the same — covers the second nesting path.
+3. A worktree allocation test (`akrogon next` first allocation on a fixture with no `worktree_root`, HOME absent from the CLI env but `AKROGON_HOME` correct) asserting the worktree lands under the fixture state home and `~/.akrogon/worktrees` gains nothing.
+4. Full suite run before/after counting unregistered hash dirs: before = +8 per run (measured), after = 0. This is verification evidence for the leaf, not a committed gate.
+
+Questions the intake does not settle:
+- Q1. May `worktreeStore` move under `AKROGON_HOME` (behavior change only when AKROGON_HOME is set), or must the default path stay exactly `homedir()`-anchored forever? I recommend yes, move.
+- Q2. Is fixing the `process.env` mutation pattern in batch tests (F5) in scope? I recommend no — separate intake if it ever flakes — but the leaf must not add new mutations of the same kind.
+- Q3. Should `copied` forward the full fixture seam set (`AKROGON_PROC_ROOT`, `AKROGON_CGROUP_ROOT`, `AKROGON_RUN_SLICE`…) or only the two temp roots? I recommend the full set verify already forwards — one invariant, no drift.
+
+## 5. Observation log (all free; all throwaway state cleaned)
+
+- O1. `HOME=/tmp/x bun -e homedir()` honors launch env; `process.env.HOME` write after start does not move `homedir()`; libc `setenv` before first `homedir()` call does; after first call does not. bun 1.4.5, 2026-11-25, probe dir /tmp/slotb-probe (removed after). Limit: per-process behavior, not necessarily stable across bun versions.
+- O2. `env -i bun` (no HOME) and `HOME=` (empty) both resolve `homedir()` to `/home/ivan` (passwd fallback). Same probe setup.
+- O3. `systemd-run --user` service unit: caller's `TESTVAR` absent inside, `HOME=/home/ivan` present. `systemd-run --user --scope`: both inherited. 2026-11-25, this host, transient units auto-collected.
+- O4. Controlled repro of S1: fixture repo + outer/inner nested `akrogon run-check` with `AKROGON_LEAF_TEMP_ROOT` set only at the outermost env. Inner created `/var/tmp/akr-1000/3b03/ca55000c` (real root) while the outer used the fixture root. Proof positive; the leaked dir was deleted by me (I created it). Fixture under /tmp/slotb-probe removed.
+- O5. Host census 2026-11-25T12:20Z: 72 hash4 dirs under `/var/tmp/akr-1000`, 69 not matching any of the 12 registered repo hashes, each one empty h8. Full suite run (one run, the maximum, 1465 pass/0 fail/91 s) added 8 new unregistered pairs. Nothing deleted (not mine).
+- O6. `git worktree add` into a nonexistent parent creates it; `git worktree remove --force` leaves the empty parent. Probe repo in /tmp/slotb-probe, removed.
+- O7. Single-file leak probes (all exit 0, all pass): `run-permit` +3 real-root pairs (twice reproducible), `verify` 0, `run-check` 0, `next` 0, `batch` +1 first run / 0 on two retries (flaky), `green-merge` +1 first / 0 retry, `batch-merge` 0, `flaky-merge` 0, `merge-attempts` 0, `self-update` 0, `install` 0, `hc-fixture-slices` 0, `leaf-slices` 0, `run-units` 0, `phase` 0, `hc-teardown` 0, `close` 0. Zero worktree-store leaks in any probe. Interpretation: S1 leaks come from nested-scope paths exercised by few tests; parallelism inside the full run amplifies them (8 in one full run).
+- O8. Live-process leak watcher (50 ms poll, /proc environ capture) ran during the full suite; caught nothing mid-write — the leaking processes are too short-lived (single `ensureLeafTemp` mkdir syscalls). Attribution therefore rests on the repro O4 and mechanism reading, not capture.
+- O9. git-shim trap for `worktree add` into the real store across 9 CLI-heavy files: never fired. Store leak not reproduced in this session; mechanism proof stands on S2 chain plus the O2/O3/O6 links.
+- Cleanup: /tmp/slotb-probe and the `/var/tmp/akr-1000/3b03` repro dir deleted; nothing else touched. The main checkout was never modified. One full suite run total, per the brief's limit.

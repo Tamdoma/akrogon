@@ -1,0 +1,45 @@
+slug: check-path-entry
+phase: merged
+created: 2026-11-27T10:22:03.324Z
+repo: akrogon
+blocked-by: []
+sources:
+  - "Tamdoma/akrogon#164"
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 1
+verdict: {}
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t126
+  B:
+    session: infra
+    address: t42t
+prompted:
+  B:
+    turn: 2
+    address: t42t
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-27T10:32:31.962Z
+broadcast:
+  kind: issue
+  name: agy-tool-entry
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/agy-tool-entry
+  pushed: 5d425ea8381036e9ae0fa87ef91d7da9d0254a06
+  sources:
+    - "Tamdoma/akrogon#164"
+direct: true
+frozen: {}

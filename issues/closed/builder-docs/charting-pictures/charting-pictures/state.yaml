@@ -1,0 +1,36 @@
+slug: charting-pictures
+phase: merged
+created: 2026-11-27
+repo: akrogon
+blocked-by:
+  - charting-guide
+sources: []
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak7a8b37c657dc2ec8f262ee3be55372
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t435
+  B:
+    session: infra
+    address: t43d
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-27T11:11:33.017Z
+frozen: {}
+frozen_cited: []
