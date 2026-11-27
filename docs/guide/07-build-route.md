@@ -15,9 +15,13 @@ Once a chart has no open questions left, Akrogon supports two Build routes: **Di
 | **Direct** | The charting agent itself, in a separate worktree | The charting agent's first consultant (`B`) | **Only under No autopilot**, when all eligibility checks pass | One small, settled change (a fast feature as well as a bug fix) |
 | **Lifecycle** | A fresh **slot A (the builder)** in its own tab | A fresh **slot B (the reviewer)** in its own tab | Always available (the only route under Semi-autopilot and Full autopilot) | Larger features, multi-task work, work needing keys/grants/live runs, or anything charted on autopilot |
 
+![Direct: the charting agent builds as slot A in a worktree, consultant B reviews as slot B, and the merge queue lands the commit on the default branch. Lifecycle: contracts in issues/open/, then a fresh slot A and a fresh slot B in their own tab, and the same merge queue.](../pictures/routes-at-a-glance.svg)
+
 ## Direct
 
 On the **Direct** route, the charting agent builds one small, settled change itself as **slot A (the builder)** inside an isolated **worktree** (a separate working copy of the project on its own git **branch**, or isolated line of changes, so your main folder stays untouched). The charting agent's first consultant acts as **slot B (the reviewer)**, and Akrogon's merge queue runs the project's checks and lands the tested **commit** (saved snapshot of changes) on your **default branch** (your main live code) just like any other task.
+
+![On Direct, after seven checks pass at the hand-off review, akrogon direct makes the worktree, the charting agent builds as slot A, consultant B reviews as slot B with a repair loop, the merge queue lands the commit, and the chart is Closed. A job that turns out bigger than expected stops in failed, then akrogon direct-drop marks the chart Held or the work moves to Lifecycle.](../pictures/direct-route.svg)
 
 Direct skips handing the work off to fresh Lifecycle seats, while keeping every decision you made during charting, the task record under `issues/open/`, independent review by slot B, the merge queue, and any configured Discord announcement.
 
@@ -64,6 +68,8 @@ If the work outgrows Direct mid-build (a settled decision needs to change, an un
 ## Lifecycle
 
 On the **Lifecycle** route, the charting agent writes complete **task contracts** (`brief.md`, `design.md`, `readiness.yaml`, and `state.yaml` under `issues/open/`) so a **fresh slot A (the builder)** and a **fresh slot B (the reviewer)** can plan, build, review, and land the work in their own dedicated herdr tab.
+
+![On Lifecycle, the charting agent writes brief.md, design.md, readiness.yaml and state.yaml under issues/open/ and stops. You run akrogon next, a fresh slot A plans and builds and a fresh slot B reviews in their own herdr tab, and the work lands.](../pictures/lifecycle-route.svg)
 
 **Example jobs that fit Lifecycle:**
 
