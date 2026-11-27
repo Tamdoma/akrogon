@@ -13,7 +13,7 @@ A chart becomes ready for hand-off only when no open fork and no **Fog** item re
 
 ## What the hand-off review shows
 
-Before writing task files under `issues/open/`, the charting agent refreshes destination GitHub issues (`akrogon pull`), checks for duplicate issues or folder collisions, runs `akrogon preflight` (which checks that your local project matches the remote repository's main branch), and presents one **hand-off review** in your `c-` tab. (Under Semi-autopilot and Full autopilot, the charting agent prints the same review in its terminal and answers it itself.)
+Before writing task files under `issues/open/`, the charting agent refreshes destination GitHub issues (`akrogon pull`), checks for duplicate issues or folder collisions, runs `akrogon preflight` (which checks that your remote repository, its default branch, and your local tracking copy exist), and presents one **hand-off review** in your `c-` tab. (Under Semi-autopilot and Full autopilot, the charting agent prints the same review in its terminal and answers it itself.)
 
 Using `client-portal`'s **weekly client report export** as an example, the review shows:
 

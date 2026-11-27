@@ -34,7 +34,7 @@ In its first reply, the charting agent confirms three things:
 
 **Consultants** are independent helper agents (`B`, `C`, `D`, and so on) that advise the charting agent while you plan. They are not the fresh **slot A (the builder)** and **slot B (the reviewer)** that later build a Lifecycle task.
 
-You can either point the charting agent at consultant terminals you already have open, or ask it to start consultants for you inside herdr. When the charting agent starts consultants itself, it asks once for each consultant's model and effort, places them in a column to the right of your charting tab, and restarts them with a clean conversation whenever you enter a new chart so earlier work does not bleed in. Consultants you opened yourself are never moved, restarted, or closed by the charting agent.
+You can either point the charting agent at consultant terminals you already have open, or ask it to start consultants for you inside herdr. When the charting agent starts consultants itself, it asks once for each consultant's tool (harness), model, and effort (unless you already named them), places them in a column to the right of your charting tab, and restarts them with a clean conversation whenever you enter a new chart so earlier work does not bleed in. Consultants you opened yourself are never moved, restarted, or closed by the charting agent.
 
 Here is what consultants do during charting: **consultants map the codebase and answer each open question independently, and the charting agent merges their views.**
 
@@ -55,7 +55,7 @@ Using `client-portal`'s weekly client report export, a complete charting session
 
 The charting agent creates a chart folder under `issues/chart/<slug>/` (for example, `issues/chart/weekly-client-report/`) and saves your exact request in `INTAKE.md`, kept separate from the agent's own code findings.
 
-If an imported GitHub seed already includes an `## Operator decision (<name>, <date>)` section written and last edited only by someone with write or admin permission on the repository, the charting agent verifies that permission and locks that decision at import. Locked seed decisions are shown up front and are never re-asked.
+If an imported GitHub seed already includes an `## Operator decision (<name>, <date>)` section authored and edited only by collaborators with write or admin permission on the repository, the charting agent verifies those permissions and locks that decision at import. Locked seed decisions are shown up front and are never re-asked.
 
 ### 2. Signposts and the needs sheet
 
