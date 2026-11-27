@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 
@@ -17,6 +17,7 @@ const SETUP_PAGES: string[] = [
   'docs/guide/03-your-three-tabs.md',
 ];
 const HERO: RegExp = /!\[([^\]]*)\]\(docs\/pictures\/three-tabs\.svg\)/;
+const AWAY_PAGES: string[] = ['docs/guide/11-while-you-are-away.md', 'docs/guide/12-when-work-stops.md'];
 // Page 04's tab section links to page 03, whose picture shows the tabs.
 const NO_PICTURE_HEADING: string = 'Where you chart';
 const EMBED: RegExp = /!\[([^\]]*)\]\((\.\.\/pictures\/[^)\s]+\.svg)\)/g;
@@ -56,10 +57,21 @@ function embeddedPictures(root: string, pages: string[]): string[] {
   return [...new Set(pictures)].sort();
 }
 
+function folderPictures(root: string): string[] {
+  return readdirSync(join(root, 'docs/pictures'))
+    .filter((name: string): boolean => name.endsWith('.svg'))
+    .map((name: string): string => `docs/pictures/${name}`)
+    .sort();
+}
+
 function pictureProblems(root: string, pages: string[]): string[] {
+  return markProblems(root, embeddedPictures(root, pages));
+}
+
+function markProblems(root: string, pictures: string[]): string[] {
   const problems: string[] = [];
   const marks: Map<string, string> = new Map<string, string>();
-  for (const picture of embeddedPictures(root, pages)) {
+  for (const picture of pictures) {
     const svg: string = readFileSync(join(root, picture), 'utf8');
     for (const token of FORBIDDEN) {
       if (svg.toLowerCase().includes(token.toLowerCase())) problems.push(`${picture}: holds ${token}`);
@@ -112,6 +124,18 @@ test('every picture on guide pages 01 to 03 holds the charting pictures mark gro
     'docs/pictures/one-akrogon-many-repos.svg',
   );
   expect(embeddedPictures(repoRoot, ['docs/guide/03-your-three-tabs.md'])).toContain('docs/pictures/three-tabs.svg');
+});
+
+test('every section of guide pages 11 and 12 has a picture with alt text', (): void => {
+  expect(sections(repoRoot, AWAY_PAGES).length).toBeGreaterThan(8);
+  expect(sectionsWithoutPicture(repoRoot, AWAY_PAGES)).toEqual([]);
+});
+
+test('every SVG in docs/pictures holds one identical mark group and no outside or moving markup', (): void => {
+  const pictures: string[] = folderPictures(repoRoot);
+  expect(pictures).toContain('docs/pictures/watch-loop.svg');
+  expect(pictures).toContain('docs/pictures/mode-and-route.svg');
+  expect(markProblems(repoRoot, pictures)).toEqual([]);
 });
 
 test('the picture checks catch a missing picture, blank alt, a changed mark group and forbidden markup', (): void => {
