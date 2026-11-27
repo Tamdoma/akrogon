@@ -1,29 +1,38 @@
 # Akrogon
 
-Akrogon is a lightweight software factory for people who already use coding agents. You chart work into written contracts. Two agent seats in herdr-app tabs on herdr-core plan, build and review it. Then the command lands it on your default branch.
+Akrogon is a lightweight software factory for people who already use coding agents. You install it once per machine to serve every registered **repository** (project folder tracked by Git). You chart a request into written **contracts** (clear scope, decisions, and completion checks), a fresh **slot A (the builder)** plans and builds each task in an isolated **worktree** (a separate working copy on its own Git branch), a fresh **slot B (the reviewer)** reviews independently and repairs most findings, and the `akrogon` command runs your checks and merges the tested changes onto your **default branch** (your main live code).
 
-It is for developers who already run an agent CLI and want a repeatable path from request to merged code. You decide what to build and when to start it. Akrogon tracks where each piece of work is and prompts the next seat. It does not decide what your product needs, and it does not deploy your product.
+It fits technical operators, agencies, and teams already running a coding agent CLI (command-line tool, such as Claude Code, Codex, agy, or pi) who want a repeatable path from request to merged code without babysitting every turn. You decide what to build and when to start it; Akrogon tracks where each task stands in plain-text files and moves work between agent terminals inside **Herdr** (your terminal workspace). Akrogon does not decide your product strategy, and it does not deploy your app.
 
-> **What you need**
->
-> - A Linux desktop with a running systemd user manager.
-> - Bun.
-> - Git.
-> - flock.
-> - herdr-core (`hc`) and herdr-app.
-> - One agent CLI, such as Claude Code, Codex or pi.
-> - An authenticated GitHub CLI (`gh`), only for GitHub work.
+## Guide
 
-![How work moves through Akrogon: a request goes to the chart door, where you and agent A settle it, then becomes a contract in issues/open, then is built, gets an independent review, is repaired if needed, is landed by the command and ends merged. A dashed side path shows the direct route, where one small settled chart keeps the charted decisions and B's review but skips the handoff to fresh seats: the door is seat A and the command lands it like any leaf.](docs/pictures/factory-overview.svg)
+Read the 12 guide pages in order, or open [Docs home](docs/README.md) for the full chapter index, occasional tools, and reference shelf.
 
-## Start here
+### 1. Set up
 
-Read the [docs home](docs/README.md). It lists the start pages in reading order and every other page.
+1. [Install Akrogon](docs/guide/01-install.md): check your machine, write the one-per-machine config, and run the installer.
+2. [Set up a repo](docs/guide/02-set-up-a-repo.md): register a repository with `/init-akrogon`, add its two-letter terminal prefix, and set up its codebase map.
+3. [Your three tabs](docs/guide/03-your-three-tabs.md): create the repository's Herdr space and your daily terminal (`t-`), charting (`c-`), and watcher (`w-`) tabs.
 
-## Daily jobs
+### 2. Charting
 
-- [A working day](docs/use/a-working-day.md): the order of the steps from request to merged.
-- [Plan work](docs/use/plan-work.md): chart a request into leaf contracts.
-- [Run work](docs/use/run-work.md): start leaves with `akrogon next`.
-- [Quick fix](docs/use/quick-fix.md): land a small settled change through the direct route.
-- [When work fails](docs/use/when-work-fails.md): read why a leaf stopped and send it back to work.
+4. [A charting session](docs/guide/04-a-charting-session.md): turn a rough idea or bug report into settled decisions in the `c-` tab with optional consultant agents.
+5. [Signposts and the needs sheet](docs/guide/05-signposts.md): set priorities, hard limits, chart order, and human-only keys or approvals once per session.
+6. [Charting mode](docs/guide/06-charting-mode.md): choose who answers questions while charting (No autopilot, Semi-autopilot, or Full autopilot).
+7. [Build route](docs/guide/07-build-route.md): choose who builds settled work (Direct for one small, settled change under No autopilot, or Lifecycle for fresh builder and reviewer seats).
+8. [Decisions, review, and hand-off](docs/guide/08-hand-off.md): check external assumptions for real, review the task tree, and hand off contracts under `issues/open/`.
+
+### 3. Lifecycle
+
+9. [The lifecycle: how work runs](docs/guide/09-lifecycle.md): start handed-off tasks with `akrogon next`, follow slot A and slot B through planning, building, review, and repair, and watch progress in `akrogon status`.
+
+### 4. Merging
+
+10. [Merging and announcements](docs/guide/10-merging.md): how the command updates each branch onto the latest main code, runs full checks and merge safety gates, pushes tested changes without rewriting history, completes issues or epics (groups of related issues), and sends optional Discord updates.
+
+### 5. While you are away and when work stops
+
+11. [While you are away](docs/guide/11-while-you-are-away.md): start and stop the optional 20-minute watcher in your `w-` tab to nudge waiting tasks and investigate failures overnight.
+12. [When work stops](docs/guide/12-when-work-stops.md): recover failed tasks, park issues, pause a repository, stop a task or check run, and read common command refusals.
+
+See [Docs home](docs/README.md) for occasional tools (`akrogon sync`, `/seed-issue`, `/learn-issues`, `akrogon rollback`, and reporting commands) and the complete reference shelf.
