@@ -6,13 +6,7 @@ This chapter follows one example job across all five pages: **adding a weekly cl
 
 ## Where you chart: the `c-` tab
 
-Akrogon runs inside **herdr**, a terminal workspace that keeps your project tabs organized in one window. In daily work, each registered **repository** (the project folder where your app's code and history live) uses three tabs:
-
-- **`t-client-portal`** (terminal tab): where you check status (`akrogon status`) and start finished work (`akrogon next`).
-- **`c-client-portal`** (charting tab): where you talk to your **charting agent** and settle open questions.
-- **`w-client-portal`** (watcher tab): where you turn on the background watcher when you step away or go to bed.
-
-Those `t-`, `c-`, and `w-` tab names are your daily workspace layout inside the project's herdr space; Akrogon finds the project space by repository name rather than enforcing tab prefixes. All charting happens in the `c-` tab.
+All charting happens in the `c-` tab (`c-client-portal`) inside your repository's herdr space, beside your terminal (`t-`) and watcher (`w-`) tabs. See [Your three tabs](03-your-three-tabs.md) for how to create the space and what runs in each tab.
 
 ## Opening a session
 
@@ -125,4 +119,4 @@ From your `t-` tab (`t-client-portal`), run `akrogon status --charts` at any tim
 
 For the full agent procedure behind every step, see [chart-issues](../../skills/chart-issues/SKILL.md).
 
-Previous: [Docs home](../README.md) · Next: [Signposts](05-signposts.md)
+Previous: [Your three tabs](03-your-three-tabs.md) · Next: [Signposts](05-signposts.md)

@@ -80,4 +80,4 @@ As soon as one chart hands off, closes, holds, or waits on a pending need or app
 
 On supported agent tools inside herdr (Claude, agy, Codex, and pi), switching to the next chart triggers a **handover**: the charting agent logs the remaining list, active consultants, and signposts path, resets its own terminal into a fresh conversation, and resumes on the next chart with the same session signposts intact.
 
-Previous: [Build route](07-build-route.md) · Back to [Docs home](../README.md)
+Previous: [Build route](07-build-route.md) · Next: [Lifecycle](09-lifecycle.md)
