@@ -6,6 +6,8 @@ A clean hand-off is where charting pays off: every decision is written down, eve
 
 A chart becomes ready for hand-off only when no open fork and no **Fog** item remains. By that point, four safeguards have already run:
 
+![Four safeguards feed a chart that is ready for hand-off: settled forks, locked seed decisions, real-world checks and the readiness check. The gate is no open fork and no Fog.](../pictures/before-hand-off.svg)
+
 1. **Settled fork records**: Every fork file in `issues/chart/<slug>/forks/` holds a `## Taken` section recording either your exact words (under No autopilot) or the charting agent's recorded pick with its reason, rejected options, and any standing consultant dissent (under Semi-autopilot or Full autopilot). Excluded ideas live in `## Off route` inside `CHART.md`.
 2. **Pre-decided GitHub seed decisions**: Any authorized `## Operator decision (<name>, <date>)` section imported from a GitHub seed is already locked and copied verbatim into each affected task's design. If charting finds a concrete blocking defect, such as a removed surface or an unprovable requirement, it surfaces that as a keep-or-change decision (or parks the chart under autopilot).
 3. **Real-world checks (proofs)**: Before hand-off, every external API call, command-line tool call, or pre-existing assumption a task's **done-criteria** (the observable results that prove the work is finished) depend on gets one real observation using the actual identity the task will use (free checks before paid ones). There is no waiver: if something cannot be checked safely or fails its check, the charting agent cuts that unproven piece out of the contract at the hand-off review and names where it lands instead.
@@ -14,6 +16,8 @@ A chart becomes ready for hand-off only when no open fork and no **Fog** item re
 ## What the hand-off review shows
 
 Before writing task files under `issues/open/`, the charting agent refreshes destination GitHub issues (`akrogon pull`), checks for duplicate issues or folder collisions, runs `akrogon preflight` (which checks that your remote repository, its default branch, and your local tracking copy exist), and presents one **hand-off review** in your `c-` tab. (Under Semi-autopilot and Full autopilot, the charting agent prints the same review in its terminal and answers it itself.)
+
+![The hand-off review card: task tree with csv-export and scheduled-email blocked by csv-export, destination repo, settled decisions, grants, models for slot A and slot B, Build route choice, usage and live-run estimates. After you approve, consultants review the drafts, the final contracts are written and state.yaml comes last.](../pictures/hand-off-review.svg)
 
 Using `client-portal`'s **weekly client report export** as an example, the review shows:
 
@@ -50,6 +54,8 @@ If consultants are active, once you approve the review, the charting agent write
 
 **At the end of a Lifecycle chart, the charting agent hands off written task contracts under `issues/open/` for a fresh slot A (the builder) and slot B (the reviewer). It does not start the work.**
 
+![On Lifecycle, contracts land in issues/open/ and CHART.md says Handed off, but nothing starts until you run akrogon next in t-client-portal or turn on the watcher in w-client-portal. On Direct, the charting agent runs akrogon direct and builds the one task, the merge queue lands it and CHART.md says Closed.](../pictures/after-hand-off.svg)
+
 Specifically:
 
 1. Each task folder under `issues/open/` receives `brief.md`, `design.md`, `readiness.yaml`, and `state.yaml` (starting in the initial planning phase, `plan.synthesis`), alongside `ISSUE.md` (and `EPIC.md` for multi-issue work).
@@ -69,6 +75,8 @@ When you choose **Direct** at an eligible hand-off review under No autopilot, th
 ## Moving to the next chart
 
 As soon as one chart hands off, closes, holds, or waits on a pending need or approval, the charting agent moves straight to the next ready chart in your signposts order without making you re-select it.
+
+![When chart 1 hands off, closes, holds or waits, a handover logs the remaining list, active consultants and signposts path, starts a fresh conversation, and chart 2 begins with the same signposts.](../pictures/next-chart.svg)
 
 On supported agent tools inside herdr (Claude, agy, Codex, and pi), switching to the next chart triggers a **handover**: the charting agent logs the remaining list, active consultants, and signposts path, resets its own terminal into a fresh conversation, and resumes on the next chart with the same session signposts intact.
 
