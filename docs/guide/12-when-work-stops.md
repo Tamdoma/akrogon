@@ -6,6 +6,8 @@ This page walks through recovering a failure on `client-portal`'s `scheduled-ema
 
 ## Failed work
 
+![Postmark rejects the scheduled-email test send, the seat moves the leaf to failed, Akrogon records the reason, sends a notice and renames the tab, and the plan, reviews, report, commits and worktree stay, while a missing key only makes a leaf wait.](../pictures/failed-work.svg)
+
 **A failed leaf is a recorded stop, not lost work.** When a leaf moves to `failed`, Akrogon keeps its `plan.md`, `review-A.md`, `review-B.md`, `implementation/report.md`, branch commits, worktree, and the exact reason it stopped.
 
 A seat stops a leaf whenever it hits something only a person can supply or decide. For example, `scheduled-email` reaches `implement` and runs its one approved test send to `staging-reports@agency.example`, but Postmark rejects it because the From address is not a confirmed sender in your Postmark account. Only you can confirm that sender. The seat writes the blocker and exact operator action into its pass artifact, runs:
@@ -21,6 +23,8 @@ When a leaf moves to `failed`, Akrogon records the `failure` field in `state.yam
 A key that is simply missing does not fail a leaf. When a key the chart declared (in the leaf's `readiness.yaml`) is absent from `client-portal/.env`, the leaf never gets a seat prompt: it waits, `akrogon status` prints a `Missing:` line such as `Missing: client-portal/scheduled-email env POSTMARK_API_KEY in client-portal: ...`, and a typed `akrogon next scheduled-email` refuses with `Leaf inputs are missing`. Add the key to `client-portal/.env` and run `akrogon next scheduled-email` again. No phase recovery is needed (see [Why a ready task may wait](09-lifecycle.md#why-a-ready-task-may-wait)).
 
 ### Recover a failed leaf in four steps
+
+![Recovering scheduled-email in four steps: read the reason with akrogon status scheduled-email, confirm the sender in Postmark, run akrogon phase scheduled-email implement with no --slot, then run akrogon next scheduled-email.](../pictures/recover-failed.svg)
 
 From your `t-client-portal` tab:
 
@@ -58,6 +62,8 @@ From your `t-client-portal` tab:
 
 ## Park an issue
 
+![The four controls park, pause, stop and stop-run, with park picked: it moves a whole issue from issues/open/ to issues/parked/, is refused when a leaf started or another open leaf needs it, and akrogon unpark brings it back.](../pictures/hold-park.svg)
+
 Parking moves a whole top-level issue (or epic) folder out of `issues/open/` into `issues/parked/` when you want to set it aside from future sweeps without deleting it. Run these commands inside `client-portal`:
 
 ```sh
@@ -83,6 +89,8 @@ Unparking returns the issue to the open queue without starting seats right away.
 
 ## Pause a repository
 
+![The four controls park, pause, stop and stop-run, with pause picked: it writes the repository into ~/.akrogon/paused.yaml, automatic passes and watch checks skip it, a typed command still runs, and akrogon unpause runs one pass.](../pictures/hold-pause.svg)
+
 Pausing stops automatic dispatch for the current repository without moving files or killing running processes:
 
 ```sh
@@ -106,6 +114,8 @@ akrogon unpause
 Pause and park serve different jobs: **park** removes whole unstarted issues from the open queue, while **pause** freezes automatic dispatch across the entire repository, running leaves included.
 
 ## Stop a leaf or a check run
+
+![The four controls park, pause, stop and stop-run, with stop and stop-run picked: stop writes the leaf into ~/.akrogon/stopped.yaml, ends its seat terminals, slice and runs, keeps the worktree, and akrogon start resumes it, stop-run stops one run, and akrogon leftovers lists what cleanup kept.](../pictures/hold-stop.svg)
 
 ### Stop and restart a leaf
 
@@ -155,6 +165,8 @@ Output is grouped by repository and reason, plus a `host` group for systemd unit
 
 ## Common command refusals
 
+![A typed command refuses and says why, the leaf stays in its phase and is not failed, and you fix the condition and rerun, shown for a refused phase move, an unmerged dependency, a refused sync and a held push.](../pictures/refusals.svg)
+
 These are **not** failed leaves. A command refuses and tells you why; fix the condition and rerun it:
 
 - **Phase-move refusal**: Common causes are uncommitted edits in the leaf worktree (`Uncommitted work in ...`), files under `issues/` modified on the leaf branch, an empty branch when entering `check.review`, a missing green `akrogon verify` receipt for the latest commit (`HEAD`), a changed or added test file missing a `Test-Change: <path> <source and reason>` trailer, leftover `<slug>-u<N>` worker worktrees, or an abandoned `capture-<name>-<run>-out.log`/`-err.log` pair without a non-blank `cleared-<run>.md` beside it. See [Checks](../reference/checks.md#refusals-and-what-to-do).
@@ -163,6 +175,8 @@ These are **not** failed leaves. A command refuses and tells you why; fix the co
 - **Non-fast-forward push refusal**: During landing, a first non-fast-forward refusal restacks onto the new remote tip and retries once automatically. A second refusal clears the batch, prints `held <slug> attempt=<id>`, and keeps the leaf's queue place in `merge` for the next pass. Any other push error moves the leaf to `failed` with Git's error output (`stderr`) in `failure.reason`. See [Merging](10-merging.md).
 
 ## Where to go next
+
+![The path csv-export and scheduled-email took, from charting and hand-off on pages 04 to 08 through lifecycle, merging, the night and one stop, ending at the docs shelf of Other tools and Reference.](../pictures/journey.svg)
 
 You have followed a feature all the way from charting through lifecycle execution, merging, overnight watching, and failure recovery. For standalone tools (`seed-issue`, `learn-issues`, `timing`, `flaky`, `sync`, `pack`, and `rollback`) and complete lookup tables, head to the docs shelf:
 
