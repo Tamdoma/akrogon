@@ -76,24 +76,34 @@ Signposts for this session (3 charts in client-portal):
      Steers: PDF/export tooling and email delivery options.
    - 2b Allow a paid rendering service up to $50/month.
 
-3. Order for this session's three charts?
-   - 3a (recommended) Weekly client report export first, CRM sync fix second, logo tweak third.
-   - 3b CRM sync fix first, drop logo tweak for this session.
+3. Which timezone should report dates and sync times use?
+   - 3a (recommended) Each client's own timezone, stored on the client account.
+     Steers: the weekly report's date window, the CRM sync timestamps, and the header labels.
+   - 3b One agency-wide timezone for every client.
+     Steers: the same three, with less setup but wrong week edges for clients elsewhere.
+
+4. Order for this session's three charts?
+   - 4a (recommended) Weekly client report export first, CRM sync fix second, logo tweak third.
+     Steers: which chart is charted and handed off first.
+   - 4b CRM sync fix first, drop logo tweak for this session.
 
 Needs sheet (answer at your own pace; pending rows wait only at proofs and hand-off):
 - Row 1 (key): POSTMARK_API_KEY in client-portal/.env — needed to verify scheduled report emails.
 - Row 2 (approval): Scoped grant to send 1 test report email to staging-reports@agency.example and verify delivery.
 - Row 3 (human-only): Confirm SPF/DKIM sending domain is verified in Postmark before scheduled emails hand off.
 
-Reply `1a 2a 3a` (or answer in your own words), plus any needs rows you already want to approve.
+Reply `1a 2a 3a 4a` (or answer in your own words), plus any needs rows you already want to approve.
+
+Challenge check
+Consultant B prefers 3b because most clients share the agency's timezone. 3a stays recommended because a wrong week edge changes the report totals.
 ```
 
 You reply:
 
 ```text
-1a 2a 3a. Approved row 2 for staging-reports@agency.example only. I'll add the Postmark key and verify DNS before hand-off.
+1a 2a 3a 4a. Approved row 2 for staging-reports@agency.example only. I'll add the Postmark key and verify DNS before hand-off.
 ```
 
-The charting agent prints a two-sentence account — *"This session prioritizes shipping the weekly client report export as CSV first with zero new paid services, followed by the CRM sync fix and logo tweak; branded PDF layout is left out of scope for now"* — records your answers and the three needs rows in `forks/signposts.md`, and moves straight into the territory map while rows 1 and 3 stay `pending`.
+The charting agent prints a two-sentence account — *"This session prioritizes shipping the weekly client report export as CSV first with zero new paid services and each client's own timezone, followed by the CRM sync fix and logo tweak; branded PDF layout is left out of scope for now"* — records your answers and the three needs rows in `forks/signposts.md`, and moves straight into the territory map while rows 1 and 3 stay `pending`.
 
 Previous: [A charting session](04-a-charting-session.md) · Next: [Charting mode](06-charting-mode.md)
