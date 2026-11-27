@@ -4,7 +4,11 @@ Leaves keep moving through `akrogon-listener.service` even when you step away, w
 
 You start the watch and you stop it. It works the same across all four supported harnesses: **`claude`**, **`codex`**, **`pi`**, and **`agy`**.
 
+![One night in w-client-portal: you start the watch, cp-watch sends a tick every 20 minutes, each tick runs one check over csv-export and scheduled-email, scheduled-email starts once csv-export merges, a stop-list item waits with a notice, and you read the notices in the morning.](../pictures/watch-loop.svg)
+
 ## Starting the watch in `w-client-portal`
+
+![You send watch-issues ~/code/client-portal in w-client-portal: it launches one cp-watch timer, runs one check now, then a tick every 20 minutes runs one check each. A live cp-watch is reported, never doubled, and a busy watcher keeps only the latest tick.](../pictures/watch-start.svg)
 
 Open your agent CLI (`claude`, `codex`, `pi`, or `agy`) in an hc terminal inside `w-client-portal` (in the same hc session that holds `client-portal`'s space, passing the registered repository root such as `~/code/client-portal`) and send:
 
@@ -26,6 +30,8 @@ Two timing behaviors are worth knowing up front:
 
 ## What each check does
 
+![One check runs six steps in order: observe once with observe.ts, start unblocked leaves with akrogon next, retry failures up to two unproductive cycles, check busy seats for loops with one steer per seat (codex is notify-only), open a consult case in cp-watch-consult, then send a notice and a short summary. A paused read stops after step 1.](../pictures/watch-check.svg)
+
 Every 20 minutes (and once on start), the watcher runs one structured check over every open leaf in `client-portal`:
 
 1. **Observe repository state once**: Runs `observe.ts` (`bun <skill-folder>/scripts/observe.ts <root>`) as its sole read of pause state and open leaves (`session`, `paused=true|false`, each leaf's phase, attempt counts, `blocked` list, seat addresses and statuses, busy durations, active transcript log paths, and any failure record). If `client-portal` is paused with `akrogon pause` (`paused=true`) or the read fails, the check reports that and stops without touching any leaf.
@@ -39,6 +45,8 @@ Every 20 minutes (and once on start), the watcher runs one structured check over
 6. **Send desktop notices and summarize**: Writes a notice via `akrogon notice` whenever a leaf needs you (or when a consult pushes to `main` or moves a leaf), which herdr-app displays as a desktop notification banner (adding `--attention` only for stop-list items that need a human). The check ends with a short reply (at most five lines) in `w-client-portal` stating what it saw, what it did, and any case folder path.
 
 ## What keeps moving vs what waits for you
+
+![Three columns: what keeps moving without you (start unblocked leaves, retry non-human failures, steer a looping seat once, consult and resume), what waits for you on the stop list (keys and logins, grants, decisions and locks, host tooling, force push, fixes that change a decision, stopping the watch), and what the watch never does.](../pictures/watch-moves-or-waits.svg)
 
 Leaving `watch-issues` running overnight lets `client-portal` handle routine interruptions without waking you, while keeping human-only decisions strictly yours.
 
@@ -70,6 +78,8 @@ When a failure or consult case hits any item below, the watcher stops acting on 
 - Never opens `.env`, and never edits `state.yaml`, leaf worktrees, or `issues/` directly.
 
 ## Stop the watch
+
+![watch-issues stop ends the cp-watch timer and closes cp-watch-consult. The watch also stops on its own when the agent exits, its terminal is reused, or /clear runs on claude and agy. /new on codex and pi may leave it running until the first tick stops it, and compaction keeps the watch alive.](../pictures/watch-stop.svg)
 
 Stop the watch from any terminal in the same hc session (in `w-client-portal` or another agent terminal) by sending:
 
