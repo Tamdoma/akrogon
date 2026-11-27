@@ -52,6 +52,8 @@ Route: <lifecycle | direct>
 ## Mode record
 
 - mode <time> <A address> <A transcript path>: <on | off | changed list | continue <mode value>> <detail>
+- mode <time> <A address> <A transcript path>: on semi-autopilot; handed <list>; consultants <named or none>
+- mode <time> <A address> <A transcript path>: on full autopilot; handed <list>; consultants <named or none>
 - mode <time> <A address> <A transcript path>: handover <time> <log>: handed <remaining list>; consultants <surviving>; signposts <path or none>; instructions <verbatim with provenance and scope, or none>
 - mode <time> <A address> <A transcript path>: handover <time> <log>: no autopilot next <chart>; consultants <surviving>; signposts <path or none>; instructions <verbatim with provenance and scope, or none>
 - mode <time> <A address> <A transcript path>: continue semi-autopilot (handover <time>)
