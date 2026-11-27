@@ -137,7 +137,7 @@ test.serial('the roll-back page manual steps roll a broken release back using th
     );
     expect(cannotStart.code).not.toBe(0);
     // The roll-back page's manual steps, verbatim against the fixture's state home.
-    const page: string = readFileSync(resolve(import.meta.dir, '../docs/use/roll-back-a-release.md'), 'utf8');
+    const page: string = readFileSync(resolve(import.meta.dir, '../docs/reference/roll-back-a-release.md'), 'utf8');
     expect(page).toContain('mv -T .next-current current');
     expect(page).toContain('release-hold.yaml');
     expect(page).toContain('writeDeploySuccess');

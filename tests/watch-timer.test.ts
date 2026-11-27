@@ -1367,7 +1367,7 @@ test('a dying watcher makes the timer exit sweep its consultant', async () => {
 test('docs describe the timer watch for all harnesses with no cron wording', () => {
   const files: string[] = [
     resolve(import.meta.dir, '../skills/watch-issues/SKILL.md'),
-    resolve(import.meta.dir, '../docs/use/watch-while-away.md'),
+    resolve(import.meta.dir, '../docs/guide/11-while-you-are-away.md'),
     resolve(import.meta.dir, '../docs/reference/skills.md'),
     resolve(import.meta.dir, '../docs/pictures/watch-loop.svg'),
     resolve(import.meta.dir, '../skills/AREA.md'),
@@ -1390,7 +1390,7 @@ test('docs describe the timer watch for all harnesses with no cron wording', () 
 
 for (const path of [
   'skills/watch-issues/SKILL.md',
-  'docs/use/watch-while-away.md',
+  'docs/guide/11-while-you-are-away.md',
   'docs/pictures/watch-loop.svg',
   'skills/AREA.md',
 ]) {
@@ -1399,7 +1399,7 @@ for (const path of [
     const check: string =
       path === 'skills/AREA.md'
         ? z.string().parse(text.split('\n').find((line) => line.includes('scripts/observe.ts')))
-        : path === 'docs/use/watch-while-away.md'
+        : path === 'docs/guide/11-while-you-are-away.md'
           ? text.split('## What each check does')[1].split('\n## ')[0]
           : text;
     expect(check).not.toContain('akrogon status');

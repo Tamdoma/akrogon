@@ -1,6 +1,8 @@
 import { test, expect } from 'bun:test';
 import { readFileSync, existsSync, lstatSync, statSync, readdirSync } from 'node:fs';
 import { resolve, dirname, join, relative } from 'node:path';
+import { globalSchema } from '../src/config';
+import { harnessArgv } from '../src/seat';
 
 type FileResolver = (absolutePath: string) => string | null;
 
@@ -302,4 +304,195 @@ test('files.md documents verify-runs timeouts, durations and attempt', (): void 
   expect(row, 'files.md holds a verify-runs.jsonl row').not.toBeUndefined();
   for (const needed of ['`timeouts`', '`durations`', '`attempt`'])
     expect(row!, `verify-runs.jsonl row names ${needed}`).toContain(needed);
+});
+
+const GUIDE_PAGES: readonly string[] = [
+  '01-install.md',
+  '02-set-up-a-repo.md',
+  '03-your-three-tabs.md',
+  '04-a-charting-session.md',
+  '05-signposts.md',
+  '06-charting-mode.md',
+  '07-build-route.md',
+  '08-hand-off.md',
+  '09-lifecycle.md',
+  '10-merging.md',
+  '11-while-you-are-away.md',
+  '12-when-work-stops.md',
+];
+
+function yamlCodeBlocks(markdown: string): string[] {
+  const blocks: string[] = [];
+  let inYaml: boolean = false;
+  let current: string[] = [];
+  for (const line of markdown.split(/\r\n|[\n\r\u2028\u2029]/)) {
+    if (!inYaml) {
+      if (/^ {0,3}```yaml\s*$/.test(line)) {
+        inYaml = true;
+        current = [];
+      }
+    } else if (/^ {0,3}```\s*$/.test(line)) {
+      blocks.push(current.join('\n'));
+      inYaml = false;
+      current = [];
+    } else {
+      current.push(line);
+    }
+  }
+  return blocks;
+}
+
+function validateInstallConfigMarkdown(markdown: string): string[] {
+  const errors: string[] = [];
+  const blocks: string[] = yamlCodeBlocks(markdown);
+  if (blocks.length < 2) {
+    return [`expected primary machine config block and optional harnesses block, found ${blocks.length} yaml block(s)`];
+  }
+
+  const primaryRaw: string = blocks[0];
+  if (/<[^>\n]+>/.test(primaryRaw)) {
+    errors.push('primary machine config contains angle-bracket placeholder');
+  }
+  let parsedPrimary: ReturnType<typeof globalSchema.parse> | null = null;
+  try {
+    const rawObj: unknown = Bun.YAML.parse(primaryRaw);
+    parsedPrimary = globalSchema.parse(rawObj);
+    const harnessNames: string[] = Object.keys(parsedPrimary.harnesses);
+    if (harnessNames.length !== 1) {
+      errors.push(`primary machine config must define exactly 1 harness, found ${harnessNames.length}`);
+    }
+    for (const slot of ['a', 'b', 'consultant'] as const) {
+      harnessArgv(parsedPrimary, parsedPrimary.slots[slot]);
+    }
+  } catch (error) {
+    errors.push(`primary machine config invalid: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  const optionalRaw: string | undefined = blocks.slice(1).find((block: string): boolean => {
+    try {
+      const obj = Bun.YAML.parse(block) as { harnesses?: Record<string, unknown> } | null;
+      return (
+        obj !== null && typeof obj === 'object' && obj.harnesses !== undefined && typeof obj.harnesses === 'object'
+      );
+    } catch {
+      return false;
+    }
+  });
+  if (optionalRaw === undefined) {
+    errors.push('missing optional harnesses yaml block');
+    return errors;
+  }
+  if (/<[^>\n]+>/.test(optionalRaw)) {
+    errors.push('optional harnesses block contains angle-bracket placeholder');
+  }
+  try {
+    const obj = Bun.YAML.parse(optionalRaw) as { harnesses: Record<string, string> };
+    const names: string[] = Object.keys(obj.harnesses);
+    if (!names.includes('agy')) errors.push('optional harnesses block missing agy');
+    if (names.length < 2) errors.push(`optional harnesses block must list multiple harnesses, found ${names.length}`);
+    const baseConfig =
+      parsedPrimary ??
+      globalSchema.parse({
+        slots: {
+          a: { harness: names[0], model: 'test-model', effort: 'high' },
+          b: { harness: names[0], model: 'test-model', effort: 'high' },
+          consultant: { harness: names[0], model: 'test-model', effort: 'high' },
+        },
+        harnesses: obj.harnesses,
+      });
+    const combined = { ...baseConfig, harnesses: { ...baseConfig.harnesses, ...obj.harnesses } };
+    for (const harness of names) {
+      harnessArgv(combined, { harness, model: 'test-model', effort: 'high' });
+    }
+  } catch (error) {
+    errors.push(`optional harnesses block invalid: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  return errors;
+}
+
+test('guide pages 01 to 12 exist, retired folders are gone, roll-back moved, and README carries no picture', () => {
+  for (const page of GUIDE_PAGES) {
+    expect(existsSync(join(repoRoot, 'docs', 'guide', page)), `missing docs/guide/${page}`).toBe(true);
+  }
+  expect(existsSync(join(repoRoot, 'docs', 'reference', 'roll-back-a-release.md'))).toBe(true);
+  for (const retired of ['start', 'use', 'examples']) {
+    expect(existsSync(join(repoRoot, 'docs', retired)), `docs/${retired} should be removed`).toBe(false);
+  }
+  const readmeProse: string = proseOnly(readFileSync(join(repoRoot, 'README.md'), 'utf8'));
+  expect(readmeProse).not.toMatch(/!\[[^\]]*\]\(/);
+  expect(readmeProse).not.toMatch(/<img\b/i);
+});
+
+test('every guide page previous/next line links its neighbours', () => {
+  for (let i: number = 0; i < GUIDE_PAGES.length; i += 1) {
+    const file: string = join(repoRoot, 'docs', 'guide', GUIDE_PAGES[i]);
+    const lines: string[] = readFileSync(file, 'utf8')
+      .split(/\r\n|[\n\r\u2028\u2029]/)
+      .map((line: string): string => line.trim())
+      .filter((line: string): boolean => line !== '');
+    const footer: string = lines[lines.length - 1] ?? '';
+    const targets: string[] = linkTargets(footer);
+    if (i > 0) {
+      expect(targets, `${GUIDE_PAGES[i]} footer missing previous ${GUIDE_PAGES[i - 1]}`).toContain(GUIDE_PAGES[i - 1]);
+    }
+    if (i < GUIDE_PAGES.length - 1) {
+      expect(targets, `${GUIDE_PAGES[i]} footer missing next ${GUIDE_PAGES[i + 1]}`).toContain(GUIDE_PAGES[i + 1]);
+    }
+  }
+});
+
+test('install guide copyable machine config passes globalSchema and harnessArgv with one CLI and optional agy block', () => {
+  const markdown: string = readFileSync(join(repoRoot, 'docs', 'guide', '01-install.md'), 'utf8');
+  expect(validateInstallConfigMarkdown(markdown)).toEqual([]);
+});
+
+test('install config validator rejects placeholders, multi-CLI primary configs, bad claude settings and missing agy', () => {
+  const validDoc: string = [
+    '```yaml',
+    'max_active: 3',
+    'slots:',
+    '  a: { harness: claude, model: claude-opus-5-5, effort: high }',
+    '  b: { harness: claude, model: claude-opus-5-5, effort: high }',
+    '  consultant: { harness: claude, model: claude-opus-5-5, effort: high }',
+    'harnesses:',
+    '  claude: "claude --model {model} --effort {effort} --dangerously-skip-permissions"',
+    'repos: {}',
+    '```',
+    '```yaml',
+    'harnesses:',
+    '  codex: "codex --no-daemon -m {model} -c model_reasoning_effort={effort} -a never -s danger-full-access"',
+    '  agy: "agy --model {model} --effort {effort} --mode auto"',
+    '```',
+  ].join('\n');
+  expect(validateInstallConfigMarkdown(validDoc)).toEqual([]);
+  expect(validateInstallConfigMarkdown(validDoc.replace('claude-opus-5-5', '<model>'))).toContain(
+    'primary machine config contains angle-bracket placeholder',
+  );
+  expect(
+    validateInstallConfigMarkdown(
+      validDoc.replace('repos: {}', '  agy: "agy --model {model} --effort {effort} --mode auto"\nrepos: {}'),
+    ),
+  ).toContain('primary machine config must define exactly 1 harness, found 2');
+  expect(
+    validateInstallConfigMarkdown(validDoc.replace('--dangerously-skip-permissions', '--settings not-json')).some(
+      (msg: string): boolean => msg.startsWith('primary machine config invalid:'),
+    ),
+  ).toBe(true);
+  expect(
+    validateInstallConfigMarkdown(
+      validDoc.replace(
+        '  agy: "agy --model {model} --effort {effort} --mode auto"',
+        '  pi: "pi --model {model} --thinking {effort} -a"',
+      ),
+    ),
+  ).toContain('optional harnesses block missing agy');
+});
+
+test('where-things-go describes docs/guide and drops retired folders', () => {
+  const text: string = readFileSync(join(repoRoot, 'docs', 'reference', 'where-things-go.md'), 'utf8');
+  expect(text).toContain('docs/guide/');
+  expect(text).not.toContain('docs/start/');
+  expect(text).not.toContain('docs/use/');
+  expect(text).not.toContain('docs/examples/');
 });
