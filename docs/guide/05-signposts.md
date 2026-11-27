@@ -6,11 +6,15 @@ Setting direction once up front keeps a charting session aligned with your busin
 
 **Signposts are your ranked priorities, hard limits, and the order of the session's charts (including any chart you choose to drop). They are asked once per session, before any territory map.**
 
+![One charting session in the c- tab: your first message, the signposts asked once, the territory map, then charts 1, 2 and 3. Waits, compaction and handovers stay inside the session. Signposts hold ranked priorities, hard limits and the chart order, including drops.](../pictures/signposts-session.svg)
+
 A single charting session covers everything from your first message in the `c-` tab until you start a new charting run. It survives waits, conversation compaction (summarizing a long chat), and automatic handovers between charts. If you resume an unfinished chart in a later session, it uses the new session's signposts rather than stale ones from days ago.
 
 ## How the signposts round works
 
 Right after intake (and after starting or restarting any consultants), the charting agent runs one quick consultant exchange to catch angles it might have missed, then presents the signposts round.
+
+![A quick consultant exchange, then the signposts round card: 4 to 7 questions, 2 or 3 options each with one recommendation, no research block, and same to reuse earlier answers. A short account follows, and forks/signposts.md is saved in the original chart with verbatim copies in the other charts.](../pictures/signposts-round.svg)
 
 Compared to normal fork rounds, signposts stay deliberately light:
 
@@ -26,6 +30,8 @@ Once answered, the charting agent prints one short account stating what the sess
 
 Who answers the signposts round depends on your [Charting mode](06-charting-mode.md):
 
+![Who answers in each Charting mode. No autopilot: you answer signposts and forks, and an unanswered signpost is asked again. Semi-autopilot: you answer signposts once, the charting agent answers forks, and standing values fill an unanswered signpost. Full autopilot: the charting agent answers both.](../pictures/signposts-by-mode.svg)
+
 | Charting mode | Who answers signposts | Who answers the forks after | If you leave a material signpost unanswered |
 |---|---|---|---|
 | **No autopilot** | You | You | Stays open and is asked again before the first fork |
@@ -39,6 +45,8 @@ If two of your own statements about signposts conflict, the charting agent shows
 ## The needs sheet
 
 One **needs sheet** travels with the signposts round, asked once per session before the first territory map and covering every chart in the session.
+
+![The needs sheet lists four kinds of rows: keys, logins and files, accounts and permissions, approvals, and human-only actions, each with status pending, supplied or late. Only you answer rows, and pending rows let charting continue, waiting only at proofs and the hand-off.](../pictures/needs-sheet.svg)
 
 The needs sheet lists every foreseeable item that only you can supply or approve:
 
@@ -59,6 +67,8 @@ If charting later uncovers a new key or wider permission that was not on the ope
 ## Worked example: `client-portal`
 
 Suppose you open `c-client-portal` on Monday morning with three items: the **weekly client report export**, a **CRM sync retry fix**, and an **agency logo header tweak**.
+
+![The client-portal example: three charts, the weekly client report export, the CRM sync retry fix and the agency logo header tweak, your reply 1a 2a 3a 4a, the chart order, three needs rows with the key pending, the approval supplied and the human-only check pending, then the territory map starts.](../pictures/signposts-example.svg)
 
 Before mapping any code, the charting agent presents a light signposts round and needs sheet together:
 
