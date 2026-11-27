@@ -315,6 +315,16 @@ test('run-check drops the seat tool-entry folder from PATH and keeps the other e
     );
     expect(result.code, result.stderr).toBe(0);
     expect(result.stdout.trim()).toBe(`${unitBin(f)}:/opt/one:${process.env.PATH}`);
+    const config: string = resolve(f.root, 'issues/config.yaml');
+    yaml(config, { ...(Bun.YAML.parse(readFileSync(config, 'utf8')) as object), pass_env: ['PATH'] });
+    const declared = await cli(
+      f,
+      ['run-check', '--', ...sh('printf %s "$PATH"')],
+      worktree,
+      baseEnv(f, { PATH: callerPath }),
+    );
+    expect(declared.code, declared.stderr).toBe(0);
+    expect(declared.stdout.trim()).toBe(`${unitBin(f)}:/opt/one:${process.env.PATH}`);
   } finally {
     f.clean();
   }
