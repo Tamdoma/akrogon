@@ -8,7 +8,7 @@ This page walks through recovering a failure on `client-portal`'s `scheduled-ema
 
 **A failed leaf is a recorded stop, not lost work.** When a leaf moves to `failed`, Akrogon keeps its `plan.md`, `review-A.md`, `review-B.md`, `implementation/report.md`, branch commits, worktree, and the exact reason it stopped.
 
-A seat stops a leaf whenever it hits something only a person can supply or decide (for example, `scheduled-email` reaches `implement` and cannot verify email delivery because `POSTMARK_API_KEY` is still missing from `client-portal/.env`). The seat writes the blocker and exact operator action into its pass artifact, runs:
+A seat stops a leaf whenever it hits something only a person can supply or decide. For example, `scheduled-email` reaches `implement` and runs its one approved test send to `staging-reports@agency.example`, but Postmark rejects it because the From address is not a confirmed sender in your Postmark account. Only you can confirm that sender. The seat writes the blocker and exact operator action into its pass artifact, runs:
 
 ```sh
 akrogon phase scheduled-email failed --slot A --reason "<what blocks the work>"
@@ -18,26 +18,25 @@ and ends its pass without waiting in chat. (Akrogon itself can also move a leaf 
 
 When a leaf moves to `failed`, Akrogon records the `failure` field in `state.yaml`, sends an attention desktop notice, and renames the leaf's herdr tab to `scheduled-email failed`. `akrogon next` gives it no further work until you recover it.
 
+A key that is simply missing does not fail a leaf. When a key the chart declared (in the leaf's `readiness.yaml`) is absent from `client-portal/.env`, the leaf never gets a seat prompt: it waits, `akrogon status` prints a `Missing:` line such as `Missing: client-portal/scheduled-email env POSTMARK_API_KEY in client-portal: ...`, and a typed `akrogon next scheduled-email` refuses with `Leaf inputs are missing`. Add the key to `client-portal/.env` and run `akrogon next scheduled-email` again. No phase recovery is needed (see [Why a ready task may wait](09-lifecycle.md#why-a-ready-task-may-wait)).
+
 ### Recover a failed leaf in four steps
 
 From your `t-client-portal` tab:
 
-1. **Inspect the failure reason and missing inputs**:
+1. **Inspect the failure reason**:
 
    ```sh
    akrogon status
    akrogon status scheduled-email
    ```
 
-   `akrogon status` prints a `Failed:` summary line naming the stopped leaf and its reason, and `akrogon status scheduled-email` prints the full `failure` block (`cause`, `phase`, `slot`, and `reason`, which often points to `plan.md`, `implementation/report.md`, or `review-B.md`) plus any `Missing:` lines, such as:
-
-   ```text
-   Missing: client-portal/scheduled-email env POSTMARK_API_KEY in client-portal: ...
-   ```
+   `akrogon status` prints a `Failed:` summary line naming the stopped leaf and its reason, and `akrogon status scheduled-email` prints the full `failure` block (`cause`, `phase`, `slot`, and `reason`). The reason names the blocker and points to the file holding the exact action, often `plan.md`, `implementation/report.md`, or `review-B.md`. Here it says to confirm `staging-reports@agency.example`'s sender in Postmark.
 
 2. **Fix the underlying cause**:
-   - For a missing credential, add `POSTMARK_API_KEY` to `client-portal/.env` (the repository named after `in` on the `Missing:` line). **Never** add keys directly to `~/.akrogon/worktrees/client-portal/scheduled-email/.env`, because Akrogon writes worktree `.env` files from the registered checkout.
+   - For this example, confirm the sender in Postmark.
    - For broken code, an expired token, or a broken test on `main`, fix that cause first. Retrying unchanged reproduces the exact same stop.
+   - If a key such as `POSTMARK_API_KEY` goes bad, replace it in `client-portal/.env`. **Never** add keys directly to `~/.akrogon/worktrees/client-portal/scheduled-email/.env`, because Akrogon writes worktree `.env` files from the registered checkout.
 
 3. **Move the leaf back to an active phase with no `--slot`**:
 

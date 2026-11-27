@@ -53,7 +53,7 @@ Leaving `watch-issues` running overnight lets `client-portal` handle routine int
 
 When a failure or consult case hits any item below, the watcher stops acting on that leaf, leaves it in `failed`, records its findings in the case folder, and sends an attention toast naming the case and the blocker:
 
-- Missing keys, credentials, or logins (for example, `POSTMARK_API_KEY` absent from `client-portal/.env`).
+- Missing keys, credentials, or logins (for example, a `POSTMARK_API_KEY` that Postmark rejects as revoked).
 - Grants or permissions (such as approving a live staging email send or a wider API scope).
 - Any change to an operator decision or lock (locked `brief.md`, `design.md`, or seed decisions).
 - Host tooling installs or downgrades.
