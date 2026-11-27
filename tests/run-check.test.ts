@@ -301,6 +301,25 @@ test('run-check drops an exported but undeclared variable', async () => {
   }
 });
 
+test('run-check drops the seat tool-entry folder from PATH and keeps the other entries in order', async () => {
+  const f: Fixture = await fixture();
+  try {
+    const { worktree } = await leafWorktree(f, 'entry-path');
+    const entryDir: string = resolve(f.home, 'tool-entry');
+    const callerPath: string = `${entryDir}:/opt/one:${entryDir}/:${process.env.PATH}`;
+    const result = await cli(
+      f,
+      ['run-check', '--', ...sh('printf %s "$PATH"')],
+      worktree,
+      baseEnv(f, { PATH: callerPath }),
+    );
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stdout.trim()).toBe(`${unitBin(f)}:/opt/one:${process.env.PATH}`);
+  } finally {
+    f.clean();
+  }
+});
+
 test('run-check sets AKROGON_BASE to the merge base', async () => {
   const f: Fixture = await fixture();
   try {
