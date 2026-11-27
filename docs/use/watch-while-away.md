@@ -4,7 +4,7 @@ Optional: the [watch-issues](../../skills/watch-issues/SKILL.md) skill checks ev
 
 ## Start the watch
 
-Open your agent CLI — claude, codex, pi or agy — in an hc terminal of the session that holds the repository's space, in the registered repository, and send:
+Open your agent CLI (claude, codex, pi or agy) in an hc terminal of the session that holds the repository's space, in the registered repository, and send:
 
 ```text
 watch-issues <root>
@@ -40,6 +40,6 @@ watch-issues stop <root>
 
 (Claude also accepts `/watch-issues stop`.) The watch also ends when the agent exits, when its terminal finishes or is reused, and when claude or agy shows a `/clear` reset. Codex and pi `/new` may leave the watch running into the new conversation. The first tick attempts to stop it. A compaction summary before a tick keeps the watch running, as does having no open leaves.
 
-If you exit a shell-launched agent right as a tick goes out — with or without a held draft — the tick can reach the shell or a program you start there. A replacement agent running `watch-issues` refuses the tick when its process ID differs.
+If you exit a shell-launched agent right as a tick goes out, with or without a held draft, the tick can reach the shell or a program you start there. A replacement agent running `watch-issues` refuses the tick when its process ID differs.
 
 Next: [Commands](../reference/commands.md)
