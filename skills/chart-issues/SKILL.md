@@ -129,7 +129,7 @@ Old record words: `manual` and `attended` read as `no autopilot`, `on autopilot`
 
 Semi-autopilot and Full autopilot start only from the operator's words in the door's own terminal, at door start or later naming a chart; the words carry the mode, the handed work and the consultants or none. Outside hc the door says autopilot cannot start.
 
-Every mode change (on, off, changed list, "continue <mode>") is appended to the mode record with its time, and the door reads the latest entry before continuing: the same A transcript path continues after compaction, while a different or unknown path starts under No autopilot until the operator says `continue <mode>`, which resumes the same handed list with lost consultants still lost.
+Every mode change (on, off, changed list, "continue <mode value>") is appended to the mode record with its time, and the door reads the latest entry before continuing: the same A transcript path continues after compaction, while a different or unknown path starts under No autopilot until the operator says `continue <mode value>`, which resumes the same handed list with lost consultants still lost.
 
 The door reads [autopilot.md](assets/autopilot.md) when the session's mode is Semi-autopilot or Full autopilot.
 

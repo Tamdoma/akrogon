@@ -22,7 +22,7 @@ The door's first reply repeats the mode, the handed work and the consultants. Wi
 
 ## What the door does
 
-The door runs every normal charting step. Under Semi-autopilot the signposts round is presented and answered once — a presented round, not a chart wait, so no chart parks on it; under Full autopilot A answers it, echoes its picks in the first reply, and records them as A's — it may order the charts you handed it but never drop one, and a drop it would make is recorded for you.
+The door runs every normal charting step. Under Semi-autopilot and Full autopilot the signposts round is presented and answered once — a presented round, not a chart wait, so no chart parks on it; under Full autopilot A answers it, echoes its picks in the first reply, and records them as A's — it may order the charts you handed it but never drop one, and a drop it would make is recorded for you.
 
 Where it would ask you a fork, seat A writes the full question in its pane and answers it itself. It picks by the evidence, the session's signposts, and where they are silent your standing values: simplicity, function over form, removing over adding, systems thinking, speed and price. A recommendation names the signpost that decided it. Each pick is recorded as A's, with its reason and the rejected options, never as your words. A never answers a seed's operator decision, or a finding against it. A decision counted from a seed stays yours.
 
