@@ -54,7 +54,7 @@ From your `t-client-portal` tab:
    akrogon next scheduled-email
    ```
 
-   Running `akrogon next scheduled-email` while the leaf is still in `failed` refuses with `Leaf is failed and needs phase recovery`; always run step 3 first.
+   `akrogon next` never restarts a leaf that is still in `failed`, so always run step 3 first. Skipping it either refuses with `Leaf is failed and needs phase recovery` or, when the leaf's seat terminals are already gone, does nothing and exits without an error.
 
 ## Park an issue
 

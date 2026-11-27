@@ -79,7 +79,7 @@ prefixes:
   client-portal: cp
 ```
 
-Akrogon checks this prefix before allocating a task in `akrogon next` or launching any seat or consultant in `akrogon seat`, and stops with an error naming `~/.akrogon/config.yaml` if the prefix is missing or collides with another repository.
+Akrogon checks this prefix before allocating a task in `akrogon next` or launching any seat or consultant in `akrogon seat`, and stops with an error if the prefix is missing (the error names `~/.akrogon/config.yaml`) or collides with another repository (the error names both repositories and the shared prefix).
 
 Check the merged settings from inside `~/code/client-portal`:
 
