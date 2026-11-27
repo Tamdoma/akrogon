@@ -11,6 +11,12 @@ const CHARTING_PAGES: string[] = [
   'docs/guide/07-build-route.md',
   'docs/guide/08-hand-off.md',
 ];
+const SETUP_PAGES: string[] = [
+  'docs/guide/01-install.md',
+  'docs/guide/02-set-up-a-repo.md',
+  'docs/guide/03-your-three-tabs.md',
+];
+const HERO: RegExp = /!\[([^\]]*)\]\(docs\/pictures\/three-tabs\.svg\)/;
 // Page 04's tab section links to page 03, whose picture shows the tabs.
 const NO_PICTURE_HEADING: string = 'Where you chart';
 const EMBED: RegExp = /!\[([^\]]*)\]\((\.\.\/pictures\/[^)\s]+\.svg)\)/g;
@@ -84,6 +90,28 @@ test('every picture on guide pages 04 to 08 holds one identical mark group and n
   expect(pictures).toContain('docs/pictures/charting-session.svg');
   expect(pictures).toContain('docs/pictures/mode-and-route.svg');
   expect(pictureProblems(repoRoot, CHARTING_PAGES)).toEqual([]);
+});
+
+function heroAlt(root: string): string {
+  const hero: RegExpMatchArray | null = readFileSync(join(root, 'README.md'), 'utf8').match(HERO);
+  return hero === null ? '' : hero[1].trim();
+}
+
+test('README embeds the three-tabs hero picture with alt text', (): void => {
+  expect(heroAlt(repoRoot)).not.toBe('');
+});
+
+test('every section of guide pages 01 to 03 has a picture with alt text', (): void => {
+  expect(sections(repoRoot, SETUP_PAGES).length).toBeGreaterThan(10);
+  expect(sectionsWithoutPicture(repoRoot, SETUP_PAGES)).toEqual([]);
+});
+
+test('every picture on guide pages 01 to 03 holds the charting pictures mark group and no outside or moving markup', (): void => {
+  expect(pictureProblems(repoRoot, [...CHARTING_PAGES, ...SETUP_PAGES])).toEqual([]);
+  expect(embeddedPictures(repoRoot, ['docs/guide/02-set-up-a-repo.md'])).toContain(
+    'docs/pictures/one-akrogon-many-repos.svg',
+  );
+  expect(embeddedPictures(repoRoot, ['docs/guide/03-your-three-tabs.md'])).toContain('docs/pictures/three-tabs.svg');
 });
 
 test('the picture checks catch a missing picture, blank alt, a changed mark group and forbidden markup', (): void => {
