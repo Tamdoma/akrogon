@@ -22,6 +22,8 @@ Open your charting agent in `c-client-portal` and start `/chart-issues` with a p
 /chart-issues Add a weekly client report export to client-portal. Consultants: slot B claude, claude-fable-5-2, high effort; slot C agy, neon, xhigh effort.
 ```
 
+![Opening a session in the c- tab: your request with its consultants, the start checks akrogon pull, akrogon flaky and akrogon status, then a first reply that confirms the consultants, the Charting mode and who answers the signposts.](../pictures/opening-a-session.svg)
+
 While charting, consultants sit in slots B, C, D, and a Lifecycle task later gets its own fresh slot B (the reviewer).
 
 You can also start `/chart-issues` with no note to work through open GitHub issues. At the start of a session, the charting agent runs `akrogon pull` to mirror open GitHub issues locally into `issues/seeds/` as **seeds** (unverified reports before they are charted). It also runs `akrogon flaky` and `akrogon status` to show any flaky (intermittent) tests or tasks stopped in `failed` that you might want to bring in.
@@ -35,6 +37,8 @@ In its first reply, the charting agent confirms three things:
 ## What consultants do during charting
 
 **Consultants** are independent helper agents (`B`, `C`, `D`, and so on) that advise the charting agent while you plan. They are not the fresh **slot A (the builder)** and **slot B (the reviewer)** that later build a Lifecycle task.
+
+![Consultants during charting: the charting agent and each consultant write blind notes, the charting agent merges them with tags that show who agreed, each consultant sends one short rebuttal, and the question comes to you with the remaining disagreements shown. Consultants are not slot A and slot B of a Lifecycle task.](../pictures/consultants.svg)
 
 You can either point the charting agent at consultant terminals you already have open, or ask it to start consultants for you inside herdr. When the charting agent starts consultants itself, it asks once for each consultant's tool (harness), model, and effort (unless you already named them), places them in a column to the right of your charting tab, and restarts them with a clean conversation whenever you enter a new chart so earlier work does not bleed in. Consultants you opened yourself are never moved, restarted, or closed by the charting agent.
 
@@ -114,6 +118,8 @@ Every chart stays saved under `issues/chart/<slug>/` even after hand-off:
 - `forks/<fork-slug>.md`: each question, its evidence, and its settled answer.
 - `slots/`: blind notes, merged views, and rebuttals from consultants.
 - `seats.yaml` and `USAGE.md`: recorded terminals and turn and token (AI usage) summary for the chart.
+
+![The chart folder issues/chart/weekly-client-report/ holds CHART.md, INTAKE.md, forks/signposts.md, one forks file per question, slots/, seats.yaml and USAGE.md. From the t-client-portal tab, akrogon status --charts shows every chart.](../pictures/chart-records.svg)
 
 From your `t-` tab (`t-client-portal`), run `akrogon status --charts` at any time to see every chart, how many fork files have a settled answer (including `signposts.md`), how many Fog items remain, and each chart's stage.
 
