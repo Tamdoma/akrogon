@@ -1,0 +1,47 @@
+slug: build-pictures
+phase: merged
+created: 2026-11-27
+repo: akrogon
+blocked-by:
+  - guide-chapters
+  - charting-pictures-more
+sources: []
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak5d6ff4f248c10fd1f85229330bf1fc
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t471
+  B:
+    session: infra
+    address: t47b
+prompted:
+  B:
+    turn: 4
+    address: t47b
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-27T15:10:12.283Z
+broadcast:
+  kind: epic
+  name: builder-docs-rest
+  destination: /home/ivan/Work/infra/akrogon/issues/closed/builder-docs-rest
+  pushed: 0397395a3acfe16bf535a147ed7164779a132c0d
+  sources: []
+frozen:
+  tests/docs-pictures.test.ts: 1dfcedd8948aad1e08568875e54ddc47baf81e6c
+frozen_cited: []

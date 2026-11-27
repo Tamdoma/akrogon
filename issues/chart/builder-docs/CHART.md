@@ -43,3 +43,5 @@ none
 - friction: the opening map's three independent returns served as each slot's blind notes for the docs-shape fork, with one merged file and one rebuttal each, instead of a separate exchange per question
 
 Handed off 2026-11-27
+
+Re-handed off 2026-11-27T13:05:30Z: builder-docs-rest rewritten to six leaves after the operator's read and a B/C review (forks/rest-shape.md), unparked.

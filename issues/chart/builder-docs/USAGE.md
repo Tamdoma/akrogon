@@ -1,4 +1,4 @@
-chart builder-docs - operator wait 32.4 min, operator turns 6; A=71891, B=84654, C=unmeasured output
+chart builder-docs - operator wait 32.5 min, operator turns 6; A=71891, B=84654, C=unmeasured output
 
 window 2026-11-27T08:37:50.000Z to 2026-11-27T09:37:09.000Z
 
@@ -13,7 +13,7 @@ seat A (harness claude, sessions /home/ivan/.claude/projects/-home-ivan-Work-inf
   turns 6
   calls 54
   average context per call 158410
-  working minutes 32.4
+  working minutes 32.5
   first turn in window 2026-11-27T08:37:35.599Z 0.8 min
   input_tokens 120
   output_tokens 71891
@@ -32,6 +32,7 @@ seat B (harness claude, sessions /home/ivan/.claude/projects/-home-ivan-Work-inf
   output_tokens 84654
   cache_read_input_tokens 6528462
   cache_creation_input_tokens 330829
+  session /home/ivan/.claude/projects/-home-ivan-Work-infra-akrogon/9783838f-518e-4725-9ec9-14031d173788.jsonl totalCostUSD 17.155765500000005 (whole-session figure; can include other charts)
 
 seat C: usage unmeasured (unknown harness agy)
 
@@ -41,5 +42,5 @@ operator turns
   2026-11-27T08:49:34.232Z 0.2 min, output A=1097 B=0
   2026-11-27T09:07:53.013Z 1.1 min, output A=5144 B=0
   2026-11-27T09:12:46.735Z 2.9 min, output A=4230 B=5174
-  2026-11-27T09:16:35.132Z 20.4 min, output A=48444 B=62848
-  total operator wait 32.4 min
+  2026-11-27T09:16:35.132Z 20.6 min, output A=49201 B=62848
+  total operator wait 32.5 min

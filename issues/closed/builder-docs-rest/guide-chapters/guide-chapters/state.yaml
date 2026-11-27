@@ -1,0 +1,40 @@
+slug: guide-chapters
+phase: merged
+created: 2026-11-27
+repo: akrogon
+blocked-by:
+  - charting-fixes
+sources: []
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak4373cecdca8cd2ff2d9c4edf588ce8
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t44w
+  B:
+    session: infra
+    address: t467
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-27T14:43:35.500Z
+frozen:
+  tests/docs-em-dash.test.ts: 0de9872251183500f82b3a3a3c68c9147f09a00f
+  tests/docs-links.test.ts: d8925dbd66dcef03a49c69fe178e25077bb15521
+  tests/rollback.test.ts: d8e91b54739d616f14d439891a3051ddf52ca666
+  tests/watch-timer.test.ts: 7d6079e76b703af989ae694ffc60715ba1fbba8c
+frozen_cited: []

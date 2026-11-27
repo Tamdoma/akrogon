@@ -1,0 +1,37 @@
+slug: charting-pictures-more
+phase: merged
+created: 2026-11-27
+repo: akrogon
+blocked-by:
+  - charting-fixes
+sources: []
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak18ad84ee3a77ddcfd37349fe555803
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t44v
+  B:
+    session: infra
+    address: t45q
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-27T14:11:18.615Z
+frozen:
+  tests/docs-pictures.test.ts: 99d96c3ad9330eb603b41fb9ddf72c17b22be27e
+frozen_cited: []

@@ -61,3 +61,21 @@ We also need to internalize it in the skills and inside of the system itself onc
 ok, this is it. Let's stick to it in the docs, as well as the entire codebase where needed
 
 Approved names: category "Charting mode" with values No autopilot, Semi-autopilot, Full autopilot; category "Build route" with values Direct, Lifecycle; "manual" dropped; docs keep slot A (the builder) and slot B (the reviewer); "charting" stays the word for planning. Needs row 3 supplied 2026-11-27.
+
+
+Operator correction after reading the charting chapter, 2026-11-27, verbatim
+
+"1. ![alt text](image.png) <- It needs to use the full example. Which two consultants? Look at what I do. I use slot B, make it something, and slot C, make it something, mentioning the harness and the model and the efforts
+
+2.  Everything else is great, but I would like to have more images to explain every section. The images look really, really good. The only thing is that the logo is not correctly positioned on the vertical axis. Or maybe it is. ![alt text](image-1.png)"
+
+"I want all of the items and the new architecture to look like that. The content is really good. Great job done by the AGY Neon writer. One thing, tell him to remove the m dashes. This is a dead AI giveaway. Everything else is perfect."
+
+"We need to rewrite everything like that. This is perfect. Tone and explanations, just add more images."
+
+Door reading (A): image.png is the example line `/chart-issues Add a weekly client report export to client-portal. Use two consultants.`; every example that starts consultants names each slot with harness, model and effort, for example `Consultants: slot B claude, claude-fable-5-2, high effort; slot C agy, neon, xhigh effort.` image-1.png is charting-session.svg, where the "created by" mark sits slightly off the text line vertically. "Every section" means every `##` section of every guide page gets a picture in the charting-pictures style. Em dashes (—) leave every human doc page, including the already merged pages 04 to 08.
+
+Applied to issues/parked/builder-docs-rest: guide-chapters (tone of 04 to 08, em dashes out everywhere, full consultant examples, guard test), new leaf charting-pictures-more (pictures per section of 04 to 08, logo placement), guide-pictures (picture per section of the rest).
+
+Operator 2026-11-27, verbatim: "Same thing with installation and setup process. It needs to be easy to follow."
+Door reading (A): pages 01 to 03 (install, repos, three tabs) get the same tone, depth and pictures as 04 to 08, written as steps a reader can follow in order.

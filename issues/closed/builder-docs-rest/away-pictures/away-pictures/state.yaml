@@ -1,0 +1,40 @@
+slug: away-pictures
+phase: merged
+created: 2026-11-27
+repo: akrogon
+blocked-by:
+  - guide-chapters
+  - charting-pictures-more
+sources: []
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak2edcf1d2a38bb7cc21a8818e498038
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t472
+  B:
+    session: infra
+    address: t47c
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-27T15:02:30.918Z
+frozen:
+  tests/AREA.md: 14007cd311455cd46a539cc2d9acf9422cbaed65
+  tests/docs-pictures.test.ts: 6ec4228e45badf0a453c33353ab53a6fcf1d9d31
+frozen_cited:
+  - "tests/AREA.md away-pictures plan D8: describes the wider picture test scope"

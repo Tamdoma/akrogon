@@ -1,0 +1,39 @@
+slug: setup-pictures
+phase: merged
+created: 2026-11-27
+repo: akrogon
+blocked-by:
+  - guide-chapters
+  - charting-pictures-more
+sources: []
+busy_since: {}
+busy_notified: {}
+blocked_notified: {}
+attempts:
+  A: 0
+  B: 0
+lost:
+  A: 0
+  B: 0
+done: []
+fix_rounds: 0
+verdict: {}
+tab: ak61b625c9f1b653147776b577f184bb
+env_names: []
+env_generation: 0
+pane: {}
+seat:
+  A:
+    session: infra
+    address: t470
+  B:
+    session: infra
+    address: t475
+prompted: {}
+prompted_at: {}
+delivery_error: {}
+merge_stamp: 2026-11-27T14:58:04.317Z
+frozen:
+  tests/AREA.md: 198cb640245fe3b4de59485d6a52fdfae3a94be7
+  tests/docs-pictures.test.ts: 8556a2a0b676c5a1285543004ae391809b20c18b
+frozen_cited: []
