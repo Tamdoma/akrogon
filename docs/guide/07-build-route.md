@@ -12,7 +12,7 @@ Once a chart has no open questions left, Akrogon supports two Build routes: **Di
 
 | Build route | Who builds (slot A) | Who reviews (slot B) | When it is offered | Best fit |
 |---|---|---|---|---|
-| **Direct** | The charting agent itself, in a separate worktree | The charting agent's first consultant (`B`) | **Only under No autopilot**, when all eligibility checks pass | One small, settled change — a fast feature as well as a bug fix |
+| **Direct** | The charting agent itself, in a separate worktree | The charting agent's first consultant (`B`) | **Only under No autopilot**, when all eligibility checks pass | One small, settled change (a fast feature as well as a bug fix) |
 | **Lifecycle** | A fresh **slot A (the builder)** in its own tab | A fresh **slot B (the reviewer)** in its own tab | Always available (the only route under Semi-autopilot and Full autopilot) | Larger features, multi-task work, work needing keys/grants/live runs, or anything charted on autopilot |
 
 ## Direct
@@ -21,7 +21,7 @@ On the **Direct** route, the charting agent builds one small, settled change its
 
 Direct skips handing the work off to fresh Lifecycle seats, while keeping every decision you made during charting, the task record under `issues/open/`, independent review by slot B, the merge queue, and any configured Discord announcement.
 
-Direct is not limited to bug fixes — it is for **fast features as well as fixes** whenever the change is small, clear, and completely settled.
+Direct is not limited to bug fixes; it is for **fast features as well as fixes** whenever the change is small, clear, and completely settled.
 
 **Example jobs that fit Direct (paired with No autopilot):**
 
@@ -30,7 +30,7 @@ Direct is not limited to bug fixes — it is for **fast features as well as fixe
 
 ### When Direct is offered
 
-**Direct is offered only under No autopilot — never under Semi-autopilot or Full autopilot.**
+**Direct is offered only under No autopilot, never under Semi-autopilot or Full autopilot.**
 
 No repository setting is needed. At the [hand-off review](08-hand-off.md), the charting agent checks eligibility automatically and offers Direct only when **every** condition below holds:
 
@@ -46,7 +46,7 @@ If any condition fails, the charting agent states why in one line at the hand-of
 
 ### What happens when you choose Direct
 
-You do not have to run the underlying commands yourself — the charting agent drives the steps while you can watch progress in `akrogon status`:
+You do not have to run the underlying commands yourself. The charting agent drives the steps while you can watch progress in `akrogon status`:
 
 1. The charting agent writes the standalone task files (`ISSUE.md`, `brief.md`, `design.md`, `readiness.yaml`) under `issues/open/<chart-slug>/` and runs `akrogon direct` with consultant `B` as reviewer, which verifies both terminals are live, creates the isolated worktree, and creates `state.yaml` with `direct: true` in the `implement` phase (no separate tab is opened).
 2. The charting agent builds the change and runs tests in that worktree as **slot A**, then moves the task to review.
@@ -56,7 +56,7 @@ You do not have to run the underlying commands yourself — the charting agent d
 
 ### If a Direct job turns out bigger than expected
 
-If the work outgrows Direct mid-build — a settled decision needs to change, an unexpected API key or live grant appears, a check cannot pass, or a second outcome shows up — the task stops in `failed` so you can pick the next step:
+If the work outgrows Direct mid-build (a settled decision needs to change, an unexpected API key or live grant appears, a check cannot pass, or a second outcome shows up), the task stops in `failed` so you can pick the next step:
 
 - **Abandon it**: the charting agent runs `akrogon direct-drop`, which stops any running checks, removes the temporary worktree and branch, archives the task folder under `<chart>/direct/`, and marks the chart `Held`.
 - **Move it to Lifecycle**: the Direct attempt is dropped the same way, and the work is handed off as a fresh Lifecycle task instead.
@@ -72,6 +72,6 @@ On the **Lifecycle** route, the charting agent writes complete **task contracts*
 - Any small change that touches sensitive billing or auth logic where you want fresh seats with clean context instead of the charting conversation.
 - **Every chart run under Semi-autopilot or Full autopilot**, because Direct is offered only under No autopilot.
 
-On Lifecycle, the charting agent writes the contracts and stops — it does not start slot A or slot B. See [Hand-off](08-hand-off.md) for what the review looks like and how you start handed-off work.
+On Lifecycle, the charting agent writes the contracts and stops. It does not start slot A or slot B. See [Hand-off](08-hand-off.md) for what the review looks like and how you start handed-off work.
 
 Previous: [Charting mode](06-charting-mode.md) · Next: [Hand-off](08-hand-off.md)

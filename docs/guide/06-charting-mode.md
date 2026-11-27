@@ -4,7 +4,7 @@ Separating how questions get answered from how code gets built lets you hand off
 
 **Charting mode decides who answers the questions while the work is charted. [Build route](07-build-route.md) decides who builds the work once every question is answered.**
 
-They are two independent choices — with one firm rule linking them: **the Direct build route is offered only under No autopilot.** Under Semi-autopilot and Full autopilot, every chart uses the Lifecycle build route.
+They are two independent choices, with one firm rule linking them: **the Direct build route is offered only under No autopilot.** Under Semi-autopilot and Full autopilot, every chart uses the Lifecycle build route.
 
 ![Charting mode (No autopilot, Semi-autopilot, Full autopilot) and Build route (Direct, Lifecycle) are two separate choices. Direct is available only with No autopilot. Every mode can use Lifecycle.](../pictures/mode-and-route.svg)
 
@@ -13,10 +13,10 @@ They are two independent choices — with one firm rule linking them: **the Dire
 | Charting mode | Who answers signposts | Who answers each fork | Direct route offered? | Best fit |
 |---|---|---|---|---|
 | **No autopilot** (default) | You | You | Yes (when eligible) | New features, client-facing decisions, small fast changes built today |
-| **Semi-autopilot** | You (once per session) | Charting agent | No — Lifecycle only | Overnight batch where you want to set priorities and limits first |
-| **Full autopilot** | Charting agent | Charting agent | No — Lifecycle only | Overnight batch of low-stakes, well-bounded work you will review in the morning |
+| **Semi-autopilot** | You (once per session) | Charting agent | No (Lifecycle only) | Overnight batch where you want to set priorities and limits first |
+| **Full autopilot** | Charting agent | Charting agent | No (Lifecycle only) | Overnight batch of low-stakes, well-bounded work you will review in the morning |
 
-You turn on a Charting mode in your own words inside your `c-` tab — no fixed command syntax is required. The charting agent reads your intent and the scope of work you hand it. Both Semi-autopilot and Full autopilot require running inside herdr (`hc`, herdr's background controller); outside herdr, the charting agent tells you autopilot cannot start.
+You turn on a Charting mode in your own words inside your `c-` tab, with no fixed command syntax required. The charting agent reads your intent and the scope of work you hand it. Both Semi-autopilot and Full autopilot require running inside herdr (`hc`, herdr's background controller); outside herdr, the charting agent tells you autopilot cannot start.
 
 ## No autopilot
 
@@ -25,21 +25,21 @@ You turn on a Charting mode in your own words inside your `c-` tab — no fixed 
 **Example jobs that fit No autopilot:**
 
 - Designing the **weekly client report export** in `client-portal`, where client-facing columns, date windows, and delivery options are business decisions only you should make.
-- Building **a small, clear new CSV export button fast today** on an existing report table — No autopilot lets you settle the single open question in one turn and take the [Direct](07-build-route.md) build route.
+- Building **a small, clear new CSV export button fast today** on an existing report table, where No autopilot lets you settle the single open question in one turn and take the [Direct](07-build-route.md) build route.
 
 **How to use it in your own words:**
 
 Just open `/chart-issues` in `c-client-portal` without asking for autopilot:
 
 ```text
-/chart-issues Add a weekly client report export to client-portal. Use consultants B and C.
+/chart-issues Add a weekly client report export to client-portal. Consultants: slot B claude, claude-fable-5-2, high effort; slot C agy, neon, xhigh effort.
 ```
 
 ## Semi-autopilot
 
 Under **Semi-autopilot**, you answer the signposts round once for the whole session, and the charting agent answers every fork, split proposal, and hand-off review after that.
 
-At each decision point, the charting agent writes the full question in its terminal and answers it itself using inspected evidence, your signposts, and — where your signposts are silent — standing engineering values (simplicity, function over form, removing over adding, systems thinking, speed, and price). Every pick is recorded in the fork file as the charting agent's own choice (never as your words), along with its reason, rejected options, and any standing consultant dissent.
+At each decision point, the charting agent writes the full question in its terminal and answers it itself using inspected evidence and your signposts, falling back where your signposts are silent to standing engineering values (simplicity, function over form, removing over adding, systems thinking, speed, and price). Every pick is recorded in the fork file as the charting agent's own choice (never as your words), along with its reason, rejected options, and any standing consultant dissent.
 
 **Example jobs that fit Semi-autopilot:**
 
@@ -51,7 +51,7 @@ At each decision point, the charting agent writes the full question in its termi
 In `c-client-portal`, say you want autopilot while you answer the signposts, naming the work to chart and which consultants to use (or none):
 
 ```text
-/chart-issues Chart these three client-portal report issues on autopilot, I'll answer the signposts. Use consultants B and C.
+/chart-issues Chart these three client-portal report issues on autopilot, I'll answer the signposts. Consultants: slot B claude, claude-fable-5-2, high effort; slot C agy, neon, xhigh effort.
 ```
 
 You can also switch Semi-autopilot on mid-chart by naming the chart in `c-client-portal`. Any answers you already gave stay recorded as yours, and if the session has no signposts yet, the charting agent asks the signposts round before answering anything itself.
@@ -60,7 +60,7 @@ You can also switch Semi-autopilot on mid-chart by naming the chart in `c-client
 
 Under **Full autopilot**, the charting agent answers **both** the signposts and every fork after them.
 
-In its first reply, the charting agent echoes the mode, your handed list of work, the consultants, its signpost picks (recorded clearly as its own), and a preview of the session's needs sheet. It may order the charts you handed it, but it can never drop one — any drop it would make is noted for you instead.
+In its first reply, the charting agent echoes the mode, your handed list of work, the consultants, its signpost picks (recorded clearly as its own), and a preview of the session's needs sheet. It may order the charts you handed it, but it can never drop one. Any drop it would make is noted for you instead.
 
 **Example jobs that fit Full autopilot:**
 
@@ -72,16 +72,16 @@ In its first reply, the charting agent echoes the mode, your handed list of work
 In `c-client-portal`, tell the charting agent to run full autopilot and answer the signposts as well, naming the work and consultants (or none):
 
 ```text
-/chart-issues Run full autopilot on these three client-portal cleanup reports — answer the signposts and all forks yourself. Use consultant B.
+/chart-issues Run full autopilot on these three client-portal cleanup reports, answering the signposts and all forks yourself. Consultants: slot B claude, claude-fable-5-2, high effort.
 ```
 
 If your message asks the charting agent to answer only the signposts while you keep answering the forks, that does not match any of the three modes, so the charting agent asks which mode you meant before proceeding.
 
 ## Direct is offered only under No autopilot
 
-**Direct is offered only under No autopilot. Semi-autopilot and Full autopilot always use the Lifecycle build route — Direct is never offered under either autopilot mode.**
+**Direct is offered only under No autopilot. Semi-autopilot and Full autopilot always use the Lifecycle build route; Direct is never offered under either autopilot mode.**
 
-Because autopilot makes design picks while you are away, every autopilot chart produces written task contracts under `issues/open/` for a fresh **slot A (the builder)** and **slot B (the reviewer)** instead of letting the charting agent edit code straight away. And remember: autopilot charts and hands off only — it never starts building the handed-off work.
+Because autopilot makes design picks while you are away, every autopilot chart produces written task contracts under `issues/open/` for a fresh **slot A (the builder)** and **slot B (the reviewer)** instead of letting the charting agent edit code straight away. And remember: autopilot charts and hands off only; it never starts building the handed-off work.
 
 ## What still waits for you under Semi-autopilot and Full autopilot
 
@@ -94,7 +94,7 @@ Autopilot never crosses human-only boundaries. If a chart hits any of the follow
 - **A blocking finding on a GitHub seed's operator decision**, where the pre-decided requirement cannot be built or verified as written (sends one attention alert).
 - **A conflict between your own answers** (such as two seed decisions contradicting each other, or a seed decision clashing with your reply).
 
-Your next message in `c-client-portal` — such as adding a key or answering `"yes"` — resumes the waiting chart while keeping autopilot active.
+Your next message in `c-client-portal` (such as adding a key or answering `"yes"`) resumes the waiting chart while keeping autopilot active.
 
 ## Boundaries, records, and turning autopilot off
 

@@ -6,7 +6,7 @@ Setting direction once up front keeps a charting session aligned with your busin
 
 **Signposts are your ranked priorities, hard limits, and the order of the session's charts (including any chart you choose to drop). They are asked once per session, before any territory map.**
 
-A single charting session covers everything from your first message in the `c-` tab until you start a new charting run — it survives waits, conversation compaction (summarizing a long chat), and automatic handovers between charts. If you resume an unfinished chart in a later session, it uses the new session's signposts rather than stale ones from days ago.
+A single charting session covers everything from your first message in the `c-` tab until you start a new charting run. It survives waits, conversation compaction (summarizing a long chat), and automatic handovers between charts. If you resume an unfinished chart in a later session, it uses the new session's signposts rather than stale ones from days ago.
 
 ## How the signposts round works
 
@@ -14,7 +14,7 @@ Right after intake (and after starting or restarting any consultants), the chart
 
 Compared to normal fork rounds, signposts stay deliberately light:
 
-- **4 to 7 questions** drawn from the work in front of you — only choices that steer several later decisions across the session's charts.
+- **4 to 7 questions** drawn from the work in front of you, covering only choices that steer several later decisions across the session's charts.
 - **2 or 3 options** per question, one labelled recommendation, and a short note saying which later decisions the answer steers.
 - **No research block** (just the reply key and challenge check, plus small text drawings only when visual options differ).
 
@@ -32,7 +32,7 @@ Who answers the signposts round depends on your [Charting mode](06-charting-mode
 | **Semi-autopilot** | You (once, for the whole session) | The charting agent | Recorded as unanswered; built-in standing values fill the gap and it is not asked again |
 | **Full autopilot** | The charting agent | The charting agent | Answered by the charting agent and echoed in its first reply |
 
-Under **Full autopilot**, the charting agent records its signpost picks clearly as its own (never as your words). It may put your handed charts into a sensible order, but it can never drop a chart you asked it to work on — any drop it would have chosen is recorded as a note for you instead.
+Under **Full autopilot**, the charting agent records its signpost picks clearly as its own (never as your words). It may put your handed charts into a sensible order, but it can never drop a chart you asked it to work on. Any drop it would have chosen is recorded as a note for you instead.
 
 If two of your own statements about signposts conflict, the charting agent shows the clash in one line and asks you under No autopilot and Semi-autopilot; only Full autopilot resolves signpost conflicts on its own. A conflict between two of your answers on a specific fork (for example, a GitHub seed decision clashing with a reply) always waits for you in every mode.
 
@@ -51,7 +51,7 @@ Each row states its purpose, which tasks use it, exact permissions or resources,
 
 Two rules keep the needs sheet practical:
 
-1. **Only you answer needs-sheet rows — never the charting agent, even under Full autopilot.** The charting agent cannot grant itself live-account permissions or invent API keys.
+1. **Only you answer needs-sheet rows, never the charting agent, even under Full autopilot.** The charting agent cannot grant itself live-account permissions or invent API keys.
 2. **Pending rows do not pause charting.** You can supply keys or approvals at your own pace while charting continues. Only the real-world checks (proofs) that need a missing item and the final hand-off wait on it, and a pending row is never re-asked as a question mid-chart.
 
 If charting later uncovers a new key or wider permission that was not on the opening sheet, the charting agent either keeps the work inside the authority you already approved or parks that chart, moves on to any other ready chart, and sends one attention alert (`akrogon notice --attention`) naming what is blocking it.
@@ -88,7 +88,7 @@ Signposts for this session (3 charts in client-portal):
    - 4b CRM sync fix first, drop logo tweak for this session.
 
 Needs sheet (answer at your own pace; pending rows wait only at proofs and hand-off):
-- Row 1 (key): POSTMARK_API_KEY in client-portal/.env — needed to verify scheduled report emails.
+- Row 1 (key): POSTMARK_API_KEY in client-portal/.env, needed to verify scheduled report emails.
 - Row 2 (approval): Scoped grant to send 1 test report email to staging-reports@agency.example and verify delivery.
 - Row 3 (human-only): Confirm SPF/DKIM sending domain is verified in Postmark before scheduled emails hand off.
 
@@ -104,6 +104,6 @@ You reply:
 1a 2a 3a 4a. Approved row 2 for staging-reports@agency.example only. I'll add the Postmark key and verify DNS before hand-off.
 ```
 
-The charting agent prints a two-sentence account — *"This session prioritizes shipping the weekly client report export as CSV first with zero new paid services and each client's own timezone, followed by the CRM sync fix and logo tweak; branded PDF layout is left out of scope for now"* — records your answers and the three needs rows in `forks/signposts.md`, and moves straight into the territory map while rows 1 and 3 stay `pending`.
+The charting agent prints a two-sentence account: *"This session prioritizes shipping the weekly client report export as CSV first with zero new paid services and each client's own timezone, followed by the CRM sync fix and logo tweak; branded PDF layout is left out of scope for now."* It then records your answers and the three needs rows in `forks/signposts.md`, and moves straight into the territory map while rows 1 and 3 stay `pending`.
 
 Previous: [A charting session](04-a-charting-session.md) · Next: [Charting mode](06-charting-mode.md)

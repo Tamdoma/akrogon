@@ -19,10 +19,12 @@ Those `t-`, `c-`, and `w-` tab names are your daily workspace layout inside the 
 Open your charting agent in `c-client-portal` and start `/chart-issues` with a plain-English request, naming any **consultants** you want beside it:
 
 ```text
-/chart-issues Add a weekly client report export to client-portal. Use two consultants.
+/chart-issues Add a weekly client report export to client-portal. Consultants: slot B claude, claude-fable-5-2, high effort; slot C agy, neon, xhigh effort.
 ```
 
-You can also start `/chart-issues` with no note to work through open GitHub issues. At the start of a session, the charting agent runs `akrogon pull` to mirror open GitHub issues locally into `issues/seeds/` (called **seeds** — unverified reports before they are charted). It also runs `akrogon flaky` and `akrogon status` to show any flaky (intermittent) tests or tasks stopped in `failed` that you might want to bring in.
+While charting, consultants sit in slots B, C, D, and a Lifecycle task later gets its own fresh slot B (the reviewer).
+
+You can also start `/chart-issues` with no note to work through open GitHub issues. At the start of a session, the charting agent runs `akrogon pull` to mirror open GitHub issues locally into `issues/seeds/` as **seeds** (unverified reports before they are charted). It also runs `akrogon flaky` and `akrogon status` to show any flaky (intermittent) tests or tasks stopped in `failed` that you might want to bring in.
 
 In its first reply, the charting agent confirms three things:
 
@@ -40,8 +42,8 @@ Here is what consultants do during charting: **consultants map the codebase and 
 
 Specifically, for both the opening map and every open decision:
 
-1. The charting agent and each consultant inspect the code and research the question blind — without seeing the charting agent's draft or each other's notes.
-2. The charting agent merges the finished notes, tagging each point with who agreed — such as `(A,B)` or `(A,B,C)`.
+1. The charting agent and each consultant inspect the code and research the question blind, without seeing the charting agent's draft or each other's notes.
+2. The charting agent merges the finished notes, tagging each point with who agreed, such as `(A,B)` or `(A,B,C)`.
 3. Each consultant reads the merged notes and sends back one short rebuttal listing only where it still disagrees.
 4. The charting agent presents the question to you with those remaining disagreements visible before you decide.
 
@@ -61,7 +63,7 @@ If an imported GitHub seed already includes an `## Operator decision (<name>, <d
 
 ### 2. Signposts and the needs sheet
 
-Once per session — before any code map is drawn — the charting agent asks a short round of **signposts** (your ranked priorities, hard limits, and the order of the session's charts) together with one **needs sheet** listing every API key, approval, or human-only step the session will need. See [Signposts](05-signposts.md) for the full walk-through.
+Once per session, before any code map is drawn, the charting agent asks a short round of **signposts** (your ranked priorities, hard limits, and the order of the session's charts) together with one **needs sheet** listing every API key, approval, or human-only step the session will need. See [Signposts](05-signposts.md) for the full walk-through.
 
 ### 3. Territory map
 
@@ -75,17 +77,17 @@ Because the map checks real code first, it often removes work you did not need o
 
 ### 4. One fork per round
 
-An open choice sharp enough to decide is called a **fork** — for example, *"Which columns and date window belong in the weekly client report export?"* or *"Should the first version ship CSV only, or CSV and PDF together?"*
+An open choice sharp enough to decide is called a **fork**, such as *"Which columns and date window belong in the weekly client report export?"* or *"Should the first version ship CSV only, or CSV and PDF together?"*
 
 The charting agent works through one fork per round, starting with the answerable question that reshapes the most remaining decisions. Each round follows the same readable layout:
 
 - **Plain context**: what the choice is and what changes based on your answer.
-- **Research**: grounded evidence gathered before asking — operator-provided notes first, then named practitioner experience, then primary docs or live code, and model knowledge only alongside the searches that found nothing stronger.
+- **Research**: grounded evidence gathered before asking. Operator-provided notes come first, then named practitioner experience, then primary docs or live code, and model knowledge only alongside the searches that found nothing stronger.
 - **Labelled options**: `1a`, `1b`, `2a`, `2b`, with one marked recommended and the trade-offs stated plainly. When options differ visually or structurally, a small text drawing sits below the options.
 - **Pitfalls avoided**: the traps behind the choice and how each option prevents them.
 - **Reply key and challenge check**: a short reply format (such as `1a 2b`, or any answer in your own words) plus any remaining consultant disagreements.
 
-Not everything is clear right away. Unclear ground — such as *"reports are slow for clients with 50+ campaigns"* — stays in **Fog** inside `CHART.md` until investigation sharpens it into a fork. Work you decide not to build goes under **Off route** with its reason so no agent brings it back later.
+Not everything is clear right away. Unclear ground (such as *"reports are slow for clients with 50+ campaigns"*) stays in **Fog** inside `CHART.md` until investigation sharpens it into a fork. Work you decide not to build goes under **Off route** with its reason so no agent brings it back later.
 
 After every answer, the charting agent saves your words and reason in `forks/<fork-slug>.md`, moves newly clear items out of Fog, and reshapes the remaining forks before asking the next round.
 

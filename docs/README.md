@@ -18,8 +18,8 @@ Read these in order to learn how a charting session works from first note to han
 
 1. [A charting session](guide/04-a-charting-session.md): one session from start to finish in the `c-` tab, and what consultants do.
 2. [Signposts and the needs sheet](guide/05-signposts.md): setting priorities, hard limits, chart order, and operator-only needs once per session.
-3. [Charting mode](guide/06-charting-mode.md): No autopilot, Semi-autopilot, and Full autopilot — who answers the questions while charting.
-4. [Build route](guide/07-build-route.md): Direct and Lifecycle — who builds the work once every question is answered.
+3. [Charting mode](guide/06-charting-mode.md): who answers the questions while charting (No autopilot, Semi-autopilot, and Full autopilot).
+4. [Build route](guide/07-build-route.md): who builds the work once every question is answered (Direct and Lifecycle).
 5. [Decisions, review, and hand-off](guide/08-hand-off.md): locking decisions, the hand-off review, and what the charting agent hands off.
 
 ## Use

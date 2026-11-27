@@ -7,7 +7,7 @@ A clean hand-off is where charting pays off: every decision is written down, eve
 A chart becomes ready for hand-off only when no open fork and no **Fog** item remains. By that point, four safeguards have already run:
 
 1. **Settled fork records**: Every fork file in `issues/chart/<slug>/forks/` holds a `## Taken` section recording either your exact words (under No autopilot) or the charting agent's recorded pick with its reason, rejected options, and any standing consultant dissent (under Semi-autopilot or Full autopilot). Excluded ideas live in `## Off route` inside `CHART.md`.
-2. **Pre-decided GitHub seed decisions**: Any authorized `## Operator decision (<name>, <date>)` section imported from a GitHub seed is already locked and copied verbatim into each affected task's design. If charting finds a concrete blocking defect — such as a removed surface or an unprovable requirement — it surfaces that as a keep-or-change decision (or parks the chart under autopilot).
+2. **Pre-decided GitHub seed decisions**: Any authorized `## Operator decision (<name>, <date>)` section imported from a GitHub seed is already locked and copied verbatim into each affected task's design. If charting finds a concrete blocking defect, such as a removed surface or an unprovable requirement, it surfaces that as a keep-or-change decision (or parks the chart under autopilot).
 3. **Real-world checks (proofs)**: Before hand-off, every external API call, command-line tool call, or pre-existing assumption a task's **done-criteria** (the observable results that prove the work is finished) depend on gets one real observation using the actual identity the task will use (free checks before paid ones). There is no waiver: if something cannot be checked safely or fails its check, the charting agent cuts that unproven piece out of the contract at the hand-off review and names where it lands instead.
 4. **Readiness and presence checks**: Every task gets a `readiness.yaml` file listing its required `inputs` (keys in `.env` or files), `produces`, scoped `grants` (operator-approved live-change grants plus standing permission for paid agent sessions where applicable), `retained` resources, and recorded `proofs`. Before writing any final files, the charting agent checks every draft `readiness.yaml` for missing keys or files so `akrogon status` prints any still-missing `Missing:` items and `akrogon next` holds the task until you supply them.
 
@@ -38,13 +38,13 @@ issues/open/weekly-client-report/
 - **Settled decisions and seed decisions**: a concise recap of the choices locked into the contracts.
 - **Confirmed grants**: any scoped live-account permissions (for example, your staging email send grant for `staging-reports@agency.example`).
 - **Effective seats**: which models will run **slot A (the builder)** and **slot B (the reviewer)**. Only when the work is model-sensitive does the review ask whether to write a custom `slots:` block at the top of `ISSUE.md` or `EPIC.md`; otherwise it uses your repository defaults.
-- **Build route choice**: either the route question (`lifecycle` or `direct`, with the charting agent's recommendation) or the one-line reason [Direct](07-build-route.md) is not offered — for `weekly-client-report`, Direct is refused because it spans two tasks and needs `POSTMARK_API_KEY` plus a staging email grant.
+- **Build route choice**: either the route question (`lifecycle` or `direct`, with the charting agent's recommendation) or the one-line reason [Direct](07-build-route.md) is not offered. For `weekly-client-report`, Direct is refused because it spans two tasks and needs `POSTMARK_API_KEY` plus a staging email grant.
 - **Usage summary**: turn count, operator wait time, and measured token output from `USAGE.md`.
 - **Live-run estimates and pre-existing proofs**: for any task needing live runs, an estimated session count and duration; plus one line per task listing every pre-existing assumption with the proof that checked it (and anything cut).
 
 If consultants are active, once you approve the review, the charting agent writes draft versions of every `brief.md` and `design.md` first, each consultant reviews the drafts as a builder and flags concrete gaps, and the charting agent applies those fixes before writing the final contracts into `issues/open/`. Prerequisite tasks are written before dependent tasks, and `state.yaml` is written last so Akrogon never dispatches a half-written task.
 
-## What the charting agent hands off — and what happens next
+## What the charting agent hands off and what happens next
 
 ### On the Lifecycle route
 
