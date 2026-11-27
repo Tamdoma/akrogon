@@ -6,6 +6,8 @@ Continuing from [Hand-off](08-hand-off.md), `client-portal` now has `issues/open
 
 ## Starting handed-off work from `t-client-portal`
 
+![In the t-client-portal tab you run one of four akrogon next forms: every ready leaf, one leaf by slug, every leaf of an issue or epic, or --all. Each call is one pass: it checks every picked leaf, starts or prompts the seats, runs the merge pass, cleans up finished worktrees, and exits. It does not stay running.](../pictures/next-pass.svg)
+
 Charting never starts builders or reviewers on its own. When you are ready to run the work, switch to your terminal tab (`t-client-portal`) inside the registered `client-portal` repository and run `akrogon next`:
 
 ```sh
@@ -28,6 +30,8 @@ Each `akrogon next` call is a single pass. It checks every picked leaf, starts o
 
 ## Why a ready task may wait
 
+![A picked leaf that cannot start prints one line saying why. It waits on blocked-by (waiting: scheduled-email on csv-export), a missing readiness.yaml input such as POSTMARK_API_KEY, a twin owner folder under issues/closed/ or issues/parked/, the max_active capacity limit, a paused repository, or a stopped or failed leaf.](../pictures/why-a-task-waits.svg)
+
 When you run `akrogon next`, ready leaves start right away and any picked leaf that cannot start prints one line explaining why:
 
 - **Waiting on `blocked-by` dependencies**: A leaf starts only when every slug in its `blocked-by` list is `merged`. While `csv-export` is still in progress, `scheduled-email` waits. A typed `akrogon next` prints a normal status line (on standard output) and does not exit with an error:
@@ -45,6 +49,8 @@ When you run `akrogon next`, ready leaves start right away and any picked leaf t
 
 ## Start order and capacity refill
 
+![Akrogon has no priority field. Within a sweep, rule 1 starts merged leaves first and rule 2 starts leaves with the most unmerged dependents next, so csv-export (1 unmerged dependent) starts ahead of a leaf with none. On every automatic pass, free slots refill from capacity waiters, longest-waiting first.](../pictures/start-order.svg)
+
 Akrogon has no priority field. Within a sweep, it orders leaves by two rules:
 
 1. **Merged leaves first**, so finishing an owner and waking dependent leaves happens before new work takes slots.
@@ -53,6 +59,8 @@ Akrogon has no priority field. Within a sweep, it orders leaves by two rules:
 If a `next` pass refuses a leaf because `max_active` (machine or repo) is full, that leaf is recorded as waiting on `capacity`. On every automatic pass (`akrogon next --wake` or `akrogon next --resume`), after seated and merged leaves are checked, Akrogon refills free slots from capacity waiters **longest-waiting first** across all unpaused repositories. If the oldest waiter's own repository is still at its repo `max_active`, it stays waiting and the next waiter is tried. A leaf that was never refused for capacity is not started by refill.
 
 ## What starts agent sessions and keeps them moving
+
+![The first akrogon next for csv-export creates a git worktree, writes the declared .env keys, runs setup if configured, and opens the leaf tab with slot A, and later slot B when review begins. After that, akrogon-listener.service wakes the next pass whenever a seat ends a turn, and progress lives in files: state.yaml, plan.md, implementation/report.md and the reviews.](../pictures/leaf-start.svg)
 
 When `akrogon next` starts `csv-export` for the first time, it prepares the workspace and launches the leaf's seats automatically:
 
@@ -71,6 +79,8 @@ Because progress lives in plain-text files under `issues/open/weekly-client-repo
 
 ## Lifecycle phases at a glance
 
+![Every Lifecycle leaf moves from plan.synthesis to implement to check.review to merge to merged. A fix verdict sends it to check.repair, Fixes handed to A go through check.fix and back to check.review, and any active phase can stop in failed.](../pictures/lifecycle-phases.svg)
+
 Every Lifecycle leaf moves through the same sequence of phases:
 
 | Phase | Active seat(s) | Skill | Main artifact | Next phase(s) |
@@ -86,6 +96,8 @@ Every Lifecycle leaf moves through the same sequence of phases:
 Any active phase can also stop in `failed` when a seat hits a blocker only a person can resolve.
 
 ## Slot A (the builder)
+
+![Slot A (the builder) plans with plan.md and red-first tests, builds the plan, runs akrogon verify and writes implementation/report.md, then passes the work to slot B (the reviewer). Slot B reviews it in check.review, repairs most Fixes in check.repair, and the leaf moves to merge.](../pictures/slot-a-and-b.svg)
 
 **Slot A** is the fresh builder seat that plans `csv-export`, writes the code, proves every done-criterion, and handles any repair exceptions sent back from review. (Slot A is separate from the charting agent you talked to in `c-client-portal`.)
 
@@ -114,6 +126,8 @@ Finally, slot A writes `implementation/report.md` (changed files, commands and p
 Slot A never stops to ask chat questions; if it hits a human-only blocker (such as a missing credential or a conflict with a locked design decision), it writes the blocker and exact operator action into its pass artifact and stops the leaf in `failed`.
 
 ## Slot B (the reviewer)
+
+![Slot B (the reviewer) side of the same drawing: at the first check both slots review blind and give a verdict of ready, nits or fix. On a fix, slot B repairs most Fixes itself in check.repair. Fixes under Handed to A go to slot A in check.fix, then back to check.review, where only slot B re-checks the repair diff before merge.](../pictures/slot-b-review.svg)
 
 **Slot B** is the independent reviewer seat (fresh for each Lifecycle leaf, separate from any charting consultants). Because slot A wrote the code, slot A is never the sole judge of it.
 
@@ -144,6 +158,8 @@ When any `Handed to A` item remains, slot B moves the leaf to `check.fix`, which
 On every re-check after a repair round (**`fix_rounds > 0`**), **only slot B** runs `check.review`, inspecting only the repair diff since the prior reviewed head. Once slot B reports `ready` or `nits`, `csv-export` moves to `merge`.
 
 ## Watching progress from `t-client-portal`
+
+![Three commands run from t-client-portal. akrogon status shows the whole repository board: the listener live or down, Failed: and Missing: lines, and a table of every leaf. akrogon status csv-export shows one leaf in detail: its state.yaml, flags, History: and the next harness, model and effort. akrogon log prints a saved run-check or verify log by its path.](../pictures/watching-progress.svg)
 
 Check the whole repository board at any time from `t-client-portal`:
 
