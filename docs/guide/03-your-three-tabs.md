@@ -11,9 +11,13 @@ Two rules separate what Akrogon enforces from what is simply your workspace habi
 - **The Herdr space name is required.** Akrogon searches your running `hc` sessions for a Herdr space whose name matches the repository's registered name in `~/.akrogon/config.yaml` verbatim (for `client-portal`, the space must be named `client-portal`). If no running session holds a space with that name, or if two running sessions both hold one, Akrogon refuses to launch seats or consultants for that repository.
 - **The `t-`, `c-`, and `w-` tab names are your convention, not enforced by code.** Akrogon never looks up or requires `t-`, `c-`, or `w-` tab prefixes. Naming your three permanent tabs `t-client-portal`, `c-client-portal`, and `w-client-portal` simply keeps them recognizable beside the temporary task tabs Akrogon opens and closes while tasks run.
 
+![The Herdr space name client-portal is required and must match the key under repos:, while the t-, c- and w- tab names are your convention that Akrogon never checks.](../pictures/space-and-tabs.svg)
+
 ## Create the space and three tabs step by step
 
 These steps set up the `client-portal` space at `~/code/client-portal`.
+
+![Five steps: open herdr-app, create the client-portal space with its t-client-portal tab, add the c-client-portal and w-client-portal tabs with tab.new, then confirm with herdr-app ls and akrogon status.](../pictures/create-space-steps.svg)
 
 ### 1. Open the Herdr window
 
@@ -69,6 +73,8 @@ If you work across multiple repositories (such as `acme-core`, `client-portal`, 
 
 In daily work, **`t-` runs `akrogon status` and `akrogon next`, `c-` runs the charting agent, and `w-` runs the watcher.**
 
+![One Herdr space named client-portal with three tabs: t-client-portal runs akrogon status and akrogon next, c-client-portal runs your agent CLI with /chart-issues, and w-client-portal runs your agent CLI with watch-issues on a 20-minute timer.](../pictures/three-tabs.svg)
+
 | Tab | Role | What you run here |
 | --- | --- | --- |
 | **`t-client-portal`** | Terminal tab | `akrogon status`, `akrogon status --charts`, `akrogon next`, `akrogon next <slug>` |
@@ -82,6 +88,8 @@ In daily work, **`t-` runs `akrogon status` and `akrogon next`, `c-` runs the ch
 ## Task tabs Akrogon manages for you
 
 When `akrogon next` starts a Lifecycle task, Akrogon opens one temporary tab inside the `client-portal` space for that task (named `<slug>`, or `<slug> failed` if it stops in `failed`) holding slot A and slot B, and closes that tab after the task merges. Leave those task tabs to Akrogon while your `t-`, `c-`, and `w-` tabs stay put.
+
+![The client-portal space with its three permanent tabs and one temporary task tab, csv-export, holding slot A, the builder, and slot B, the reviewer. akrogon next opens it, merging closes it, a stopped task shows as csv-export failed, and herdr-core keeps the terminals running when the window closes.](../pictures/task-tabs.svg)
 
 Closing the Herdr window does not kill running terminals: `herdr-core` keeps them alive in the background, and Akrogon continues running seats headless until you reopen the window.
 
