@@ -13,7 +13,7 @@ Chart consultants are different from seats A and B. A consultant is an hc termin
 
 ## chart-issues
 
-- **Result:** charts of open questions (forks) turned into settled leaf contracts in a registered repository. One signposts round opens the session and sets its direction, then three Charting modes — No autopilot, Semi-autopilot and Full autopilot — set who answers the signposts and the forks. A small settled chart can instead take the direct route: the door builds it in a worktree as seat A of a real leaf, seat B reviews, and the command lands it like any leaf.
+- **Result:** charts of open questions (forks) turned into settled leaf contracts in a registered repository. One signposts round opens the session and sets its direction, then three Charting modes (No autopilot, Semi-autopilot and Full autopilot) set who answers the signposts and the forks. A small settled chart can instead take the direct route: the door builds it in a worktree as seat A of a real leaf, seat B reviews, and the command lands it like any leaf.
 - **When to use:** you have notes, reports or seeds and need to decide what to build before any code is written.
 - **Who starts it:** you. It is operator-invoked only. It asks you questions in chat. Semi-autopilot and Full autopilot run only when you switch them on in words.
 - **Source:** [`skills/chart-issues/SKILL.md`](../../skills/chart-issues/SKILL.md)
@@ -43,7 +43,7 @@ Chart consultants are different from seats A and B. A consultant is an hc termin
 
 - **Result:** the reference for the command-owned merge phase: the merge turn's batch and rebase, the `akrogon land` run that verifies, gates and pushes, each `merge_exit` into `check.repair` or `failed`, and the operator's slot-less `akrogon phase <slug> merged`. Merge holds no seat, so no prompt names this skill.
 - **When to use:** to understand or intervene in a leaf's merge: a held batch, a merge exit the repair seat reported, or a `failed` merge leaf's recovery.
-- **Who starts it:** nobody — it documents what the command runs.
+- **Who starts it:** nobody. It documents what the command runs.
 - **Source:** [`skills/merge-issue/SKILL.md`](../../skills/merge-issue/SKILL.md)
 
 ## seed-issue

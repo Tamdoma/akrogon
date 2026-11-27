@@ -14,7 +14,7 @@ This page lists what Akrogon does not do for you, and the work that stays yours.
 - It does not dispatch a leaf with a missing input. `akrogon next` refuses it until the need is supplied.
 - It does not dispatch in a paused repository on automatic passes. A manual `akrogon next` still works there. See [src/pause.ts](../../src/pause.ts).
 - It does not park an issue that has a running leaf, or a set of issues that would leave an open leaf waiting on a leaf that is no longer reachable. See [src/park.ts](../../src/park.ts).
-- It does not approve anything for you, and outside a chart door running Semi-autopilot or Full autopilot it does not decide product questions: seats record an action only you can take and stop the leaf on it, instead of guessing. Under Semi-autopilot and Full autopilot the door's seat A answers its own forks — see [Charting mode](../use/autopilot.md). See [check-issue](../../skills/check-issue/SKILL.md).
+- It does not approve anything for you, and outside a chart door running Semi-autopilot or Full autopilot it does not decide product questions: seats record an action only you can take and stop the leaf on it, instead of guessing. Under Semi-autopilot and Full autopilot the door's seat A answers its own forks; see [Charting mode](../use/autopilot.md). See [check-issue](../../skills/check-issue/SKILL.md).
 - It does not run the operator-only skills by itself. [chart-issues](../../skills/chart-issues/SKILL.md), [learn-issues](../../skills/learn-issues/SKILL.md) and [watch-issues](../../skills/watch-issues/SKILL.md) start only when you start them.
 
 ## What stays your job
