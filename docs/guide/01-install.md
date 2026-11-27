@@ -19,6 +19,8 @@ Before installing, run these checks in a terminal. Each row shows the command an
 | One coding agent CLI (`claude`, `codex`, `agy`, or `pi`; the starter config below uses `claude`) | `claude --version` | A version number (or check `codex --version`, `agy --version`, or `pi --version`) |
 | Optional: GitHub CLI (`gh`), only if you mirror or close GitHub issues | `gh auth status` | `Logged in to github.com account ...` |
 
+![A checklist for a ready machine: Linux with a systemd user manager, Bun, Git, flock, herdr-core, herdr-app and one agent CLI, each with its check command and what a ready machine prints, plus the optional GitHub CLI.](../pictures/machine-check.svg)
+
 For `systemctl --user is-system-running`, `degraded` means an unrelated user service failed while the user manager itself is running, which is enough for Akrogon. Any other output or an error means no `systemd` user manager is running.
 
 If Akrogon is already installed on this machine, run `akrogon config`. Outside a registered repository, it prints your active machine settings as YAML ending with `repo: none`. When every check above matches, skip straight to [Set up a repo](02-set-up-a-repo.md).
@@ -26,6 +28,8 @@ If Akrogon is already installed on this machine, run `akrogon config`. Outside a
 ## Install step by step
 
 Run these steps in order from a fresh machine.
+
+![Five install steps from left to right: clone into ~/code/akrogon, write ~/.akrogon/config.yaml, run bun install and bun src/akrogon.ts install, put ~/.local/bin on PATH, and check that akrogon config ends with repo: none. Under step 3, what install creates: ~/.akrogon/current, ~/.local/bin/akrogon, skill folders for every agent CLI and systemd units with akrogon-listener.service.](../pictures/install-steps.svg)
 
 ### 1. Clone Akrogon
 
@@ -155,6 +159,8 @@ harnesses:
   pi: "pi --model {model} --thinking {effort} -a --exclude-tools request_user_input"
 ```
 
+![The harnesses: list in ~/.akrogon/config.yaml holds claude, codex, agy and pi. Each slot names one harness, for example slot A, the builder, uses claude, slot B, the reviewer, uses codex, and consultant uses pi. Every harness a slot names needs a line under harnesses:.](../pictures/agent-clis.svg)
+
 Keep `claude:` under `harnesses:` if any slot still uses `claude`. Every harness referenced by `slots` (in `~/.akrogon/config.yaml`, a repository's `issues/config.yaml`, or an issue's front matter) must have a matching entry here. For `pi`, Akrogon automatically appends a fresh `--session-id` at launch; for `agy`, Akrogon handles the startup trust prompt once the terminal opens.
 
 For every key `~/.akrogon/config.yaml` accepts, see [Settings](../reference/config.md).
@@ -162,5 +168,7 @@ For every key `~/.akrogon/config.yaml` accepts, see [Settings](../reference/conf
 ## Updates and rollback
 
 If you also register your Akrogon checkout as the repository `akrogon`, Akrogon builds a release under `~/.akrogon/releases/<commit>` from each merged update and switches `~/.akrogon/current` to that release automatically instead of running directly from your checkout. See [Releases and updates](../reference/releases-and-updates.md) for how deploys work, and [Roll back a release](../reference/roll-back-a-release.md) if an update ever breaks `akrogon`.
+
+![With your checkout registered as the repository akrogon, each merged update builds a release under ~/.akrogon/releases/, ~/.akrogon/current switches to it, and akrogon rollback points current back at the previous release.](../pictures/updates-and-rollback.svg)
 
 Previous: [Docs home](../README.md) · Next: [Set up a repo](02-set-up-a-repo.md)
