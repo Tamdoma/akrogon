@@ -86,19 +86,21 @@ function writeAtomic(path: string, content: string, mode: number): void {
   renameSync(temp, path);
 }
 
+// A PATH entry naming the seat entry directory, by resolved path or realpath.
+export function isToolEntryDir(dir: string, home: string): boolean {
+  const entryDir: string = resolve(home, 'tool-entry');
+  const realEntry: string | undefined = existsSync(entryDir) ? realpathSync(entryDir) : undefined;
+  return resolve(dir) === entryDir || (realEntry !== undefined && existsSync(dir) && realpathSync(dir) === realEntry);
+}
+
 // The real bash resolved once per refresh: PATH entries inside the entry
 // directory itself are filtered out so the wrapper can never resolve to
 // itself; anything unreadable falls back to /usr/bin/bash.
 function realBash(home: string): string {
-  const entryDir: string = resolve(home, 'tool-entry');
-  const realEntry: string | undefined = existsSync(entryDir) ? realpathSync(entryDir) : undefined;
   const candidates: string[] = [];
   for (const dir of (process.env.PATH ?? '').split(':')) {
-    if (dir === '') continue;
-    const resolvedDir: string = resolve(dir);
-    if (resolvedDir === entryDir || (realEntry !== undefined && existsSync(dir) && realpathSync(dir) === realEntry))
-      continue;
-    candidates.push(resolve(resolvedDir, 'bash'));
+    if (dir === '' || isToolEntryDir(dir, home)) continue;
+    candidates.push(resolve(dir, 'bash'));
   }
   candidates.push('/usr/bin/bash');
   for (const candidate of candidates) {

@@ -35,7 +35,7 @@ import { locate, type LogTarget } from './evidence';
 import { FlockError, flockHold } from './flock';
 import { captureAncestry } from './pack';
 import { leafSlice, runSlice, runUnitArgv, runUnitBase, runtimeDir, sessionBusAddress, startRunGuard } from './scope';
-import { relocateFromToolCgroup } from './tool-cgroup';
+import { isToolEntryDir, relocateFromToolCgroup } from './tool-cgroup';
 import { type Phase } from './routing';
 
 const forbidden: readonly string[] = [
@@ -86,6 +86,11 @@ export function constructedEnv(repo: Repo, runRoot: string): Record<string, stri
     const value: string | undefined = process.env[key];
     if (value !== undefined) env[key] = value;
   }
+  // An agy seat puts its tool-entry wrapper first on PATH; like every other seat wiring it stays out of checked runs.
+  if (env.PATH !== undefined)
+    env.PATH = env.PATH.split(':')
+      .filter((dir: string): boolean => dir === '' || !isToolEntryDir(dir, homePath()))
+      .join(':');
   env.LANG = 'C.UTF-8';
   for (const key of [...repo.config.env, ...repo.config.pass_env]) {
     const value: string | undefined = process.env[key];
