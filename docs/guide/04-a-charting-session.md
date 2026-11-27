@@ -51,6 +51,8 @@ Consultants also review the draft task contracts as builders right before final 
 
 Using `client-portal`'s weekly client report export, a complete charting session moves through six steps:
 
+![One charting session in the c- tab: intake, signposts, a territory map drawn with consultants, one decision per round, Charting mode and Build route, then the hand-off.](../pictures/charting-session.svg)
+
 ### 1. Intake
 
 The charting agent creates a chart folder under `issues/chart/<slug>/` (for example, `issues/chart/weekly-client-report/`) and saves your exact request in `INTAKE.md`, kept separate from the agent's own code findings.

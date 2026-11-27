@@ -6,6 +6,8 @@ Separating how questions get answered from how code gets built lets you hand off
 
 They are two independent choices — with one firm rule linking them: **the Direct build route is offered only under No autopilot.** Under Semi-autopilot and Full autopilot, every chart uses the Lifecycle build route.
 
+![Charting mode (No autopilot, Semi-autopilot, Full autopilot) and Build route (Direct, Lifecycle) are two separate choices. Direct is available only with No autopilot. Every mode can use Lifecycle.](../pictures/mode-and-route.svg)
+
 ## The three Charting modes at a glance
 
 | Charting mode | Who answers signposts | Who answers each fork | Direct route offered? | Best fit |

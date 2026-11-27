@@ -4,6 +4,8 @@ Choosing the right build route lets you ship small, settled changes in minutes w
 
 **Build route decides who builds the work once every question is answered. [Charting mode](06-charting-mode.md) decides who answers the questions while the work is charted.**
 
+![Charting mode (No autopilot, Semi-autopilot, Full autopilot) and Build route (Direct, Lifecycle) are two separate choices. Direct is available only with No autopilot. Every mode can use Lifecycle.](../pictures/mode-and-route.svg)
+
 Once a chart has no open questions left, Akrogon supports two Build routes: **Direct** and **Lifecycle**.
 
 ## Direct vs Lifecycle at a glance
