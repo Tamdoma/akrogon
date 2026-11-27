@@ -59,7 +59,7 @@
   <rect class="box" x="300" y="430" width="620" height="58" rx="9"/>
   <text x="320" y="454">Stopped or failed leaf</text>
   <text class="soft" x="900" y="454" text-anchor="end">automatic passes skip it</text>
-  <text class="mono" x="320" y="475">akrogon start &lt;slug&gt;</text>
+  <text class="mono" x="320" y="475">stopped: akrogon start &lt;slug&gt;, failed: needs phase recovery</text>
 
   <g transform="translate(838 518)"><title>Tamdoma</title>
   <text x="0" y="0" text-anchor="end" style="font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; letter-spacing: .04em; fill: #5e7355;">created by</text>
