@@ -18,11 +18,13 @@ const SETUP_PAGES: string[] = [
 ];
 const HERO: RegExp = /!\[([^\]]*)\]\(docs\/pictures\/three-tabs\.svg\)/;
 const AWAY_PAGES: string[] = ['docs/guide/11-while-you-are-away.md', 'docs/guide/12-when-work-stops.md'];
+const BUILD_PAGES: string[] = ['docs/guide/09-lifecycle.md', 'docs/guide/10-merging.md'];
 // Page 04's tab section links to page 03, whose picture shows the tabs.
 const NO_PICTURE_HEADING: string = 'Where you chart';
 const EMBED: RegExp = /!\[([^\]]*)\]\((\.\.\/pictures\/[^)\s]+\.svg)\)/g;
 const MARK: RegExp = /<g transform="translate\([-\d.]+ [-\d.]+\)"><title>Tamdoma<\/title>[\s\S]*?<\/g>\s*<\/g>/g;
 const FORBIDDEN: string[] = ['href', '<script', '@import', '@font-face', 'animation', '<animate'];
+const RETIRED_PHRASES: RegExp = /manual mode|manual route|quick fix|autopilot signposts/i;
 
 type Section = { page: string; heading: string; body: string };
 
@@ -76,6 +78,7 @@ function markProblems(root: string, pictures: string[]): string[] {
     for (const token of FORBIDDEN) {
       if (svg.toLowerCase().includes(token.toLowerCase())) problems.push(`${picture}: holds ${token}`);
     }
+    if (RETIRED_PHRASES.test(svg)) problems.push(`${picture}: holds a retired phrase`);
     const groups: string[] = svg.match(MARK) ?? [];
     const titles: number = svg.split('<title>Tamdoma</title>').length - 1;
     if (groups.length !== 1 || titles !== 1) {
@@ -138,6 +141,18 @@ test('every SVG in docs/pictures holds one identical mark group and no outside o
   expect(markProblems(repoRoot, pictures)).toEqual([]);
 });
 
+test('every section of guide pages 09 and 10 has its own picture with alt text', (): void => {
+  expect(sections(repoRoot, BUILD_PAGES).length).toBe(14);
+  expect(sectionsWithoutPicture(repoRoot, BUILD_PAGES)).toEqual([]);
+  expect(embeddedPictures(repoRoot, BUILD_PAGES).length).toBe(sections(repoRoot, BUILD_PAGES).length);
+});
+
+test('pictures on guide pages 09 and 10 hold the same mark group as pages 04 to 08 and no outside or moving markup', (): void => {
+  expect(embeddedPictures(repoRoot, ['docs/guide/09-lifecycle.md'])).toContain('docs/pictures/slot-a-and-b.svg');
+  expect(embeddedPictures(repoRoot, ['docs/guide/10-merging.md'])).toContain('docs/pictures/merge-landing.svg');
+  expect(pictureProblems(repoRoot, [...CHARTING_PAGES, ...BUILD_PAGES])).toEqual([]);
+});
+
 test('the picture checks catch a missing picture, blank alt, a changed mark group and forbidden markup', (): void => {
   const dir: string = mkdtempSync(join(tmpdir(), 'akrogon-pictures-'));
   const mark: (x: number, y: number, scale: string) => string = (x: number, y: number, scale: string): string =>
@@ -180,10 +195,14 @@ test('the picture checks catch a missing picture, blank alt, a changed mark grou
       '<style>@font-face { font-family: X; }</style>',
       '<style>text { animation: spin 1s; }</style>',
       '<animate attributeName="x" to="1"/>',
+      '<text>Manual mode</text>',
     ];
-    const expected: string[] = ['href', 'href', '<script', '@import', '@font-face', 'animation', '<animate'].map(
-      (token: string): string => `docs/pictures/b.svg: holds ${token}`,
-    );
+    const expected: string[] = [
+      ...['href', 'href', '<script', '@import', '@font-face', 'animation', '<animate'].map(
+        (token: string): string => `docs/pictures/b.svg: holds ${token}`,
+      ),
+      'docs/pictures/b.svg: holds a retired phrase',
+    ];
     tokens.forEach((body: string, i: number): void => {
       writeFileSync(join(dir, 'docs/pictures/b.svg'), svg(`${body}\n${mark(838, 442, '0.05')}`));
       expect(pictureProblems(dir, pages)).toEqual([expected[i]]);
