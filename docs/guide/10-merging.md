@@ -12,7 +12,7 @@ Each registered repository has **one merge turn** at a time. Leaves in `merge` l
 
 Akrogon orders eligible `merge` leaves by three rules:
 
-1. **Active batch holder first**: A leaf already holding a `batch` record keeps the turn until its attempt finishes.
+1. **Active batch holder first**: A leaf already partway through landing keeps the turn until that attempt finishes. Akrogon tracks each landing attempt as a `batch` record in the leaf's `state.yaml`.
 2. **Most unmerged dependents next**: Transitive count of unmerged leaves waiting on it, so `csv-export` (blocking `scheduled-email`) lands ahead of a leaf with zero dependents.
 3. **Earliest `merge_stamp`**: The timestamp recorded when the leaf entered `merge` (falling back to `issues/log.jsonl` and then slug order).
 
@@ -31,7 +31,7 @@ When `csv-export` gets the merge turn, `akrogon next` handles the rebase and lau
 
 1. **Reconciles existing batches**: If a dead land unit had already pushed its candidate commit, Akrogon reconciles the leaf straight to `merged`; if an applied batch lost its land unit before pushing, Akrogon relaunches `akrogon land` under the same attempt ID.
 2. **Fetches and rebases**: Fetches `<remote>` (`origin`), records a new `batch` in `state.yaml`, rebases `csv-export` onto `<remote>/<default_branch>` in a disposable worktree, and strips any resurrected retired lines from `learnings/LESSONS.md` as a fixup commit (`lessons: retire applied lines`) if needed.
-3. **Applies and starts the land unit**: Moves branch `csv-export` to the rebased `top`, marks `batch.applied: true`, and starts:
+3. **Applies and starts the land unit**: Moves branch `csv-export` to the rebased commit (`top`) and starts:
 
    ```sh
    akrogon land csv-export --attempt <id>
@@ -45,8 +45,8 @@ If the rebase conflicts or the `csv-export` worktree has uncommitted edits at tu
 
 `akrogon land csv-export --attempt <id>` holds the repository's check admission line for the whole attempt (later runs for `client-portal` wait until the land run finishes) and performs three steps:
 
-1. **Runs merge verification**: Executes `akrogon verify --attempt <id>` on a fresh checkout of the candidate head. Merge verification runs `setup`, then every `checks` entry **not** listed in `merge_covers` (non-`full` in config order, then `full`), and once those are green, runs every **`merge_checks`** entry **in parallel**. `akrogon verify --attempt <id>` is the only runner of `merge_checks`; `akrogon run-check` refuses them.
-2. **Enforces land gates**: Checks that the worktree is clean, no files under `issues/` are touched on the branch, every changed or added test file has its required `Test-Change:` trailer over the pushed range (plus frozen-plan checks), no retired lesson line was resurrected in the range, HEAD descends from the recorded `top`, and a qualifying green merge receipt (or main-red cover) exists for HEAD. Passing stamps `batch.tested_top` and `batch.tested_main`.
+1. **Runs merge verification**: Executes `akrogon verify --attempt <id>` on a fresh checkout of the candidate head. Merge verification runs `setup`, then every `checks` entry **not** listed in `merge_covers` (in config order, with the slow checks listed under `full` last), and once those are green, runs every **`merge_checks`** entry **in parallel**. `akrogon verify --attempt <id>` is the only runner of `merge_checks`; `akrogon run-check` refuses them.
+2. **Enforces land gates**: Checks that the worktree is clean, no files under `issues/` are touched on the branch, every changed or added test file has its required `Test-Change:` trailer over the pushed range (plus frozen-plan checks), no retired lesson line was resurrected in the range, HEAD descends from the recorded `top`, and a qualifying green merge receipt (or main-red cover) exists for HEAD.
 3. **Pushes fast-forward**: Pushes the tested head fast-forward to `<remote>/<default_branch>` (never `--force`):
    - **Success**: Records the attempt as `merged` and moves `csv-export` to `merged` with no seat.
    - **First non-fast-forward refusal**: Someone else pushed to `main` while checks ran. Land fetches the new remote tip, restacks (replays the leaf's commits onto the updated branch), re-verifies and re-gates, and retries the push **once** inside the same run.
@@ -69,7 +69,7 @@ Because merge holds no seat, any uncovered red verify, refused gate, rebase conf
 Before exiting on `red`, `akrogon land` checks two built-in covers automatically:
 
 - **Main-red cover**: If every failing unit is a named test title already failing the same command in an unresolved base comparison run on `main`, the head lands with that run as its receipt.
-- **Repeated-red base check**: If a returning leaf fails again on the exact same recorded holder head with at least one repeating named test title that the cover missed, land runs the base commit itself (or reuses an existing green row on the merge-base tree). If the base is red on every failing unit, the head lands; if the base is green, land exits to `check.repair` with `base_verdict=<id>` pointing to that green base evidence.
+- **Repeated-red base check**: If a returning leaf fails again on the exact same recorded holder head with at least one repeating named test title that the cover missed, land runs the base commit itself (or reuses an earlier green result for that same base commit). If the base is red on every failing unit, the head lands; if the base is green, land exits to `check.repair` with `base_verdict=<id>` pointing to that green base evidence.
 
 When a leaf lands in `check.repair` from merge, **slot B** reads the kept logs with `akrogon log` (and may run the narrowest failing command through `akrogon run-check`, never the whole `merge_checks` suite) and takes one of four outcomes:
 
