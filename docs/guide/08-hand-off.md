@@ -50,11 +50,11 @@ If consultants are active, once you approve the review, the charting agent write
 
 ## What the charting agent hands off and what happens next
 
+![On Lifecycle, contracts land in issues/open/ and CHART.md says Handed off, but nothing starts until you run akrogon next in t-client-portal or turn on the watcher in w-client-portal. On Direct, the charting agent runs akrogon direct and builds the one task, the merge queue lands it and CHART.md says Closed.](../pictures/after-hand-off.svg)
+
 ### On the Lifecycle route
 
 **At the end of a Lifecycle chart, the charting agent hands off written task contracts under `issues/open/` for a fresh slot A (the builder) and slot B (the reviewer). It does not start the work.**
-
-![On Lifecycle, contracts land in issues/open/ and CHART.md says Handed off, but nothing starts until you run akrogon next in t-client-portal or turn on the watcher in w-client-portal. On Direct, the charting agent runs akrogon direct and builds the one task, the merge queue lands it and CHART.md says Closed.](../pictures/after-hand-off.svg)
 
 Specifically:
 
