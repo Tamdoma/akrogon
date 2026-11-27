@@ -2,7 +2,7 @@
 
 Akrogon runs from an installed release, not from your source checkout. Landed work reaches the release through a deploy. This page explains where releases live, how registered checkouts follow the default branch, what starts a deploy and how a failed update shows up.
 
-![Releases are built from the merged default branch into a release folder that holds the active release behind current and the previous release. akrogon rollback makes the previous release active and holds the rolled-back commit.](../pictures/releases.svg)
+A deploy builds a release from the tip of the remote default branch, and `current` points at the active release. `akrogon rollback` makes the previous release active and holds the rolled-back commit.
 
 ## Release and checkout
 

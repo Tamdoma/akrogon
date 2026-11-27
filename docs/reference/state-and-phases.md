@@ -4,7 +4,7 @@ Each leaf has a `state.yaml` file in its folder. It says which phase the leaf is
 
 The commands write `state.yaml` read-only, so an agent's edit tool fails on it and the agent has to use the command. To edit it by hand on purpose, run `chmod u+w <path>` first.
 
-![Leaf phases from plan.synthesis through merged. A leaf starts at plan.synthesis. A fix verdict in check.review loops through check.repair and check.fix back to check.review. Any boxed phase can stop in failed.](../pictures/phases.svg)
+A leaf starts at `plan.synthesis` and moves through `implement`, `check.review` and `merge` to `merged`. A `fix` verdict loops through `check.repair` and `check.fix` back to `check.review`, and any active phase can stop in `failed`.
 
 ## Phases
 

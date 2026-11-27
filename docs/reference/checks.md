@@ -2,7 +2,7 @@
 
 This page explains how akrogon runs your checks, what proof a phase move asks for, and what to do when a move is refused. Each command named here has a one-line entry in [Commands](commands.md#checks-and-logs). The check settings live in [Settings](config.md#repo-issuesconfigyaml).
 
-![A change goes through akrogon verify on a fresh checkout. Green writes a receipt. Red can pass only if the same tests fail on the base. A changed test file without a trailer is refused.](../pictures/verification.svg)
+`akrogon verify` checks a commit on a fresh checkout and writes a receipt, and the phase moves below need a green one. A red check passes only when the same tests also fail on the base, and a changed test file without a `Test-Change` trailer is refused.
 
 ## What runs where
 

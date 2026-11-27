@@ -2,7 +2,7 @@
 
 Akrogon keeps two kinds of things apart. Issue records live in the registered checkout under `issues/`. Code changes live in leaf worktrees, in a store outside the checkout.
 
-![Project folders: the registered checkout's issues/ folder holds seeds/, chart/, open/, parked/ and closed/ plus the records log.jsonl, timings.jsonl, merge-attempts.jsonl and verify-runs.jsonl, and a separate worktree store at ~/.akrogon/worktrees/<repo> holds one folder per leaf](../pictures/project-folders.svg)
+The registered checkout's `issues/` folder holds the record folders and logs laid out below. Leaf worktrees live in a separate store, by default `~/.akrogon/worktrees/<repo>`.
 
 ## Layout of issues/
 

@@ -2,7 +2,7 @@
 
 Akrogon reads its settings from three places. This page says what each place holds and which one wins when two of them set the same seat. The rules live in [src/config.ts](../../src/config.ts).
 
-![Seat a and seat b are each looked up in ISSUE.md, then EPIC.md, then the repo issues/config.yaml, then the machine config.yaml, and the first file that sets the seat wins](../pictures/config-layers.svg)
+Seats `a` and `b` are each looked up in `ISSUE.md`, then `EPIC.md`, then the repo `issues/config.yaml`, then the machine `config.yaml`. The first file that sets the seat wins.
 
 To see the settings that apply where you stand, run:
 
