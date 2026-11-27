@@ -29,7 +29,7 @@ One page per job.
 - [A working day](use/a-working-day.md): the order of the steps from request to merged, and the two other routes.
 - [Plan work](use/plan-work.md): chart a request into leaf contracts with `/chart-issues`.
 - [Quick fix](use/quick-fix.md): let the chart door build one small, settled change itself through the direct route.
-- [Autopilot](use/autopilot.md): let the chart door chart and hand off a fixed list of work without asking you each question.
+- [Charting mode](use/autopilot.md): let the chart door chart and hand off a fixed list of work without asking you each question.
 - [Write issues by hand](use/write-issues-by-hand.md): write the leaf files yourself and order leaves with `blocked-by`.
 - [Run work](use/run-work.md): start ready leaves and move running ones forward with `akrogon next`.
 - [Park, pause and stop](use/park-pause-stop.md): hold work back by parking an issue, pausing a repository, stopping a leaf or stopping one check run.
@@ -62,7 +62,7 @@ Real cases from projects outside Akrogon. They are not steps to follow.
 
 - [Examples](examples/README.md): an overview of the three stories.
 - [Quick fix story](examples/quick-fix-story.md): one bug fixed through the direct route.
-- [Autopilot story](examples/autopilot-story.md): three speed reports charted by autopilot and landed as three leaves.
+- [Semi-autopilot story](examples/autopilot-story.md): three speed reports charted under Semi-autopilot and landed as three leaves.
 - [Recovery story](examples/recovery-story.md): a failed leaf whose code was carried forward and merged.
 
 The code map for agents is the [reference index](reference-index.md).

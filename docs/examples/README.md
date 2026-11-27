@@ -6,9 +6,9 @@ These are real cases from projects outside Akrogon. Each one tells what happened
 
 [Quick fix story](quick-fix-story.md) shows the direct route. A bug in a web framework project was charted with one fork, and the chart door built, reviewed and landed the fix itself, with one repair round and no leaf files. The rules are in [Quick fix](../use/quick-fix.md).
 
-## Autopilot story
+## Semi-autopilot story
 
-[Autopilot story](autopilot-story.md) shows autopilot. In a project that builds client websites, the chart door answered its own forks for three speed reports and handed off three leaves. The leaves then ran through review, repair and merge, and all three landed. The rules are in [Autopilot](../use/autopilot.md).
+[Semi-autopilot story](autopilot-story.md) shows Semi-autopilot. In a project that builds client websites, the chart door answered its own forks for three speed reports and handed off three leaves. The leaves then ran through review, repair and merge, and all three landed. The rules are in [Charting mode](../use/autopilot.md).
 
 ## Recovery story
 

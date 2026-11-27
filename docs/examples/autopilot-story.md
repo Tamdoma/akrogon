@@ -1,10 +1,10 @@
-# Autopilot story: three speed fixes
+# Semi-autopilot story: three speed fixes
 
-This is a true story from a project that builds client websites. Three bug reports were about speed: a client texture image was shipped as a heavy raw file, built sites had no measured speed floor, and an SEO audit called its own speed data a gap. The operator handed them to a chart door in [Autopilot](../use/autopilot.md). Seat A charted them alone, three leaves ran through the lifecycle, and all three landed on main.
+This is a true story from a project that builds client websites. Three bug reports were about speed: a client texture image was shipped as a heavy raw file, built sites had no measured speed floor, and an SEO audit called its own speed data a gap. The operator handed them to a chart door running [Semi-autopilot](../use/autopilot.md). Seat A charted them alone, three leaves ran through the lifecycle, and all three landed on main.
 
-## The operator switched autopilot on
+## The operator switched Semi-autopilot on
 
-The operator typed one message in the chart door's pane. It named autopilot, the batch of reports, and one chart consultant, B. The door was running [chart-issues](../../skills/chart-issues/SKILL.md). It saved the words in the chart's `INTAKE.md` and added a mode line to `CHART.md`.
+The operator typed one message in the chart door's pane. It named Semi-autopilot, the batch of reports, and one chart consultant, B. The door was running [chart-issues](../../skills/chart-issues/SKILL.md). It saved the words in the chart's `INTAKE.md` and added a mode line to `CHART.md`.
 
 The batch held several charts. The door worked them one at a time. Between charts it handed itself to a fresh conversation in the same pane, so its context stayed small. Each handover was written in the mode record.
 
@@ -21,7 +21,7 @@ The chart's destination named the three outcomes. Seat A wrote each fork as a fu
 
 Two things stayed off route: moving another audit's Lighthouse runner, and changing how analytics scripts load. Both are listed under `Off route`.
 
-Every handed chart takes the lifecycle route in autopilot. The door wrote three leaves, `pagespeed-rank-preflight`, `brand-raster-webp` and `lighthouse-floor-gate`, each starting at `plan.synthesis`. `akrogon status` read all three without error. The chart's last marker became `Handed off`, and the mode turned itself off because no handed chart was left open.
+Every handed chart takes the lifecycle route under Semi-autopilot. The door wrote three leaves, `pagespeed-rank-preflight`, `brand-raster-webp` and `lighthouse-floor-gate`, each starting at `plan.synthesis`. `akrogon status` read all three without error. The chart's last marker became `Handed off`, and the mode turned itself off because no handed chart was left open.
 
 The whole chart took one operator turn. The usage lines in `USAGE.md` came from the door's usage script, run just before the handoff review.
 

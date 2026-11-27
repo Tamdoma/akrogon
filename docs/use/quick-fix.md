@@ -20,7 +20,7 @@ The door refuses the direct route, and says why in one line, when any of these h
 - A step only a person can do is still pending.
 - No B pane is named.
 - The door is not inside hc.
-- The door is running in [Autopilot](autopilot.md).
+- The door is running in [Semi-autopilot or Full autopilot](autopilot.md).
 
 When it refuses, you get the normal lifecycle questions.
 
@@ -51,4 +51,4 @@ A task that outgrows the route stops the leaf `failed`: a settled decision must 
 
 The full command list is in [commands.md](../reference/commands.md).
 
-Next: [Autopilot](autopilot.md)
+Next: [Charting mode](autopilot.md)

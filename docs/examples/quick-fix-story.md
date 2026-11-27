@@ -2,7 +2,7 @@
 
 This page tells how one real bug in a web framework project went through the direct route, from the operator's request to the fix on the main branch. The rules behind each step are in [Quick fix](../use/quick-fix.md).
 
-![Ways to run a chart: an attended chart ends in the direct route when small and eligible or in a lifecycle handoff, an autopilot chart ends only in a lifecycle handoff, and an optional watch runs beside the handed-off leaves.](../pictures/ways-to-run.svg)
+![Ways to run a chart: a No autopilot chart ends in the direct route when small and eligible or in a lifecycle handoff, a Semi-autopilot or Full autopilot chart ends only in a lifecycle handoff, and an optional watch runs beside the handed-off leaves.](../pictures/ways-to-run.svg)
 
 This story took the direct route branch of the picture.
 
