@@ -59,4 +59,4 @@ Sources: [src/self-update.ts](../../src/self-update.ts) (`deployStage`, `selfUpd
 
 ## Rollback
 
-`akrogon rollback` makes the previous release active and holds the rolled-back commit so it does not redeploy. See [src/rollback.ts](../../src/rollback.ts).
+`akrogon rollback` makes the previous release active and holds the rolled-back commit so it does not redeploy. See [Roll back a release](roll-back-a-release.md) and [src/rollback.ts](../../src/rollback.ts).

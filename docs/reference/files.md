@@ -30,7 +30,7 @@ Akrogon keeps two kinds of things apart. Issue records live in the registered ch
 | `parked/`        | Issues moved aside by `akrogon park`. `akrogon unpark` moves them back.                                                                                                                                                                     | [park.ts](../../src/park.ts)                                                                       |
 | `closed/`        | Completed issues. When every leaf of the owner (the issue, or its epic when it has one) is done, its `*.log` files are deleted and the owner folder moves here. Each run's failing test names stay in `verify-runs.jsonl`. `akrogon log <path>` still reads a log from an older `evidence.tar.zst` by its plain path. | [phase.ts](../../src/phase.ts), [pack.ts](../../src/pack.ts), [evidence.ts](../../src/evidence.ts) |
 
-`akrogon sync` commits eligible files under `issues/`. It skips `seeds/`, `.lock` and `.closing` files, and the worktree store if it sits inside the checkout. It never commits leaf code. See [sync.ts](../../src/sync.ts) `eligibleRecord`.
+`akrogon sync` commits eligible files under `issues/` (see [Saving records with akrogon sync](#saving-records-with-akrogon-sync)). It skips `seeds/`, `.lock`, `.closing`, `*.tar.zst.tmp`, and the worktree store if it sits inside the checkout, and never commits leaf code. See [sync.ts](../../src/sync.ts) `eligibleRecord`.
 
 ## Issue and epic files
 
@@ -103,3 +103,95 @@ It skips runs that never finished, runs whose setup failed and entries marked `r
 Leaf code lives outside the checkout. The default store is `~/.akrogon/worktrees/<repo>`, with one folder per leaf. `akrogon config` prints the resolved path as `worktree_store`.
 
 The repo key `worktree_root` in `issues/config.yaml` moves the store. It must point outside the checkout, or Akrogon refuses with an error. See [config.ts](../../src/config.ts) `worktreeStore`.
+
+## Writing issues by hand
+
+When work is already settled, you can skip charting and write the leaf files yourself under `issues/open/` in your registered checkout. A leaf sits two or three folders deep:
+
+```text
+issues/open/<issue>/<slug>/
+issues/open/<epic>/<issue>/<slug>/
+```
+
+Put these starter files in place:
+
+```text
+issues/open/<issue>/
+  ISSUE.md
+  <slug>/
+    brief.md
+    design.md
+    state.yaml
+```
+
+- `ISSUE.md` states the issue's overall goal. An epic folder holds `EPIC.md` for the epic's goal.
+- `brief.md` is the leaf contract: owned files, limits, and concrete done-criteria.
+- `design.md` holds decisions the seats need. Leave it out if you have none.
+- `state.yaml` holds the leaf's lifecycle state.
+
+Seats read `brief.md` and `design.md` at every phase (see [plan-issue](../../skills/plan-issue/SKILL.md)). Start `state.yaml` with only the fields a person sets:
+
+```yaml
+slug: <slug>
+phase: plan.synthesis
+created: <date>
+repo: <repo>
+blocked-by: []
+sources: []
+```
+
+- `slug` must match the leaf folder name, using lowercase letters and digits joined by `-`. Each slug must be unique in the repository; duplicate slugs are reported unreadable ([state.ts](../../src/state.ts)).
+- `repo` is the repository's key from `repos` in your machine `config.yaml`. A leaf with another key is reported and skipped.
+- A leaf starts at `plan.synthesis`, where seat A writes `plan.md`.
+- Optional `sources` lists GitHub reports this leaf delivers as `owner/repo#n`, closed when the leaf's issue or epic completes.
+- Leave every other field to Akrogon commands (see [state-and-phases.md](state-and-phases.md)).
+
+A new folder does not start on its own; run `akrogon next <slug>` to dispatch it.
+
+### Ordering leaves with `blocked-by`
+
+Add another leaf's slug to `blocked-by` when this leaf needs that leaf's merged code:
+
+- Entries are leaf slugs, not issue folder names.
+- The leaf starts only when every listed leaf is `merged`. Until then `akrogon next` prints `waiting: <slug> on <other-slug> (<phase>)` ([next.ts](../../src/next.ts)).
+- A listed leaf that is `failed`, `parked`, `missing`, or `unreadable` keeps the leaf from starting ([turn.ts](../../src/turn.ts) `unmergedDeps`).
+- When a leaf merges, Akrogon starts leaves in the same repository that list it.
+- Akrogon does not check for cycles. Two leaves that list each other never start.
+- `blocked-by` is not a priority list. Leave it empty when leaves do not depend on each other so they can run in any order.
+
+`akrogon status` shows each leaf's `blocked-by` list on the board. See [commands.md](commands.md).
+
+## Saving records with akrogon sync
+
+Akrogon keeps leaf code and lifecycle records apart. A leaf branch carries code only, while plans, reviews, state, and logs under `issues/` live on the default branch in the registered checkout. A phase move refuses any leaf branch that changes files under `issues/`, failing with `Issue files on leaf branch belong in <leaf folder>` ([phase.ts](../../src/phase.ts) `requireNoIssueFiles`).
+
+To save records from the registered checkout on its default branch, run `akrogon sync`. It runs these steps in order ([sync.ts](../../src/sync.ts)):
+
+1. Checks that HEAD is on the configured `default_branch`. Any other branch or a detached HEAD stops it with `Cannot sync from <branch>; required branch: <default_branch>`.
+2. Checks staged files. If anything staged is outside eligible issue records, it stops and lists those paths with `Cannot sync with staged paths outside eligible issue records`.
+3. Checks that active coordination lock paths inside the repo are not tracked in git.
+4. Fetches the configured remote's default branch, and verifies that no active coordination lock paths arrive or replay and no git-ignored local paths collide with incoming or replayed files.
+5. Stages every changed, deleted, or new eligible record under `issues/` and commits with the message `sync issues`. Nothing staged means no commit.
+6. Rebases onto the fetched tip with `--autostash`, setting aside your other unstaged edits and putting them back. If restoring those edits conflicts, sync stops before pushing and lists the conflicting paths.
+7. Pushes to the configured remote's default branch.
+
+### Eligible and skipped files
+
+An eligible record is a file under `issues/` that is not (`eligibleRecord` in [sync.ts](../../src/sync.ts)):
+
+- in `issues/seeds/`, which `akrogon pull` rewrites
+- a `.lock` or `.closing` file
+- a `*.tar.zst.tmp` file left by an in-progress pack
+- inside the worktree store, when that store sits inside the checkout
+
+Files outside `issues/` are never eligible records. That includes `learnings/LESSONS.md` and `learnings/history/`, which skills leave for you to commit yourself.
+
+### Sync refusals
+
+Fix the reported condition and run `akrogon sync` again:
+
+- **Wrong branch:** switch the registered checkout to its configured `default_branch`.
+- **Staged files outside records:** run `git diff --cached --name-only`, then commit them yourself or unstage them with `git restore --staged <path>`.
+- **Ignored files in the way (`Cannot sync over ignored operator paths`):** a git-ignored local file would collide with the fetched tip or replayed commits; move or remove it.
+- **Lock paths tracked, incoming, or replayed:** an active coordination lock path is tracked in git, arrives from the remote, or is touched by a local commit; remove the listed paths from git, then sync.
+- **Autostash restoration conflicts:** resolve the listed unmerged paths, then run `akrogon sync` again.

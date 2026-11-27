@@ -4,10 +4,8 @@ This page is for people who change Akrogon. It says which folder each kind of pa
 
 ## Folders
 
-- `docs/start/`: pages a new reader reads in order, each ending with a link to the next one.
-- `docs/use/`: one page per reader goal, such as planning work or recovering a failed leaf.
-- `docs/reference/`: pages to look facts up in, such as commands, settings and phases.
-- `docs/examples/`: real cases told in order, with links to the pages behind each step.
+- `docs/guide/`: numbered guide chapters (`01` through `12`) read in order, each ending with previous and next links.
+- `docs/reference/`: pages to look facts up in, such as commands, settings, files, phases, and rollback steps.
 - `docs/pictures/`: SVG pictures, drawn in the [picture style](#pictures).
 - `docs/reference-index.md`: the code index agents read first. It links each code area.
 

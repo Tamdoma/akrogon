@@ -5,7 +5,7 @@ A skill is a set of instructions an agent follows for one kind of job. Each one 
 There are two kinds:
 
 - **Skills you start yourself.** You type them in an agent session, for example `/chart-issues` or `/seed-issue`.
-- **Skills the `akrogon` command starts.** When a leaf moves to a new phase, the command sends a prompt to a seat's pane. Seat A and seat B are the two execution seats. They plan, build, review and repair leaves. You do not type these skills during normal work.
+- **Skills the `akrogon` command starts.** When a leaf moves to a new phase, the command sends a prompt to a seat's pane. Seat A and seat B (slot A and slot B in the guide) are the two execution seats. They plan, build, review and repair leaves. You do not type these skills during normal work.
 
 Chart consultants are different from seats A and B. A consultant is an hc terminal (B, C, D and so on), started by the door as its child or supplied by the operator, that chart-issues asks for an independent view while it plans a chart. Consultants help decide what to build. Execution seats do the leaf work after handoff.
 
@@ -13,7 +13,7 @@ Chart consultants are different from seats A and B. A consultant is an hc termin
 
 ## chart-issues
 
-- **Result:** charts of open questions (forks) turned into settled leaf contracts in a registered repository. One signposts round opens the session and sets its direction, then three Charting modes (No autopilot, Semi-autopilot and Full autopilot) set who answers the signposts and the forks. A small settled chart can instead take the direct route: the door builds it in a worktree as seat A of a real leaf, seat B reviews, and the command lands it like any leaf.
+- **Result:** charts of open questions (forks) turned into settled leaf contracts in a registered repository. One signposts round opens the session and sets its direction, then three Charting modes (No autopilot, Semi-autopilot and Full autopilot) set who answers the signposts and the forks. Two Build routes decide who builds the settled work: the Lifecycle route hands contracts to fresh execution seats, while the Direct route (offered only under No autopilot) lets the chart door build a small, settled change itself in a worktree as seat A of a real leaf, with consultant B reviewing as seat B and the command landing it like any leaf.
 - **When to use:** you have notes, reports or seeds and need to decide what to build before any code is written.
 - **Who starts it:** you. It is operator-invoked only. It asks you questions in chat. Semi-autopilot and Full autopilot run only when you switch them on in words.
 - **Source:** [`skills/chart-issues/SKILL.md`](../../skills/chart-issues/SKILL.md)
@@ -29,14 +29,14 @@ Chart consultants are different from seats A and B. A consultant is an hc termin
 
 - **Result:** code in the leaf worktree that does what the plan says, or repairs for review findings. Seat A works inline, hands units to workers in waves of up to 3, or builds alone when every wave holds one unit.
 - **When to use:** a leaf is in `implement` or `check.fix`. You can also run it yourself without a leaf for a standalone task in the current checkout.
-- **Who starts it:** the command, dispatching seat A. The chart door also starts it for a direct-route chart.
+- **Who starts it:** the command, dispatching seat A. The chart door also starts it for a Direct-route chart.
 - **Source:** [`skills/implement-issue/SKILL.md`](../../skills/implement-issue/SKILL.md)
 
 ## check-issue
 
-- **Result:** a review file per reviewer with Fix and Nit findings and a verdict. In lifecycle `check.repair`, B repairs most Fixes itself.
-- **When to use:** any leaf in `check.review`, or a lifecycle leaf in `check.repair`.
-- **Who starts it:** for lifecycle leaves, the command dispatches A and B for initial review and B for `check.repair` and later reviews. For direct leaves, the chart door sends every review to B and handles `check.repair` as A.
+- **Result:** a review file per reviewer with Fix and Nit findings and a verdict. In Lifecycle `check.repair`, B repairs most Fixes itself.
+- **When to use:** any leaf in `check.review`, or a Lifecycle leaf in `check.repair`.
+- **Who starts it:** for Lifecycle leaves, the command dispatches A and B for initial review and B for `check.repair` and later reviews. For Direct leaves, the chart door sends every review to B and handles `check.repair` as A.
 - **Source:** [`skills/check-issue/SKILL.md`](../../skills/check-issue/SKILL.md)
 
 ## merge-issue
@@ -71,7 +71,7 @@ Chart consultants are different from seats A and B. A consultant is an hc termin
 
 - **Result:** a timer terminal that checks every open leaf of one repo every 20 minutes through your agent. It moves waiting leaves on, recovers some failures, steers looping seats once and notifies you when a leaf needs you.
 - **When to use:** you are stepping away and want open leaves to keep moving.
-- **Who starts it:** you. It works in claude, codex, pi and agy. Use `watch-issues stop` to end it. It also ends on agent exit, terminal reuse, or a reset the harness shows. A compaction summary before a tick keeps it running. Stated limits: a prompt typed into the watcher terminal when a tick is due can receive the tick (claude/agy check inside that turn; codex drops the prompt's task); a shell-launched agent exiting right as a tick goes out can leave the tick in the shell, with or without a held draft. See the reset and held-draft limits in [Watch while away](../use/watch-while-away.md#stop-the-watch).
+- **Who starts it:** you. It works in claude, codex, pi and agy. Use `watch-issues stop` to end it. It also ends on agent exit, terminal reuse, or a reset the harness shows. A compaction summary before a tick keeps it running. Stated limits: a prompt typed into the watcher terminal when a tick is due can receive the tick (claude/agy check inside that turn; codex drops the prompt's task); a shell-launched agent exiting right as a tick goes out can leave the tick in the shell, with or without a held draft. See the reset and held-draft limits in [While you are away](../guide/11-while-you-are-away.md#stop-the-watch).
 - **Source:** [`skills/watch-issues/SKILL.md`](../../skills/watch-issues/SKILL.md)
 
 ## learn-issues

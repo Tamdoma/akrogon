@@ -2,33 +2,51 @@
 
 One line per term. Each term links to the page that explains it.
 
-- **[Chart](../use/plan-work.md#open-a-chart)**: a folder under `issues/chart/` where the door and you settle a request, one fork per open question.
-- **[Chart door](../use/plan-work.md#open-a-chart)**: the agent pane where you run `/chart-issues`. It is called A, asks one fork per round and writes the leaves. [Who answers depends on the mode](../use/autopilot.md).
-- **[Charting mode](../use/autopilot.md)**: who answers the questions while work is charted. Under No autopilot you answer the signposts and every fork. Under Semi-autopilot you answer the signposts once and seat A answers its own forks for a fixed list of work, then hands off. Under Full autopilot A answers the signposts too. It starts no execution.
+## Guide words to shelf words
+
+The numbered guide chapters use plain everyday names, while these reference shelf pages and Akrogon commands use the underlying record and CLI terms:
+
+| Guide word | Shelf word |
+| --- | --- |
+| `task` | `leaf` |
+| `slot A (the builder)` | `seat A` |
+| `slot B (the reviewer)` | `seat B` |
+| `charting agent` | `chart door` |
+| `Direct` | `direct route` |
+| `Lifecycle` | `lifecycle route` |
+| `Charting mode` | `No autopilot` / `Semi-autopilot` / `Full autopilot` (`## Mode record`) |
+| `Build route` | `Route: direct\|lifecycle` |
+| `watcher` | `watch-issues` / timer terminal |
+
+## Terms
+
+- **[Build route](../guide/07-build-route.md)**: who builds settled work after charting: [Direct](../guide/07-build-route.md#direct) (offered only under No autopilot) or [Lifecycle](../guide/07-build-route.md#lifecycle). Recorded on the `Route:` line of `CHART.md`.
+- **[Chart](../guide/04-a-charting-session.md#opening-a-session)**: a folder under `issues/chart/` where the charting agent (chart door) and you settle a request, one fork per open question.
+- **[Charting mode](../guide/06-charting-mode.md)**: who answers questions while work is charted: under No autopilot you answer the signposts and every fork; under Semi-autopilot you answer the signposts once and the charting agent answers every fork; under Full autopilot the charting agent answers both. It charts and hands off only; it never starts building.
 - **[Check](checks.md)**: a named command under `checks` in `issues/config.yaml`, such as `test: npm test`. A red check stops a leaf from moving to review and from landing.
-- **[Consultant](../use/plan-work.md#open-a-chart)**: a helper pane (B, C, D and so on) that gives the chart door an independent view while it charts. It is not seat A or seat B.
-- **[Contract](../start/why-it-works.md#a-contract-comes-before-code)**: a leaf's `brief.md` and `design.md`. They say what to build, why, how to tell it is done, and the settled decisions the build must follow.
-- **[Direct route](../use/quick-fix.md)**: the chart door builds one small, settled change itself as seat A of the leaf, B reviews it, and the command lands it like any leaf. It skips the handoff to fresh seats.
-- **[Epic](files.md#issue-and-epic-files)**: a folder under `issues/open/` that groups issues. It holds `EPIC.md`.
-- **[Failed](../use/when-work-fails.md)**: the phase a leaf stops in when a seat records a reason it cannot go on. The plan, reviews and code stay, and you send the leaf back to an active phase.
-- **[Fork](../use/plan-work.md#answer-one-fork-per-round)**: one open question in a chart, sharp enough to answer. It records the answer and the reason. [Who answers depends on the mode](../use/autopilot.md).
-- **[Grounding](../start/set-up-a-project.md#grounding)**: the index file named by `grounding.index` and the `AREA.md` files it links, which give agents a short route into your code.
-- **[Harness](config.md#machine-configyaml)**: an agent CLI and the command that starts it, listed under `harnesses` in the machine `config.yaml`.
+- **[Consultant](../guide/04-a-charting-session.md#what-consultants-do-during-charting)**: a helper terminal (`B`, `C`, `D`, and so on) that gives the charting agent an independent view during charting; on the Direct route, consultant `B` also acts as slot B.
+- **[Contract](../guide/08-hand-off.md)**: a leaf's `brief.md` and `design.md`. They state what to build, why, how to tell it is done, and the settled decisions the build must follow.
+- **[Direct](../guide/07-build-route.md#direct)**: the build route (offered only under No autopilot) where the charting agent builds one small, settled change itself in a worktree as slot A, consultant `B` reviews it as slot B, and the merge queue lands it like any leaf.
+- **[Epic](files.md#issue-and-epic-files)**: a folder under `issues/open/` that groups related issues. It holds `EPIC.md`.
+- **[Failed](../guide/12-when-work-stops.md#failed-work)**: the phase a leaf stops in when a seat or command records a reason it cannot go on. The plan, reviews, and code stay, and you move the leaf back to an active phase once the blocker is fixed.
+- **[Fork](../guide/04-a-charting-session.md#4-one-fork-per-round)**: one open question in a chart, sharp enough to answer, recording the decision and its reason. [Who answers depends on the Charting mode](../guide/06-charting-mode.md).
+- **[Grounding](../guide/02-set-up-a-repo.md#grounding)**: the index file named by `grounding.index` and the `AREA.md` files it links, giving agents a short route into your code.
+- **[Harness](config.md#machine-configyaml)**: an agent CLI and the command template that starts it, listed under `harnesses` in the machine `config.yaml`.
 - **[Issue](files.md#issue-and-epic-files)**: a folder under `issues/open/` that holds `ISSUE.md` and one or more leaves.
-- **[Landing](../use/merge-and-announce.md)**: putting a tested commit on your default branch. `akrogon land` checks the commit, pushes it and moves the leaf to `merged`.
-- **[Leaf](files.md#leaf-folder-records)**: one piece of work small enough to plan, build and review as a unit. Its folder name is the slug commands use.
-- **[Lesson](../use/learn-from-work.md#what-a-lesson-is)**: one line in `learnings/LESSONS.md` plus a history file, written when a finding matters beyond its leaf.
-- **[Merged](state-and-phases.md#phases)**: the last phase of a leaf whose commit is on the default branch. A merged leaf never moves again.
-- **[Park](../use/park-pause-stop.md#park-an-issue)**: move a whole issue to `issues/parked/` so passes do not pick it up. `akrogon unpark` brings it back.
-- **[Pause](../use/park-pause-stop.md#pause-a-repository)**: stop automatic passes for one repository. Commands you type still run. `akrogon unpause` turns them back on.
+- **[Landing](../guide/10-merging.md)**: putting a verified commit on your default branch. `akrogon land` verifies the commit, runs the merge gates, pushes it, and moves the leaf to `merged`.
+- **[Leaf](files.md#leaf-folder-records)**: one task small enough to plan, build, and review as a unit. Its folder name is the slug commands use.
+- **[Lesson](skills.md#learn-issues)**: one line in `learnings/LESSONS.md` plus a history file, written when a finding matters beyond its leaf.
+- **[Lifecycle](../guide/07-build-route.md#lifecycle)**: the build route where the charting agent writes leaf contracts under `issues/open/` for a fresh slot A and slot B to plan, build, review, and land in their own tab. Always available, and the only route under Semi-autopilot and Full autopilot.
+- **[Merged](state-and-phases.md#phases)**: the final phase of a leaf whose commit is on the default branch. A merged leaf never moves again.
+- **[Park](../guide/12-when-work-stops.md#park-an-issue)**: move a whole issue to `issues/parked/` so automatic passes skip it. `akrogon unpark` brings it back.
+- **[Pause](../guide/12-when-work-stops.md#pause-a-repository)**: stop automatic passes for one repository while keeping commands you type working. `akrogon unpause` turns them back on.
 - **[Phase](state-and-phases.md)**: the step a leaf is in, such as `implement` or `check.review`, written in its `state.yaml`. Only Akrogon commands change it.
-- **[Release](releases-and-updates.md)**: a built copy of Akrogon under `~/.akrogon/releases/<commit>`. The `akrogon` command runs from the release that `current` points at.
-- **[Seat A and seat B](../start/why-it-works.md#build-and-review-are-separate-seats)**: the two agent roles that work a leaf. A plans and builds, both review, and B repairs most findings and takes over landing when it needs a seat.
-- **[Seed](../use/report-an-observation.md#bring-reports-into-your-checkout)**: an imported GitHub issue in `issues/seeds/`, written by `akrogon pull`. It is unverified and not ready to run.
-- **[Slot](config.md)**: the name the settings and commands use for a seat, as in the `slots` key and `akrogon phase --slot A`.
-- **[Signposts](../use/plan-work.md#set-the-signposts)**: the one round that opens a chart door session and sets its direction (ranked priorities, hard limits and the order or drop of the session's charts), steering every map and later pick. Answered per the Charting mode: by you under No autopilot and Semi-autopilot, by A under Full autopilot.
-- **[Stop](../use/park-pause-stop.md#stop-a-leaf)**: mark a leaf stopped and end every process its seats started. `akrogon start` clears the mark.
-- **[Sync](../use/save-records.md)**: `akrogon sync` commits the records under `issues/`, rebases and pushes them on the default branch.
-- **[Verify](checks.md#prove-a-commit-with-akrogon-verify)**: `akrogon verify` runs every check on a fresh checkout of a commit and writes a receipt. Moves into review and landing need a green one.
-- **[Worktree](../start/what-it-is.md#the-words)**: a separate checkout where a leaf's code changes happen, so your own checkout stays untouched.
+- **[Release](releases-and-updates.md)**: a built copy of Akrogon under `~/.akrogon/releases/<commit>`. The installed `akrogon` command runs from the release that `current` points at.
+- **[Seed](skills.md#seed-issue)**: an imported GitHub issue in `issues/seeds/`, written by `akrogon pull`. It is unverified intake and not ready to run.
+- **[Signposts](../guide/05-signposts.md)**: the opening round of a charting session that sets direction (ranked priorities, hard limits, and the order or drop of the session's charts). Answered by you under No autopilot and Semi-autopilot, and by the charting agent under Full autopilot.
+- **[Slot A and slot B](../guide/09-lifecycle.md)**: the two execution roles (called seat A and seat B in shelf pages; configured under `slots` in [Settings](config.md) and passed as `--slot A` or `--slot B`). [Slot A](../guide/09-lifecycle.md#slot-a-the-builder) plans and builds, both review initially, and [slot B](../guide/09-lifecycle.md#slot-b-the-reviewer) repairs most findings and handles follow-up reviews.
+- **[Stop](../guide/12-when-work-stops.md#stop-a-leaf-or-a-check-run)**: mark a leaf stopped and end every process its seats, check runs, and verify passes started (`akrogon start` clears the mark), or stop a single check run with `akrogon stop-run`.
+- **[Sync](files.md#saving-records-with-akrogon-sync)**: `akrogon sync` commits eligible issue records under `issues/`, rebases, and pushes them on the default branch.
+- **[Verify](checks.md#prove-a-commit-with-akrogon-verify)**: `akrogon verify` runs every configured check on a fresh checkout of a commit and writes a receipt. Moves into review and landing require a green one.
+- **[Worktree](files.md)**: a separate git checkout where a leaf's code changes happen on its own branch, leaving your main checkout untouched.
 - **[Worktree store](files.md#worktree-store)**: the folder outside your checkout that holds one worktree per leaf, by default `~/.akrogon/worktrees/<repo>`.
