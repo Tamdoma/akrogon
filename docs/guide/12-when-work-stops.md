@@ -25,10 +25,11 @@ From your `t-client-portal` tab:
 1. **Inspect the failure reason and missing inputs**:
 
    ```sh
+   akrogon status
    akrogon status scheduled-email
    ```
 
-   Read the `failure` block (`cause`, `phase`, `slot`, and `reason`, which often points to `plan.md`, `implementation/report.md`, or `review-B.md`) and any `Missing:` lines, such as:
+   `akrogon status` prints a `Failed:` summary line naming the stopped leaf and its reason, and `akrogon status scheduled-email` prints the full `failure` block (`cause`, `phase`, `slot`, and `reason`, which often points to `plan.md`, `implementation/report.md`, or `review-B.md`) plus any `Missing:` lines, such as:
 
    ```text
    Missing: client-portal/scheduled-email env POSTMARK_API_KEY in client-portal: ...
@@ -157,10 +158,10 @@ Output is grouped by repository and reason, plus a `host` group for systemd unit
 
 These are **not** failed leaves. A command refuses and tells you why; fix the condition and rerun it:
 
-- **Phase-move refusal**: Common causes are uncommitted edits in the leaf worktree (`Uncommitted work in ...`), files under `issues/` modified on the leaf branch, an empty branch when entering `check.review`, a missing green `akrogon verify` receipt for HEAD, a changed or added test file missing a `Test-Change: <path> <source and reason>` trailer, leftover `<slug>-u<N>` worker worktrees, or an abandoned `capture-<name>-<run>-out.log`/`-err.log` pair without a non-blank `cleared-<run>.md` beside it. See [Checks](../reference/checks.md#refusals-and-what-to-do).
+- **Phase-move refusal**: Common causes are uncommitted edits in the leaf worktree (`Uncommitted work in ...`), files under `issues/` modified on the leaf branch, an empty branch when entering `check.review`, a missing green `akrogon verify` receipt for the latest commit (`HEAD`), a changed or added test file missing a `Test-Change: <path> <source and reason>` trailer, leftover `<slug>-u<N>` worker worktrees, or an abandoned `capture-<name>-<run>-out.log`/`-err.log` pair without a non-blank `cleared-<run>.md` beside it. See [Checks](../reference/checks.md#refusals-and-what-to-do).
 - **Failed or unavailable dependency**: If `scheduled-email` lists `csv-export` in `blocked-by` and `csv-export` is `failed`, `parked`, `missing`, or `unreadable`, `akrogon next scheduled-email` refuses with `Leaf dependencies are not merged` until `csv-export` is recovered or unparked and merged.
-- **Sync refusal**: `akrogon sync` runs only inside the registered checkout on its `default_branch` (`main`), and refuses if HEAD is detached or on another branch, if files outside eligible `issues/` records are staged, or if incoming commits collide with ignored local paths or active lock files. Check with `git status --short` and `git diff --cached --name-only`, decide what to do with those files, and rerun `akrogon sync`.
-- **Non-fast-forward push refusal**: During landing, a first non-fast-forward refusal restacks onto the new remote tip and retries once automatically. A second refusal clears the batch, prints `held <slug> attempt=<id>`, and keeps the leaf's queue place in `merge` for the next pass. Any other push error moves the leaf to `failed` with git's stderr in `failure.reason`. See [Merging](10-merging.md).
+- **Sync refusal**: `akrogon sync` runs only inside the registered checkout on its `default_branch` (`main`), and refuses if `HEAD` is detached or on another branch, if files outside eligible `issues/` records are staged, or if incoming commits collide with ignored local paths or active lock files. Check with `git status --short` and `git diff --cached --name-only`, decide what to do with those files, and rerun `akrogon sync`.
+- **Non-fast-forward push refusal**: During landing, a first non-fast-forward refusal restacks onto the new remote tip and retries once automatically. A second refusal clears the batch, prints `held <slug> attempt=<id>`, and keeps the leaf's queue place in `merge` for the next pass. Any other push error moves the leaf to `failed` with Git's error output (`stderr`) in `failure.reason`. See [Merging](10-merging.md).
 
 ## Where to go next
 

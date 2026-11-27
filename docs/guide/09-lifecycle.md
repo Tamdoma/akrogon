@@ -30,13 +30,13 @@ Each `akrogon next` call is a single pass. It checks every picked leaf, starts o
 
 When you run `akrogon next`, ready leaves start right away and any picked leaf that cannot start prints one line explaining why:
 
-- **Waiting on `blocked-by` dependencies**: A leaf starts only when every slug in its `blocked-by` list is `merged`. While `csv-export` is still in progress, `scheduled-email` waits. A typed `akrogon next` prints a normal stdout line and does not exit with an error:
+- **Waiting on `blocked-by` dependencies**: A leaf starts only when every slug in its `blocked-by` list is `merged`. While `csv-export` is still in progress, `scheduled-email` waits. A typed `akrogon next` prints a normal status line (on standard output) and does not exit with an error:
 
   ```text
   waiting: scheduled-email on csv-export (implement)
   ```
 
-  If a dependency is `failed`, `parked`, `missing`, or `unreadable`, `akrogon next` reports `Leaf dependencies are not merged` on stderr and exits 1.
+  If a dependency is `failed`, `parked`, `missing`, or `unreadable`, `akrogon next` reports `Leaf dependencies are not merged` on standard error (`stderr`) and exits 1.
 - **Missing `readiness.yaml` inputs**: Every required `env` variable or local `file` in `readiness.yaml` must be present and non-empty where the file specifies (for example, `POSTMARK_API_KEY` in `client-portal/.env`). When an input is absent, `akrogon status` prints a `Missing:` line naming its kind, variable name, holder, and setup steps (never its value), and `akrogon next` refuses to start the leaf with `Leaf inputs are missing` (exit 1). Dependencies are reported before missing inputs.
 - **Twin owner folder clash**: If `issues/open/weekly-client-report` shares a name with a folder under `issues/closed/` or `issues/parked/`, every leaf under it is skipped with an error until the clash is removed.
 - **Capacity limit (`max_active`)**: `max_active` in `~/.akrogon/config.yaml` (default `3`) caps how many leaves can hold live seats at once across all registered repositories. Because each leaf has two seats, this counts leaves rather than agent processes. Leaves that already have a live seat keep moving, and leaves waiting in `merge` do not count toward the machine limit. A repository can also set a lower `max_active` in `issues/config.yaml` (printed as `repo_max_active` by `akrogon config`); for a leaf that has never started, the repo's leaves waiting in `merge` behind the landing leaf count toward the repo cap too. A new leaf starts only when both limits have room.
@@ -56,10 +56,10 @@ If a `next` pass refuses a leaf because `max_active` (machine or repo) is full, 
 
 When `akrogon next` starts `csv-export` for the first time, it prepares the workspace and launches the leaf's seats automatically:
 
-1. **Creates a sparse git worktree** at `~/.akrogon/worktrees/client-portal/csv-export` (the default `worktree_store`, overridable outside the checkout via `worktree_root` in `issues/config.yaml`) on branch `csv-export` branched from `<remote>/<default_branch>`. Sparse checkout excludes `issues/` so issue records stay only in the registered `client-portal` checkout.
+1. **Creates an isolated git worktree** at `~/.akrogon/worktrees/client-portal/csv-export` (the default `worktree_store`, overridable outside the checkout via `worktree_root` in `issues/config.yaml`) on branch `csv-export` branched from `<remote>/<default_branch>`. Sparse checkout excludes `issues/` so issue records stay only in the registered `client-portal` checkout.
 2. **Writes declared `.env` keys**: Copies only the variable names listed under `env` in `issues/config.yaml` from `client-portal/.env` into the worktree's git-ignored `.env` (refusing if `.env` is tracked or not git-ignored).
-3. **Runs `setup` if configured**: Executes `issues/config.yaml`'s `setup` command under `flock` on the repository install lock, checks `akrogon guard own-modules`, and writes an `akrogon-setup` marker so setup runs once per checkout state.
-4. **Opens the leaf tab and starts seats**: Allocates the leaf's herdr tab (`csv-export`) in the `client-portal` space and launches **slot A** (and later **slot B** when review begins) as hc terminals inside the leaf's own systemd user slice (`akrogon-l<hash>.slice`), with `TMPDIR` pointing to the leaf's private temp folder and `AKROGON_BASE` set to the branch merge-base.
+3. **Runs `setup` if configured**: Executes `issues/config.yaml`'s `setup` command under `flock` (a file lock on the repository install lock so parallel worktrees do not collide), checks `akrogon guard own-modules`, and writes an `akrogon-setup` marker so setup runs once per checkout state.
+4. **Opens the leaf tab and starts seats**: Allocates the leaf's herdr tab (`csv-export`) in the `client-portal` space and launches **slot A** (and later **slot B** when review begins) as hc terminals inside the leaf's own systemd user slice (`akrogon-l<hash>.slice`, an isolated Linux resource group), with `TMPDIR` pointing to the leaf's private temp folder and `AKROGON_BASE` set to the branch merge-base.
 
 After you start work with `akrogon next`, you do not copy prompts between panes. The background systemd user service **`akrogon-listener.service`** (running `akrogon listen`) subscribes to hc events for every live session's labelled `akrogon=1` terminals:
 
@@ -107,7 +107,7 @@ Next, Akrogon prompts slot A with [implement-issue](../../skills/implement-issue
 - **Serial-solo**: When `implement: subagents` (the default) is set, but every wave in `plan.md` holds only one unit, slot A implements the plan itself with no worker sub-briefs or worker worktrees.
 - **Worker waves**: When `implement: subagents` is set and a wave holds multiple independent units (disjoint owned paths and no shared test resources), slot A writes an eight-section sub-brief per unit under `implementation/` and runs up to **3 workers** in parallel per wave, each in its own `<slug>-u<N>` worktree, landing and removing worker worktrees between waves.
 
-After the last unit lands, slot A refreshes the branch again, reruns affected done-criterion proofs through `akrogon run-check`, and runs **`akrogon verify`** in the leaf worktree on the committed HEAD. `akrogon verify` checks out that commit fresh, runs `setup` and every configured `checks` command, and writes the leaf green receipt that entering review requires. Seats never run `merge_checks` (those belong to the command's merge run).
+After the last unit lands, slot A refreshes the branch again, reruns affected done-criterion proofs through `akrogon run-check`, and runs **`akrogon verify`** in the leaf worktree on the latest committed tip (`HEAD`). `akrogon verify` checks out that commit fresh, runs `setup` and every configured `checks` command, and writes the leaf green receipt that entering review requires. Seats never run `merge_checks` (those belong to the command's merge run).
 
 Finally, slot A writes `implementation/report.md` (changed files, commands and pasted results, proof commits, base and HEAD commits, known limitations) and moves the leaf forward with `akrogon phase csv-export check.review --slot A`.
 

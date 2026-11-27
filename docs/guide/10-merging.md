@@ -1,6 +1,6 @@
 # Merging and announcements
 
-When a leaf passes review, it enters `merge`. Akrogon rebases it onto your default branch, runs the full merge checks and gates on a fresh checkout, pushes fast-forward, completes the issue or epic when its last leaf lands, and sends an optional plain-language Discord summary.
+When a leaf passes review, it enters `merge`. Akrogon rebases it onto your default branch, runs the full merge checks and gates on a fresh checkout, pushes fast-forward (adding the commit cleanly on top of the branch without rewriting history), completes the issue or epic when its last leaf lands, and sends an optional plain-language Discord summary.
 
 You do not run merge commands by hand. `akrogon next` (and the automatic wakes from `akrogon-listener.service`) drives the merge turn for you.
 
@@ -49,9 +49,9 @@ If the rebase conflicts or the `csv-export` worktree has uncommitted edits at tu
 2. **Enforces land gates**: Checks that the worktree is clean, no files under `issues/` are touched on the branch, every changed or added test file has its required `Test-Change:` trailer over the pushed range (plus frozen-plan checks), no retired lesson line was resurrected in the range, HEAD descends from the recorded `top`, and a qualifying green merge receipt (or main-red cover) exists for HEAD. Passing stamps `batch.tested_top` and `batch.tested_main`.
 3. **Pushes fast-forward**: Pushes the tested head fast-forward to `<remote>/<default_branch>` (never `--force`):
    - **Success**: Records the attempt as `merged` and moves `csv-export` to `merged` with no seat.
-   - **First non-fast-forward refusal**: Someone else pushed to `main` while checks ran. Land fetches the new remote tip, restacks, re-verifies and re-gates, and retries the push **once** inside the same run.
+   - **First non-fast-forward refusal**: Someone else pushed to `main` while checks ran. Land fetches the new remote tip, restacks (replays the leaf's commits onto the updated branch), re-verifies and re-gates, and retries the push **once** inside the same run.
    - **Second non-fast-forward refusal**: Land logs the attempt `red`, clears `batch`, prints `held csv-export attempt=<id>`, and **keeps `csv-export`'s queue place** in `merge` so the next pass rebuilds on the updated base.
-   - **Any other push error** (auth, network, server error): Land logs the attempt `red`, clears `batch`, and moves the leaf to `failed` with git's stderr in `failure.reason` for operator recovery.
+   - **Any other push error** (auth, network, server error): Land logs the attempt `red`, clears `batch`, and moves the leaf to `failed` with Git's error output (`stderr`) in `failure.reason` for operator recovery.
 
 If you ever need to land an already-applied batch manually from `t-client-portal`, the one operator move allowed on a `merge` holder is slot-less `akrogon phase <slug> merged`.
 
@@ -61,7 +61,7 @@ Because merge holds no seat, any uncovered red verify, refused gate, rebase conf
 
 | `merge-exit=` | What happened | Recorded fields |
 | --- | --- | --- |
-| `red` | `akrogon verify --attempt <id>` went red and neither main-red cover nor land's base comparison pass covered it. | `run=<id>`, `top=<sha>`, `base_verdict=<id>` (when a base check ran or matched) |
+| `red` | `akrogon verify --attempt <id>` went red and neither main-red cover nor land's base comparison pass covered it. | `run=<id>`, `top=<sha>` (the candidate commit ID), `base_verdict=<id>` (when a base check ran or matched) |
 | `gate` | A land gate refused (for example, missing `Test-Change:` trailer or resurrected retired lesson). | `refusal=<text>`, `top=<sha>` |
 | `conflict` | The rebase at turn start or during a land restack conflicted. | `base=<sha>` (plus `top=<sha>` on a land exit) |
 | `dirty` | The leaf worktree held uncommitted work at apply or restack. | `base=<sha>` (plus `top=<sha>` on a land exit) |

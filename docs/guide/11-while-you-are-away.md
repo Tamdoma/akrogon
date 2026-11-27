@@ -6,13 +6,13 @@ You start the watch and you stop it. It works the same across all four supported
 
 ## Starting the watch in `w-client-portal`
 
-Open your agent CLI (`claude`, `codex`, `pi`, or `agy`) in an hc terminal inside `w-client-portal` (in the same hc session that holds `client-portal`'s space, with the registered repository root `<root>`) and send:
+Open your agent CLI (`claude`, `codex`, `pi`, or `agy`) in an hc terminal inside `w-client-portal` (in the same hc session that holds `client-portal`'s space, passing the registered repository root such as `~/code/client-portal`) and send:
 
 ```text
-watch-issues /path/to/client-portal
+watch-issues ~/code/client-portal
 ```
 
-In `claude`, you can also use the slash alias `/watch-issues /path/to/client-portal`.
+In `claude`, you can also use the slash alias `/watch-issues ~/code/client-portal`.
 
 Starting the watch does two things right away:
 
@@ -36,7 +36,7 @@ Every 20 minutes (and once on start), the watcher runs one structured check over
    - On **`codex`**, the seat is **notify-only** (interrupting a backgrounded command leaves codex working), so the watch notifies you instead of steering.
    - If the same seat loops again on a later check, the watch notifies you rather than stopping it a second time.
 5. **Open a consult case for deeper failures**: When a leaf hits a consult trigger (such as `scheduled-email` failing twice in a row on a flaky integration test or a broken commit on `main`, failing on a human prerequisite, having an `unknown` failure record, or having a missing or malformed `issues/log.jsonl`), the watch checks whether an identical signature already closed a case (`consults.ts match`). If clear, it opens one case folder under `~/.akrogon/watch/client-portal/consults/<case-id>` (outside the watched repository) and launches one peer consultant terminal (`cp-watch-consult`) using the machine **`slots.consultant`** recipe from `~/.akrogon/config.yaml` (`akrogon seat --watch-consultant`). The watch and consultant exchange numbered turn files (`turn-<n>-watch.md` and `turn-<n>-consultant.md`) via `hc send`. When the consultant proves a permitted fix (such as repairing `main` in a detached case worktree, proving it with `akrogon verify --holder <case>`, and pushing fast-forward, or fixing a clean idle leaf worktree inside its decided brief and design), the watch records agreement, closes the consultant, re-observes, and resumes the leaf (`check.fix` if `failure.phase` was `merge`, `check.repair`, or `check.review`; otherwise `failure.phase`).
-6. **Send desktop notices and summarize**: Writes a notice via `akrogon notice` whenever a leaf needs you (or when a consult pushes to `main` or moves a leaf), which herdr-app displays as a toast (adding `--attention` only for stop-list items that need a human). The check ends with a short reply (at most five lines) in `w-client-portal` stating what it saw, what it did, and any case folder path.
+6. **Send desktop notices and summarize**: Writes a notice via `akrogon notice` whenever a leaf needs you (or when a consult pushes to `main` or moves a leaf), which herdr-app displays as a desktop notification banner (adding `--attention` only for stop-list items that need a human). The check ends with a short reply (at most five lines) in `w-client-portal` stating what it saw, what it did, and any case folder path.
 
 ## What keeps moving vs what waits for you
 
@@ -74,17 +74,17 @@ When a failure or consult case hits any item below, the watcher stops acting on 
 Stop the watch from any terminal in the same hc session (in `w-client-portal` or another agent terminal) by sending:
 
 ```text
-watch-issues stop /path/to/client-portal
+watch-issues stop ~/code/client-portal
 ```
 
-In `claude`, you can also use `/watch-issues stop /path/to/client-portal`. This stops the timer terminal (`cp-watch`) and closes any active consultant terminal (`cp-watch-consult`).
+In `claude`, you can also use `/watch-issues stop ~/code/client-portal`. This stops the timer terminal (`cp-watch`) and closes any active consultant terminal (`cp-watch-consult`).
 
 Keep these automatic stop rules and harness limits in mind:
 
 - **Automatic stops**: The watch also ends on its own when the watching agent exits, when its terminal finishes or is reused (foreground or transcript changes), or when **`claude` or `agy`** shows a **`/clear`** reset. Having no open leaves does **not** end the watch; it stays live until stopped.
 - **`/clear` vs `/new`**: While `claude` and `agy` `/clear` resets stop the watch cleanly, **`codex` and `pi` `/new`** may leave the watch running into the new conversation. The first tick in the new conversation detects that it is the first prompt and attempts to stop the watch automatically (though sending another prompt before that first tick spends that check, leaving the watch running until you send `watch-issues stop`).
 - **Compaction keeps the watch alive**: A conversation compaction summary arriving before a tick is not treated as a reset; the watch stays active across compactions overnight.
-- **Exiting a shell-launched agent**: If you exit a shell-launched agent right as a tick goes out (with or without a held draft in hc), the tick text can land in the underlying shell or a program you just started there. If you start a replacement agent running `watch-issues`, it refuses the stale tick because the tick's `pid=` no longer matches.
+- **Exiting a shell-launched agent**: If you exit a shell-launched agent right as a tick goes out (with or without a held draft in hc), the tick text can land in the underlying shell or a program you just started there. If you start a replacement agent running `watch-issues`, it refuses the stale tick because the tick's process ID (`pid=`) no longer matches.
 
 For full watcher rules and machine consultant configuration, see [watch-issues](../../skills/watch-issues/SKILL.md), [Settings](../reference/config.md), and [Commands](../reference/commands.md).
 
