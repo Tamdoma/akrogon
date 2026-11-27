@@ -8,6 +8,8 @@ Continuing `client-portal`'s `weekly-client-report`, `csv-export` has just clear
 
 ## One merge turn per repository
 
+![Each repository has one merge queue. The holder, csv-export, lands onto origin/main while the leaves in places 2 and 3 wait untouched. Three rules order the queue: the active batch holder first, then the most unmerged dependents (csv-export blocks scheduled-email, so it lands first), then the earliest merge_stamp. The TURN column in akrogon status shows holder, 2 and 3.](../pictures/merge-turn.svg)
+
 Each registered repository has **one merge turn** at a time. Leaves in `merge` line up in a single queue per repository so only one leaf lands onto `<remote>/<default_branch>` (`origin/main`) at a time, and waiting leaves are untouched while the holder runs.
 
 Akrogon orders eligible `merge` leaves by three rules:
@@ -24,6 +26,8 @@ Run `akrogon status` from `t-client-portal` to see the queue:
 - The `NOTE` column shows `land` while the holder has an active land batch, and `akrogon status csv-export` prints `land alive: akrogon-land-<id>` (or `land dead:` if the unit exited).
 
 ## Command-owned landing with no seat
+
+![Merge holds no seat. akrogon next reconciles existing batches, fetches and rebases csv-export onto origin/main, then applies the batch and starts akrogon land csv-export as its own background land unit, akrogon-land plus the attempt ID. A rebase conflict or a dirty worktree never reaches akrogon land and goes straight to check.repair.](../pictures/merge-landing.svg)
 
 Merge holds **no seat**. No prompt names `merge-issue`, and `akrogon phase` refuses `--slot` or `--attempt` on a `merge` leaf.
 
@@ -43,6 +47,8 @@ If the rebase conflicts or the `csv-export` worktree has uncommitted edits at tu
 
 ## Checks, land gates, and pushing
 
+![The land run does three steps: merge verification with akrogon verify, the land gates, and a fast-forward push to origin/main. The push ends one of four ways: success records merged, a first non-fast-forward refusal restacks and retries once, a second refusal holds csv-export and keeps its queue place, and any other push error moves the leaf to failed.](../pictures/land-run.svg)
+
 `akrogon land csv-export --attempt <id>` holds the repository's check admission line for the whole attempt (later runs for `client-portal` wait until the land run finishes) and performs three steps:
 
 1. **Runs merge verification**: Executes `akrogon verify --attempt <id>` on a fresh checkout of the candidate head. Merge verification runs `setup`, then every `checks` entry **not** listed in `merge_covers` (in config order, with the slow checks listed under `full` last), and once those are green, runs every **`merge_checks`** entry **in parallel**. `akrogon verify --attempt <id>` is the only runner of `merge_checks`; `akrogon run-check` refuses them.
@@ -56,6 +62,8 @@ If the rebase conflicts or the `csv-export` worktree has uncommitted edits at tu
 If you ever need to land an already-applied batch manually from `t-client-portal`, the one operator move allowed on a `merge` holder is slot-less `akrogon phase <slug> merged`.
 
 ## When checks go red or a gate refuses
+
+![Four merge-exit causes (red, gate, conflict, dirty) move the leaf to check.repair. On red, the main-red cover and the repeated-red base check run first, and a covered head lands. In check.repair, slot B repairs and returns to merge, hands the fix to slot A in check.fix, returns a flaky red unchanged, or stops in failed on a main red.](../pictures/merge-exit.svg)
 
 Because merge holds no seat, any uncovered red verify, refused gate, rebase conflict, or dirty worktree moves the leaf out of `merge` into **`check.repair`**, clears `batch`, and records **`state.merge_exit`**. The next pass prompts **slot B** with `merge-exit=<reason>` and the recorded fields:
 
@@ -82,6 +90,8 @@ When a leaf lands in `check.repair` from merge, **slot B** reads the kept logs w
 
 ## Issue and epic completion
 
+![When csv-export lands, it moves to merged, the issue stays open, scheduled-email wakes, and csv-export's herdr tab and worktree are removed. When scheduled-email, the last leaf, lands, the issue completes: linked GitHub issues are closed, plain log files are deleted, the folder moves from issues/open/ to issues/closed/, and Akrogon prints issue complete weekly-client-report.](../pictures/issue-complete.svg)
+
 Watch what happens across both leaves of `weekly-client-report`:
 
 1. **When `csv-export` lands**: `csv-export` moves to `merged`. Because `scheduled-email` is still open under `issues/open/weekly-client-report/`, the issue stays open. Akrogon immediately wakes **`scheduled-email`** (whose `blocked-by: [csv-export]` is now satisfied), closes `csv-export`'s herdr tab, and removes `csv-export`'s finished worktree and slice.
@@ -98,6 +108,8 @@ Watch what happens across both leaves of `weekly-client-report`:
 For multi-issue epics, individual issues inside the epic stay quiet when they finish; the folder moves to `issues/closed/<epic>/` and prints `epic complete <epic>` once every leaf of the whole epic is `merged`.
 
 ## Announcements
+
+![When the issue completes, akrogon status shows broadcast pending and slot B runs broadcast-issue once. It sends one plain-language Discord update with a headline, a before list and a now list, one per completed issue or epic and never one per leaf. A failed send never undoes the merge.](../pictures/announcement.svg)
 
 If your repository sets `broadcast.discord.webhook_env` in `issues/config.yaml`, Akrogon sends **one** plain-language Discord update per completed standalone issue or completed epic (never one per leaf).
 
