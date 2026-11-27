@@ -411,7 +411,7 @@ function validateInstallConfigMarkdown(markdown: string): string[] {
   return errors;
 }
 
-test('guide pages 01 to 12 exist, retired folders are gone, roll-back moved, and README carries no picture', () => {
+test('guide pages 01 to 12 exist, retired folders are gone, roll-back moved, and README carries only the three-tabs hero picture', () => {
   for (const page of GUIDE_PAGES) {
     expect(existsSync(join(repoRoot, 'docs', 'guide', page)), `missing docs/guide/${page}`).toBe(true);
   }
@@ -420,7 +420,10 @@ test('guide pages 01 to 12 exist, retired folders are gone, roll-back moved, and
     expect(existsSync(join(repoRoot, 'docs', retired)), `docs/${retired} should be removed`).toBe(false);
   }
   const readmeProse: string = proseOnly(readFileSync(join(repoRoot, 'README.md'), 'utf8'));
-  expect(readmeProse).not.toMatch(/!\[[^\]]*\]\(/);
+  const readmeImages: string[] = [...readmeProse.matchAll(/!\[[^\]]*\]\(([^)\s]+)\)/g)].map(
+    (match: RegExpMatchArray): string => match[1],
+  );
+  expect(readmeImages).toEqual(['docs/pictures/three-tabs.svg']);
   expect(readmeProse).not.toMatch(/<img\b/i);
 });
 
