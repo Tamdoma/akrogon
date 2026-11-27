@@ -24,11 +24,15 @@ prefixes:
   partner-hub: ph
 ```
 
+![One install, ~/.akrogon/config.yaml, serves three repositories: acme-core with prefix ac, and client-portal with cp and partner-hub with ph built on it. Each prefix names that repository's terminals, such as cp-csv-export-a for slot A, the builder, and cp-watch for the watcher timer.](../pictures/one-akrogon-many-repos.svg)
+
 Each entry under `repos:` maps a repository name (its checkout folder name) to its checkout path. Each entry under `prefixes:` gives that repository a unique two-letter lowercase prefix (`ac`, `cp`, `ph`). Akrogon uses the prefix to name every terminal it starts for that repository in Herdr (such as `cp-csv-export-a` for slot A, `cp-slot-b` for a charting consultant, `cp-watch` for the watcher timer, and `cp-watch-consult` for a watch consultant) and refuses to start work if a repository's prefix is missing or shared with another repository.
 
 Repeat the four steps below for each repository you want to register. The walk-through uses `client-portal` at `~/code/client-portal`.
 
 ## Set up `client-portal` step by step
+
+![Four steps: run /init-akrogon in your agent CLI at the repo root, accept the proposal so akrogon init writes issues/config.yaml, issues/open/, learnings/LESSONS.md, .gitignore, .gitattributes and the repos: entry, add client-portal: cp under prefixes:, and check that akrogon status shows client-portal, then commit the setup files.](../pictures/repo-setup-steps.svg)
 
 ### 1. Open your agent CLI at the repo root and run `/init-akrogon`
 
@@ -124,6 +128,8 @@ grounding:
   index: docs/reference-index.md
 ```
 
+![The issues/config.yaml card holds remote, default_branch, setup, checks, grounding.index and optional slots. Side notes: merge_checks run only at merge time and advisory never blocks. slots here override a and b for this repository, and consultant always comes from ~/.akrogon/config.yaml.](../pictures/repo-settings.svg)
+
 - **`remote`** and **`default_branch`**: the Git remote and branch tasks branch from and land on (defaults: `origin` and `main`).
 - **`setup`**: optional command to install dependencies in each fresh task worktree (proposed automatically only when a lockfile such as `bun.lock`, `package-lock.json`, `pnpm-lock.yaml`, or `yarn.lock` is already committed in `HEAD`).
 - **`checks`**: named commands every task must pass before review and before merging. A red check blocks progress. Slower full suites go under `merge_checks` (which run only at merge time); non-blocking commands go under `advisory`. See [Checks](../reference/checks.md).
@@ -135,6 +141,8 @@ Every key in `issues/config.yaml` is documented in [Settings](../reference/confi
 ## Grounding
 
 **Grounding** gives agents a compact map of your codebase so they open the right files immediately instead of reading the whole repository on every task.
+
+![The top index docs/reference-index.md holds one line per area, and some lines point at an AREA.md of at most 40 lines with Commands, Key files, Non-obvious patterns and See also, which points at real repository paths. Planning copies paths into the read-first list, building works from that list, and reviewing checks that every path named in a changed AREA.md still exists.](../pictures/grounding-map.svg)
 
 It has two layers:
 
