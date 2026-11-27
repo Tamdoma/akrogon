@@ -1,19 +1,19 @@
-# Autopilot
+# Charting mode
 
-Autopilot lets a chart door work through a fixed list of charts without asking you each question. Use it for incoming work you are happy to let seat A decide, such as a batch of bug reports. Autopilot charts and hands off. It starts no execution.
+Charting mode is the mode a chart door runs under: who answers its questions while work is charted. Its values are No autopilot, Semi-autopilot and Full autopilot. Semi-autopilot and Full autopilot let a chart door work through a fixed list of charts without asking you each question. Use them for incoming work you are happy to let seat A decide, such as a batch of bug reports. They chart and hand off. They start no execution. This page covers the modes and how to switch them on.
 
-It is one of the ways to run work shown in [Plan work](plan-work.md). The full mode rules are in [chart-issues](../../skills/chart-issues/SKILL.md).
+They are ways to run work shown in [Plan work](plan-work.md). The full mode rules are in [chart-issues](../../skills/chart-issues/SKILL.md).
 
 ## Switch it on
 
-Autopilot needs the door to run inside hc. Outside hc the door says it cannot start.
+Semi-autopilot and Full autopilot need the door to run inside hc. Outside hc the door says it cannot start.
 
-Three modes exist. In the default manual mode you answer the signposts and every fork. Under autopilot you answer the signposts once, for the whole session, and A answers every fork after. Under full autopilot — "autopilot signposts" — A answers the signposts and every fork. In every mode, a fork already taken from an operator decision section in an imported seed is not asked again, and A never answers it. If your words hand over only the signposts while you keep the forks, that matches no mode, so the door asks which you meant.
+Charting mode has three values. Under No autopilot, the default, you answer the signposts and every fork. Under Semi-autopilot you answer the signposts once, for the whole session, and A answers every fork after. Under Full autopilot A answers the signposts and every fork. In every mode, a fork already taken from an operator decision section in an imported seed is not asked again, and A never answers it. If your words hand over only the signposts while you keep the forks, that matches no mode, so the door asks which you meant.
 
-In the chart door's own pane, say it in plain words. Name autopilot, the work you are handing it, and the chart consultants to use, or none:
+In the chart door's own pane, say it in plain words. Name the mode, the work you are handing it, and the chart consultants to use, or none:
 
 ```text
-/chart-issues run autopilot on these two bug reports, consultants B
+/chart-issues run semi-autopilot on these two bug reports, consultants B
 ```
 
 You can also switch it on later in the same door, naming a chart. Answers you already gave in that chart stay yours. If the session has no signposts yet, the signposts round runs first, before A answers anything.
@@ -22,7 +22,7 @@ The door's first reply repeats the mode, the handed work and the consultants. Wi
 
 ## What the door does
 
-The door runs every normal charting step. Under autopilot the signposts round is presented and answered once — a presented round, not a chart wait, so no chart parks on it; under full autopilot A answers it, echoes its picks in the first reply, and records them as A's — it may order the charts you handed it but never drop one, and a drop it would make is recorded for you.
+The door runs every normal charting step. Under Semi-autopilot the signposts round is presented and answered once — a presented round, not a chart wait, so no chart parks on it; under Full autopilot A answers it, echoes its picks in the first reply, and records them as A's — it may order the charts you handed it but never drop one, and a drop it would make is recorded for you.
 
 Where it would ask you a fork, seat A writes the full question in its pane and answers it itself. It picks by the evidence, the session's signposts, and where they are silent your standing values: simplicity, function over form, removing over adding, systems thinking, speed and price. A recommendation names the signpost that decided it. Each pick is recorded as A's, with its reason and the rejected options, never as your words. A never answers a seed's operator decision, or a finding against it. A decision counted from a seed stays yours.
 

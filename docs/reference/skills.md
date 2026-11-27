@@ -13,9 +13,9 @@ Chart consultants are different from seats A and B. A consultant is an hc termin
 
 ## chart-issues
 
-- **Result:** charts of open questions (forks) turned into settled leaf contracts in a registered repository. One signposts round opens the session and sets its direction, then three modes — manual, autopilot and full autopilot — set who answers the signposts and the forks. A small settled chart can instead take the direct route: the door builds it in a worktree as seat A of a real leaf, seat B reviews, and the command lands it like any leaf.
+- **Result:** charts of open questions (forks) turned into settled leaf contracts in a registered repository. One signposts round opens the session and sets its direction, then three Charting modes — No autopilot, Semi-autopilot and Full autopilot — set who answers the signposts and the forks. A small settled chart can instead take the direct route: the door builds it in a worktree as seat A of a real leaf, seat B reviews, and the command lands it like any leaf.
 - **When to use:** you have notes, reports or seeds and need to decide what to build before any code is written.
-- **Who starts it:** you. It is operator-invoked only. It asks you questions in chat. Autopilot runs only when you switch it on in words.
+- **Who starts it:** you. It is operator-invoked only. It asks you questions in chat. Semi-autopilot and Full autopilot run only when you switch them on in words.
 - **Source:** [`skills/chart-issues/SKILL.md`](../../skills/chart-issues/SKILL.md)
 
 ## plan-issue

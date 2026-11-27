@@ -6,11 +6,11 @@ The [chart-issues](../../skills/chart-issues/SKILL.md) skill holds the full proc
 
 ## Pick a way to run it
 
-![Ways to run a chart: an attended chart ends in the direct route when small and eligible or in a lifecycle handoff, an autopilot chart ends only in a lifecycle handoff, and an optional watch runs beside the handed-off leaves.](../pictures/ways-to-run.svg)
+![Ways to run a chart: a No autopilot chart ends in the direct route when small and eligible or in a lifecycle handoff, a Semi-autopilot or Full autopilot chart ends only in a lifecycle handoff, and an optional watch runs beside the handed-off leaves.](../pictures/ways-to-run.svg)
 
-- Attended chart: you answer each question. This page covers it.
+- No autopilot chart: you answer each question. This page covers it.
 - Direct route: for a small, settled, code-only job. It skips the leaf handoff and `akrogon next`, and keeps the charted decisions and B's review. See [Quick fix](quick-fix.md).
-- Autopilot: the door answers its own questions for a fixed list of work. It charts and hands off, and starts no execution. See [Autopilot](autopilot.md).
+- Semi-autopilot and Full autopilot: the door answers its own questions for a fixed list of work. It charts and hands off, and starts no execution. See [Charting mode](autopilot.md).
 - Write the files yourself: when nothing is left to decide. See [Write issues by hand](write-issues-by-hand.md).
 
 ## Open a chart
@@ -31,9 +31,9 @@ Charts live in `issues/chart/<slug>/`. `CHART.md` lists what is settled, the ope
 
 The door's first questions are the signposts: one round, once per door session, covering every chart in it. They set the session's direction — the priorities in order, hard limits, and the order or drop of its charts. Before the round, one consultant exchange adds missed angles. The round itself is light: four to seven questions, each with two or three choices, a recommendation and what it steers — which later picks across the session's charts it reshapes — and no research line. With it, the door asks one needs sheet for the session: every key, login, file, permission and approval the charting will require, including grants, recorded as `## Needs` rows in `forks/signposts.md` after `## Taken`. Charting continues while rows are pending. A pending need holds the proofs and handoffs that depend on it. After the answers, one short account states what the session will prioritize and give up. Your answers steer the territory map and every later pick, and the door records them in `forks/signposts.md`. If an earlier session on the same repo left signposts, the door offers them as the proposed answers: reply "same" or change them.
 
-A door session lasts until you start a new door run — it survives waits, compaction and handovers — and a chart resumed in a later run takes that run's signposts, never an earlier session's. The record's original sits in the chart where the round ran; every other chart of the session holds a verbatim copy naming the original. A correction is recorded on the original with its date and copied to the open charts. An unresolved conflict between your statements is shown in one line and asked in manual and autopilot modes. Under full autopilot A resolves it. The chart order, and any drop, comes from the signposts.
+A door session lasts until you start a new door run — it survives waits, compaction and handovers — and a chart resumed in a later run takes that run's signposts, never an earlier session's. The record's original sits in the chart where the round ran; every other chart of the session holds a verbatim copy naming the original. A correction is recorded on the original with its date and copied to the open charts. An unresolved conflict between your statements is shown in one line and asked under No autopilot and Semi-autopilot. Under Full autopilot A resolves it. The chart order, and any drop, comes from the signposts.
 
-Who answers them depends on the mode. In the default manual mode you answer the signposts and every fork. Under autopilot you answer the signposts once and A answers every fork after. Under full autopilot — "autopilot signposts" — A answers both. In every mode, a fork already taken from an operator decision section in an imported seed is not asked again, and A never answers it. A material signposts question you leave unanswered in manual mode is asked again before the first fork; under autopilot it is recorded as unanswered and not asked again, and under full autopilot A answers it. The [chart-issues](../../skills/chart-issues/SKILL.md) skill holds the rest.
+Who answers them depends on the mode. Charting mode has three values. Under No autopilot, the default, you answer the signposts and every fork. Under Semi-autopilot you answer the signposts once and A answers every fork after. Under Full autopilot A answers both. In every mode, a fork already taken from an operator decision section in an imported seed is not asked again, and A never answers it. A material signposts question you leave unanswered under No autopilot is asked again before the first fork; under Semi-autopilot it is recorded as unanswered and not asked again, and under Full autopilot A answers it. The [chart-issues](../../skills/chart-issues/SKILL.md) skill holds the rest.
 
 ## Read the territory map
 
