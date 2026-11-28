@@ -1,6 +1,12 @@
 # Akrogon
 
-Akrogon is a lightweight software factory for people who already use coding agents. You install it once per machine to serve every registered **repository** (project folder tracked by Git). You chart a request into written **contracts** (clear scope, decisions, and completion checks), a fresh **slot A (the builder)** plans and builds each task in an isolated **worktree** (a separate working copy on its own Git branch), a fresh **slot B (the reviewer)** reviews independently and repairs most findings, and the `akrogon` command runs your checks and merges the tested changes onto your **default branch** (your main live code).
+Akrogon is a lightweight software factory for people who already use coding agents.
+
+You install it once per machine to serve every registered **repository**.
+
+- You chart a request into written **contracts** (clear scope, decisions, and completion checks),
+- A fresh **slot A (the builder)** plans and builds each task in an isolated **worktree** (a separate working copy on its own Git branch),
+- A fresh **slot B (the reviewer)** reviews independently and repairs most findings, and the `akrogon` command runs your checks and merges the tested changes onto your **default branch** (your main live code).
 
 It fits technical operators, agencies, and teams already running a coding agent CLI (command-line tool, such as Claude Code, Codex, agy, or pi) who want a repeatable path from request to merged code without babysitting every turn. You decide what to build and when to start it; Akrogon tracks where each task stands in plain-text files and moves work between agent terminals inside **Herdr** (your terminal workspace). Akrogon does not decide your product strategy, and it does not deploy your app.
 

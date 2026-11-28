@@ -1,0 +1,9 @@
+opened: '2026-11-28T06:15:30Z'
+spans:
+  - start: '2026-11-28T06:15:30Z'
+seats:
+  - slot: A
+    address: t126
+    name: null
+    harness: claude
+    session: /home/ivan/.claude/projects/-home-ivan-Work-infra-akrogon/cbe6ffb3-cf96-4e61-ac35-95fbfe7b9209.jsonl
