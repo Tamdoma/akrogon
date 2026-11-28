@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test';
 import { homedir, tmpdir } from 'node:os';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { suiteRoot } from './isolation';
 import { leafTemp, worktreeStore, repoSchema, type Repo } from '../src/config';
@@ -43,6 +43,8 @@ test.serial(
       const { refreshToolEntry } = await import('../src/tool-cgroup');
       refreshToolEntry(home);
       const entry: string = resolve(home, 'tool-entry');
+      const entryAlias: string = resolve(home, 'entry-alias');
+      symlinkSync(entry, entryAlias);
       const repoRoot: string = resolve(import.meta.dir, '..');
       const argv: string[] = [process.execPath, 'test', 'tests/tool-entry.test.ts', '-t', 'exactly once'];
 
@@ -53,6 +55,7 @@ test.serial(
       for (const [label, env] of [
         ['path-first', pathWired],
         ['bash-env', bashenvWired],
+        ['symlinked-path', { ...pathWired, PATH: `${entryAlias}:${process.env.PATH}` }],
       ] as const) {
         const child: Bun.SyncSubprocess<'pipe', 'pipe'> = Bun.spawnSync(argv, {
           cwd: repoRoot,
