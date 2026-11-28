@@ -24032,3 +24032,5 @@
 {"kind":"wait","slug":"build-pictures","reason":"merge_turn","ts":"2026-11-27T15:10:12.917Z","repo":"akrogon"}
 {"kind":"visit_start","slug":"build-pictures","phase":"merged","visit":0,"ts":"2026-11-27T15:10:15.209Z","repo":"akrogon"}
 {"kind":"prompt","slug":"build-pictures","slot":"B","phase":"merged","visit":0,"session":"/home/ivan/.claude/projects/-home-ivan--akrogon-worktrees-akrogon-build-pictures/8784e0aa-f679-42ba-91f9-c44422937048.jsonl","outcome":"delivered","ts":"2026-11-27T15:10:33.274Z","repo":"akrogon"}
+{"kind":"check_start","slug":"checkout","run":"0885dbb3-4fa4-4a9c-b988-266854ad5baf","name":"wt","scope":"leaf","wait_ms":6,"ts":"2026-11-27T22:05:32.841Z","repo":"akrogon"}
+{"kind":"check_end","slug":"checkout","run":"0885dbb3-4fa4-4a9c-b988-266854ad5baf","name":"wt","scope":"leaf","exit":1,"duration_ms":5098,"log":"/tmp/claude-1000/-home-ivan-Work-infra-akrogon/cbe6ffb3-cf96-4e61-ac35-95fbfe7b9209/scratchpad/rc/check-wt-1795817137939-2890298.log","ts":"2026-11-27T22:05:37.939Z","repo":"akrogon"}
