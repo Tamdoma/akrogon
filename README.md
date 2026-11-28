@@ -8,7 +8,9 @@ You install it once per machine to serve every registered **repository**.
 - A fresh **slot A (the builder)** plans and builds each task in an isolated **worktree** (a separate working copy on its own Git branch),
 - A fresh **slot B (the reviewer)** reviews independently and repairs most findings, and the `akrogon` command runs your checks and merges the tested changes onto your **default branch** (your main live code).
 
-It fits technical operators, agencies, and teams already running a coding agent CLI (command-line tool, such as Claude Code, Codex, agy, or pi) who want a repeatable path from request to merged code without babysitting every turn. You decide what to build and when to start it; Akrogon tracks where each task stands in plain-text files and moves work between agent terminals inside **Herdr** (your terminal workspace). Akrogon does not decide your product strategy, and it does not deploy your app.
+It fits technical operators, agencies, developers and teams already running a coding agent CLI (command-line tool, such as Claude Code, Codex, agy, or pi) who want a repeatable path from request to merged code without babysitting every turn.
+
+You decide what to build and when to start it; Akrogon tracks where each task stands in plain-text files and moves work between agent terminals inside **Herdr** (your terminal workspace). Akrogon does not decide your product strategy, and it does not deploy your app -- but it can build the deployment process for you and then do it.
 
 ![One Herdr space named client-portal with three tabs: t-client-portal runs akrogon status and akrogon next, c-client-portal runs your agent CLI with /chart-issues, and w-client-portal runs your agent CLI with watch-issues on a 20-minute timer.](docs/pictures/three-tabs.svg)
 
