@@ -94,7 +94,7 @@ export function constructedEnv(repo: Repo, runRoot: string): Record<string, stri
   // An agy seat puts its tool-entry wrapper first on PATH; like every other seat wiring it stays out of checked runs.
   if (env.PATH !== undefined)
     env.PATH = env.PATH.split(':')
-      .filter((dir: string): boolean => dir === '' || !isToolEntryDir(dir, homePath()))
+      .filter((dir: string): boolean => dir === '' || !isToolEntryDir(dir))
       .join(':');
   env.DBUS_SESSION_BUS_ADDRESS = 'unix:path=/nonexistent';
   // Node's compile cache writes hundreds of MB into each run's TMPDIR and is never reused.

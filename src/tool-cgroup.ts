@@ -12,7 +12,7 @@ import {
   constants,
   existsSync,
 } from 'node:fs';
-import { basename, resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 import { homePath, toolRoot, type Repo } from './config';
 import { cgroupRoot, leafSlice, procRoot, sliceCgroup } from './scope';
 import { appendTiming } from './timing';
@@ -86,26 +86,28 @@ function writeAtomic(path: string, content: string, mode: number): void {
   renameSync(temp, path);
 }
 
-// A PATH entry naming the seat entry directory, by resolved path or realpath.
-export function isToolEntryDir(dir: string, home: string): boolean {
-  const entryDir: string = resolve(home, 'tool-entry');
-  const realEntry: string | undefined = existsSync(entryDir) ? realpathSync(entryDir) : undefined;
-  return resolve(dir) === entryDir || (realEntry !== undefined && existsSync(dir) && realpathSync(dir) === realEntry);
+// Akrogon owns the name tool-entry: a PATH entry is a seat entry directory when the
+// folder itself, or the real path it resolves to, is named tool-entry — for any home.
+export function isToolEntryDir(dir: string): boolean {
+  if (basename(resolve(dir)) === 'tool-entry') return true;
+  return existsSync(dir) && basename(realpathSync(dir)) === 'tool-entry';
 }
 
-// The real bash resolved once per refresh: PATH entries inside the entry
-// directory itself are filtered out so the wrapper can never resolve to
-// itself; anything unreadable falls back to /usr/bin/bash.
-function realBash(home: string): string {
+// The real bash resolved once per refresh: a candidate whose real path sits inside a
+// tool-entry folder is skipped so the wrapper can never resolve to itself or to another
+// home's wrapper — covering the entry folder itself, a symlinked folder and a symlinked
+// bash file; anything unreadable falls back to /usr/bin/bash.
+function realBash(): string {
   const candidates: string[] = [];
   for (const dir of (process.env.PATH ?? '').split(':')) {
-    if (dir === '' || isToolEntryDir(dir, home)) continue;
+    if (dir === '') continue;
     candidates.push(resolve(dir, 'bash'));
   }
   candidates.push('/usr/bin/bash');
   for (const candidate of candidates) {
     try {
-      return realpathSync(candidate);
+      const real: string = realpathSync(candidate);
+      if (!isToolEntryDir(dirname(real))) return real;
     } catch {
       // absent or unreadable entry: try the next
     }
@@ -118,7 +120,7 @@ function realBash(home: string): string {
 export function refreshToolEntry(home: string): void {
   const dir: string = resolve(home, 'tool-entry');
   mkdirSync(dir, { recursive: true });
-  const rendered: { env: string; wrapper: string } = entryTemplate(cgroupRoot(), realBash(home));
+  const rendered: { env: string; wrapper: string } = entryTemplate(cgroupRoot(), realBash());
   writeAtomic(resolve(dir, 'bash'), rendered.wrapper, 0o755);
   writeAtomic(resolve(dir, 'bash-env'), rendered.env, 0o644);
 }

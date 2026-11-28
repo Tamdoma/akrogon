@@ -11,6 +11,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { dlopen, FFIType } from 'bun:ffi';
+import { isToolEntryDir } from '../src/tool-cgroup';
 
 const libc = dlopen('libc.so.6', {
   setenv: { args: [FFIType.cstring, FFIType.cstring, FFIType.i32], returns: FFIType.i32 },
@@ -76,6 +77,20 @@ for (const name of ['DISPLAY', 'XAUTHORITY', 'WAYLAND_DISPLAY']) {
   delete process.env[name];
   if (libc.symbols.unsetenv(name) !== 0) throw new Error(`unsetenv(${name}) failed`);
 }
+// A seat wires shells through its tool-entry: agy puts the folder first on PATH, pi and codex
+// name bash-env in BASH_ENV. A direct `bun test` launched from such a seat must behave like a
+// clean shell, so the preload drops every tool-entry PATH entry (recognised by name, as
+// src/run-check.ts does, keeping empty entries) and unsets BASH_ENV — the same setEnv/unsetenv
+// pair, since process.env writes alone do not reach libc getenv.
+setEnv(
+  'PATH',
+  (process.env.PATH ?? '')
+    .split(':')
+    .filter((dir: string): boolean => dir === '' || !isToolEntryDir(dir))
+    .join(':'),
+);
+delete process.env.BASH_ENV;
+if (libc.symbols.unsetenv('BASH_ENV') !== 0) throw new Error('unsetenv(BASH_ENV) failed');
 // git starts a detached `maintenance run --auto` after commit, fetch and a push's receive-pack,
 // which adds and removes objects/maintenance.lock after the command returns. Every repo the suite
 // inits or clones copies this template's config, bare remotes included, and linked worktrees share
