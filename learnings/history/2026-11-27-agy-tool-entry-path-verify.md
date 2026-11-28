@@ -17,3 +17,5 @@ On 2026-11-27, during `implement-issue charting-guide slot=A phase=implement` on
 ## Abstract learning
 
 Seat-injected `PATH` wrappers (such as `agy`'s `<home>/tool-entry` shim for `bash`) propagate into child check/verify environments unless filtered by the check runner or test harness isolation layer; any test asserting unwired shell behavior inside a scope with `AKROGON_SEAT_CGROUP` set becomes harness-dependent and fails exclusively on `agy` seats while remaining green on other harnesses and `akrogon land`.
+
+Applied 2026-11-28 by tests/isolation.ts:85: the preload drops every tool-entry PATH entry by name and unsets BASH_ENV, so a direct run from a wired seat behaves like a clean shell, and src/tool-cgroup.ts:91 makes isToolEntryDir name-based with no home argument, so the leak's mechanism — the seat's wrapper surviving into test and check environments — is stopped on every reachable path.
