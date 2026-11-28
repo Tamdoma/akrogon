@@ -100,6 +100,10 @@ test.serial('the entry places a bash tool shell exactly once at the scope root a
     writeFileSync(script, scopeScript());
     const slice: string = `akrogon-tentry-p${process.pid}.slice`;
     slices.push(slice);
+    // Unique per run: a child bun test of this file (the direct-run proof in
+    // tests/isolation.test.ts) overlapping the outer suite must never collide on
+    // the systemd unit name.
+    const unit: string = `tentry-${process.pid}-${Math.random().toString(36).slice(2, 8)}.scope`;
     const env: NodeJS.ProcessEnv = {
       ...userBus,
       ENTRY: entry,
@@ -112,7 +116,7 @@ test.serial('the entry places a bash tool shell exactly once at the scope root a
         '--scope',
         '--quiet',
         `--slice=${slice}`,
-        '--unit=tentry.scope',
+        `--unit=${unit}`,
         '-p',
         'Delegate=yes',
         '--setenv=ENTRY',
